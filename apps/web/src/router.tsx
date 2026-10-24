@@ -22,6 +22,7 @@ import { OptimizationPage } from './pages/Optimization';
 import { CostsPage } from './pages/Costs';
 import { MorePage } from './pages/More';
 import { NotFoundPage } from './pages/NotFound';
+import { DecisionHubPage, PlaybookHubPage, PortfolioHubPage } from './pages/Hubs';
 
 function RequireAuth() {
   const { me, loading } = useAuth();
@@ -64,23 +65,23 @@ export const router = createBrowserRouter([
           { path: '/campanhas/nova', element: <NewCampaignPage /> },
           { path: '/campanhas/:id', element: <CampaignDetailPage /> },
           { path: '/tentativas', element: <AttemptsPage /> },
-          { path: '/contatos', element: <ContactsPage /> },
+          { path: '/contatos', element: <PortfolioHubPage /> },
           { path: '/contatos/:id', element: <ContactDetailPage /> },
-          { path: '/mailings', element: <MailingsPage /> },
+          { path: '/mailings', element: <PortfolioHubPage /> },
           { path: '/mailings/importar', element: <MailingImportPage /> },
           { path: '/mailings/:id', element: <MailingDetailPage /> },
-          { path: '/listas', element: <ListsPage /> },
+          { path: '/listas', element: <PortfolioHubPage /> },
           { path: '/listas/nova', element: <NewListPage /> },
           { path: '/listas/:id', element: <ListDetailPage /> },
-          { path: '/jornadas', element: <JourneysPage /> },
-          { path: '/estrategias', element: <StrategiesPage /> },
+          { path: '/jornadas', element: <PlaybookHubPage /> },
+          { path: '/estrategias', element: <PlaybookHubPage /> },
           { path: '/estrategias/:id', element: <StrategyDetailPage /> },
-          { path: '/tabulacoes', element: <TabulationsPage /> },
+          { path: '/tabulacoes', element: <PlaybookHubPage /> },
           { path: '/canais', element: <ChannelsPage /> },
           { path: '/controle', element: <ControlPage /> },
-          { path: '/experimentos', element: <ExperimentsPage /> },
-          { path: '/otimizacao', element: <OptimizationPage /> },
-          { path: '/custos', element: <CostsPage /> },
+          { path: '/experimentos', element: <DecisionHubPage /> },
+          { path: '/otimizacao', element: <DecisionHubPage /> },
+          { path: '/custos', element: <DecisionHubPage /> },
           { path: '/mais', element: <MorePage /> },
           { path: '*', element: <NotFoundPage /> },
         ],

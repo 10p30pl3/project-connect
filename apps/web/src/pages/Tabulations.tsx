@@ -12,11 +12,14 @@ function channelList(v: unknown): ChannelType[] {
   return [];
 }
 
-export function TabulationsPage() {
+export function TabulationsSection() {
   const q = useQuery({ queryKey: ['tabulations'], queryFn: () => get<{ items: Tabulation[] }>('/tabulations') });
   return (
-    <div>
-      <PageHeader title="Tabulações" subtitle="Catálogo de resultados normalizados. A ação de cada tabulação é definida na estratégia." />
+    <div className="space-y-3">
+      <div>
+        <h2 className="text-sm font-semibold text-slate-800">Catálogo de Tabulações</h2>
+        <p className="text-xs text-slate-500">Resultados normalizados de máquina ou humano. A ação de cada tabulação é definida no template de estratégia.</p>
+      </div>
       {q.isLoading ? (
         <Loading />
       ) : q.error ? (
@@ -55,4 +58,8 @@ export function TabulationsPage() {
       )}
     </div>
   );
+}
+
+export function TabulationsPage() {
+  return <TabulationsSection />;
 }

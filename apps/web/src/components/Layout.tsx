@@ -11,19 +11,14 @@ import {
   ChevronDown,
   Compass,
   Database,
-  DollarSign,
-  FlaskConical,
   Home,
   ListFilter,
   LogOut,
   Megaphone,
   Menu,
-  Route,
   Settings2,
   ShieldAlert,
   SlidersHorizontal,
-  Tags,
-  Users,
 } from 'lucide-react';
 import { ROLE_LABEL } from '@voll/shared';
 import { useAuth } from '../lib/auth';
@@ -31,41 +26,49 @@ import { AttemptDrawer } from './AttemptDrawer';
 import { BrandLogo } from './ui';
 import type { ReactNode } from 'react';
 
-export type NavItem = { to: string; label: string; icon: ReactNode; end?: boolean };
+export type NavItem = { to: string; label: string; icon: ReactNode; end?: boolean; matchPrefixes?: string[] };
 const ico = 'size-4 shrink-0';
 export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: 'Operação',
     items: [
-      { to: '/', label: 'Visão geral', icon: <Home className={ico} aria-hidden />, end: true },
+      { to: '/', label: 'Painel operacional', icon: <Home className={ico} aria-hidden />, end: true, matchPrefixes: ['/tentativas'] },
       { to: '/campanhas', label: 'Campanhas', icon: <Megaphone className={ico} aria-hidden /> },
-      { to: '/tentativas', label: 'Tentativas', icon: <Activity className={ico} aria-hidden /> },
     ],
   },
   {
-    title: 'Central de Decisão',
+    title: 'Carteiras & Público',
     items: [
-      { to: '/experimentos', label: 'Experimentos A/B', icon: <FlaskConical className={ico} aria-hidden /> },
-      { to: '/otimizacao', label: 'Otimização consultiva', icon: <Compass className={ico} aria-hidden /> },
-      { to: '/custos', label: 'Custos e conciliação', icon: <DollarSign className={ico} aria-hidden /> },
+      {
+        to: '/mailings',
+        label: 'Bases & Listas',
+        icon: <Database className={ico} aria-hidden />,
+        matchPrefixes: ['/mailings', '/listas', '/contatos'],
+      },
+    ],
+  },
+  {
+    title: 'Inteligência & Governança',
+    items: [
+      {
+        to: '/otimizacao',
+        label: 'Central de Decisão',
+        icon: <Compass className={ico} aria-hidden />,
+        matchPrefixes: ['/otimizacao', '/experimentos', '/custos'],
+      },
       { to: '/controle', label: 'Controle central', icon: <ShieldAlert className={ico} aria-hidden /> },
     ],
   },
   {
-    title: 'Dados',
+    title: 'Engenharia de Cobrança',
     items: [
-      { to: '/contatos', label: 'Contatos', icon: <Users className={ico} aria-hidden /> },
-      { to: '/mailings', label: 'Mailings', icon: <Database className={ico} aria-hidden /> },
-      { to: '/listas', label: 'Listas', icon: <ListFilter className={ico} aria-hidden /> },
-    ],
-  },
-  {
-    title: 'Configuração',
-    items: [
-      { to: '/jornadas', label: 'Jornadas', icon: <Route className={ico} aria-hidden /> },
-      { to: '/estrategias', label: 'Estratégias', icon: <SlidersHorizontal className={ico} aria-hidden /> },
-      { to: '/tabulacoes', label: 'Tabulações', icon: <Tags className={ico} aria-hidden /> },
-      { to: '/canais', label: 'Canais', icon: <Cable className={ico} aria-hidden /> },
+      {
+        to: '/estrategias',
+        label: 'Réguas & Estratégias',
+        icon: <SlidersHorizontal className={ico} aria-hidden />,
+        matchPrefixes: ['/estrategias', '/jornadas', '/tabulacoes'],
+      },
+      { to: '/canais', label: 'Canais & Conectores', icon: <Cable className={ico} aria-hidden /> },
     ],
   },
 ];
@@ -180,25 +183,28 @@ export function Layout() {
             <div key={g.title} className="mb-4">
               <div className="px-2.5 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{g.title}</div>
               <ul className="space-y-0.5">
-                {g.items.map((it) => (
-                  <li key={it.to}>
-                    <NavLink
-                      to={it.to}
-                      end={it.end}
-                      className={({ isActive }) =>
-                        clsx(
-                          'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] transition-colors',
-                          isActive
-                            ? 'bg-brand-50 font-semibold text-brand-800 shadow-2xs ring-1 ring-inset ring-brand-200/70'
-                            : 'font-medium text-slate-600 hover:bg-slate-100/80 hover:text-slate-900',
-                        )
-                      }
-                    >
-                      {it.icon}
-                      {it.label}
-                    </NavLink>
-                  </li>
-                ))}
+                {g.items.map((it) => {
+                  const matchedByPrefix = it.matchPrefixes?.some((p) => loc.pathname.startsWith(p)) ?? false;
+                  return (
+                    <li key={it.to}>
+                      <NavLink
+                        to={it.to}
+                        end={it.end}
+                        className={({ isActive }) =>
+                          clsx(
+                            'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] transition-colors',
+                            isActive || matchedByPrefix
+                              ? 'bg-brand-50 font-semibold text-brand-800 shadow-2xs ring-1 ring-inset ring-brand-200/70'
+                              : 'font-medium text-slate-600 hover:bg-slate-100/80 hover:text-slate-900',
+                          )
+                        }
+                      >
+                        {it.icon}
+                        {it.label}
+                      </NavLink>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ))}

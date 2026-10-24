@@ -9,7 +9,7 @@ import { fmtDateTime, fmtNumber } from '../lib/format';
 import { useCursorPager, useDebounced } from '../lib/hooks';
 import { Badge, Card, ErrorState, Field, Input, Loading, PageHeader, Pager, TableWrap } from '../components/ui';
 
-export function ContactsPage() {
+export function ContactsSection() {
   const [text, setText] = useState('');
   const q = useDebounced(text, 300);
   const pager = useCursorPager();
@@ -19,21 +19,27 @@ export function ContactsPage() {
     placeholderData: keepPreviousData,
   });
   return (
-    <div>
-      <PageHeader title="Contatos" subtitle="Identidade persistente do cliente em todas as cargas e campanhas" />
-      <Field label="Buscar por nome ou ID" className="mb-3 max-w-md">
-        {(p) => (
-          <Input
-            id={p.id}
-            type="search"
-            value={text}
-            onChange={(e) => {
-              setText(e.target.value);
-              pager.reset();
-            }}
-          />
-        )}
-      </Field>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-800">Contatos e Bloqueios (DNC)</h2>
+          <p className="text-xs text-slate-500">Identidade persistente do cliente em todas as cargas e campanhas, com contadores compartilhados.</p>
+        </div>
+        <Field label="Buscar por nome ou ID" className="w-full sm:w-80">
+          {(p) => (
+            <Input
+              id={p.id}
+              type="search"
+              placeholder="Digite nome ou código do cliente…"
+              value={text}
+              onChange={(e) => {
+                setText(e.target.value);
+                pager.reset();
+              }}
+            />
+          )}
+        </Field>
+      </div>
       <Card padded={false}>
         {data.isLoading ? (
           <div className="p-4">
@@ -114,4 +120,8 @@ export function ContactsPage() {
       </Card>
     </div>
   );
+}
+
+export function ContactsPage() {
+  return <ContactsSection />;
 }

@@ -11,22 +11,22 @@ import { Badge, btnClass, Card, Empty, ErrorState, Field, Input, Loading, PageHe
 import { ImportFlow } from '../components/ImportFlow';
 import { formatCell } from '../components/ListEditor';
 
-export function MailingsPage() {
+export function MailingsSection() {
   const { can } = useAuth();
   const q = useQuery({ queryKey: ['mailings'], queryFn: () => get<{ items: MailingSummary[] }>('/mailings') });
   return (
-    <div>
-      <PageHeader
-        title="Mailings"
-        subtitle="Cargas originais de clientes e campos de negócio"
-        actions={
-          can('mailings.write') && (
-            <Link to="/mailings/importar" className={btnClass('primary')}>
-              <Plus className="size-4" aria-hidden /> Importar mailing
-            </Link>
-          )
-        }
-      />
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-800">Mailings (Cargas Originais)</h2>
+          <p className="text-xs text-slate-500">Arquivos CSV e cargas importadas com versionamento e conferência de linhas.</p>
+        </div>
+        {can('mailings.write') && (
+          <Link to="/mailings/importar" className={btnClass('primary', 'sm')}>
+            <Plus className="size-4" aria-hidden /> Importar mailing
+          </Link>
+        )}
+      </div>
       {q.isLoading ? (
         <Loading />
       ) : q.error ? (
@@ -43,6 +43,7 @@ export function MailingsPage() {
                   <th>Registros</th>
                   <th>Última carga</th>
                   <th>Criado</th>
+                  <th className="text-right">Ação rápida</th>
                 </tr>
               </thead>
               <tbody>
@@ -69,6 +70,11 @@ export function MailingsPage() {
                       )}
                     </td>
                     <td className="text-xs text-slate-600">{fmtDateTime(m.createdAt)}</td>
+                    <td className="text-right">
+                      <Link to={`/listas/nova?mailing=${m.id}`} className="text-xs font-medium text-brand-700 hover:underline">
+                        Criar lista →
+                      </Link>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -78,6 +84,10 @@ export function MailingsPage() {
       )}
     </div>
   );
+}
+
+export function MailingsPage() {
+  return <MailingsSection />;
 }
 
 export function MailingImportPage() {

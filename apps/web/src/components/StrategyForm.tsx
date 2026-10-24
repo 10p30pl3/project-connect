@@ -64,6 +64,34 @@ export function StrategyForm({
   const num = { valueAsNumber: true } as const;
   const anyErr = firstError(e);
 
+  function applyPreset(preset: 'PREVENTIVA' | 'PADRAO' | 'INTENSIVA') {
+    if (preset === 'PREVENTIVA') {
+      setValue('calendar.days', [1, 2, 3, 4, 5], { shouldDirty: true });
+      setValue('calendar.start', '09:00', { shouldDirty: true });
+      setValue('calendar.end', '18:00', { shouldDirty: true });
+      setValue('limits.total', 6, { shouldDirty: true });
+      setValue('limits.daily', 2, { shouldDirty: true });
+      setValue('retry.intervalMinutes', 60, { shouldDirty: true });
+      setValue('retry.maxPerDestination', 2, { shouldDirty: true });
+    } else if (preset === 'PADRAO') {
+      setValue('calendar.days', [1, 2, 3, 4, 5], { shouldDirty: true });
+      setValue('calendar.start', '08:00', { shouldDirty: true });
+      setValue('calendar.end', '20:00', { shouldDirty: true });
+      setValue('limits.total', 10, { shouldDirty: true });
+      setValue('limits.daily', 3, { shouldDirty: true });
+      setValue('retry.intervalMinutes', 30, { shouldDirty: true });
+      setValue('retry.maxPerDestination', 3, { shouldDirty: true });
+    } else if (preset === 'INTENSIVA') {
+      setValue('calendar.days', [1, 2, 3, 4, 5, 6], { shouldDirty: true });
+      setValue('calendar.start', '08:00', { shouldDirty: true });
+      setValue('calendar.end', '21:00', { shouldDirty: true });
+      setValue('limits.total', 15, { shouldDirty: true });
+      setValue('limits.daily', 5, { shouldDirty: true });
+      setValue('retry.intervalMinutes', 15, { shouldDirty: true });
+      setValue('retry.maxPerDestination', 5, { shouldDirty: true });
+    }
+  }
+
   return (
     <form onSubmit={submit} noValidate className="space-y-5" data-testid="strategy-form">
       {extraTop}
@@ -72,6 +100,25 @@ export function StrategyForm({
           {serverErr ?? anyErr}
         </Alert>
       )}
+
+      {/* Barra de Presets Rápidos de Cobrança */}
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-2xs">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-slate-600">Perfis Rápidos de Cobrança</div>
+          <div className="text-xs text-slate-500">Preencha rapidamente os parâmetros recomendados por faixa de atraso e ajuste se necessário:</div>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <Button size="sm" variant="secondary" onClick={() => applyPreset('PREVENTIVA')}>
+            Preventiva Leve (1–15d)
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => applyPreset('PADRAO')}>
+            Cobrança Padrão (16–60d)
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => applyPreset('INTENSIVA')}>
+            Recuperação Intensiva (60d+)
+          </Button>
+        </div>
+      </div>
       <fieldset className="space-y-3 rounded-xl border border-slate-200/90 bg-slate-50/40 p-4">
         <legend className="px-1.5 text-xs font-semibold uppercase tracking-wider text-slate-600">Calendário Operacional</legend>
         <div>
@@ -159,21 +206,6 @@ export function StrategyForm({
         <p className="text-xs text-slate-500">Limites institucionais do Controle central prevalecem e não podem ser afrouxados pelo template.</p>
       </fieldset>
 
-      <fieldset className="space-y-3 rounded-xl border border-slate-200/90 bg-slate-50/40 p-4">
-        <legend className="px-1.5 text-xs font-semibold uppercase tracking-wider text-slate-600">Distribuição e Integração</legend>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="Tamanho do lote" error={e.distribution?.batchSize?.message}>
-            {(p) => <Input id={p.id} type="number" min={1} max={500} aria-invalid={p.invalid} {...register('distribution.batchSize', num)} />}
-          </Field>
-          <Field label="Máximo pendente" error={e.distribution?.maxPending?.message}>
-            {(p) => <Input id={p.id} type="number" min={1} aria-invalid={p.invalid} {...register('distribution.maxPending', num)} />}
-          </Field>
-          <Field label="Validade da reserva (s)" error={e.distribution?.leaseSeconds?.message}>
-            {(p) => <Input id={p.id} type="number" min={10} max={3600} aria-invalid={p.invalid} {...register('distribution.leaseSeconds', num)} />}
-          </Field>
-        </div>
-      </fieldset>
-
       <fieldset className="space-y-3 rounded-xl border border-brand-200/80 bg-brand-50/20 p-4">
         <legend className="px-1.5 text-xs font-semibold uppercase tracking-wider text-brand-800">Otimização Consultiva (§22)</legend>
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3.5 py-2.5">
@@ -219,29 +251,53 @@ export function StrategyForm({
         </div>
       </fieldset>
 
-      <fieldset className="space-y-3 rounded-xl border border-slate-200/90 bg-slate-50/40 p-4">
-        <legend className="px-1.5 text-xs font-semibold uppercase tracking-wider text-slate-600">Regras por Tabulação</legend>
-        {!tabs.data ? (
-          <p className="text-sm text-slate-500">Carregando tabulações…</p>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {tabs.data.items.map((t) => (
-              <Field key={t.code} label={`${t.name} (${t.code})`}>
-                {(p) => (
-                  <Select id={p.id} {...register(`tabulationRules.${t.code}` as const)} defaultValue={initial.tabulationRules[t.code] ?? (t.isConversion ? 'FINISH_SUCCESS' : 'RETRY')}>
-                    {TABULATION_ACTIONS.map((a) => (
-                      <option key={a} value={a}>
-                        {TABULATION_ACTION_LABEL[a]}
-                      </option>
-                    ))}
-                  </Select>
-                )}
+      <details className="group rounded-xl border border-slate-200/90 bg-white">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-50">
+          <span>Configurações Avançadas (Matriz de Tabulações e Lote de Distribuição)</span>
+          <span className="text-xs font-normal text-brand-700 group-open:hidden">Expandir ajustes finos ↓</span>
+          <span className="hidden text-xs font-normal text-slate-500 group-open:inline">Recolher ↑</span>
+        </summary>
+        <div className="space-y-4 border-t border-slate-100 p-4">
+          <fieldset className="space-y-3 rounded-xl border border-slate-200/90 bg-slate-50/40 p-4">
+            <legend className="px-1.5 text-xs font-semibold uppercase tracking-wider text-slate-600">Distribuição e Integração</legend>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Field label="Tamanho do lote" error={e.distribution?.batchSize?.message}>
+                {(p) => <Input id={p.id} type="number" min={1} max={500} aria-invalid={p.invalid} {...register('distribution.batchSize', num)} />}
               </Field>
-            ))}
-          </div>
-        )}
-        {tabs.data?.items.some((t) => t.isOptOut) && <p className="text-xs text-slate-500">Opt-out sempre aplica DNC, independentemente da ação configurada.</p>}
-      </fieldset>
+              <Field label="Máximo pendente" error={e.distribution?.maxPending?.message}>
+                {(p) => <Input id={p.id} type="number" min={1} aria-invalid={p.invalid} {...register('distribution.maxPending', num)} />}
+              </Field>
+              <Field label="Validade da reserva (s)" error={e.distribution?.leaseSeconds?.message}>
+                {(p) => <Input id={p.id} type="number" min={10} max={3600} aria-invalid={p.invalid} {...register('distribution.leaseSeconds', num)} />}
+              </Field>
+            </div>
+          </fieldset>
+
+          <fieldset className="space-y-3 rounded-xl border border-slate-200/90 bg-slate-50/40 p-4">
+            <legend className="px-1.5 text-xs font-semibold uppercase tracking-wider text-slate-600">Regras por Tabulação</legend>
+            {!tabs.data ? (
+              <p className="text-sm text-slate-500">Carregando tabulações…</p>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {tabs.data.items.map((t) => (
+                  <Field key={t.code} label={`${t.name} (${t.code})`}>
+                    {(p) => (
+                      <Select id={p.id} {...register(`tabulationRules.${t.code}` as const)} defaultValue={initial.tabulationRules[t.code] ?? (t.isConversion ? 'FINISH_SUCCESS' : 'RETRY')}>
+                        {TABULATION_ACTIONS.map((a) => (
+                          <option key={a} value={a}>
+                            {TABULATION_ACTION_LABEL[a]}
+                          </option>
+                        ))}
+                      </Select>
+                    )}
+                  </Field>
+                ))}
+              </div>
+            )}
+            {tabs.data?.items.some((t) => t.isOptOut) && <p className="text-xs text-slate-500">Opt-out sempre aplica DNC, independentemente da ação configurada.</p>}
+          </fieldset>
+        </div>
+      </details>
 
       <div className="flex justify-end gap-2">
         {onCancel && <Button onClick={onCancel}>Cancelar</Button>}

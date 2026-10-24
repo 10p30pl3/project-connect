@@ -12,11 +12,14 @@ import { StrategySummary, daysLabel } from '../components/Summaries';
 import { StrategyForm } from '../components/StrategyForm';
 import { WizardReturnBanner } from './NewCampaign';
 
-export function StrategiesPage() {
+export function StrategiesSection() {
   const q = useQuery({ queryKey: ['strategies'], queryFn: () => get<{ items: Strategy[] }>('/strategies') });
   return (
-    <div>
-      <PageHeader title="Estratégias" subtitle="Templates versionados: calendário, limites, retentativas e regras por tabulação" />
+    <div className="space-y-3">
+      <div>
+        <h2 className="text-sm font-semibold text-slate-800">Estratégias de Cobrança (Templates Versionados)</h2>
+        <p className="text-xs text-slate-500">Calendário operacional, limites de esforço, cadência de retentativas, otimização consultiva e regras por tabulação.</p>
+      </div>
       {q.isLoading ? (
         <Loading />
       ) : q.error ? (
@@ -67,6 +70,10 @@ export function StrategiesPage() {
       )}
     </div>
   );
+}
+
+export function StrategiesPage() {
+  return <StrategiesSection />;
 }
 
 export function StrategyDetailPage() {

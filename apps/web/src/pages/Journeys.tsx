@@ -8,23 +8,23 @@ import { useAuth } from '../lib/auth';
 import { Alert, Button, Card, Empty, ErrorState, Field, Input, Loading, Modal, PageHeader, Select, useToast } from '../components/ui';
 import { JourneySteps } from '../components/Summaries';
 
-export function JourneysPage() {
+export function JourneysSection() {
   const { can } = useAuth();
   const q = useQuery({ queryKey: ['journeys'], queryFn: () => get<{ items: Journey[] }>('/journeys') });
   const [open, setOpen] = useState(false);
   return (
-    <div>
-      <PageHeader
-        title="Jornadas"
-        subtitle="Ordem dos canais, conexões e prazos de feedback (sem política de retentativa local)"
-        actions={
-          can('journeys.write') && (
-            <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setOpen(true)}>
-              Nova jornada
-            </Button>
-          )
-        }
-      />
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-800">Jornadas de Acionamento (Sequência de Canais)</h2>
+          <p className="text-xs text-slate-500">Ordem dos canais, conexões e prazos de feedback (sem política de retentativa local).</p>
+        </div>
+        {can('journeys.write') && (
+          <Button variant="primary" size="sm" icon={<Plus className="size-4" aria-hidden />} onClick={() => setOpen(true)}>
+            Nova jornada
+          </Button>
+        )}
+      </div>
       {q.isLoading ? (
         <Loading />
       ) : q.error ? (
@@ -43,6 +43,10 @@ export function JourneysPage() {
       <NewJourneyDialog open={open} onOpenChange={setOpen} />
     </div>
   );
+}
+
+export function JourneysPage() {
+  return <JourneysSection />;
 }
 
 function NewJourneyDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {

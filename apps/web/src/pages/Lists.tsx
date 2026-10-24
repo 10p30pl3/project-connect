@@ -12,22 +12,22 @@ import { formatCell, ListEditor } from '../components/ListEditor';
 
 const modeBadge = (m: 'SNAPSHOT' | 'DYNAMIC') => <Badge tone={m === 'DYNAMIC' ? 'blue' : 'gray'}>{m === 'DYNAMIC' ? 'Dinâmica' : 'Fotografia'}</Badge>;
 
-export function ListsPage() {
+export function ListsSection() {
   const { can } = useAuth();
   const q = useQuery({ queryKey: ['lists'], queryFn: () => get<{ items: ListSummary[] }>('/lists') });
   return (
-    <div>
-      <PageHeader
-        title="Listas"
-        subtitle="Views versionadas sobre um mailing: filtros, ordenação e modalidade"
-        actions={
-          can('lists.write') && (
-            <Link to="/listas/nova" className={btnClass('primary')}>
-              <Plus className="size-4" aria-hidden /> Nova lista
-            </Link>
-          )
-        }
-      />
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-800">Listas de Segmentação</h2>
+          <p className="text-xs text-slate-500">Views versionadas sobre um mailing: filtros, ordenação multi-coluna e modalidade (Fotografia ou Dinâmica).</p>
+        </div>
+        {can('lists.write') && (
+          <Link to="/listas/nova" className={btnClass('primary', 'sm')}>
+            <Plus className="size-4" aria-hidden /> Nova lista
+          </Link>
+        )}
+      </div>
       {q.isLoading ? (
         <Loading />
       ) : q.error ? (
@@ -70,6 +70,10 @@ export function ListsPage() {
       )}
     </div>
   );
+}
+
+export function ListsPage() {
+  return <ListsSection />;
 }
 
 export function NewListPage() {
