@@ -1451,6 +1451,7 @@ export async function handleMockApi<T = unknown>(
   if (pathname === '/optimization' && method === 'GET') {
     const cid = searchParams.get('campaignId');
     const camp = CAMPAIGNS.find((c) => c.id === cid) ?? CAMPAIGNS[0];
+    const optCfg = camp.strategy.config.optimization ?? { enabled: true, policy: 'LOWEST_COST_PER_CPC' as const, minEvidences: 3 };
     const recs = CONTACTS.slice(0, 10).map((c, idx) => ({
       contactId: c.id,
       externalId: c.externalId,
@@ -1458,19 +1459,69 @@ export async function handleMockApi<T = unknown>(
       channel: idx % 2 === 0 ? 'WhatsApp' : 'Discador',
       destinationMasked: c.destinations[0]?.addressMasked ?? '1198****01',
       bestTimeWindow: idx % 3 === 0 ? '10:00 – 12:00' : '14:00 – 16:30',
-      evidencesCount: 3 + (idx % 4),
+      evidencesCount: Math.max(optCfg.minEvidences, 3) + (idx % 4),
       historicRate: 0.25 + (idx * 0.04),
       estimatedCostPerSuccess: 0.45 + (idx * 0.15),
-      policyUsed: 'Menor custo por CPC (mínimo 3 evidências)',
+      policyUsed: optCfg.enabled ? `Política: ${optCfg.policy}` : 'Ordem fixa do template',
     }));
     return {
+      enabled: optCfg.enabled,
+      policyCode: optCfg.policy,
+      minEvidences: optCfg.minEvidences,
+      strategyId: camp.strategy.id,
+      strategyName: camp.strategyName,
+      strategyVersion: camp.strategyVersion,
       items: recs,
-      policy: 'Menor custo por CPC (com fallback para ordem do template)',
+      policy:
+        optCfg.policy === 'HIGHEST_HISTORIC_RATE'
+          ? 'Maior taxa histórica de atendimento (CPC)'
+          : optCfg.policy === 'BEST_TIME_WINDOW'
+            ? 'Melhor janela horária observada'
+            : optCfg.policy === 'TEMPLATE_ORDER'
+              ? 'Ordem fixa da jornada / prioridade do destino'
+              : 'Menor custo estimado por CPC / sucesso',
       notes: [
-        'Amostra mínima de 3 evidências satisfeita para os candidatos exibidos.',
+        `Amostra mínima de ${optCfg.minEvidences} evidências satisfeita para os candidatos exibidos.`,
         'Horários calculados a partir de eventos com CPC anterior no mesmo cluster.',
       ],
     } as T;
+  }
+  if (pathname === '/optimization/configure' && method === 'POST') {
+    const camp = CAMPAIGNS.find((c) => c.id === body.campaignId) ?? CAMPAIGNS[0];
+    const strat = STRATEGIES.find((s) => s.id === camp.strategy.id) ?? STRATEGIES[0];
+    const nextConfig: StrategyConfig = {
+      ...camp.strategy.config,
+      optimization: {
+        enabled: body.enabled ?? true,
+        policy: body.policy ?? 'LOWEST_COST_PER_CPC',
+        minEvidences: Number(body.minEvidences ?? 3),
+      },
+    };
+    const nextVer: StrategyVersion = {
+      id: nextUuid(),
+      version: strat.versions.length + 1,
+      config: nextConfig,
+      publishedAt: new Date().toISOString(),
+    };
+    strat.latestVersion = nextVer;
+    strat.versions.push(nextVer);
+    camp.strategyVersion = nextVer.version;
+    camp.strategy = { id: strat.id, version: nextVer.version, config: nextConfig };
+    return { ok: true, version: nextVer.version } as T;
+  }
+  if (pathname === '/optimization/apply' && method === 'POST') {
+    AUDITS.unshift({
+      id: AUDITS.length + 1,
+      at: new Date().toISOString(),
+      user: { name: me.name },
+      action: 'optimization.apply_recommendation',
+      entity: 'campaign',
+      entityId: body.campaignId ?? CAMPAIGNS[0].id,
+      reason: body.contactId ? `Recomendação aplicada ao contato ${body.contactId.slice(-4)}` : 'Recomendações consultivas aplicadas ao lote da fila',
+      before: { mode: 'CONSULTIVE_PENDING' },
+      after: { mode: 'APPLIED_BY_MANAGER', appliedCount: body.count ?? 1 },
+    });
+    return { ok: true } as T;
   }
 
   // Central de Decisão · Custos & Conciliação (§20)

@@ -3,11 +3,18 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { z } from 'zod';
-import { StrategyConfigSchema, TABULATION_ACTIONS, TABULATION_ACTION_LABEL, type StrategyConfig } from '@voll/shared';
+import {
+  OPTIMIZATION_POLICIES,
+  OPTIMIZATION_POLICY_LABEL,
+  StrategyConfigSchema,
+  TABULATION_ACTIONS,
+  TABULATION_ACTION_LABEL,
+  type StrategyConfig,
+} from '@voll/shared';
 import { applyFieldErrors, get } from '../lib/api';
 import type { Tabulation } from '../lib/types';
 import { WEEKDAYS } from '../lib/format';
-import { Alert, Button, Field, Input, Select } from './ui';
+import { Alert, Button, Checkbox, Field, Input, Select } from './ui';
 
 type Form = z.input<typeof StrategyConfigSchema>;
 
@@ -163,6 +170,51 @@ export function StrategyForm({
           </Field>
           <Field label="Validade da reserva (s)" error={e.distribution?.leaseSeconds?.message}>
             {(p) => <Input id={p.id} type="number" min={10} max={3600} aria-invalid={p.invalid} {...register('distribution.leaseSeconds', num)} />}
+          </Field>
+        </div>
+      </fieldset>
+
+      <fieldset className="space-y-3 rounded-xl border border-brand-200/80 bg-brand-50/20 p-4">
+        <legend className="px-1.5 text-xs font-semibold uppercase tracking-wider text-brand-800">Otimização Consultiva (§22)</legend>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3.5 py-2.5">
+          <div>
+            <div className="text-sm font-medium text-slate-900">Habilitar avaliação consultiva neste template</div>
+            <div className="text-xs text-slate-500">Calcula propensão, melhor janela horária e menor custo por CPC na Central de Decisão sem sobrescrever DNC ou limites.</div>
+          </div>
+          <Checkbox
+            label="Otimização ativa"
+            defaultChecked={initial.optimization?.enabled ?? true}
+            {...register('optimization.enabled')}
+          />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Política de recomendação" error={e.optimization?.policy?.message}>
+            {(p) => (
+              <Select id={p.id} defaultValue={initial.optimization?.policy ?? 'LOWEST_COST_PER_CPC'} {...register('optimization.policy')}>
+                {OPTIMIZATION_POLICIES.map((pol) => (
+                  <option key={pol} value={pol}>
+                    {OPTIMIZATION_POLICY_LABEL[pol]}
+                  </option>
+                ))}
+              </Select>
+            )}
+          </Field>
+          <Field
+            label="Mínimo de evidências históricas exigidas"
+            hint="Abaixo desse volume, mantém a ordem padrão do template"
+            error={e.optimization?.minEvidences?.message}
+          >
+            {(p) => (
+              <Input
+                id={p.id}
+                type="number"
+                min={1}
+                max={50}
+                defaultValue={initial.optimization?.minEvidences ?? 3}
+                aria-invalid={p.invalid}
+                {...register('optimization.minEvidences', num)}
+              />
+            )}
           </Field>
         </div>
       </fieldset>

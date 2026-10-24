@@ -118,6 +118,21 @@ export const TABULATION_ACTION_LABEL: Record<TabulationAction, string> = {
   FINISH_FAIL: 'Encerrar sem sucesso',
 };
 
+/** Política de otimização consultiva e ordenação de destinos (§22). */
+export const OPTIMIZATION_POLICIES = [
+  'TEMPLATE_ORDER',
+  'LOWEST_COST_PER_CPC',
+  'HIGHEST_HISTORIC_RATE',
+  'BEST_TIME_WINDOW',
+] as const;
+export type OptimizationPolicy = (typeof OPTIMIZATION_POLICIES)[number];
+export const OPTIMIZATION_POLICY_LABEL: Record<OptimizationPolicy, string> = {
+  TEMPLATE_ORDER: 'Ordem fixa da jornada / prioridade do destino',
+  LOWEST_COST_PER_CPC: 'Menor custo estimado por CPC / sucesso',
+  HIGHEST_HISTORIC_RATE: 'Maior taxa histórica de atendimento (CPC)',
+  BEST_TIME_WINDOW: 'Melhor janela horária observada (Best Time to Contact)',
+};
+
 // ------------------------------------------------------------------ strategy config
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM');
 
@@ -145,6 +160,13 @@ export const StrategyConfigSchema = z
       maxPending: z.number().int().min(1).max(5000).default(50),
       leaseSeconds: z.number().int().min(10).max(3600).default(60),
     }),
+    optimization: z
+      .object({
+        enabled: z.boolean().default(true),
+        policy: z.enum(OPTIMIZATION_POLICIES).default('LOWEST_COST_PER_CPC'),
+        minEvidences: z.number().int().min(1).max(50).default(3),
+      })
+      .optional(),
     /** código da tabulação -> ação */
     tabulationRules: z.record(z.string(), z.enum(TABULATION_ACTIONS)),
   })
