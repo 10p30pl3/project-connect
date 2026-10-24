@@ -74,14 +74,16 @@ export async function api<T = unknown>(path: string, opts: Opts = {}): Promise<T
   }
   if (res.status === 204) return undefined as T;
   const ct = res.headers.get('content-type') ?? '';
-  // Quando implantado estaticamente (ex.: Vercel sem backend/DB), /api/* devolve HTML da SPA ou 404/502/503/504 não-problem+json
+  // Quando implantado na Vercel sem banco/backend configurado, /api/* devolve HTML, 404/405/500/502/503/504 ou 401 em /auth/me
   const isProblemJson = ct.includes('problem+json');
-  if (ct.includes('text/html') || (!res.ok && !isProblemJson && [404, 405, 500, 502, 503, 504].includes(res.status))) {
-    const dataPreview = ct.includes('json') ? await res.clone().json().catch(() => null) : null;
-    if (!dataPreview || typeof dataPreview !== 'object' || !('type' in dataPreview)) {
-      clientMockActive = true;
-      return handleMockApi<T>(path, { method: opts.method, body: opts.body, headers });
-    }
+  if (
+    ct.includes('text/html') ||
+    res.status >= 500 ||
+    (!res.ok && !isProblemJson && [404, 405, 502, 503, 504].includes(res.status)) ||
+    (res.status === 401 && path === '/auth/me')
+  ) {
+    clientMockActive = true;
+    return handleMockApi<T>(path, { method: opts.method, body: opts.body, headers });
   }
   const data = ct.includes('json') ? await res.json().catch(() => null) : await res.text();
   if (!res.ok) {

@@ -23,7 +23,6 @@ import {
 import { ApiError } from './api';
 import type {
   AttemptDetail,
-  AttemptRow,
   AuditRow,
   Block,
   CampaignDetail,
@@ -44,6 +43,7 @@ import type {
   ListSummary,
   MailingDetail,
   MailingRecord,
+  MailingSummary,
   Me,
   Overview,
   Preflight,
