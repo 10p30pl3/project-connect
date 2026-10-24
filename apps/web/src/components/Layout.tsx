@@ -9,7 +9,10 @@ import {
   BookMarked,
   Cable,
   ChevronDown,
+  Compass,
   Database,
+  DollarSign,
+  FlaskConical,
   Home,
   ListFilter,
   LogOut,
@@ -39,6 +42,15 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     ],
   },
   {
+    title: 'Central de Decisão',
+    items: [
+      { to: '/experimentos', label: 'Experimentos A/B', icon: <FlaskConical className={ico} aria-hidden /> },
+      { to: '/otimizacao', label: 'Otimização consultiva', icon: <Compass className={ico} aria-hidden /> },
+      { to: '/custos', label: 'Custos e conciliação', icon: <DollarSign className={ico} aria-hidden /> },
+      { to: '/controle', label: 'Controle central', icon: <ShieldAlert className={ico} aria-hidden /> },
+    ],
+  },
+  {
     title: 'Dados',
     items: [
       { to: '/contatos', label: 'Contatos', icon: <Users className={ico} aria-hidden /> },
@@ -53,7 +65,6 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { to: '/estrategias', label: 'Estratégias', icon: <SlidersHorizontal className={ico} aria-hidden /> },
       { to: '/tabulacoes', label: 'Tabulações', icon: <Tags className={ico} aria-hidden /> },
       { to: '/canais', label: 'Canais', icon: <Cable className={ico} aria-hidden /> },
-      { to: '/controle', label: 'Controle central', icon: <ShieldAlert className={ico} aria-hidden /> },
     ],
   },
 ];

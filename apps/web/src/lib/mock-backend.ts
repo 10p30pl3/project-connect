@@ -1343,5 +1343,103 @@ export async function handleMockApi<T = unknown>(
     return { items: AUDITS, nextCursor: null } as T;
   }
 
+  // Central de Decisão · Experimentos A/B (§21)
+  if (pathname === '/experiments' && method === 'GET') {
+    return {
+      items: [
+        {
+          id: uuid(701),
+          name: 'Teste de Cadência: WhatsApp Primeiro vs. Discador Direto',
+          status: 'RUNNING',
+          list: { id: LIST_ID, name: 'Atraso > 30 dias (SP/RJ)' },
+          groupA: {
+            name: 'A (WhatsApp → Discador)',
+            journeyName: 'WhatsApp → Discador',
+            strategyName: 'Demonstração 24x7',
+            evaluated: 80,
+            conversions: 18,
+            rate: 0.225,
+            wilsonInterval: [0.148, 0.326],
+            costPerConversion: 1.85,
+          },
+          groupB: {
+            name: 'B (Discador Direto)',
+            journeyName: 'Discador',
+            strategyName: 'Padrão cobrança',
+            evaluated: 80,
+            conversions: 11,
+            rate: 0.137,
+            wilsonInterval: [0.078, 0.231],
+            costPerConversion: 2.45,
+          },
+          winner: null,
+          conclusionNote: 'Intervalos de Wilson sobrepostos [14.8%–32.6%] vs [7.8%–23.1%]. Amostra em maturação — resultado estatisticamente inconclusivo.',
+          createdAt: '2026-10-21T10:00:00Z',
+        },
+      ],
+    } as T;
+  }
+  if (pathname.match(/^\/experiments\/([^/]+)\/simulate-batch$/) && method === 'POST') {
+    return { ok: true } as T;
+  }
+  if (pathname === '/experiments' && method === 'POST') {
+    return { id: nextUuid() } as T;
+  }
+
+  // Central de Decisão · Otimização & Recomendações (§22)
+  if (pathname === '/optimization' && method === 'GET') {
+    const cid = searchParams.get('campaignId');
+    const camp = CAMPAIGNS.find((c) => c.id === cid) ?? CAMPAIGNS[0];
+    const recs = CONTACTS.slice(0, 10).map((c, idx) => ({
+      contactId: c.id,
+      externalId: c.externalId,
+      name: c.name,
+      channel: idx % 2 === 0 ? 'WhatsApp' : 'Discador',
+      destinationMasked: c.destinations[0]?.addressMasked ?? '1198****01',
+      bestTimeWindow: idx % 3 === 0 ? '10:00 – 12:00' : '14:00 – 16:30',
+      evidencesCount: 3 + (idx % 4),
+      historicRate: 0.25 + (idx * 0.04),
+      estimatedCostPerSuccess: 0.45 + (idx * 0.15),
+      policyUsed: 'Menor custo por CPC (mínimo 3 evidências)',
+    }));
+    return {
+      items: recs,
+      policy: 'Menor custo por CPC (com fallback para ordem do template)',
+      notes: [
+        'Amostra mínima de 3 evidências satisfeita para os candidatos exibidos.',
+        'Horários calculados a partir de eventos com CPC anterior no mesmo cluster.',
+      ],
+    } as T;
+  }
+
+  // Central de Decisão · Custos & Conciliação (§20)
+  if (pathname === '/costs' && method === 'GET') {
+    const list = Array.from(ATTEMPTS.values()).map((a, idx) => ({
+      attemptId: a.attempt.id,
+      campaignName: a.attempt.campaign?.name ?? CAMPAIGNS[0].name,
+      contactName: a.attempt.contact.name ?? 'Cliente',
+      channel: a.attempt.channelType === 'VOICE' ? 'Discador' : 'WhatsApp',
+      connectionName: a.attempt.connectionName,
+      tariffPreserved: a.attempt.tariffSnapshot,
+      estimatedCost: a.attempt.tariffSnapshot,
+      confirmedCost: idx === 0 ? 0.048 : idx === 1 ? 0.115 : null,
+      status: idx < 2 ? ('CONFIRMED' as const) : ('ESTIMATED' as const),
+      invoiceRef: idx < 2 ? 'FAT-2026-10-CONECT' : null,
+      createdAt: a.attempt.createdAt,
+    }));
+    return {
+      items: list,
+      summary: {
+        totalConfirmed: 0.163,
+        totalEstimated: 0.36,
+        coverageCount: 2,
+        pendingCount: list.length - 2,
+      },
+    } as T;
+  }
+  if (pathname === '/costs/reconcile-batch' && method === 'POST') {
+    return { ok: true } as T;
+  }
+
   return {} as T;
 }

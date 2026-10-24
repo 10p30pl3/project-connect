@@ -17,6 +17,9 @@ import { StrategiesPage, StrategyDetailPage } from './pages/Strategies';
 import { TabulationsPage } from './pages/Tabulations';
 import { ChannelsPage } from './pages/Channels';
 import { ControlPage } from './pages/Control';
+import { ExperimentsPage } from './pages/Experiments';
+import { OptimizationPage } from './pages/Optimization';
+import { CostsPage } from './pages/Costs';
 import { MorePage } from './pages/More';
 import { NotFoundPage } from './pages/NotFound';
 
@@ -75,6 +78,9 @@ export const router = createBrowserRouter([
           { path: '/tabulacoes', element: <TabulationsPage /> },
           { path: '/canais', element: <ChannelsPage /> },
           { path: '/controle', element: <ControlPage /> },
+          { path: '/experimentos', element: <ExperimentsPage /> },
+          { path: '/otimizacao', element: <OptimizationPage /> },
+          { path: '/custos', element: <CostsPage /> },
           { path: '/mais', element: <MorePage /> },
           { path: '*', element: <NotFoundPage /> },
         ],
