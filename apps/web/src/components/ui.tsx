@@ -35,6 +35,26 @@ import {
 import { ATTEMPT_STATE_LABEL, CAMPAIGN_STATUS_LABEL, type AttemptState, type CampaignStatus } from '@voll/shared';
 import { errorMessage } from '../lib/api';
 
+// ------------------------------------------------------------------ Brand Logo
+export function BrandLogo({ size = 'md', showTagline = false }: { size?: 'sm' | 'md' | 'lg'; showTagline?: boolean }) {
+  const iconCls = size === 'lg' ? 'size-10 rounded-xl' : size === 'sm' ? 'size-7 rounded-lg' : 'size-8 rounded-lg';
+  const textCls = size === 'lg' ? 'text-xl' : size === 'sm' ? 'text-sm' : 'text-[15px]';
+  return (
+    <div className="inline-flex items-center gap-2.5 select-none">
+      <div className={clsx('relative shrink-0 shadow-sm ring-1 ring-brand-700/15 overflow-hidden', iconCls)}>
+        <img src="/favicon.svg" alt="" className="size-full object-cover" />
+      </div>
+      <div className="flex flex-col leading-none">
+        <div className={clsx('font-bold tracking-tight text-slate-900 flex items-center gap-1', textCls)}>
+          <span>Voll</span>
+          <span className="bg-gradient-to-r from-brand-700 to-indigo-600 bg-clip-text text-transparent">Connect</span>
+        </div>
+        {showTagline && <span className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-slate-400">Orquestração Inteligente</span>}
+      </div>
+    </div>
+  );
+}
+
 // ------------------------------------------------------------------ Button
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'link';
 type BtnProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: 'sm' | 'md'; loading?: boolean; icon?: ReactNode };
@@ -85,9 +105,9 @@ export function PageHeader({ title, subtitle, actions, back }: { title: ReactNod
 
 export function Card({ title, actions, children, className, padded = true }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; padded?: boolean }) {
   return (
-    <section className={clsx('rounded-lg border border-slate-200 bg-white shadow-sm', className)}>
+    <section className={clsx('rounded-xl border border-slate-200/90 bg-white shadow-xs', className)}>
       {(title || actions) && (
-        <header className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-2.5">
+        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
           {title && <h2 className="text-sm font-semibold text-slate-800">{title}</h2>}
           {actions}
         </header>
@@ -99,11 +119,11 @@ export function Card({ title, actions, children, className, padded = true }: { t
 
 export function Stat({ label, value, hint, tone }: { label: ReactNode; value: ReactNode; hint?: ReactNode; tone?: 'warn' | 'bad' | 'good' }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
-      <div className="text-xs font-medium text-slate-600">{label}</div>
+    <div className="rounded-xl border border-slate-200/90 bg-white px-4 py-3 shadow-xs transition-colors hover:border-slate-300/80">
+      <div className="text-xs font-medium text-slate-500">{label}</div>
       <div
         className={clsx(
-          'tabular mt-1 text-2xl font-semibold',
+          'tabular mt-1 text-2xl font-semibold tracking-tight text-slate-900',
           tone === 'warn' && 'text-amber-700',
           tone === 'bad' && 'text-red-700',
           tone === 'good' && 'text-emerald-700',
@@ -258,8 +278,8 @@ export function Field({ label, error, hint, required, className, children }: Fie
   const errId = error ? `${id}-err` : undefined;
   const describedBy = [hintId, errId].filter(Boolean).join(' ') || undefined;
   return (
-    <div className={clsx('flex flex-col gap-1', className)}>
-      <label htmlFor={id} className="text-[13px] font-medium text-slate-800">
+    <div className={clsx('flex flex-col gap-1.5', className)}>
+      <label htmlFor={id} className="block text-[13px] font-medium leading-snug text-slate-700">
         {label}
         {required && (
           <span className="text-red-600" aria-hidden>
@@ -268,15 +288,15 @@ export function Field({ label, error, hint, required, className, children }: Fie
           </span>
         )}
       </label>
-      {children({ id, describedBy, invalid: !!error })}
+      <div className="mt-auto">{children({ id, describedBy, invalid: !!error })}</div>
       {hint && !error && (
-        <p id={hintId} className="text-xs text-slate-500">
+        <p id={hintId} className="text-xs leading-relaxed text-slate-500">
           {hint}
         </p>
       )}
       {error && (
         <p id={errId} className="flex items-center gap-1 text-xs font-medium text-red-700">
-          <AlertCircle className="size-3.5" aria-hidden />
+          <AlertCircle className="size-3.5 shrink-0" aria-hidden />
           {error}
         </p>
       )}
@@ -285,7 +305,7 @@ export function Field({ label, error, hint, required, className, children }: Fie
 }
 
 const inputCls =
-  'h-9 w-full rounded-md border border-slate-300 bg-white px-2.5 text-sm shadow-sm placeholder:text-slate-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-200 disabled:bg-slate-100 aria-[invalid=true]:border-red-500 aria-[invalid=true]:ring-red-100';
+  'h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 shadow-xs transition-colors placeholder:text-slate-400 hover:border-slate-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-200 disabled:bg-slate-100 disabled:text-slate-500 aria-[invalid=true]:border-red-500 aria-[invalid=true]:ring-red-100';
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, ...p }, ref) {
   return <input ref={ref} className={clsx(inputCls, className)} {...p} />;
@@ -303,7 +323,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSel
 
 export function Checkbox({ label, className, ...p }: InputHTMLAttributes<HTMLInputElement> & { label: ReactNode }) {
   return (
-    <label className={clsx('inline-flex cursor-pointer items-center gap-2 text-sm', className)}>
+    <label className={clsx('inline-flex cursor-pointer items-center gap-2 text-sm text-slate-800 select-none', className)}>
       <input type="checkbox" className="size-4 rounded border-slate-300 accent-brand-700" {...p} />
       {label}
     </label>
@@ -375,33 +395,40 @@ export function Modal({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-900/40" />
-        <Dialog.Content
+        <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-900/45 backdrop-blur-[2px]" />
+        <div
           className={clsx(
-            'fixed z-50 flex max-h-[100dvh] flex-col bg-white shadow-xl focus:outline-none',
-            side
-              ? 'inset-y-0 right-0 w-full max-w-2xl'
-              : clsx('left-1/2 top-1/2 max-h-[90dvh] w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 rounded-lg', wide ? 'max-w-3xl' : 'max-w-lg'),
+            'fixed inset-0 z-50 flex',
+            side ? 'justify-end' : 'items-center justify-center p-4 sm:p-6',
           )}
         >
-          <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-3.5">
-            <div>
-              <Dialog.Title className="text-base font-semibold text-slate-900">{title}</Dialog.Title>
-              {description ? (
-                <Dialog.Description className="mt-0.5 text-sm text-slate-600">{description}</Dialog.Description>
-              ) : (
-                <Dialog.Description className="sr-only">{typeof title === 'string' ? title : 'Janela'}</Dialog.Description>
-              )}
+          <Dialog.Content
+            className={clsx(
+              'flex flex-col bg-white shadow-2xl ring-1 ring-slate-900/10 focus:outline-none',
+              side
+                ? 'h-full max-h-[100dvh] w-full max-w-2xl'
+                : clsx('max-h-[90dvh] w-full rounded-xl', wide ? 'max-w-3xl' : 'max-w-lg'),
+            )}
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-6 py-4">
+              <div className="min-w-0">
+                <Dialog.Title className="text-base font-semibold tracking-tight text-slate-900">{title}</Dialog.Title>
+                {description ? (
+                  <Dialog.Description className="mt-0.5 text-sm text-slate-600">{description}</Dialog.Description>
+                ) : (
+                  <Dialog.Description className="sr-only">{typeof title === 'string' ? title : 'Janela'}</Dialog.Description>
+                )}
+              </div>
+              <Dialog.Close asChild>
+                <Button variant="ghost" size="sm" aria-label="Fechar">
+                  <X className="size-4" aria-hidden />
+                </Button>
+              </Dialog.Close>
             </div>
-            <Dialog.Close asChild>
-              <Button variant="ghost" size="sm" aria-label="Fechar">
-                <X className="size-4" aria-hidden />
-              </Button>
-            </Dialog.Close>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
-          {footer && <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 px-5 py-3">{footer}</div>}
-        </Dialog.Content>
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
+            {footer && <div className="flex flex-wrap justify-end gap-2.5 border-t border-slate-100 bg-slate-50/50 px-6 py-3.5 rounded-b-xl">{footer}</div>}
+          </Dialog.Content>
+        </div>
       </Dialog.Portal>
     </Dialog.Root>
   );

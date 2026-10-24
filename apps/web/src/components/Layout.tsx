@@ -28,6 +28,7 @@ import {
 import { ROLE_LABEL } from '@voll/shared';
 import { useAuth } from '../lib/auth';
 import { AttemptDrawer } from './AttemptDrawer';
+import { BrandLogo } from './ui';
 import type { ReactNode } from 'react';
 
 export type NavItem = { to: string; label: string; icon: ReactNode; end?: boolean };
@@ -170,16 +171,15 @@ export function Layout() {
         Pular para o conteúdo
       </a>
       {/* Sidebar desktop */}
-      <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
-        <div className="flex h-14 items-center gap-2 border-b border-slate-100 px-4">
-          <img src="/favicon.svg" alt="" className="size-7" />
-          <span className="text-[15px] font-semibold tracking-tight">Voll Connect</span>
+      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-slate-200/90 bg-white md:flex">
+        <div className="flex h-15 items-center border-b border-slate-100 px-4">
+          <BrandLogo showTagline />
         </div>
-        <nav aria-label="Navegação principal" className="flex-1 overflow-y-auto px-2 py-3">
+        <nav aria-label="Navegação principal" className="flex-1 overflow-y-auto px-3 py-3.5">
           {NAV_GROUPS.map((g) => (
             <div key={g.title} className="mb-4">
-              <div className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">{g.title}</div>
-              <ul>
+              <div className="px-2.5 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{g.title}</div>
+              <ul className="space-y-0.5">
                 {g.items.map((it) => (
                   <li key={it.to}>
                     <NavLink
@@ -187,8 +187,10 @@ export function Layout() {
                       end={it.end}
                       className={({ isActive }) =>
                         clsx(
-                          'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm',
-                          isActive ? 'bg-brand-50 font-medium text-brand-800' : 'text-slate-700 hover:bg-slate-100',
+                          'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] transition-colors',
+                          isActive
+                            ? 'bg-brand-50 font-semibold text-brand-800 shadow-2xs ring-1 ring-inset ring-brand-200/70'
+                            : 'font-medium text-slate-600 hover:bg-slate-100/80 hover:text-slate-900',
                         )
                       }
                     >
@@ -201,21 +203,21 @@ export function Layout() {
             </div>
           ))}
         </nav>
-        <div className="border-t border-slate-100 px-3 py-2 text-[11px] text-slate-500">
-          <Settings2 className="mr-1 inline size-3" aria-hidden />
-          MVP · conector simulado
+        <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-2.5 text-[11px] font-medium text-slate-500">
+          <Settings2 className="mr-1.5 inline size-3.5 text-brand-700" aria-hidden />
+          MVP · Conector simulado ativo
         </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-4 backdrop-blur">
+        <header className="sticky top-0 z-30 flex h-15 items-center justify-between gap-3 border-b border-slate-200/90 bg-white/95 px-4 backdrop-blur md:px-6">
           <div className="flex items-center gap-2 md:hidden">
-            <img src="/favicon.svg" alt="" className="size-7" />
-            <span className="font-semibold">Voll Connect</span>
+            <BrandLogo size="sm" />
           </div>
-          <div className="hidden text-sm text-slate-500 md:block">
-            <BookMarked className="mr-1 inline size-4" aria-hidden />
-            Campanhas inteligentes, do mailing ao contato
+          <div className="hidden items-center gap-2 text-xs font-medium text-slate-500 md:flex">
+            <span className="inline-flex size-2 rounded-full bg-emerald-500" aria-hidden />
+            <BookMarked className="size-3.5 text-brand-700" aria-hidden />
+            <span>Campanhas inteligentes, do mailing ao contato</span>
           </div>
           <UserMenu />
         </header>

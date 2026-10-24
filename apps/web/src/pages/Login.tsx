@@ -6,7 +6,7 @@ import type { z } from 'zod';
 import { useState } from 'react';
 import { useAuth } from '../lib/auth';
 import { applyFieldErrors, errorMessage } from '../lib/api';
-import { Alert, Button, Field, Input } from '../components/ui';
+import { Alert, BrandLogo, Button, Field, Input } from '../components/ui';
 
 type F = z.infer<typeof LoginSchema>;
 
@@ -33,9 +33,8 @@ export function LoginPage() {
   return (
     <div className="grid min-h-full place-items-center bg-gradient-to-b from-brand-50 to-slate-50 px-4 py-10">
       <div className="w-full max-w-sm">
-        <div className="mb-6 flex items-center justify-center gap-2">
-          <img src="/favicon.svg" alt="" className="size-9" />
-          <span className="text-xl font-semibold tracking-tight">Voll Connect</span>
+        <div className="mb-6 flex items-center justify-center">
+          <BrandLogo size="lg" showTagline />
         </div>
         <form onSubmit={onSubmit} noValidate className="space-y-4 rounded-lg border border-slate-200 bg-white p-6 shadow-sm" aria-labelledby="login-title">
           <h1 id="login-title" className="text-lg font-semibold">

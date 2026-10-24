@@ -435,6 +435,8 @@ function seedAttempts() {
     { id: uuid(404), contactIdx: 4, channel: 'WHATSAPP', connName: 'WhatsApp simulado', state: 'RECONCILIATION', tabCode: null, cost: null, tariff: 0.05, camp: CAMPAIGNS[0] },
     { id: uuid(405), contactIdx: 5, channel: 'VOICE', connName: 'Discador simulado', state: 'FINALIZED', tabCode: 'NO_ANSWER', cost: 0.12, tariff: 0.12, camp: CAMPAIGNS[1] },
     { id: uuid(406), contactIdx: 6, channel: 'VOICE', connName: 'Discador simulado', state: 'FINALIZED', tabCode: 'CONVERSION', cost: 0.12, tariff: 0.12, camp: CAMPAIGNS[1] },
+    { id: uuid(407), contactIdx: 7, channel: 'WHATSAPP', connName: 'WhatsApp simulado', state: 'RESERVED', tabCode: null, cost: null, tariff: 0.05, camp: CAMPAIGNS[0] },
+    { id: uuid(408), contactIdx: 8, channel: 'VOICE', connName: 'Discador simulado', state: 'AWAITING_FEEDBACK', tabCode: null, cost: null, tariff: 0.12, camp: CAMPAIGNS[0] },
   ];
 
   for (const s of specs) {
@@ -491,11 +493,15 @@ function seedAttempts() {
     const nextAction =
       s.state === 'RECONCILIATION'
         ? 'Resolver reconciliação (Supervisor/Admin)'
-        : s.state === 'SENT'
-          ? 'Aguardar retorno do canal'
-          : tab?.code === 'CONVERSION'
-            ? 'Inscrição encerrada com sucesso'
-            : 'Aguardar intervalo de retentativa';
+        : s.state === 'RESERVED'
+          ? 'Despacho exclusivo reservado para o conector'
+          : s.state === 'AWAITING_FEEDBACK'
+            ? 'Aguardando confirmação final / tabulação do canal'
+            : s.state === 'SENT'
+              ? 'Aguardar retorno do canal'
+              : tab?.code === 'CONVERSION'
+                ? 'Inscrição encerrada com sucesso'
+                : 'Aguardar intervalo de retentativa';
 
     ATTEMPTS.set(s.id, {
       attempt: {
@@ -664,6 +670,40 @@ export async function handleMockApi<T = unknown>(
   // Overview
   if (pathname === '/overview' && method === 'GET') {
     const attempts = Array.from(ATTEMPTS.values()).map((a) => a.attempt);
+    const workingRecords = attempts.filter((a) => ['RESERVED', 'SENT', 'AWAITING_FEEDBACK', 'RECONCILIATION'].includes(a.state));
+    const workingContactIds = new Set(workingRecords.map((a) => a.contact.id));
+    const activeCamp = CAMPAIGNS.find((c) => c.status === 'RUNNING') ?? CAMPAIGNS[0];
+    const queueCandidates = CONTACTS.filter(
+      (c) => !workingContactIds.has(c.id) && !c.blocks.some((b) => !b.revokedAt),
+    ).slice(0, 8);
+
+    const nextInQueue = queueCandidates.map((c, idx) => {
+      const hasWa = c.destinations.some((d) => d.channelType === 'WHATSAPP');
+      const channelType: ChannelType = idx % 2 === 0 && hasWa ? 'WHATSAPP' : 'VOICE';
+      const dest = c.destinations.find((d) => d.channelType === channelType) ?? c.destinations[0];
+      const eligibleNow = idx < 5 && !CONTROL.globalSuspension;
+      return {
+        enrollmentId: uuid(650 + idx),
+        position: idx + 1,
+        contact: { id: c.id, externalId: c.externalId, name: c.name },
+        campaign: { id: activeCamp.id, name: activeCamp.name },
+        audienceName: activeCamp.audience.name,
+        stage: idx < 4 ? 0 : 1,
+        channelType,
+        destinationMasked: dest?.addressMasked ?? '—',
+        counters: {
+          total: c.historyTotal !== null ? c.historyTotal + (idx % 2) : null,
+          today: idx % 2,
+          totalLimit: activeCamp.strategy.config.limits.total,
+          dailyLimit: activeCamp.strategy.config.limits.daily,
+        },
+        nextEligibleAt: eligibleNow
+          ? new Date().toISOString()
+          : new Date(Date.now() + (idx + 1) * 420_000).toISOString(),
+        eligibleNow,
+      };
+    });
+
     const ov: Overview = {
       campaigns: {
         running: CAMPAIGNS.filter((c) => c.status === 'RUNNING').length,
@@ -673,13 +713,15 @@ export async function handleMockApi<T = unknown>(
         completed: CAMPAIGNS.filter((c) => c.status === 'COMPLETED' || c.status === 'CLOSED').length,
       },
       attempts: {
-        active: attempts.filter((a) => ['RESERVED', 'SENT', 'AWAITING_FEEDBACK', 'RECONCILIATION'].includes(a.state)).length,
+        active: workingRecords.length,
         reconciliation: attempts.filter((a) => a.state === 'RECONCILIATION').length,
         sentToday: attempts.length,
       },
       contacts: CONTACTS.length,
       mailings: MAILINGS.length,
       globalSuspension: CONTROL.globalSuspension,
+      workingRecords,
+      nextInQueue,
     };
     return ov as T;
   }

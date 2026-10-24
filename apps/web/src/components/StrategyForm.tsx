@@ -65,10 +65,10 @@ export function StrategyForm({
           {serverErr ?? anyErr}
         </Alert>
       )}
-      <fieldset className="space-y-3">
-        <legend className="text-sm font-semibold">Calendário</legend>
+      <fieldset className="space-y-3 rounded-xl border border-slate-200/90 bg-slate-50/40 p-4">
+        <legend className="px-1.5 text-xs font-semibold uppercase tracking-wider text-slate-600">Calendário Operacional</legend>
         <div>
-          <span className="mb-1 block text-[13px] font-medium" id="days-label">
+          <span className="mb-1.5 block text-[13px] font-medium text-slate-700" id="days-label">
             Dias permitidos
           </span>
           <div className="flex flex-wrap gap-1.5" role="group" aria-labelledby="days-label">
@@ -86,7 +86,7 @@ export function StrategyForm({
                       { shouldDirty: true, shouldValidate: formState.submitCount > 0 },
                     )
                   }
-                  className={`h-8 w-11 rounded-md text-xs font-medium ring-1 ring-inset ${on ? 'bg-brand-700 text-white ring-brand-700' : 'bg-white ring-slate-300'}`}
+                  className={`h-8 w-11 rounded-lg text-xs font-semibold transition-colors ring-1 ring-inset ${on ? 'bg-brand-700 text-white ring-brand-700 shadow-2xs' : 'bg-white text-slate-700 ring-slate-300 hover:bg-slate-50'}`}
                 >
                   {d}
                 </button>
@@ -96,13 +96,13 @@ export function StrategyForm({
           {e.calendar?.days && <p className="mt-1 text-xs font-medium text-red-700">{e.calendar.days.message}</p>}
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="Início" required error={e.calendar?.start?.message}>
+          <Field label="Início da janela" required error={e.calendar?.start?.message}>
             {(p) => <Input id={p.id} type="time" aria-invalid={p.invalid} aria-describedby={p.describedBy} {...register('calendar.start')} />}
           </Field>
-          <Field label="Fim" required error={e.calendar?.end?.message}>
+          <Field label="Fim da janela" required error={e.calendar?.end?.message}>
             {(p) => <Input id={p.id} type="time" aria-invalid={p.invalid} aria-describedby={p.describedBy} {...register('calendar.end')} />}
           </Field>
-          <Field label="Fuso" error={e.calendar?.timezone?.message}>
+          <Field label="Fuso horário" error={e.calendar?.timezone?.message}>
             {(p) => (
               <Select id={p.id} {...register('calendar.timezone')}>
                 <option value="America/Sao_Paulo">America/Sao_Paulo</option>
@@ -117,9 +117,9 @@ export function StrategyForm({
         </div>
       </fieldset>
 
-      <fieldset className="space-y-3">
-        <legend className="text-sm font-semibold">Tentativas e limites</legend>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <fieldset className="space-y-3 rounded-xl border border-slate-200/90 bg-slate-50/40 p-4">
+        <legend className="px-1.5 text-xs font-semibold uppercase tracking-wider text-slate-600">Tentativas, Limites e Retentativa</legend>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Field label="Limite total por cliente" required error={e.limits?.total?.message}>
             {(p) => <Input id={p.id} type="number" min={1} aria-invalid={p.invalid} aria-describedby={p.describedBy} {...register('limits.total', num)} />}
           </Field>
@@ -152,8 +152,8 @@ export function StrategyForm({
         <p className="text-xs text-slate-500">Limites institucionais do Controle central prevalecem e não podem ser afrouxados pelo template.</p>
       </fieldset>
 
-      <fieldset className="space-y-3">
-        <legend className="text-sm font-semibold">Distribuição e integração</legend>
+      <fieldset className="space-y-3 rounded-xl border border-slate-200/90 bg-slate-50/40 p-4">
+        <legend className="px-1.5 text-xs font-semibold uppercase tracking-wider text-slate-600">Distribuição e Integração</legend>
         <div className="grid gap-3 sm:grid-cols-3">
           <Field label="Tamanho do lote" error={e.distribution?.batchSize?.message}>
             {(p) => <Input id={p.id} type="number" min={1} max={500} aria-invalid={p.invalid} {...register('distribution.batchSize', num)} />}
@@ -167,12 +167,12 @@ export function StrategyForm({
         </div>
       </fieldset>
 
-      <fieldset className="space-y-2">
-        <legend className="text-sm font-semibold">Regras por tabulação</legend>
+      <fieldset className="space-y-3 rounded-xl border border-slate-200/90 bg-slate-50/40 p-4">
+        <legend className="px-1.5 text-xs font-semibold uppercase tracking-wider text-slate-600">Regras por Tabulação</legend>
         {!tabs.data ? (
           <p className="text-sm text-slate-500">Carregando tabulações…</p>
         ) : (
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             {tabs.data.items.map((t) => (
               <Field key={t.code} label={`${t.name} (${t.code})`}>
                 {(p) => (

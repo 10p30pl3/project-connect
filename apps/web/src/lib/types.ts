@@ -27,12 +27,28 @@ export type User = { id: string; email: string; name: string; role: Role; active
 
 export type Paginated<T> = { items: T[]; nextCursor: string | null; total?: number };
 
+export type OverviewQueueItem = {
+  enrollmentId: string;
+  position: number;
+  contact: { id: string; externalId: string; name: string | null };
+  campaign: { id: string; name: string };
+  audienceName: string;
+  stage: number;
+  channelType: ChannelType;
+  destinationMasked: string;
+  counters: { total: number | null; today: number; totalLimit: number; dailyLimit: number };
+  nextEligibleAt: string | null;
+  eligibleNow: boolean;
+};
+
 export type Overview = {
   campaigns: { running: number; paused: number; ready: number; scheduled: number; completed: number };
   attempts: { active: number; reconciliation: number; sentToday: number };
   contacts: number;
   mailings: number;
   globalSuspension: boolean;
+  workingRecords?: AttemptRow[];
+  nextInQueue?: OverviewQueueItem[];
 };
 
 export type MailingSummary = {

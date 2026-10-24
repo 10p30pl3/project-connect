@@ -21,8 +21,9 @@ body { @apply bg-slate-50 text-slate-900 antialiased; font-size: 14px; }
 .tabular { font-variant-numeric: tabular-nums; }
 
 table.data { @apply w-full text-left text-[13px]; border-collapse: separate; border-spacing: 0; }
-table.data th { @apply sticky top-0 z-[1] bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600 border-b border-slate-200; }
-table.data td { @apply px-3 py-2 border-b border-slate-100 align-top; }
-table.data tbody tr:hover { @apply bg-brand-50/50; }
+table.data th { @apply sticky top-0 z-[1] bg-slate-50/95 px-3.5 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-200; }
+table.data td { @apply px-3.5 py-2.5 border-b border-slate-100 align-middle; }
+table.data tbody tr:last-child td { @apply border-b-0; }
+table.data tbody tr:hover { @apply bg-brand-50/40; }
 
 .skeleton { @apply animate-pulse rounded bg-slate-200; }
