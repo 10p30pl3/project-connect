@@ -25,7 +25,7 @@ npm run db:seed      # organização, usuários, tabulações, conexões simulad
 npm run dev          # API :3333 + worker + web :5173
 ```
 
-Acesse http://localhost:5173 com `admin@voll.local` / `Voll@2026`. Há um usuário por perfil (`gestor@`, `supervisor@`, `operador@`, `analista@voll.local`, mesma senha).
+Acesse http://localhost:5173. **Não há tela de login**: com `AUTH_DISABLED=true` (padrão do `.env.example`) o app abre direto como Administrador, e o menu do usuário permite **ver como** Gestor, Supervisor, Operador ou Analista. Para reativar o login, defina `AUTH_DISABLED=false` (usuários do seed: `admin@`, `gestor@`, `supervisor@`, `operador@`, `analista@voll.local`, senha `Voll@2026`). Em `NODE_ENV=production` o login é sempre exigido.
 
 Para ver o motor funcionando fora do horário comercial, crie uma campanha com a estratégia **Demonstração 24x7**.
 

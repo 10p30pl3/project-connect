@@ -7,6 +7,8 @@ export const config = {
   webOrigin: process.env.WEB_ORIGIN ?? 'http://localhost:5173',
   workerTickMs: Number(process.env.WORKER_TICK_MS ?? 2000),
   isProduction: process.env.NODE_ENV === 'production',
+  /** Modo mockup: sem login; cada requisição age como o usuário demo do perfil escolhido (header X-Demo-Role). */
+  authDisabled: process.env.AUTH_DISABLED !== 'false' && process.env.NODE_ENV !== 'production',
   seedAdminEmail: process.env.SEED_ADMIN_EMAIL ?? 'admin@voll.local',
   seedAdminPassword: process.env.SEED_ADMIN_PASSWORD ?? 'Voll@2026',
 };

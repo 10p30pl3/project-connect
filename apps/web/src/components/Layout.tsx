@@ -1,5 +1,8 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { useQueryClient } from '@tanstack/react-query';
+import { ROLES } from '@voll/shared';
+import { setDemoRole } from '../lib/api';
 import clsx from 'clsx';
 import {
   Activity,
@@ -66,6 +69,7 @@ const MOBILE: NavItem[] = [
 function UserMenu() {
   const { me, logout } = useAuth();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   if (!me) return null;
   return (
     <DropdownMenu.Root>
@@ -103,15 +107,44 @@ function UserMenu() {
             </div>
           </div>
           <DropdownMenu.Separator className="my-1 h-px bg-slate-100" />
-          <DropdownMenu.Item
-            className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 outline-none data-[highlighted]:bg-slate-100"
-            onSelect={async () => {
-              await logout();
-              navigate('/login', { replace: true });
-            }}
-          >
-            <LogOut className="size-4" aria-hidden /> Sair
-          </DropdownMenu.Item>
+          {me.demoMode ? (
+            <>
+              <DropdownMenu.Label className="px-2 pb-1 pt-1.5 text-xs font-medium text-slate-500">
+                Mockup sem login · ver como
+              </DropdownMenu.Label>
+              <DropdownMenu.RadioGroup
+                value={me.role}
+                onValueChange={(role) => {
+                  setDemoRole(role);
+                  qc.clear();
+                  navigate('/', { replace: true });
+                }}
+              >
+                {ROLES.map((r) => (
+                  <DropdownMenu.RadioItem
+                    key={r}
+                    value={r}
+                    className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 outline-none data-[highlighted]:bg-slate-100 data-[state=checked]:font-semibold"
+                  >
+                    <span className="inline-block w-3 text-brand-700" aria-hidden>
+                      {me.role === r ? '✓' : ''}
+                    </span>
+                    {ROLE_LABEL[r]}
+                  </DropdownMenu.RadioItem>
+                ))}
+              </DropdownMenu.RadioGroup>
+            </>
+          ) : (
+            <DropdownMenu.Item
+              className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 outline-none data-[highlighted]:bg-slate-100"
+              onSelect={async () => {
+                await logout();
+                navigate('/login', { replace: true });
+              }}
+            >
+              <LogOut className="size-4" aria-hidden /> Sair
+            </DropdownMenu.Item>
+          )}
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>

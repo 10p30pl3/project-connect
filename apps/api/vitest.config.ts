@@ -14,6 +14,7 @@ export default defineConfig({
       TEST_DATABASE_URL: testDb,
       JWT_SECRET: 'test-secret',
       NODE_ENV: 'test',
+      AUTH_DISABLED: 'false',
     },
   },
 });

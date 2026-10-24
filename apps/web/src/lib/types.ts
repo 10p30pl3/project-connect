@@ -20,6 +20,8 @@ export type Me = {
   role: Role;
   organization: { id: string; name: string };
   workspace: { id: string; name: string; timezone: string };
+  /** true quando a API roda sem login (mockup) */
+  demoMode?: boolean;
 };
 export type User = { id: string; email: string; name: string; role: Role; active?: boolean; createdAt?: string };
 

@@ -54,7 +54,7 @@ export async function authRoutes(app: FastifyInstance, opts: { loginRateMax: num
   app.get('/auth/me', { preHandler: authenticate }, async (req) => {
     const me = await loadMe(actor(req).userId!);
     if (!me) throw new HttpError(401, 'Não autenticado', 'Usuário inativo');
-    return me;
+    return { ...me, demoMode: config.authDisabled };
   });
 
   app.get('/users', { preHandler: [authenticate, requireRoles()] }, async (req) => {

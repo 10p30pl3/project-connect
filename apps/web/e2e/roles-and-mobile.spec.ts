@@ -10,7 +10,7 @@ test('perfil Analista consulta sem botões de ação', async ({ page, browser })
 
   const ctx = await browser.newContext();
   const p2 = await ctx.newPage();
-  await login(p2, email, 'Analista@2026');
+  await login(p2, email, 'Analista@2026', 'ANALYST');
   await p2.goto('/campanhas');
   await expect(p2.getByRole('heading', { name: 'Campanhas' })).toBeVisible();
   await expect(p2.getByRole('link', { name: 'Nova campanha' })).toHaveCount(0);

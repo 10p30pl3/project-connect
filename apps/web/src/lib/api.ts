@@ -23,8 +23,27 @@ export function setUnauthorizedHandler(fn: () => void) {
   onUnauthorized = fn;
 }
 
+const DEMO_ROLE_KEY = 'vc_demo_role';
+/** Modo mockup: perfil simulado enviado em X-Demo-Role (a API ignora quando o login está ativo). */
+export function getDemoRole(): string | null {
+  try {
+    return localStorage.getItem(DEMO_ROLE_KEY);
+  } catch {
+    return null;
+  }
+}
+export function setDemoRole(role: string) {
+  try {
+    localStorage.setItem(DEMO_ROLE_KEY, role);
+  } catch {
+    /* sem storage: fica no padrão (Administrador) */
+  }
+}
+
 export async function api<T = unknown>(path: string, opts: Opts = {}): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json', ...opts.headers };
+  const demoRole = getDemoRole();
+  if (demoRole) headers['X-Demo-Role'] = demoRole;
   let body: BodyInit | undefined;
   if (opts.body !== undefined) {
     headers['Content-Type'] = 'application/json';
