@@ -760,8 +760,27 @@ export async function handleMockApi<T = unknown>(
   if (pathname === '/lists/preview' && method === 'POST') {
     const m = MAILINGS.find((x) => x.detail.id === body.mailingId) ?? MAILINGS[0];
     const filters: ListFilter[] = body.filters ?? [];
+    const sorts: { field: string; dir: 'asc' | 'desc' }[] = body.sort ?? [];
     const activeRecords = m.records.filter((r) => !r.blocked);
-    const filtered = filters.length === 0 ? activeRecords : activeRecords.slice(0, Math.max(1, Math.floor(activeRecords.length * 0.7)));
+    let filtered = filters.length === 0 ? [...activeRecords] : activeRecords.slice(0, Math.max(1, Math.floor(activeRecords.length * 0.7)));
+
+    if (sorts.length > 0) {
+      filtered.sort((a, b) => {
+        for (const s of sorts) {
+          const valA = (s.field === 'external_id' ? a.externalId : s.field === 'name' ? a.name : a.fields[s.field]) ?? '';
+          const valB = (s.field === 'external_id' ? b.externalId : s.field === 'name' ? b.name : b.fields[s.field]) ?? '';
+          let cmp = 0;
+          if (typeof valA === 'number' && typeof valB === 'number') {
+            cmp = valA - valB;
+          } else {
+            cmp = String(valA).localeCompare(String(valB), undefined, { numeric: true });
+          }
+          if (cmp !== 0) return s.dir === 'desc' ? -cmp : cmp;
+        }
+        return 0;
+      });
+    }
+
     const prev: ListPreview = {
       selected: filtered.length,
       excluded: [{ reason: 'DNC', count: m.records.filter((r) => r.blocked).length || 1 }],

@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Plus, Trash2 } from 'lucide-react';
 import { FILTER_OPS, REASON_LABEL, type ListFilter } from '@voll/shared';
 import { ApiError, errorMessage, post } from '../lib/api';
 import type { ListPreview, ListPublishResult } from '../lib/types';
@@ -102,6 +102,36 @@ export function ListEditor({
   const fieldType = (k: string) => fields.find((f) => f.key === k)?.type ?? 'text';
   const sampleCols = useMemo(() => fields.slice(0, 5).map((f) => f.key), [fields]);
 
+  function toggleColumnSort(fieldKey: string) {
+    const existingIndex = sort.findIndex((s) => s.field === fieldKey);
+    let nextSort: Sort[];
+
+    if (existingIndex === -1) {
+      // Adiciona como primeira ou nova ordenação (até 3 no total)
+      const newEntry: Sort = { field: fieldKey, dir: 'asc' };
+      nextSort = [newEntry, ...sort].slice(0, 3);
+    } else {
+      const current = sort[existingIndex];
+      if (current.dir === 'asc') {
+        // asc -> desc
+        nextSort = sort.map((s, idx) => (idx === existingIndex ? { ...s, dir: 'desc' as const } : s));
+      } else {
+        // desc -> remove
+        nextSort = sort.filter((_, idx) => idx !== existingIndex);
+      }
+    }
+
+    setSort(nextSort);
+    // Aplica diretamente na prévia para resposta interativa instantânea
+    setApplied((prev) => ({ ...prev, sort: nextSort }));
+  }
+
+  function getSortInfo(fieldKey: string) {
+    const idx = applied.sort.findIndex((s) => s.field === fieldKey);
+    if (idx === -1) return null;
+    return { priority: idx + 1, dir: applied.sort[idx].dir, total: applied.sort.length };
+  }
+
   return (
     <div className="space-y-4" data-testid="list-editor">
       <Field label="Nome da lista" required error={errors.name || undefined}>
@@ -202,37 +232,6 @@ export function ListEditor({
                 Adicionar filtro
               </Button>
             </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr]">
-              <Field label="Ordenar por">
-                {(p) => (
-                  <Select
-                    id={p.id}
-                    value={sort[0]?.field ?? ''}
-                    onChange={(e) => setSort(e.target.value ? [{ field: e.target.value, dir: sort[0]?.dir ?? 'asc' }] : [])}
-                  >
-                    <option value="">Ordem do mailing</option>
-                    {fields.map((fl) => (
-                      <option key={fl.key} value={fl.key}>
-                        {fl.key}
-                      </option>
-                    ))}
-                  </Select>
-                )}
-              </Field>
-              <Field label="Direção">
-                {(p) => (
-                  <Select
-                    id={p.id}
-                    disabled={!sort[0]}
-                    value={sort[0]?.dir ?? 'asc'}
-                    onChange={(e) => sort[0] && setSort([{ field: sort[0].field, dir: e.target.value as 'asc' | 'desc' }])}
-                  >
-                    <option value="asc">Crescente</option>
-                    <option value="desc">Decrescente</option>
-                  </Select>
-                )}
-              </Field>
-            </div>
             <div className="flex items-center gap-3">
               <Button
                 variant="primary"
@@ -290,15 +289,70 @@ export function ListEditor({
                   )}
                 </div>
               </div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-xs text-slate-500">
+                  Clique no título da coluna para ordenar (crescente / decrescente / remover). Até 3 níveis simultâneos.
+                </span>
+                {applied.sort.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
+                    <span className="font-medium">Ordenação ativa:</span>
+                    {applied.sort.map((s, idx) => (
+                      <Badge key={s.field} tone="brand">
+                        {idx + 1}º {s.field} ({s.dir === 'asc' ? '↑ crescente' : '↓ decrescente'})
+                      </Badge>
+                    ))}
+                    <button
+                      type="button"
+                      className="ml-1 text-xs text-brand-700 underline hover:text-brand-900"
+                      onClick={() => {
+                        setSort([]);
+                        setApplied((prev) => ({ ...prev, sort: [] }));
+                      }}
+                    >
+                      Limpar
+                    </button>
+                  </div>
+                )}
+              </div>
               <TableWrap label="Amostra de contatos">
                 <table className="data">
                   <thead>
                     <tr>
-                      <th>ID</th>
-                      <th>Nome</th>
-                      {sampleCols.map((c) => (
-                        <th key={c}>{c}</th>
-                      ))}
+                      <th>
+                        <button
+                          type="button"
+                          className="group inline-flex items-center gap-1 font-semibold text-slate-700 hover:text-brand-800"
+                          onClick={() => toggleColumnSort('external_id')}
+                        >
+                          ID
+                          <SortIcon info={getSortInfo('external_id')} />
+                        </button>
+                      </th>
+                      <th>
+                        <button
+                          type="button"
+                          className="group inline-flex items-center gap-1 font-semibold text-slate-700 hover:text-brand-800"
+                          onClick={() => toggleColumnSort('name')}
+                        >
+                          Nome
+                          <SortIcon info={getSortInfo('name')} />
+                        </button>
+                      </th>
+                      {sampleCols.map((c) => {
+                        const sInfo = getSortInfo(c);
+                        return (
+                          <th key={c}>
+                            <button
+                              type="button"
+                              className="group inline-flex items-center gap-1 font-semibold text-slate-700 hover:text-brand-800"
+                              onClick={() => toggleColumnSort(c)}
+                            >
+                              <span className="uppercase">{c}</span>
+                              <SortIcon info={sInfo} />
+                            </button>
+                          </th>
+                        );
+                      })}
                     </tr>
                   </thead>
                   <tbody>
@@ -330,6 +384,18 @@ export function ListEditor({
         </div>
       )}
     </div>
+  );
+}
+
+function SortIcon({ info }: { info: { priority: number; dir: 'asc' | 'desc'; total: number } | null }) {
+  if (!info) {
+    return <ArrowUpDown className="size-3 text-slate-400 opacity-40 group-hover:opacity-100" aria-hidden />;
+  }
+  return (
+    <span className="inline-flex items-center text-brand-700 font-bold text-xs" title={`Ordenação ${info.priority}ª: ${info.dir === 'asc' ? 'crescente' : 'decrescente'}`}>
+      {info.dir === 'asc' ? <ArrowUp className="size-3.5 stroke-[2.5]" aria-hidden /> : <ArrowDown className="size-3.5 stroke-[2.5]" aria-hidden />}
+      {info.total > 1 && <span className="text-[10px] ml-0.5">{info.priority}</span>}
+    </span>
   );
 }
 
