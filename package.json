@@ -1,0 +1,30 @@
+{
+  "name": "voll-connect",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Voll Connect — gestão de listas e acionamentos (MVP, fatia vertical P0)",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "db:up": "docker compose up -d db",
+    "db:migrate": "npm run migrate -w @voll/api",
+    "db:seed": "npm run seed -w @voll/api",
+    "dev:api": "npm run dev -w @voll/api",
+    "dev:worker": "npm run worker -w @voll/api",
+    "dev:web": "npm run dev -w @voll/web",
+    "dev": "concurrently -n api,worker,web -c blue,magenta,green \"npm:dev:api\" \"npm:dev:worker\" \"npm:dev:web\"",
+    "build": "npm run build -w @voll/shared --if-present && npm run build -w @voll/api && npm run build -w @voll/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test -w @voll/api",
+    "test:e2e": "npm run test:e2e -w @voll/web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
