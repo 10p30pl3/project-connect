@@ -1,7 +1,13 @@
 import type { ApiProblem } from '@voll/shared';
 import type { FieldValues, Path, UseFormSetError, UseFormSetFocus } from 'react-hook-form';
+import { handleMockApi } from './mock-backend';
 
 export const API_BASE = '/api';
+
+let clientMockActive = import.meta.env.VITE_DEMO_MOCK === 'true';
+export function isClientMockActive() {
+  return clientMockActive;
+}
 
 export class ApiError extends Error {
   status: number;
@@ -44,6 +50,9 @@ export async function api<T = unknown>(path: string, opts: Opts = {}): Promise<T
   const headers: Record<string, string> = { Accept: 'application/json', ...opts.headers };
   const demoRole = getDemoRole();
   if (demoRole) headers['X-Demo-Role'] = demoRole;
+  if (clientMockActive) {
+    return handleMockApi<T>(path, { method: opts.method, body: opts.body, headers });
+  }
   let body: BodyInit | undefined;
   if (opts.body !== undefined) {
     headers['Content-Type'] = 'application/json';
@@ -60,10 +69,20 @@ export async function api<T = unknown>(path: string, opts: Opts = {}): Promise<T
     });
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e;
-    throw new ApiError({ type: 'network', title: 'Sem conexão com o servidor', status: 0, detail: 'Verifique sua conexão e tente novamente.' });
+    clientMockActive = true;
+    return handleMockApi<T>(path, { method: opts.method, body: opts.body, headers });
   }
   if (res.status === 204) return undefined as T;
   const ct = res.headers.get('content-type') ?? '';
+  // Quando implantado estaticamente (ex.: Vercel sem backend/DB), /api/* devolve HTML da SPA ou 404/502/503/504 não-problem+json
+  const isProblemJson = ct.includes('problem+json');
+  if (ct.includes('text/html') || (!res.ok && !isProblemJson && [404, 405, 500, 502, 503, 504].includes(res.status))) {
+    const dataPreview = ct.includes('json') ? await res.clone().json().catch(() => null) : null;
+    if (!dataPreview || typeof dataPreview !== 'object' || !('type' in dataPreview)) {
+      clientMockActive = true;
+      return handleMockApi<T>(path, { method: opts.method, body: opts.body, headers });
+    }
+  }
   const data = ct.includes('json') ? await res.json().catch(() => null) : await res.text();
   if (!res.ok) {
     const problem: ApiProblem =
