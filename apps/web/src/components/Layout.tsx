@@ -353,18 +353,25 @@ export function Layout() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-15 items-center justify-between gap-3 border-b border-slate-200/90 bg-white/95 px-4 backdrop-blur md:px-6">
-          <div className="flex items-center gap-2 md:hidden">
-            <BrandLogo size="sm" />
+        <header className="sticky top-0 z-30 border-b border-slate-200/90 bg-white/95 backdrop-blur">
+          <div className="mx-auto flex h-15 w-full max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 md:px-8">
+            <div className="flex items-center gap-2 md:hidden">
+              <BrandLogo size="sm" />
+            </div>
+            <div className="hidden items-center gap-2 text-xs font-medium text-slate-500 md:flex">
+              <span className="inline-flex size-2 rounded-full bg-emerald-500" aria-hidden />
+              <BookMarked className="size-3.5 text-brand-700" aria-hidden />
+              <span>Campanhas inteligentes, do mailing ao contato</span>
+            </div>
+            <UserMenu />
           </div>
-          <div className="hidden items-center gap-2 text-xs font-medium text-slate-500 md:flex">
-            <span className="inline-flex size-2 rounded-full bg-emerald-500" aria-hidden />
-            <BookMarked className="size-3.5 text-brand-700" aria-hidden />
-            <span>Campanhas inteligentes, do mailing ao contato</span>
-          </div>
-          <UserMenu />
         </header>
-        <main id="conteudo" tabIndex={-1} className="mx-auto w-full max-w-[1400px] flex-1 px-4 pb-24 pt-5 focus:outline-none md:px-6 md:pb-8" key={loc.pathname}>
+        <main
+          id="conteudo"
+          tabIndex={-1}
+          className="mx-auto w-full max-w-7xl flex-1 px-4 pb-24 pt-6 focus:outline-none sm:px-6 md:px-8 md:pb-10"
+          key={loc.pathname}
+        >
           <Outlet />
         </main>
       </div>

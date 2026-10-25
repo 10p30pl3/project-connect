@@ -239,7 +239,7 @@ export function NewCampaignPage() {
   // Modo Dia a Dia: Jornada Única e Minimalista (estilo Google / ChatGPT)
   if (!isManualWizard) {
     return (
-      <div className="mx-auto max-w-4xl space-y-6 py-2">
+      <div className="w-full space-y-6 py-2">
         <UnifiedCampaignCreator
           mailings={mailingsQ.data?.items}
           lists={listsQ.data?.items}
@@ -688,6 +688,9 @@ function UnifiedCampaignCreator({
   const toast = useToast();
   const idemRef = useRef<string | null>(null);
 
+  // Wizard Step: 1 = Base, 2 = Objetivo, 3 = Revisão
+  const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
+
   // 1. Base selection state
   const [sourceType, setSourceType] = useState<'EXISTING' | 'IMPORT'>('EXISTING');
   const [useList, setUseList] = useState<boolean>(draft.audienceMode === 'LIST');
@@ -711,11 +714,7 @@ function UnifiedCampaignCreator({
     return `${PROMPT_TEMPLATES[0].defaultName} · ${dateStr}`;
   });
 
-  // 3. Execution mode
-  const [operatingMode, setOperatingMode] = useState<OperatingMode>(
-    extra.operatingMode || 'PRODUCTION',
-  );
-  const [labSamplePct, setLabSamplePct] = useState<number>(extra.labSamplePct || 10);
+  // 3. Execution parameters
   const [maxAcceptableCpcBrl, setMaxAcceptableCpcBrl] = useState<number>(
     extra.maxAcceptableCpcBrl || 4.5,
   );
@@ -747,10 +746,12 @@ function UnifiedCampaignCreator({
     const mailingIdToUse = selectedMailingId || activeMailing?.id;
     if (!mailingIdToUse) {
       setFormError('Selecione ou importe uma base de contatos para continuar.');
+      setWizardStep(1);
       return;
     }
     if (!campaignName.trim()) {
       setFormError('Informe o nome da campanha.');
+      setWizardStep(2);
       return;
     }
     if (!bestJourney?.latestVersion?.id || !bestStrategy?.latestVersion?.id) {
@@ -788,397 +789,521 @@ function UnifiedCampaignCreator({
 
   return (
     <div className="space-y-6">
-      {/* Hero do Esboço: Voll Connect Inteligência de Contato */}
-      <div className="relative overflow-hidden rounded-2xl border border-brand-200/80 bg-gradient-to-br from-brand-50/80 via-white to-purple-50/40 p-6 md:p-8 shadow-xs">
-        <div className="flex items-center gap-2 mb-2.5">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-100/90 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-brand-800">
-            <Sparkles className="size-3 text-brand-700" aria-hidden /> Voll Connect · Inteligência de Contato
-          </span>
+      {/* Wizard Header & Stepper */}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200/80 pb-4">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-slate-900">Nova Campanha</h1>
+          <p className="text-xs text-slate-500">
+            {wizardStep === 1 && 'Etapa 1 de 3 · Seleção da base de contatos'}
+            {wizardStep === 2 && 'Etapa 2 de 3 · Definição do objetivo em linguagem natural'}
+            {wizardStep === 3 && 'Etapa 3 de 3 · Revisão de CPC e disparo da campanha'}
+          </p>
         </div>
-        <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900">
-          Encontre a pessoa certa com o menor custo possível.
-        </h1>
-        <p className="mt-2 text-sm text-slate-600 max-w-2xl leading-relaxed">
-          Comece escolhendo sua base e conte o que precisa em linguagem natural. A inteligência do Voll Connect organiza o público, calcula os 8 blocos de CPC, projeta os canais e horários ótimos da TIC Domicílios 2025.
-        </p>
 
-        <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-brand-100/70 pt-4">
-          <div className="flex items-center gap-2.5 text-xs font-medium text-slate-700">
-            <span className="grid size-5.5 place-items-center rounded-full bg-brand-700 text-white font-bold text-[11px]" aria-hidden>
+        <nav aria-label="Progresso do assistente" className="flex items-center gap-1.5 sm:gap-2">
+          <button
+            type="button"
+            onClick={() => setWizardStep(1)}
+            className={clsx(
+              'flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition',
+              wizardStep === 1
+                ? 'bg-brand-700 text-white font-semibold shadow-2xs'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200',
+            )}
+          >
+            <span
+              className={clsx(
+                'grid size-4.5 place-items-center rounded-full text-[10px] font-bold',
+                wizardStep === 1 ? 'bg-white text-brand-700' : 'bg-slate-300 text-slate-700',
+              )}
+            >
               1
             </span>
-            <span>Escolha a base de contatos</span>
-          </div>
-          <div className="flex items-center gap-2.5 text-xs font-medium text-slate-700">
-            <span className="grid size-5.5 place-items-center rounded-full bg-brand-700 text-white font-bold text-[11px]" aria-hidden>
+            <span>Base</span>
+          </button>
+
+          <span className="text-slate-300 text-xs font-bold" aria-hidden>
+            →
+          </span>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (selectedMailingId || activeMailing?.id) setWizardStep(2);
+            }}
+            disabled={!selectedMailingId && !activeMailing?.id}
+            className={clsx(
+              'flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition',
+              wizardStep === 2
+                ? 'bg-brand-700 text-white font-semibold shadow-2xs'
+                : wizardStep > 2
+                ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                : 'bg-slate-100/60 text-slate-400 cursor-not-allowed',
+            )}
+          >
+            <span
+              className={clsx(
+                'grid size-4.5 place-items-center rounded-full text-[10px] font-bold',
+                wizardStep === 2 ? 'bg-white text-brand-700' : 'bg-slate-300 text-slate-700',
+              )}
+            >
               2
             </span>
-            <span>Conte o objetivo em linguagem natural</span>
-          </div>
-          <div className="flex items-center gap-2.5 text-xs font-medium text-slate-700">
-            <span className="grid size-5.5 place-items-center rounded-full bg-brand-700 text-white font-bold text-[11px]" aria-hidden>
+            <span>Objetivo</span>
+          </button>
+
+          <span className="text-slate-300 text-xs font-bold" aria-hidden>
+            →
+          </span>
+
+          <button
+            type="button"
+            onClick={() => {
+              if ((selectedMailingId || activeMailing?.id) && campaignName.trim()) setWizardStep(3);
+            }}
+            disabled={!campaignName.trim() || (!selectedMailingId && !activeMailing?.id)}
+            className={clsx(
+              'flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition',
+              wizardStep === 3
+                ? 'bg-brand-700 text-white font-semibold shadow-2xs'
+                : 'bg-slate-100/60 text-slate-400 cursor-not-allowed',
+            )}
+          >
+            <span
+              className={clsx(
+                'grid size-4.5 place-items-center rounded-full text-[10px] font-bold',
+                wizardStep === 3 ? 'bg-white text-brand-700' : 'bg-slate-300 text-slate-700',
+              )}
+            >
               3
             </span>
-            <span>Revise o plano de CPC e dê o play</span>
-          </div>
-        </div>
+            <span>Revisão</span>
+          </button>
+        </nav>
       </div>
 
-      {/* Card 1: Base de Contatos */}
-      <Card
-        title={
-          <div className="flex items-center justify-between w-full">
-            <span className="flex items-center gap-2">
-              <Database className="size-4 text-brand-700" aria-hidden />
-              <span>1. Base de Contatos</span>
-            </span>
-            {activeMailing && (
-              <Badge tone="green">
-                ✓ {fmtNumber(targetCount)} contatos qualificados
-              </Badge>
-            )}
-          </div>
-        }
-      >
+      {/* ETAPA 1: BASE DE CONTATOS */}
+      {wizardStep === 1 && (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => setSourceType('EXISTING')}
-              className={clsx(
-                'flex items-center gap-3 rounded-xl border p-3.5 text-left transition',
-                sourceType === 'EXISTING'
-                  ? 'border-brand-500 bg-brand-50/70 font-semibold text-brand-900 ring-2 ring-brand-500/20'
-                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
-              )}
-            >
-              <FileSpreadsheet className="size-5 text-brand-700 shrink-0" aria-hidden />
-              <div>
-                <div className="text-sm font-semibold">Usar base ou lista pronta</div>
-                <div className="text-xs font-normal text-slate-500">Mailing importado ou lista segmentada</div>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setSourceType('IMPORT')}
-              className={clsx(
-                'flex items-center gap-3 rounded-xl border p-3.5 text-left transition',
-                sourceType === 'IMPORT'
-                  ? 'border-brand-500 bg-brand-50/70 font-semibold text-brand-900 ring-2 ring-brand-500/20'
-                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
-              )}
-            >
-              <UploadCloud className="size-5 text-brand-700 shrink-0" aria-hidden />
-              <div>
-                <div className="text-sm font-semibold">Carregar novo mailing (CSV)</div>
-                <div className="text-xs font-normal text-slate-500">Upload de planilha com conferência de colunas</div>
-              </div>
-            </button>
-          </div>
-
-          {sourceType === 'EXISTING' ? (
-            <div className="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 space-y-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <label htmlFor="select-base" className="text-xs font-medium text-slate-700">
-                  Selecione a carteira de contatos
-                </label>
-                {lists && lists.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setUseList(!useList)}
-                    className="text-xs text-brand-700 hover:underline font-medium"
-                  >
-                    {useList ? 'Trocar para mailing completo' : 'Usar uma lista filtrada específica'}
-                  </button>
+          <Card
+            title={
+              <div className="flex items-center justify-between w-full">
+                <span className="flex items-center gap-2">
+                  <Database className="size-4 text-brand-700" aria-hidden />
+                  <span>1. Base de Contatos</span>
+                </span>
+                {activeMailing && (
+                  <Badge tone="green">
+                    ✓ {fmtNumber(targetCount)} contatos qualificados
+                  </Badge>
                 )}
               </div>
-
-              {!useList ? (
-                <Select
-                  id="select-base"
-                  value={selectedMailingId}
-                  onChange={(e) => setSelectedMailingId(e.target.value)}
+            }
+          >
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSourceType('EXISTING')}
+                  className={clsx(
+                    'flex items-center gap-3 rounded-xl border p-3.5 text-left transition',
+                    sourceType === 'EXISTING'
+                      ? 'border-brand-500 bg-brand-50/70 font-semibold text-brand-900 ring-2 ring-brand-500/20'
+                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+                  )}
                 >
-                  <option value="">Selecione um mailing...</option>
-                  {mailings?.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name} — {fmtNumber(m.recordCount)} registros ({fmtDateTime(m.createdAt)})
-                    </option>
-                  ))}
-                </Select>
+                  <FileSpreadsheet className="size-5 text-brand-700 shrink-0" aria-hidden />
+                  <div>
+                    <div className="text-sm font-semibold">Usar base ou lista pronta</div>
+                    <div className="text-xs font-normal text-slate-500">Mailing existente ou lista segmentada</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSourceType('IMPORT')}
+                  className={clsx(
+                    'flex items-center gap-3 rounded-xl border p-3.5 text-left transition',
+                    sourceType === 'IMPORT'
+                      ? 'border-brand-500 bg-brand-50/70 font-semibold text-brand-900 ring-2 ring-brand-500/20'
+                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+                  )}
+                >
+                  <UploadCloud className="size-5 text-brand-700 shrink-0" aria-hidden />
+                  <div>
+                    <div className="text-sm font-semibold">Carregar novo mailing (CSV)</div>
+                    <div className="text-xs font-normal text-slate-500">Upload de planilha com conferência</div>
+                  </div>
+                </button>
+              </div>
+
+              {sourceType === 'EXISTING' ? (
+                <div className="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <label htmlFor="select-base" className="text-xs font-medium text-slate-700">
+                      Selecione a base de contatos
+                    </label>
+                    {lists && lists.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setUseList(!useList)}
+                        className="text-xs text-brand-700 hover:underline font-medium"
+                      >
+                        {useList ? 'Trocar para mailing completo' : 'Usar lista segmentada específica'}
+                      </button>
+                    )}
+                  </div>
+
+                  {!useList ? (
+                    <Select
+                      id="select-base"
+                      value={selectedMailingId}
+                      onChange={(e) => setSelectedMailingId(e.target.value)}
+                    >
+                      <option value="">Selecione um mailing...</option>
+                      {mailings?.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name} — {fmtNumber(m.recordCount)} registros ({fmtDateTime(m.createdAt)})
+                        </option>
+                      ))}
+                    </Select>
+                  ) : (
+                    <Select
+                      id="select-base"
+                      value={selectedListId}
+                      onChange={(e) => {
+                        setSelectedListId(e.target.value);
+                        const l = lists?.find((x) => x.id === e.target.value);
+                        if (l) setSelectedMailingId(l.mailing.id);
+                      }}
+                    >
+                      <option value="">Selecione uma lista...</option>
+                      {lists?.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.name} — {fmtNumber(l.latestVersion?.memberCount ?? 0)} membros (v{l.latestVersion?.version})
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+
+                  {activeMailing && (
+                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                      <Check className="size-3.5 text-emerald-600" />
+                      <span>
+                        Base selecionada: <strong>{activeMailing.name}</strong> · {fmtNumber(targetCount)} contatos qualificados
+                      </span>
+                    </div>
+                  )}
+                </div>
               ) : (
-                <Select
-                  id="select-base"
-                  value={selectedListId}
-                  onChange={(e) => {
-                    setSelectedListId(e.target.value);
-                    const l = lists?.find((x) => x.id === e.target.value);
-                    if (l) setSelectedMailingId(l.mailing.id);
-                  }}
-                >
-                  <option value="">Selecione uma lista...</option>
-                  {lists?.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.name} — {fmtNumber(l.latestVersion?.memberCount ?? 0)} membros (v{l.latestVersion?.version})
-                    </option>
-                  ))}
-                </Select>
-              )}
-
-              {activeMailing && (
-                <div className="flex items-center gap-2 text-xs text-slate-600">
-                  <Check className="size-3.5 text-emerald-600" />
-                  <span>
-                    Base ativa: <strong>{activeMailing.name}</strong> · {fmtNumber(targetCount)} contatos prontos para acionamento
-                  </span>
+                <div className="rounded-xl border border-slate-200 bg-white p-4">
+                  <ImportFlow
+                    onImported={(r) => {
+                      qc.invalidateQueries({ queryKey: ['mailings'] });
+                      setSelectedMailingId(r.mailingId);
+                      setSourceType('EXISTING');
+                      toast('success', `Mailing "${r.name}" importado e selecionado!`);
+                    }}
+                  />
                 </div>
               )}
             </div>
-          ) : (
-            <div className="rounded-xl border border-slate-200 bg-white p-4">
-              <ImportFlow
-                onImported={(r) => {
-                  qc.invalidateQueries({ queryKey: ['mailings'] });
-                  setSelectedMailingId(r.mailingId);
-                  setSourceType('EXISTING');
-                  toast('success', `Mailing "${r.name}" importado e selecionado!`);
-                }}
-              />
-            </div>
-          )}
-        </div>
-      </Card>
+          </Card>
 
-      {/* Card 2: Objetivo da Campanha (Prompt ChatGPT / Google) */}
-      <Card
-        title={
-          <div className="flex items-center justify-between w-full">
-            <span className="flex items-center gap-2">
-              <Sparkles className="size-4 text-brand-700" aria-hidden />
-              <span>2. O que você precisa alcançar?</span>
-            </span>
-            <span className="text-xs font-normal text-slate-500">Prompt em linguagem natural</span>
-          </div>
-        }
-      >
-        <div className="space-y-3.5">
-          <div className="relative">
-            <Textarea
-              id="campaign-prompt"
-              rows={3}
-              className="font-sans text-sm p-3.5 rounded-xl border-slate-200 focus:border-brand-500"
-              placeholder="Descreva o objetivo da campanha (ex: Cobrança preventiva recente 15 a 30 dias com foco em WhatsApp e menor custo por CPC)..."
-              value={promptText}
-              onChange={(e) => setPromptText(e.target.value)}
-            />
-          </div>
-
-          <div>
-            <div className="text-xs font-medium text-slate-500 mb-1.5">Sugestões rápidas de objetivo (1 clique):</div>
-            <div className="flex flex-wrap gap-1.5">
-              {PROMPT_TEMPLATES.map((tmpl) => (
-                <button
-                  key={tmpl.label}
-                  type="button"
-                  onClick={() => handleApplyTemplate(tmpl)}
-                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50/70 px-2.5 py-1 text-xs font-medium text-slate-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-900 transition"
-                >
-                  <Sparkles className="size-3 text-brand-600" aria-hidden />
-                  {tmpl.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="pt-2">
-            <Field label="Nome da Campanha" required>
-              {(p) => (
-                <Input
-                  id={p.id}
-                  value={campaignName}
-                  onChange={(e) => setCampaignName(e.target.value)}
-                  placeholder="Nome identificador da campanha"
-                />
-              )}
-            </Field>
-          </div>
-        </div>
-      </Card>
-
-      {/* Card 3: Alocação Inteligente de CPC */}
-      <Card
-        title={
-          <span className="flex items-center gap-2">
-            <Rocket className="size-4 text-brand-700" aria-hidden />
-            <span>3. Alocação Inteligente & Menor Custo por CPC</span>
-          </span>
-        }
-      >
-        <div className="rounded-xl border border-brand-200/90 bg-gradient-to-r from-brand-50/70 via-white to-slate-50 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-sm text-slate-900">Motor de Otimização Autônomo Ativo</span>
-                <Badge tone="green">Produção Otimizada</Badge>
-                <Badge tone="brand">Golden Record Conectado</Badge>
-              </div>
-              <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
-                A esteira de inteligência analisa o perfil de cada contato no backend (TIC Domicílios 2025 + histórico unificado), determinando canal ótimo, janela horária Wi-Fi e DDD local com economia projetada superior a 40%.
-              </p>
-            </div>
-            <div className="text-right">
-              <div className="text-xs text-slate-500 font-medium">Meta Máxima Aceitável</div>
-              <div className="text-sm font-bold text-slate-900">{fmtMoney(maxAcceptableCpcBrl)} / CPC</div>
-            </div>
-          </div>
-        </div>
-      </Card>
-
-      {/* Card 4: Plano Otimizado de Contato (Calculado pela Inteligência) */}
-      <Card
-        title={
-          <div className="flex items-center justify-between w-full">
-            <span className="flex items-center gap-2">
-              <ShieldCheck className="size-4 text-brand-700" aria-hidden />
-              <span>4. Plano de CPC Otimizado (TIC Domicílios 2025)</span>
-            </span>
-            <button
-              type="button"
-              onClick={() => setShowBlocksDetail(!showBlocksDetail)}
-              className="flex items-center gap-1 text-xs font-medium text-brand-700 hover:underline"
-            >
-              {showBlocksDetail ? 'Ocultar detalhes dos 8 blocos' : 'Ver os 8 blocos em detalhe'}
-              {showBlocksDetail ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-            </button>
-          </div>
-        }
-      >
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-            <Stat
-              label="Contatos Qualificados"
-              value={fmtNumber(targetCount)}
-              hint="Base qualificada"
-            />
-            <Stat
-              label="Taxa Estimada de CPC"
-              value="38,4%"
-              tone="good"
-              hint="Auditável por tabulação"
-            />
-            <Stat
-              label="Custo por CPC Otimizado"
-              value="R$ 3,18"
-              tone="good"
-              hint="vs. R$ 5,60 Força Bruta"
-            />
-            <Stat
-              label="Economia Projetada"
-              value="43,2%"
-              tone="good"
-              hint="Redução de custo unitário"
-            />
-          </div>
-
-          <div className="rounded-xl border border-brand-200/80 bg-brand-50/50 p-3.5 text-xs text-brand-950 flex items-start gap-2.5">
-            <Database className="size-4 text-brand-700 shrink-0 mt-0.5" aria-hidden />
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
             <div>
-              <strong>Base Cumulativa Ativa (Golden Record):</strong> Telefones confirmados em campanhas anteriores recebem automaticamente classificação <strong>Phone-Intent P1</strong>. Números inválidos e registros em DNC/Procon são despriorizados ou bloqueados antes do disparo.
+              <button
+                type="button"
+                onClick={onOpenManualWizard}
+                className="text-xs text-slate-500 hover:text-brand-700 underline underline-offset-2 transition"
+              >
+                Campanha manual avançada →
+              </button>
+            </div>
+            <Button
+              variant="primary"
+              size="md"
+              disabled={!selectedMailingId && !activeMailing?.id}
+              onClick={() => setWizardStep(2)}
+              icon={<ArrowRight className="size-4" aria-hidden />}
+            >
+              Avançar para o Objetivo →
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ETAPA 2: OBJETIVO EM LINGUAGEM NATURAL */}
+      {wizardStep === 2 && (
+        <div className="space-y-4">
+          <Card
+            title={
+              <div className="flex items-center justify-between w-full">
+                <span className="flex items-center gap-2">
+                  <Sparkles className="size-4 text-brand-700" aria-hidden />
+                  <span>2. Objetivo da Campanha</span>
+                </span>
+                <span className="text-xs font-normal text-slate-500">Linguagem natural</span>
+              </div>
+            }
+          >
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label htmlFor="campaign-prompt" className="text-xs font-medium text-slate-700">
+                  Descreva o objetivo da campanha
+                </label>
+                <Textarea
+                  id="campaign-prompt"
+                  rows={3}
+                  className="font-sans text-sm p-3.5 rounded-xl border-slate-200 focus:border-brand-500"
+                  placeholder="Ex: Cobrança preventiva recente 15 a 30 dias com foco em WhatsApp e menor custo por CPC..."
+                  value={promptText}
+                  onChange={(e) => setPromptText(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <div className="text-xs font-medium text-slate-500 mb-1.5">Sugestões rápidas (1 clique):</div>
+                <div className="flex flex-wrap gap-1.5">
+                  {PROMPT_TEMPLATES.map((tmpl) => (
+                    <button
+                      key={tmpl.label}
+                      type="button"
+                      onClick={() => handleApplyTemplate(tmpl)}
+                      className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50/70 px-2.5 py-1 text-xs font-medium text-slate-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-900 transition"
+                    >
+                      <Sparkles className="size-3 text-brand-600" aria-hidden />
+                      {tmpl.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                <Field label="Nome da Campanha" required>
+                  {(p) => (
+                    <Input
+                      id={p.id}
+                      value={campaignName}
+                      onChange={(e) => setCampaignName(e.target.value)}
+                      placeholder="Nome identificador da campanha"
+                    />
+                  )}
+                </Field>
+
+                <Field label="Teto de Custo por CPC (R$)">
+                  {(p) => (
+                    <Input
+                      id={p.id}
+                      type="number"
+                      step="0.10"
+                      min="0.50"
+                      value={maxAcceptableCpcBrl}
+                      onChange={(e) => setMaxAcceptableCpcBrl(Number(e.target.value) || 4.5)}
+                    />
+                  )}
+                </Field>
+              </div>
+            </div>
+          </Card>
+
+          <div className="flex items-center justify-between gap-3 pt-2">
+            <Button
+              variant="secondary"
+              onClick={() => setWizardStep(1)}
+              icon={<ArrowLeft className="size-4" aria-hidden />}
+            >
+              ← Voltar para Base
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              disabled={!campaignName.trim()}
+              onClick={() => setWizardStep(3)}
+              icon={<ArrowRight className="size-4" aria-hidden />}
+            >
+              Avançar para Revisão & Disparo →
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ETAPA 3: REVISÃO & DISPARO */}
+      {wizardStep === 3 && (
+        <div className="space-y-4">
+          <Card
+            title={
+              <div className="flex items-center justify-between w-full">
+                <span className="flex items-center gap-2">
+                  <ShieldCheck className="size-4 text-brand-700" aria-hidden />
+                  <span>3. Revisão & CPC Otimizado</span>
+                </span>
+                <Badge tone="green">Pronta para Disparo</Badge>
+              </div>
+            }
+          >
+            <div className="space-y-4">
+              {/* Resumo compacto dos parâmetros */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 rounded-xl border border-slate-200/90 bg-slate-50/60 p-3.5 text-xs text-slate-700">
+                <div>
+                  <span className="text-slate-500 block text-[11px]">Base Selecionada:</span>
+                  <span className="font-semibold text-slate-900 truncate block">
+                    {activeMailing?.name ?? 'Mailing'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[11px]">Nome da Campanha:</span>
+                  <span className="font-semibold text-slate-900 truncate block">{campaignName}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[11px]">Teto Máximo Aceitável:</span>
+                  <span className="font-semibold text-slate-900">{fmtMoney(maxAcceptableCpcBrl)} / CPC</span>
+                </div>
+              </div>
+
+              {/* Indicadores de CPC */}
+              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                <Stat
+                  label="Contatos Qualificados"
+                  value={fmtNumber(targetCount)}
+                  hint="Base qualificada"
+                />
+                <Stat
+                  label="Taxa Estimada CPC"
+                  value="38,4%"
+                  tone="good"
+                  hint="Auditável por tabulação"
+                />
+                <Stat
+                  label="Custo por CPC Otimizado"
+                  value="R$ 3,18"
+                  tone="good"
+                  hint="vs. R$ 5,60 Força Bruta"
+                />
+                <Stat
+                  label="Economia Projetada"
+                  value="43,2%"
+                  tone="good"
+                  hint="Redução unitária"
+                />
+              </div>
+
+              {/* Detalhe dos 8 blocos (colapsado por padrão) */}
+              <div className="border-t border-slate-200/80 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowBlocksDetail(!showBlocksDetail)}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-brand-700 hover:text-brand-800 transition"
+                >
+                  {showBlocksDetail ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+                  <span>
+                    {showBlocksDetail
+                      ? 'Ocultar matriz dos 8 blocos (TIC Domicílios 2025)'
+                      : 'Ver matriz dos 8 blocos (TIC Domicílios 2025)'}
+                  </span>
+                </button>
+
+                {showBlocksDetail && (
+                  <div className="pt-3">
+                    <TableWrap label="8 Blocos Padronizados de Otimização">
+                      <table className="data">
+                        <thead>
+                          <tr>
+                            <th className="w-12">Bloco</th>
+                            <th>Segmento Demográfico (TIC 2025)</th>
+                            <th>Canal Primário</th>
+                            <th>Janela Ótima</th>
+                            <th>Phone-Intent</th>
+                            <th>Custo Previsto</th>
+                            <th>Decisão</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {BLOCKS_TEMPLATE.map((b) => (
+                            <tr key={b.blockNum}>
+                              <td className="tabular font-bold text-slate-500">#{b.blockNum}</td>
+                              <td>
+                                <div className="font-semibold text-slate-900">{b.name}</div>
+                                <div className="text-[11px] text-slate-500">{b.demographics}</div>
+                              </td>
+                              <td>
+                                <Badge
+                                  tone={
+                                    b.channel === 'WHATSAPP'
+                                      ? 'green'
+                                      : b.channel === 'VOICE'
+                                      ? 'brand'
+                                      : 'blue'
+                                  }
+                                >
+                                  {CHANNEL_LABEL[b.channel]}
+                                </Badge>
+                              </td>
+                              <td className="text-xs text-slate-700">{b.timeWindow}</td>
+                              <td>
+                                <Badge
+                                  tone={
+                                    b.phoneTier.startsWith('P1')
+                                      ? 'green'
+                                      : b.phoneTier.startsWith('P2')
+                                      ? 'brand'
+                                      : 'gray'
+                                  }
+                                >
+                                  {b.phoneTier}
+                                </Badge>
+                              </td>
+                              <td className="tabular font-semibold text-emerald-700">
+                                {fmtMoney(b.estimatedCpcBrl)}
+                              </td>
+                              <td>
+                                <Badge tone={b.tone}>{b.decision}</Badge>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </TableWrap>
+                  </div>
+                )}
+              </div>
+            </div>
+          </Card>
+
+          {formError && <Alert tone="error">{formError}</Alert>}
+
+          {/* Barra de Ação Final */}
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
+            <Button
+              variant="secondary"
+              onClick={() => setWizardStep(2)}
+              icon={<ArrowLeft className="size-4" aria-hidden />}
+            >
+              ← Voltar para Objetivo
+            </Button>
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              <Button
+                variant="secondary"
+                onClick={() => handleCreate('READY')}
+                loading={isCreating && createStartMode === 'READY'}
+                disabled={isCreating}
+              >
+                Salvar como pronta
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => handleCreate('NOW')}
+                loading={isCreating && createStartMode === 'NOW'}
+                disabled={isCreating}
+                icon={<Rocket className="size-4" aria-hidden />}
+              >
+                Criar e iniciar campanha →
+              </Button>
             </div>
           </div>
-
-          {showBlocksDetail && (
-            <div className="pt-2">
-              <TableWrap label="8 Blocos Padronizados de Otimização">
-                <table className="data">
-                  <thead>
-                    <tr>
-                      <th className="w-12">Bloco</th>
-                      <th>Segmento Demográfico (TIC 2025)</th>
-                      <th>Canal Primário</th>
-                      <th>Janela Ótima</th>
-                      <th>Phone-Intent</th>
-                      <th>Custo Previsto</th>
-                      <th>Decisão</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {BLOCKS_TEMPLATE.map((b) => (
-                      <tr key={b.blockNum}>
-                        <td className="tabular font-bold text-slate-500">#{b.blockNum}</td>
-                        <td>
-                          <div className="font-semibold text-slate-900">{b.name}</div>
-                          <div className="text-[11px] text-slate-500">{b.demographics}</div>
-                        </td>
-                        <td>
-                          <Badge tone={b.channel === 'WHATSAPP' ? 'green' : b.channel === 'VOICE' ? 'brand' : 'blue'}>
-                            {CHANNEL_LABEL[b.channel]}
-                          </Badge>
-                        </td>
-                        <td className="text-xs text-slate-700">{b.timeWindow}</td>
-                        <td>
-                          <Badge tone={b.phoneTier.startsWith('P1') ? 'green' : b.phoneTier.startsWith('P2') ? 'brand' : 'gray'}>
-                            {b.phoneTier}
-                          </Badge>
-                        </td>
-                        <td className="tabular font-semibold text-emerald-700">{fmtMoney(b.estimatedCpcBrl)}</td>
-                        <td>
-                          <Badge tone={b.tone}>{b.decision}</Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </TableWrap>
-            </div>
-          )}
         </div>
-      </Card>
-
-      {formError && <Alert tone="error">{formError}</Alert>}
-
-      {/* Barra de Ação Principal */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
-        <div className="flex items-center gap-2 text-xs text-slate-600">
-          <Check className="size-4 text-emerald-600 shrink-0" aria-hidden />
-          <span>Pronto para iniciar: jornada multicanal e réguas horárias atribuídas automaticamente.</span>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2.5">
-          <Button
-            variant="secondary"
-            onClick={() => handleCreate('READY')}
-            loading={isCreating && createStartMode === 'READY'}
-            disabled={isCreating}
-          >
-            Salvar como pronta
-          </Button>
-          <Button
-            variant="primary"
-            onClick={() => handleCreate('NOW')}
-            loading={isCreating && createStartMode === 'NOW'}
-            disabled={isCreating}
-            icon={<Rocket className="size-4" aria-hidden />}
-          >
-            Criar e iniciar campanha →
-          </Button>
-        </div>
-      </div>
-
-      {/* Link Discreto Campanha Manual */}
-      <div className="pt-4 pb-2 text-center border-t border-slate-200/80">
-        <p className="text-xs text-slate-500">
-          Precisa de filtros SQL manuais, etapas e réguas horárias personalizadas?{' '}
-          <button
-            type="button"
-            onClick={onOpenManualWizard}
-            className="font-semibold text-brand-700 hover:text-brand-800 underline underline-offset-2 transition"
-          >
-            Criar campanha manual →
-          </button>
-        </p>
-      </div>
+      )}
     </div>
   );
 }
