@@ -528,154 +528,270 @@ export async function runIntelligencePipeline(
     // Ajuste conforme a Finalidade informada no Prompt Inicial (H-C7)
     const isTransactionalOrSupport =
       input.purposeCode === 'ATENDIMENTO_SUPORTE' || input.purposeCode === 'CONFIRMACAO_SERVICO';
-    const purposeBoost = isTransactionalOrSupport ? 1.25 : input.purposeCode === 'PESQUISA_RELACIONAMENTO' ? 1.1 : 1.0;
+    const isAgendamentos = input.purposeCode === 'AGENDAMENTOS';
+    const isVendas = input.purposeCode === 'VENDAS';
+    const isCobranca = input.purposeCode === 'COBRANCA';
 
-    // Passo econômico de E-mail quando competitivo (H-A3, H-C4: 25-59 anos com e-mail válido)
-    if (
-      emailDests.length > 0 &&
-      ['25_34', '35_44', '45_59'].includes(ageInfo.bracket) &&
-      (hypMap.get('H-A3')?.enabled ?? true)
-    ) {
-      candidateSteps.push({
-        step: candidateSteps.length + 1,
-        channel: 'EMAIL',
-        destinationId: emailDests[0].id,
-        address: emailDests[0].address,
-        shiftSlot: shiftRecyclingOrder[0] ?? 'MANHA_08_11',
-        localTimeWindow: '08:30–10:00',
-        waitMinutesAfterPrev: 0,
-        warmupNote: 'Ancoragem de contexto e transparência de motivo (H-C4 / H-A3)',
-        tariffBrl: defaultTariffs.EMAIL,
-        conditionalCpcProb: Number(Math.min(0.32, 0.14 * purposeBoost * (ticAge.emailAmongUsersPct / 70)).toFixed(3)),
-        stopCondition: 'Encerrar se responder ou confirmar titularidade via link/resposta',
-      });
-    }
+    const purposeBoost = isAgendamentos
+      ? 1.45
+      : isTransactionalOrSupport
+      ? 1.25
+      : isVendas
+      ? 1.15
+      : input.purposeCode === 'PESQUISA_RELACIONAMENTO'
+      ? 1.1
+      : 1.0;
 
-    if (phoneIntentTier === 'P1_VOZ_DIRETA' && voiceDests.length > 0) {
-      // Sênior / P1: Voz Local primeiro + WhatsApp assistido como passo seguinte
-      const bestVoice = voiceDests[0];
-      candidateSteps.push({
-        step: candidateSteps.length + 1,
-        channel: 'VOICE',
-        destinationId: bestVoice.id,
-        address: bestVoice.address,
-        shiftSlot: shiftRecyclingOrder[0] ?? 'MANHA_08_11',
-        localTimeWindow,
-        waitMinutesAfterPrev: candidateSteps.length ? 120 : 0,
-        warmupNote: `Discagem com BINA DDD ${dddProfile.ddd} Local e identificação nominal imediata (H-A4 / H-C6)`,
-        tariffBrl: defaultTariffs.VOICE,
-        conditionalCpcProb: Number(Math.min(0.55, 0.34 * purposeBoost * (locatorScore / 80)).toFixed(3)),
-        stopCondition: 'Encerrar ao confirmar CPC na tabulação; se Terceiro, invalidar destino (H-L2)',
-      });
-      if (effectiveWaDests.length > 0 && candidateSteps.length < maxSteps) {
+    const appointmentDateStr =
+      attrs.data_agendamento ??
+      attrs.appointment_date ??
+      attrs.data_consulta ??
+      attrs.data_visita ??
+      attrs.data ??
+      attrs.horario_agendamento ??
+      '';
+
+    if (isAgendamentos) {
+      // Cadência Especial de Agendamentos: Lembrete 1 dia antes (D-1) + Lembrete no dia (D-0)
+      if (effectiveWaDests.length > 0) {
         candidateSteps.push({
-          step: candidateSteps.length + 1,
+          step: 1,
           channel: 'WHATSAPP',
           destinationId: effectiveWaDests[0].id,
           address: effectiveWaDests[0].address,
-          shiftSlot: shiftRecyclingOrder[1] ?? 'TARDE_14_17',
-          localTimeWindow: '14:30–16:30',
-          waitMinutesAfterPrev: 180,
-          warmupNote: 'Mensagem formal de fácil leitura no celular com opção de falar com atendente (83% uso Cetic C5)',
+          shiftSlot: 'MANHA_08_11',
+          localTimeWindow: '09:00–11:00 (D-1 Véspera)',
+          waitMinutesAfterPrev: 0,
+          warmupNote: appointmentDateStr
+            ? `Lembrete D-1 (1 dia antes): WhatsApp interativo com confirmação em 1 toque (Data: ${appointmentDateStr})`
+            : 'Lembrete D-1 (1 dia antes): WhatsApp interativo com botões [1 - Sim, confirmo] e [2 - Reagendar]',
           tariffBrl: defaultTariffs.WHATSAPP,
-          conditionalCpcProb: Number(Math.min(0.48, 0.29 * purposeBoost).toFixed(3)),
-          stopCondition: 'Encerrar após confirmação do titular',
+          conditionalCpcProb: 0.78,
+          stopCondition: 'Confirmar comparecimento pelo botão ou iniciar fluxo de reagendamento',
         });
-      }
-    } else if (phoneIntentTier === 'P3_DIGITAL_ASSINCRONO' && effectiveWaDests.length > 0) {
-      // Digital-First (Jovens / Metrópole saturada)
-      candidateSteps.push({
-        step: candidateSteps.length + 1,
-        channel: 'WHATSAPP',
-        destinationId: effectiveWaDests[0].id,
-        address: effectiveWaDests[0].address,
-        shiftSlot: shiftRecyclingOrder[0] ?? 'ALMOCO_11_14',
-        localTimeWindow,
-        waitMinutesAfterPrev: candidateSteps.length ? 90 : 0,
-        warmupNote: 'Abordagem curta com remetente verificado e opções rápidas de resposta (H-A2 / H-C1)',
-        tariffBrl: defaultTariffs.WHATSAPP,
-        conditionalCpcProb: Number(Math.min(0.58, 0.36 * purposeBoost * (locatorScore / 82)).toFixed(3)),
-        stopCondition: 'Aguardar resposta ativa do titular (Leitura isolada não conta como CPC - H-C1)',
-      });
-      if (effectiveSmsDests.length > 0 && candidateSteps.length < maxSteps) {
+
+        if (maxSteps >= 2) {
+          candidateSteps.push({
+            step: 2,
+            channel: 'WHATSAPP',
+            destinationId: effectiveWaDests[0].id,
+            address: effectiveWaDests[0].address,
+            shiftSlot: shiftRecyclingOrder[0] ?? 'MANHA_08_11',
+            localTimeWindow: '2h antes do horário agendado (D-0)',
+            waitMinutesAfterPrev: 1440,
+            warmupNote: 'Lembrete D-0 (no dia): WhatsApp informativo 2h antes com localização, mapa e orientações de chegada',
+            tariffBrl: defaultTariffs.WHATSAPP,
+            conditionalCpcProb: 0.88,
+            stopCondition: 'Comparecimento presencial confirmado (Prevenção de No-Show)',
+          });
+        }
+
+        if (maxSteps >= 3 && voiceDests.length > 0) {
+          candidateSteps.push({
+            step: 3,
+            channel: 'VOICE',
+            destinationId: voiceDests[0].id,
+            address: voiceDests[0].address,
+            shiftSlot: 'ALMOCO_11_14',
+            localTimeWindow: '11:00–12:30',
+            waitMinutesAfterPrev: 120,
+            warmupNote: `Chamada confirmatória ativa com DDD ${dddProfile.ddd} Local caso não haja retorno prévio no WhatsApp`,
+            tariffBrl: defaultTariffs.VOICE,
+            conditionalCpcProb: 0.65,
+            stopCondition: 'Encerrar após confirmação de presença com titular',
+          });
+        }
+      } else if (effectiveSmsDests.length > 0) {
         candidateSteps.push({
-          step: candidateSteps.length + 1,
+          step: 1,
           channel: 'SMS',
           destinationId: effectiveSmsDests[0].id,
           address: effectiveSmsDests[0].address,
-          shiftSlot: shiftRecyclingOrder[1] ?? 'FIM_TARDE_17_20',
-          localTimeWindow: '18:00–19:30',
-          waitMinutesAfterPrev: 240,
-          warmupNote: 'Pré-aviso curto contextual antes de tentativa de voz identificada (H-C2)',
+          shiftSlot: 'MANHA_08_11',
+          localTimeWindow: '09:00–11:00 (D-1 Véspera)',
+          waitMinutesAfterPrev: 0,
+          warmupNote: appointmentDateStr
+            ? `Lembrete D-1 por SMS: confirme seu agendamento em ${appointmentDateStr}`
+            : 'Lembrete D-1 por SMS: confirme agendamento respondendo 1 p/ SIM ou 2 p/ REAGENDAR',
           tariffBrl: defaultTariffs.SMS,
-          conditionalCpcProb: Number(Math.min(0.28, 0.16 * purposeBoost).toFixed(3)),
-          stopCondition: 'Encerrar se responder ou destravar atendimento na chamada seguinte',
+          conditionalCpcProb: 0.62,
+          stopCondition: 'Encerrar se responder ou confirmar presença',
         });
-      }
-      if (voiceDests.length > 0 && candidateSteps.length < maxSteps) {
-        candidateSteps.push({
-          step: candidateSteps.length + 1,
-          channel: 'VOICE',
-          destinationId: voiceDests[0].id,
-          address: voiceDests[0].address,
-          shiftSlot: shiftRecyclingOrder[1] ?? 'FIM_TARDE_17_20',
-          localTimeWindow: '18:10–19:30',
-          waitMinutesAfterPrev: 10,
-          warmupNote: `Chamada única pós-aviso com DDD ${dddProfile.ddd} Local`,
-          tariffBrl: defaultTariffs.VOICE,
-          conditionalCpcProb: Number(Math.min(0.44, 0.27 * purposeBoost).toFixed(3)),
-          stopCondition: 'Stop-Loss de voz para evitar marcação de spam no Android/iOS',
-        });
+
+        if (maxSteps >= 2) {
+          candidateSteps.push({
+            step: 2,
+            channel: 'SMS',
+            destinationId: effectiveSmsDests[0].id,
+            address: effectiveSmsDests[0].address,
+            shiftSlot: 'MANHA_08_11',
+            localTimeWindow: '2h antes do agendamento (D-0)',
+            waitMinutesAfterPrev: 1440,
+            warmupNote: 'Lembrete D-0 por SMS: seu compromisso é hoje. Detalhes de endereço e horário',
+            tariffBrl: defaultTariffs.SMS,
+            conditionalCpcProb: 0.74,
+            stopCondition: 'Comparecimento confirmado',
+          });
+        }
       }
     } else {
-      // P2: Micro-jornada Warm-up (SMS/WPP) -> Voz Identificada (FICO CCS / NICE ContactEngine / H-C2)
-      if (effectiveSmsDests.length > 0 && (hypMap.get('H-C2')?.enabled ?? true)) {
+      // Passo econômico de E-mail quando competitivo (H-A3, H-C4: 25-59 anos com e-mail válido)
+      if (
+        emailDests.length > 0 &&
+        ['25_34', '35_44', '45_59'].includes(ageInfo.bracket) &&
+        (hypMap.get('H-A3')?.enabled ?? true)
+      ) {
         candidateSteps.push({
           step: candidateSteps.length + 1,
-          channel: 'SMS',
-          destinationId: effectiveSmsDests[0].id,
-          address: effectiveSmsDests[0].address,
-          shiftSlot: shiftRecyclingOrder[0] ?? 'ALMOCO_11_14',
-          localTimeWindow,
-          waitMinutesAfterPrev: candidateSteps.length ? 60 : 0,
-          warmupNote: `Warm-up Pré-Chamada: avisa que a marca ligará do DDD ${dddProfile.ddd} em instantes (H-C2)`,
-          tariffBrl: defaultTariffs.SMS,
-          conditionalCpcProb: Number(Math.min(0.25, 0.15 * purposeBoost).toFixed(3)),
-          stopCondition: 'Se cliente responder no texto, concluir CPC sem precisar discar',
+          channel: 'EMAIL',
+          destinationId: emailDests[0].id,
+          address: emailDests[0].address,
+          shiftSlot: shiftRecyclingOrder[0] ?? 'MANHA_08_11',
+          localTimeWindow: '08:30–10:00',
+          waitMinutesAfterPrev: 0,
+          warmupNote: isVendas
+            ? 'Apresentação de proposta comercial personalizada por e-mail'
+            : 'Ancoragem de contexto e transparência de motivo (H-C4 / H-A3)',
+          tariffBrl: defaultTariffs.EMAIL,
+          conditionalCpcProb: Number(Math.min(0.32, 0.14 * purposeBoost * (ticAge.emailAmongUsersPct / 70)).toFixed(3)),
+          stopCondition: 'Encerrar se responder ou confirmar titularidade via link/resposta',
         });
       }
-      if (voiceDests.length > 0 && candidateSteps.length < maxSteps) {
+
+      if (phoneIntentTier === 'P1_VOZ_DIRETA' && voiceDests.length > 0) {
+        // Sênior / P1: Voz Local primeiro + WhatsApp assistido como passo seguinte
+        const bestVoice = voiceDests[0];
         candidateSteps.push({
           step: candidateSteps.length + 1,
           channel: 'VOICE',
-          destinationId: voiceDests[0].id,
-          address: voiceDests[0].address,
-          shiftSlot: shiftRecyclingOrder[0] ?? 'ALMOCO_11_14',
+          destinationId: bestVoice.id,
+          address: bestVoice.address,
+          shiftSlot: shiftRecyclingOrder[0] ?? 'MANHA_08_11',
           localTimeWindow,
-          waitMinutesAfterPrev: 10,
-          warmupNote: `Chamada sincronizada pós-Warmup com DDD ${dddProfile.ddd} Local (H-C2 / H-C6)`,
+          waitMinutesAfterPrev: candidateSteps.length ? 120 : 0,
+          warmupNote: isVendas
+            ? `Discagem consultiva com BINA DDD ${dddProfile.ddd} Local para oferta de novos serviços`
+            : `Discagem com BINA DDD ${dddProfile.ddd} Local e identificação nominal imediata (H-A4 / H-C6)`,
           tariffBrl: defaultTariffs.VOICE,
-          conditionalCpcProb: Number(Math.min(0.56, 0.35 * purposeBoost * (locatorScore / 80)).toFixed(3)),
-          stopCondition: 'Confirmar titularidade; se Não Atende, reciclar turno para WhatsApp (H-T2)',
+          conditionalCpcProb: Number(Math.min(0.55, 0.34 * purposeBoost * (locatorScore / 80)).toFixed(3)),
+          stopCondition: isVendas
+            ? 'Encerrar ao tabular interesse comercial ou recusa formal'
+            : 'Encerrar ao confirmar CPC na tabulação; se Terceiro, invalidar destino (H-L2)',
         });
-      }
-      if (effectiveWaDests.length > 0 && candidateSteps.length < maxSteps) {
+        if (effectiveWaDests.length > 0 && candidateSteps.length < maxSteps) {
+          candidateSteps.push({
+            step: candidateSteps.length + 1,
+            channel: 'WHATSAPP',
+            destinationId: effectiveWaDests[0].id,
+            address: effectiveWaDests[0].address,
+            shiftSlot: shiftRecyclingOrder[1] ?? 'TARDE_14_17',
+            localTimeWindow: '14:30–16:30',
+            waitMinutesAfterPrev: 180,
+            warmupNote: isVendas
+              ? 'Catálogo comercial e condições especiais enviadas por WhatsApp'
+              : 'Mensagem formal de fácil leitura no celular com opção de falar com atendente (83% uso Cetic C5)',
+            tariffBrl: defaultTariffs.WHATSAPP,
+            conditionalCpcProb: Number(Math.min(0.48, 0.29 * purposeBoost).toFixed(3)),
+            stopCondition: 'Encerrar após confirmação do titular',
+          });
+        }
+      } else if (phoneIntentTier === 'P3_DIGITAL_ASSINCRONO' && effectiveWaDests.length > 0) {
+        // Digital-First (Jovens / Metrópole saturada)
         candidateSteps.push({
           step: candidateSteps.length + 1,
           channel: 'WHATSAPP',
           destinationId: effectiveWaDests[0].id,
           address: effectiveWaDests[0].address,
-          shiftSlot: shiftRecyclingOrder[1] ?? 'FIM_TARDE_17_20',
-          localTimeWindow: dddProfile.dataCapExhaustionPct >= 46 ? '19:00–20:45 (Wi-Fi)' : '17:45–19:30',
-          waitMinutesAfterPrev: 240,
-          warmupNote:
-            dddProfile.dataCapExhaustionPct >= 46
-              ? 'Disparo na janela de Wi-Fi residencial devido a 46%-54% de fim de franquia móvel na região (H-G3)'
-              : 'Transbordo assíncrono em turno rotacionado (H-T2 / H-T5)',
+          shiftSlot: shiftRecyclingOrder[0] ?? 'ALMOCO_11_14',
+          localTimeWindow,
+          waitMinutesAfterPrev: candidateSteps.length ? 90 : 0,
+          warmupNote: isVendas
+            ? 'Oferta digital interativa com botões de contratação e portabilidade (H-A2)'
+            : 'Abordagem curta com remetente verificado e opções rápidas de resposta (H-A2 / H-C1)',
           tariffBrl: defaultTariffs.WHATSAPP,
-          conditionalCpcProb: Number(Math.min(0.52, 0.31 * purposeBoost).toFixed(3)),
-          stopCondition: 'Encerrar ao confirmar CPC',
+          conditionalCpcProb: Number(Math.min(0.58, 0.36 * purposeBoost * (locatorScore / 82)).toFixed(3)),
+          stopCondition: 'Aguardar resposta ativa do titular (Leitura isolada não conta como CPC - H-C1)',
         });
+        if (effectiveSmsDests.length > 0 && candidateSteps.length < maxSteps) {
+          candidateSteps.push({
+            step: candidateSteps.length + 1,
+            channel: 'SMS',
+            destinationId: effectiveSmsDests[0].id,
+            address: effectiveSmsDests[0].address,
+            shiftSlot: shiftRecyclingOrder[1] ?? 'FIM_TARDE_17_20',
+            localTimeWindow: '18:00–19:30',
+            waitMinutesAfterPrev: 240,
+            warmupNote: 'Pré-aviso curto contextual antes de tentativa de voz identificada (H-C2)',
+            tariffBrl: defaultTariffs.SMS,
+            conditionalCpcProb: Number(Math.min(0.28, 0.16 * purposeBoost).toFixed(3)),
+            stopCondition: 'Encerrar se responder ou destravar atendimento na chamada seguinte',
+          });
+        }
+        if (voiceDests.length > 0 && candidateSteps.length < maxSteps) {
+          candidateSteps.push({
+            step: candidateSteps.length + 1,
+            channel: 'VOICE',
+            destinationId: voiceDests[0].id,
+            address: voiceDests[0].address,
+            shiftSlot: shiftRecyclingOrder[1] ?? 'FIM_TARDE_17_20',
+            localTimeWindow: '18:10–19:30',
+            waitMinutesAfterPrev: 10,
+            warmupNote: `Chamada única pós-aviso com DDD ${dddProfile.ddd} Local`,
+            tariffBrl: defaultTariffs.VOICE,
+            conditionalCpcProb: Number(Math.min(0.44, 0.27 * purposeBoost).toFixed(3)),
+            stopCondition: 'Stop-Loss de voz para evitar marcação de spam no Android/iOS',
+          });
+        }
+      } else {
+        // P2: Micro-jornada Warm-up (SMS/WPP) -> Voz Identificada (FICO CCS / NICE ContactEngine / H-C2)
+        if (effectiveSmsDests.length > 0 && (hypMap.get('H-C2')?.enabled ?? true)) {
+          candidateSteps.push({
+            step: candidateSteps.length + 1,
+            channel: 'SMS',
+            destinationId: effectiveSmsDests[0].id,
+            address: effectiveSmsDests[0].address,
+            shiftSlot: shiftRecyclingOrder[0] ?? 'ALMOCO_11_14',
+            localTimeWindow,
+            waitMinutesAfterPrev: candidateSteps.length ? 60 : 0,
+            warmupNote: `Warm-up Pré-Chamada: avisa que a marca ligará do DDD ${dddProfile.ddd} em instantes (H-C2)`,
+            tariffBrl: defaultTariffs.SMS,
+            conditionalCpcProb: Number(Math.min(0.25, 0.15 * purposeBoost).toFixed(3)),
+            stopCondition: 'Se cliente responder no texto, concluir CPC sem precisar discar',
+          });
+        }
+        if (voiceDests.length > 0 && candidateSteps.length < maxSteps) {
+          candidateSteps.push({
+            step: candidateSteps.length + 1,
+            channel: 'VOICE',
+            destinationId: voiceDests[0].id,
+            address: voiceDests[0].address,
+            shiftSlot: shiftRecyclingOrder[0] ?? 'ALMOCO_11_14',
+            localTimeWindow,
+            waitMinutesAfterPrev: 10,
+            warmupNote: `Chamada sincronizada pós-Warmup com DDD ${dddProfile.ddd} Local (H-C2 / H-C6)`,
+            tariffBrl: defaultTariffs.VOICE,
+            conditionalCpcProb: Number(Math.min(0.56, 0.35 * purposeBoost * (locatorScore / 80)).toFixed(3)),
+            stopCondition: 'Confirmar titularidade; se Não Atende, reciclar turno para WhatsApp (H-T2)',
+          });
+        }
+        if (effectiveWaDests.length > 0 && candidateSteps.length < maxSteps) {
+          candidateSteps.push({
+            step: candidateSteps.length + 1,
+            channel: 'WHATSAPP',
+            destinationId: effectiveWaDests[0].id,
+            address: effectiveWaDests[0].address,
+            shiftSlot: shiftRecyclingOrder[1] ?? 'FIM_TARDE_17_20',
+            localTimeWindow: dddProfile.dataCapExhaustionPct >= 46 ? '19:00–20:45 (Wi-Fi)' : '17:45–19:30',
+            waitMinutesAfterPrev: 240,
+            warmupNote:
+              dddProfile.dataCapExhaustionPct >= 46
+                ? 'Disparo na janela de Wi-Fi residencial devido a 46%-54% de fim de franquia móvel na região (H-G3)'
+                : 'Transbordo assíncrono em turno rotacionado (H-T2 / H-T5)',
+            tariffBrl: defaultTariffs.WHATSAPP,
+            conditionalCpcProb: Number(Math.min(0.52, 0.31 * purposeBoost).toFixed(3)),
+            stopCondition: 'Encerrar ao confirmar CPC',
+          });
+        }
       }
     }
 

@@ -410,20 +410,85 @@ export const OPERATING_MODE_LABEL: Record<OperatingMode, string> = {
   LABORATORY: 'Modo Laboratório (Amostra Viável → Testes Reais em Ondas)',
 };
 
+export const PRIMARY_OPERATION_PURPOSES = ['COBRANCA', 'VENDAS', 'AGENDAMENTOS'] as const;
+
 export const OPERATION_PURPOSES = [
   'COBRANCA',
   'VENDAS',
-  'ATENDIMENTO_SUPORTE',
+  'AGENDAMENTOS',
   'CONFIRMACAO_SERVICO',
+  'ATENDIMENTO_SUPORTE',
   'PESQUISA_RELACIONAMENTO',
 ] as const;
 export type OperationPurpose = (typeof OPERATION_PURPOSES)[number];
+
 export const OPERATION_PURPOSE_LABEL: Record<OperationPurpose, string> = {
-  COBRANCA: 'Cobrança e Renegociação de Crédito',
-  VENDAS: 'Vendas, Adesão e Renovação Comercial',
-  ATENDIMENTO_SUPORTE: 'Atendimento e Resolução de Problema Solicitado',
-  CONFIRMACAO_SERVICO: 'Confirmação Transacional / Agendamento de Serviço',
-  PESQUISA_RELACIONAMENTO: 'Pesquisa, Retenção e Relacionamento Preventivo',
+  COBRANCA: 'Cobrança e Recuperação de Crédito',
+  VENDAS: 'Vendas, Oferta Comercial e Up-sell',
+  AGENDAMENTOS: 'Agendamentos e Confirmação de Presença',
+  CONFIRMACAO_SERVICO: 'Confirmação Transacional / Agendamento',
+  ATENDIMENTO_SUPORTE: 'Atendimento e Suporte ao Cliente',
+  PESQUISA_RELACIONAMENTO: 'Pesquisa e Relacionamento Preventivo',
+};
+
+export type PurposeMetadata = {
+  code: OperationPurpose;
+  title: string;
+  shortTitle: string;
+  tagline: string;
+  metricLabel: string;
+  secondaryMetricLabel: string;
+  recommendedChannel: string;
+  cadenceSummary: string;
+  benchmarkUnitCostBrl: number;
+  optimizedUnitCostBrl: number;
+  expectedRatePct: number;
+  savingsOrGainPct: number;
+};
+
+export const PURPOSE_METADATA: Record<'COBRANCA' | 'VENDAS' | 'AGENDAMENTOS', PurposeMetadata> = {
+  COBRANCA: {
+    code: 'COBRANCA',
+    title: 'Cobrança e Recuperação de Crédito',
+    shortTitle: 'Cobrança',
+    tagline: 'Localização de titular, renegociação amigável e acordos com PIX.',
+    metricLabel: 'Custo por CPC Otimizado',
+    secondaryMetricLabel: 'Taxa Estimada de CPC',
+    recommendedChannel: 'WhatsApp Oficial + Discador BINA Local',
+    cadenceSummary: 'Aspect ALM Shift Matrix (turnos alternados, mínimo 6h entre tentativas)',
+    benchmarkUnitCostBrl: 5.60,
+    optimizedUnitCostBrl: 3.18,
+    expectedRatePct: 38.4,
+    savingsOrGainPct: 43.2,
+  },
+  VENDAS: {
+    code: 'VENDAS',
+    title: 'Vendas, Oferta Comercial e Up-sell',
+    shortTitle: 'Venda',
+    tagline: 'Ofertas ativas, upgrade de planos e conversão consultiva de leads.',
+    metricLabel: 'Custo por Conversão / Lead',
+    secondaryMetricLabel: 'Taxa de Conversão Estimada',
+    recommendedChannel: 'WhatsApp Interativo (Catálogo) + Discador Consultivo',
+    cadenceSummary: 'Janelas nobres de receptividade (almoço e 17h30–20h30)',
+    benchmarkUnitCostBrl: 14.50,
+    optimizedUnitCostBrl: 8.20,
+    expectedRatePct: 16.5,
+    savingsOrGainPct: 35.0,
+  },
+  AGENDAMENTOS: {
+    code: 'AGENDAMENTOS',
+    title: 'Agendamentos e Confirmação de Presença',
+    shortTitle: 'Agendamentos',
+    tagline: 'Confirmação de consultas, visitas técnicas e redução drástica de no-show.',
+    metricLabel: 'Custo por Confirmação',
+    secondaryMetricLabel: 'Taxa de Comparecimento / Presença',
+    recommendedChannel: 'WhatsApp Oficial com Botões (Sim / Reagendar) + SMS Fallback',
+    cadenceSummary: 'Lembrete 1 dia antes (D-1 com botões) + Lembrete no dia (D-0 informativo 2h antes)',
+    benchmarkUnitCostBrl: 1.80,
+    optimizedUnitCostBrl: 0.42,
+    expectedRatePct: 78.5,
+    savingsOrGainPct: 52.0,
+  },
 };
 
 export const CETIC_AGE_BRACKETS = ['16_24', '25_34', '35_44', '45_59', '60_PLUS', 'UNKNOWN'] as const;

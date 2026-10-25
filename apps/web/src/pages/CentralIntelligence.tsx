@@ -6,9 +6,12 @@ import {
   Activity,
   ArrowRight,
   BrainCircuit,
+  CalendarCheck,
+  CalendarClock,
   Check,
   CheckCircle2,
   Clock,
+  Coins,
   Compass,
   Database,
   FlaskConical,
@@ -19,6 +22,7 @@ import {
   RefreshCw,
   Rocket,
   ShieldCheck,
+  ShoppingBag,
   SlidersHorizontal,
   Sparkles,
   TrendingDown,
@@ -27,9 +31,12 @@ import {
 } from 'lucide-react';
 import {
   CHANNEL_LABEL,
+  OPERATION_PURPOSE_LABEL,
   OPTIMIZATION_POLICIES,
   OPTIMIZATION_POLICY_LABEL,
+  PURPOSE_METADATA,
   type ChannelType,
+  type OperationPurpose,
   type OptimizationPolicy,
 } from '@voll/shared';
 import { get, post } from '../lib/api';
@@ -207,12 +214,27 @@ export function CentralIntelligencePage() {
     },
   });
 
+  const campaignPurpose: 'COBRANCA' | 'VENDAS' | 'AGENDAMENTOS' =
+    (selectedCampaign?.purposeCode as any) ??
+    (selectedCampaign?.name.toLowerCase().includes('agendamento')
+      ? 'AGENDAMENTOS'
+      : selectedCampaign?.name.toLowerCase().includes('venda')
+      ? 'VENDAS'
+      : 'COBRANCA');
+
+  const purposeMeta = PURPOSE_METADATA[campaignPurpose] ?? PURPOSE_METADATA.COBRANCA;
+
   // Métricas
-  const championCpcRate = 21.2;
-  const championCpcCost = 5.60;
-  const challengerCpcRate = 38.4;
-  const challengerCpcCost = 3.18;
-  const unitSavings = championCpcCost - challengerCpcCost; // R$ 2,42
+  const championCpcRate =
+    campaignPurpose === 'AGENDAMENTOS'
+      ? 48.0
+      : campaignPurpose === 'VENDAS'
+      ? 11.2
+      : 21.2;
+  const championCpcCost = purposeMeta.benchmarkUnitCostBrl;
+  const challengerCpcRate = purposeMeta.expectedRatePct;
+  const challengerCpcCost = purposeMeta.optimizedUnitCostBrl;
+  const unitSavings = Math.max(0, championCpcCost - challengerCpcCost);
   const totalProjectedSavings = totalBase * unitSavings;
 
   return (
@@ -240,11 +262,16 @@ export function CentralIntelligencePage() {
               <span className="font-semibold text-slate-900">1. Campanha em Produção (Champion Atual)</span>
               <InfoTooltip content="Linha de base em execução no workspace que será desafiada pelo experimento." />
             </div>
-            {selectedCampaign && (
-              <Badge tone={selectedCampaign.status === 'RUNNING' ? 'green' : 'brand'}>
-                {selectedCampaign.statusLabel}
+            <div className="flex items-center gap-2">
+              <Badge tone={campaignPurpose === 'AGENDAMENTOS' ? 'green' : campaignPurpose === 'VENDAS' ? 'blue' : 'brand'}>
+                {purposeMeta.shortTitle}: {purposeMeta.title}
               </Badge>
-            )}
+              {selectedCampaign && (
+                <Badge tone={selectedCampaign.status === 'RUNNING' ? 'green' : 'brand'}>
+                  {selectedCampaign.statusLabel}
+                </Badge>
+              )}
+            </div>
           </div>
         }
       >
@@ -297,11 +324,24 @@ export function CentralIntelligencePage() {
             </div>
           </div>
 
+          {campaignPurpose === 'AGENDAMENTOS' && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-950 flex items-center gap-2.5">
+              <CalendarClock className="size-4 text-emerald-700 shrink-0" />
+              <span>
+                <strong>Régua de Agendamentos Ativa:</strong> O Challenger avalia a eficácia do Lembrete D-1 (1 dia antes com botões interativos de confirmação) e Lembrete D-0 (no dia 2h antes com localização e orientações), projetando redução de 52% nas faltas (No-Show).
+              </span>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 pt-1 border-t border-slate-100">
             <Stat
               label={
                 <span className="flex items-center">
-                  Custo/CPC Produção
+                  {campaignPurpose === 'AGENDAMENTOS'
+                    ? 'Custo/Confirmação Atual'
+                    : campaignPurpose === 'VENDAS'
+                    ? 'Custo/Conversão Atual'
+                    : 'Custo/CPC Produção'}
                   <InfoTooltip content="Custo médio unitário observado na produção sem a otimização do Challenger." />
                 </span>
               }
@@ -310,8 +350,12 @@ export function CentralIntelligencePage() {
             <Stat
               label={
                 <span className="flex items-center">
-                  Taxa de CPC Atual
-                  <InfoTooltip content="Percentual de contatos com a Pessoa Certa confirmada por tabulação." />
+                  {campaignPurpose === 'AGENDAMENTOS'
+                    ? 'Taxa de Comparecimento Atual'
+                    : campaignPurpose === 'VENDAS'
+                    ? 'Taxa de Conversão Atual'
+                    : 'Taxa de CPC Atual'}
+                  <InfoTooltip content={purposeMeta.secondaryMetricLabel} />
                 </span>
               }
               value={`${championCpcRate}%`}
@@ -747,22 +791,22 @@ export function CentralIntelligencePage() {
 
                   <tr>
                     <td className="py-2.5 px-3.5 font-medium text-slate-600 flex items-center">
-                      <span>Taxa de CPC (Pessoa Certa)</span>
-                      <InfoTooltip content="Percentual de ligações ou mensagens que confirmaram a Pessoa Certa por tabulação." />
+                      <span>{purposeMeta.secondaryMetricLabel}</span>
+                      <InfoTooltip content="Taxa observada de sucesso e conversão útil na régua de contatos." />
                     </td>
                     <td className="py-2.5 px-3.5 text-slate-700 tabular">{championCpcRate}%</td>
                     <td className="py-2.5 px-3.5 text-brand-900 font-bold tabular text-sm bg-brand-50/20">
                       {challengerCpcRate}%
                     </td>
                     <td className="py-2.5 px-3.5 text-emerald-700 font-bold tabular bg-emerald-50/20">
-                      +{(challengerCpcRate - championCpcRate).toFixed(1)} p.p. (+81,1% assertividade)
+                      +{(challengerCpcRate - championCpcRate).toFixed(1)} p.p. (+{(((challengerCpcRate - championCpcRate) / championCpcRate) * 100).toFixed(1)}% assertividade)
                     </td>
                   </tr>
 
                   <tr>
                     <td className="py-2.5 px-3.5 font-medium text-slate-600 flex items-center">
-                      <span>Custo por CPC Confirmado</span>
-                      <InfoTooltip content="Gasto total dividido pelo número de CPCs válidos auditados." />
+                      <span>{purposeMeta.metricLabel}</span>
+                      <InfoTooltip content="Gasto total dividido pelo número de eventos válidos auditados." />
                     </td>
                     <td className="py-2.5 px-3.5 text-slate-700 tabular font-medium">
                       R$ {championCpcCost.toFixed(2)}
@@ -771,7 +815,7 @@ export function CentralIntelligencePage() {
                       R$ {challengerCpcCost.toFixed(2)}
                     </td>
                     <td className="py-2.5 px-3.5 text-emerald-700 font-extrabold tabular bg-emerald-50/20">
-                      -43,2% no custo unitário (Economia de R$ {unitSavings.toFixed(2)} por contato)
+                      -{(((championCpcCost - challengerCpcCost) / championCpcCost) * 100).toFixed(1)}% no custo unitário (Economia de R$ {unitSavings.toFixed(2)} por contato)
                     </td>
                   </tr>
 

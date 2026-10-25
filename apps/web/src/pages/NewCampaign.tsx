@@ -6,10 +6,13 @@ import {
   ArrowLeft,
   ArrowRight,
   BrainCircuit,
+  CalendarCheck,
+  CalendarClock,
   Check,
   ChevronDown,
   ChevronUp,
   CloudOff,
+  Coins,
   Database,
   FileSpreadsheet,
   Filter,
@@ -20,6 +23,7 @@ import {
   Rocket,
   Save,
   ShieldCheck,
+  ShoppingBag,
   SlidersHorizontal,
   Sparkles,
   TrendingDown,
@@ -32,6 +36,8 @@ import {
   OPERATING_MODE_LABEL,
   OPERATION_PURPOSE_LABEL,
   OPERATION_PURPOSES,
+  PRIMARY_OPERATION_PURPOSES,
+  PURPOSE_METADATA,
   type CampaignDraft,
   type ChannelType,
   type OperatingMode,
@@ -626,6 +632,7 @@ const BLOCKS_TEMPLATE = [
 ];
 
 const PROMPT_TEMPLATES = [
+  // Cobrança
   {
     label: 'Cobrança Preventiva (1–30 dias)',
     prompt:
@@ -641,25 +648,57 @@ const PROMPT_TEMPLATES = [
     purposeCode: 'COBRANCA' as OperationPurpose,
   },
   {
-    label: 'Confirmação Cadastral & Higienização',
+    label: 'Renegociação com PIX Instantâneo',
     prompt:
-      'Higienização e confirmação cadastral da base de clientes. Validar telefones confirmados no Golden Record com classificação Phone-Intent P1 e excluir números com falha técnica.',
-    defaultName: 'Confirmação Cadastral · Golden Record',
-    purposeCode: 'CONFIRMACAO_SERVICO' as OperationPurpose,
+      'Proposta de acordo e renegociação com envio de link seguro e chave PIX copiável diretamente no WhatsApp, com desconto especial para quitação à vista.',
+    defaultName: 'Acordo PIX · Renegociação',
+    purposeCode: 'COBRANCA' as OperationPurpose,
   },
+
+  // Vendas
   {
-    label: 'Vendas & Oferta de Crédito',
+    label: 'Venda Ativa de Novos Planos',
     prompt:
-      'Campanha de oferta de crédito e reativação comercial. Disparo via WhatsApp rico com botões interativos de ação e direcionamento imediato para agentes receptivos.',
-    defaultName: 'Oferta de Crédito · Conversão Rápida',
+      'Campanha de venda ativa comercial e oferta de planos e serviços. Disparo inicial via WhatsApp interativo com catálogo de ofertas e encaminhamento imediato para consultor de vendas.',
+    defaultName: 'Venda Ativa · Novos Planos',
     purposeCode: 'VENDAS' as OperationPurpose,
   },
   {
-    label: 'Pesquisa de Satisfação & Relacionamento',
+    label: 'Up-sell & Renovação Comercial',
     prompt:
-      'Pesquisa de satisfação e relacionamento pós-venda. Contato não invasivo preferencialmente via canais digitais nos horários de folga comercial.',
-    defaultName: 'Pesquisa de Satisfação · Clientes',
-    purposeCode: 'PESQUISA_RELACIONAMENTO' as OperationPurpose,
+      'Oferta de upgrade de plano e renovação para clientes da base. Abordagem consultiva multicanal em janelas de receptividade (almoço e pós-expediente comercial).',
+    defaultName: 'Up-sell · Oferta Exclusiva',
+    purposeCode: 'VENDAS' as OperationPurpose,
+  },
+  {
+    label: 'Reativação de Inativos',
+    prompt:
+      'Campanha de reengajamento e resgate de clientes inativos com condições especiais de retorno e atendimento prioritário.',
+    defaultName: 'Reativação Comercial · Clientes',
+    purposeCode: 'VENDAS' as OperationPurpose,
+  },
+
+  // Agendamentos
+  {
+    label: 'Lembrete de Consulta / Exame (D-1 e D-0)',
+    prompt:
+      'Cadência de confirmação de consultas e exames: Lembrete 1 dia antes (D-1) via WhatsApp interativo com botões de confirmação rápida e lembrete no dia (D-0) 2h antes com endereço e orientações.',
+    defaultName: 'Confirmação Consultas · D-1 e D-0',
+    purposeCode: 'AGENDAMENTOS' as OperationPurpose,
+  },
+  {
+    label: 'Confirmação de Visita Técnica (D-1 e D-0)',
+    prompt:
+      'Confirmação de agendamento de visita técnica domiciliar com verificação de presença do responsável no D-1 e envio de dados do técnico no dia (D-0 2h antes).',
+    defaultName: 'Visitas Técnicas · Lembretes',
+    purposeCode: 'AGENDAMENTOS' as OperationPurpose,
+  },
+  {
+    label: 'Reagendamento de Faltas (No-Show)',
+    prompt:
+      'Campanha preventiva para recuperação de faltas e reagendamento amigável de horários vagos com botão de escolha rápida de nova data.',
+    defaultName: 'Prevenção No-Show · Reagendamento',
+    purposeCode: 'AGENDAMENTOS' as OperationPurpose,
   },
 ];
 
@@ -744,6 +783,14 @@ function UnifiedCampaignCreator({
     setCampaignName(`${tmpl.defaultName} · ${dateStr}`);
   };
 
+  const handleSelectPurpose = (purp: 'COBRANCA' | 'VENDAS' | 'AGENDAMENTOS') => {
+    setPurposeCode(purp);
+    const tmpl = PROMPT_TEMPLATES.find((t) => t.purposeCode === purp) ?? PROMPT_TEMPLATES[0];
+    setPromptText(tmpl.prompt);
+    const dateStr = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    setCampaignName(`${tmpl.defaultName} · ${dateStr}`);
+  };
+
   const handleCreate = async (startMode: 'NOW' | 'READY') => {
     setFormError(null);
     const mailingIdToUse = selectedMailingId || activeMailing?.id;
@@ -778,6 +825,7 @@ function UnifiedCampaignCreator({
         listVersionId: useList && activeList?.latestVersion ? activeList.latestVersion.id : null,
         journeyVersionId: bestJourney.latestVersion.id,
         strategyVersionId: bestStrategy.latestVersion.id,
+        purposeCode,
         startMode,
         scheduledAt: null,
       };
@@ -1252,6 +1300,138 @@ function UnifiedCampaignCreator({
                 </div>
               )}
 
+              {/* Seletor Visual dos 3 Objetivos da Plataforma */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-800">
+                    Objetivo Principal da Operação
+                  </span>
+                  <span className="text-[11px] text-slate-500">
+                    Calibra réguas, canais prioritários e o modelo preditivo
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Cobrança */}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectPurpose('COBRANCA')}
+                    className={clsx(
+                      'flex flex-col text-left p-3.5 rounded-xl border transition-all text-xs space-y-1.5 cursor-pointer',
+                      purposeCode === 'COBRANCA'
+                        ? 'border-brand-600 bg-brand-50/50 shadow-xs ring-2 ring-brand-500/20'
+                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60',
+                    )}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-1.5 font-bold text-slate-900">
+                        <Coins className="size-4 text-amber-600 shrink-0" />
+                        <span>🪙 Cobrança</span>
+                      </div>
+                      {purposeCode === 'COBRANCA' && (
+                        <span className="size-2 rounded-full bg-brand-600" />
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-600 line-clamp-2">
+                      Localização de titular, renegociação amigável e acordos com PIX.
+                    </p>
+                    <div className="pt-1 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100">
+                      <span>Custo/CPC Otimizado</span>
+                      <strong className="text-emerald-700">R$ 3,18</strong>
+                    </div>
+                  </button>
+
+                  {/* Venda */}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectPurpose('VENDAS')}
+                    className={clsx(
+                      'flex flex-col text-left p-3.5 rounded-xl border transition-all text-xs space-y-1.5 cursor-pointer',
+                      purposeCode === 'VENDAS'
+                        ? 'border-brand-600 bg-brand-50/50 shadow-xs ring-2 ring-brand-500/20'
+                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60',
+                    )}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-1.5 font-bold text-slate-900">
+                        <ShoppingBag className="size-4 text-blue-600 shrink-0" />
+                        <span>🛍️ Venda</span>
+                      </div>
+                      {purposeCode === 'VENDAS' && (
+                        <span className="size-2 rounded-full bg-brand-600" />
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-600 line-clamp-2">
+                      Ofertas ativas, upgrade de planos e conversão consultiva de leads.
+                    </p>
+                    <div className="pt-1 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100">
+                      <span>Custo/Lead Otimizado</span>
+                      <strong className="text-emerald-700">R$ 8,20</strong>
+                    </div>
+                  </button>
+
+                  {/* Agendamentos */}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectPurpose('AGENDAMENTOS')}
+                    className={clsx(
+                      'flex flex-col text-left p-3.5 rounded-xl border transition-all text-xs space-y-1.5 cursor-pointer',
+                      purposeCode === 'AGENDAMENTOS'
+                        ? 'border-emerald-600 bg-emerald-50/50 shadow-xs ring-2 ring-emerald-500/20'
+                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60',
+                    )}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-1.5 font-bold text-slate-900">
+                        <CalendarCheck className="size-4 text-emerald-600 shrink-0" />
+                        <span>📅 Agendamentos</span>
+                      </div>
+                      {purposeCode === 'AGENDAMENTOS' && (
+                        <span className="size-2 rounded-full bg-emerald-600" />
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-600 line-clamp-2">
+                      Confirmação de presença e redução de no-show (Lembretes D-1 e D-0).
+                    </p>
+                    <div className="pt-1 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100">
+                      <span>Custo/Confirmação</span>
+                      <strong className="text-emerald-700">R$ 0,42</strong>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Banner de Cadência Automática para Agendamentos (D-1 e D-0) */}
+              {purposeCode === 'AGENDAMENTOS' && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 text-xs text-emerald-950 space-y-2">
+                  <div className="flex items-center gap-2 font-bold text-emerald-900">
+                    <CalendarClock className="size-4 text-emerald-700 shrink-0" />
+                    <span>Cadência Automática de Agendamento (Prevenção de No-Show)</span>
+                  </div>
+                  <p className="text-slate-700 text-xs leading-relaxed">
+                    Se o mailing possuir data de agendamento, o Voll Connect envia lembrete 1 dia antes e no dia:
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
+                    <div className="rounded-lg border border-emerald-200/80 bg-white/95 p-2.5 space-y-0.5 shadow-2xs">
+                      <div className="font-bold text-emerald-900 flex items-center gap-1.5 text-xs">
+                        <span>🔔 Lembrete 1 dia antes (D-1)</span>
+                      </div>
+                      <p className="text-slate-600 text-[11px] leading-snug">
+                        WhatsApp Oficial interativo com botões de 1 toque: <strong>[1 - Sim, confirmo]</strong> e <strong>[2 - Quero reagendar]</strong>.
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-emerald-200/80 bg-white/95 p-2.5 space-y-0.5 shadow-2xs">
+                      <div className="font-bold text-emerald-900 flex items-center gap-1.5 text-xs">
+                        <span>📍 Lembrete no dia (D-0 · 2h antes)</span>
+                      </div>
+                      <p className="text-slate-600 text-[11px] leading-snug">
+                        WhatsApp informativo (ou SMS fallback) com endereço completo, mapa de localização e orientações de chegada.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <label htmlFor="campaign-prompt" className="text-xs font-medium text-slate-700">
                   Descreva o objetivo do acionamento
@@ -1267,72 +1447,114 @@ function UnifiedCampaignCreator({
               </div>
 
               <div>
-                <div className="text-xs font-medium text-slate-500 mb-1.5">Sugestões rápidas (1 clique):</div>
+                <div className="text-xs font-medium text-slate-500 mb-1.5">Sugestões rápidas para {OPERATION_PURPOSE_LABEL[purposeCode] ?? 'o objetivo'}:</div>
                 <div className="flex flex-wrap gap-1.5">
-                  {PROMPT_TEMPLATES.map((tmpl) => (
+                  {PROMPT_TEMPLATES.filter((t) => t.purposeCode === purposeCode).map((tmpl) => (
                     <button
                       key={tmpl.label}
                       type="button"
                       onClick={() => handleApplyTemplate(tmpl)}
-                      className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50/70 px-2.5 py-1 text-xs font-medium text-slate-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-900 transition"
+                      className="inline-flex items-center gap-1 rounded-full border border-brand-200 bg-brand-50/60 px-2.5 py-1 text-xs font-medium text-brand-900 hover:border-brand-300 hover:bg-brand-100 transition cursor-pointer"
                     >
                       <Sparkles className="size-3 text-brand-600" aria-hidden />
+                      {tmpl.label}
+                    </button>
+                  ))}
+                  {PROMPT_TEMPLATES.filter((t) => t.purposeCode !== purposeCode).map((tmpl) => (
+                    <button
+                      key={tmpl.label}
+                      type="button"
+                      onClick={() => handleApplyTemplate(tmpl)}
+                      className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50/70 px-2.5 py-1 text-xs font-medium text-slate-600 hover:border-slate-300 hover:bg-slate-100 transition cursor-pointer opacity-75 hover:opacity-100"
+                    >
                       {tmpl.label}
                     </button>
                   ))}
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                <Field label="Teto de Custo por CPC (R$)">
-                  {(p) => (
-                    <Input
-                      id={p.id}
-                      type="number"
-                      step="0.10"
-                      min="0.50"
-                      value={maxAcceptableCpcBrl}
-                      onChange={(e) => setMaxAcceptableCpcBrl(Number(e.target.value) || 4.5)}
-                    />
-                  )}
-                </Field>
+              {(() => {
+                const meta =
+                  PURPOSE_METADATA[purposeCode as keyof typeof PURPOSE_METADATA] ??
+                  PURPOSE_METADATA.COBRANCA;
 
-                <div className="flex flex-col justify-end">
-                  <div className="text-xs text-slate-500 pb-1">Canal de Contato Prioritário</div>
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-                    <Badge tone="green">WhatsApp Oficial</Badge>
-                    <span className="text-xs text-slate-400">+</span>
-                    <Badge tone="brand">Discador Otimizado</Badge>
-                  </div>
-                </div>
-              </div>
+                return (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                      <Field label={`${meta.metricLabel} Máximo (R$)`}>
+                        {(p) => (
+                          <Input
+                            id={p.id}
+                            type="number"
+                            step="0.10"
+                            min="0.10"
+                            value={maxAcceptableCpcBrl}
+                            onChange={(e) => setMaxAcceptableCpcBrl(Number(e.target.value) || 4.5)}
+                          />
+                        )}
+                      </Field>
 
-              {/* Indicadores de CPC */}
-              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 pt-2 border-t border-slate-200/80">
-                <Stat
-                  label="Contatos Qualificados"
-                  value={fmtNumber(targetCount)}
-                  hint="Base qualificada"
-                />
-                <Stat
-                  label="Taxa Estimada CPC"
-                  value="38,4%"
-                  tone="good"
-                  hint="Auditável por tabulação"
-                />
-                <Stat
-                  label="Custo por CPC Otimizado"
-                  value="R$ 3,18"
-                  tone="good"
-                  hint="vs. R$ 5,60 Força Bruta"
-                />
-                <Stat
-                  label="Economia Projetada"
-                  value="43,2%"
-                  tone="good"
-                  hint="Redução unitária"
-                />
-              </div>
+                      <div className="flex flex-col justify-end">
+                        <div className="text-xs text-slate-500 pb-1">Canais Prioritários Recomendados</div>
+                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                          {meta.code === 'AGENDAMENTOS' ? (
+                            <>
+                              <Badge tone="green">WhatsApp com Botões</Badge>
+                              <span className="text-xs text-slate-400">+</span>
+                              <Badge tone="brand">SMS / Voz Fallback</Badge>
+                            </>
+                          ) : meta.code === 'VENDAS' ? (
+                            <>
+                              <Badge tone="green">WhatsApp Interativo</Badge>
+                              <span className="text-xs text-slate-400">+</span>
+                              <Badge tone="brand">Discador Consultivo</Badge>
+                            </>
+                          ) : (
+                            <>
+                              <Badge tone="green">WhatsApp Oficial</Badge>
+                              <span className="text-xs text-slate-400">+</span>
+                              <Badge tone="brand">Discador BINA Local</Badge>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Indicadores de Eficiência Adaptados por Objetivo */}
+                    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 pt-2 border-t border-slate-200/80">
+                      <Stat
+                        label="Contatos Qualificados"
+                        value={fmtNumber(targetCount)}
+                        hint="Base qualificada"
+                      />
+                      <Stat
+                        label={meta.secondaryMetricLabel}
+                        value={`${meta.expectedRatePct.toFixed(1)}%`}
+                        tone="good"
+                        hint="Auditável por tabulação"
+                      />
+                      <Stat
+                        label={meta.metricLabel}
+                        value={fmtMoney(meta.optimizedUnitCostBrl)}
+                        tone="good"
+                        hint={`vs. ${fmtMoney(meta.benchmarkUnitCostBrl)} Tradicional`}
+                      />
+                      <Stat
+                        label={
+                          meta.code === 'AGENDAMENTOS'
+                            ? 'Redução de No-Show'
+                            : meta.code === 'VENDAS'
+                            ? 'Aumento de Vendas'
+                            : 'Economia Projetada'
+                        }
+                        value={`${meta.code === 'VENDAS' ? '+' : '-'}${meta.savingsOrGainPct.toFixed(1)}%`}
+                        tone="good"
+                        hint={meta.cadenceSummary.slice(0, 32) + '...'}
+                      />
+                    </div>
+                  </>
+                );
+              })()}
 
               {/* Detalhe dos 8 blocos (colapsado por padrão) */}
               <div className="border-t border-slate-200/80 pt-3">
@@ -1506,10 +1728,24 @@ function UnifiedCampaignCreator({
                   <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1">
                     <span className="text-slate-500 block text-[11px] font-medium">3. Acionamento</span>
                     <span className="font-semibold text-slate-900 block truncate">
-                      {skipAiOptimization ? 'Disparo Direto' : OPERATION_PURPOSE_LABEL[purposeCode] || 'Cobrança'}
+                      {skipAiOptimization
+                        ? 'Disparo Direto'
+                        : purposeCode === 'AGENDAMENTOS'
+                        ? '📅 Agendamentos (D-1 e D-0)'
+                        : purposeCode === 'VENDAS'
+                        ? '🛍️ Venda & Up-sell'
+                        : '🪙 Cobrança & Recuperação'}
                     </span>
                     <span className="text-slate-500 text-[11px] block">
-                      {skipAiOptimization ? 'Sem otimização IA' : `Teto: ${fmtMoney(maxAcceptableCpcBrl)} / CPC`}
+                      {skipAiOptimization
+                        ? 'Sem otimização IA'
+                        : `Teto: ${fmtMoney(maxAcceptableCpcBrl)} / ${
+                            purposeCode === 'AGENDAMENTOS'
+                              ? 'Confirmação'
+                              : purposeCode === 'VENDAS'
+                              ? 'Lead'
+                              : 'CPC'
+                          }`}
                     </span>
                   </div>
 
@@ -1524,6 +1760,24 @@ function UnifiedCampaignCreator({
                           Sem filtro preditivo
                         </span>
                       </>
+                    ) : purposeCode === 'AGENDAMENTOS' ? (
+                      <>
+                        <span className="font-semibold text-emerald-700 block">
+                          R$ 0,42 / Confirmação
+                        </span>
+                        <span className="text-emerald-700 text-[11px] block">
+                          -52,0% redução de no-show (D-1 e D-0)
+                        </span>
+                      </>
+                    ) : purposeCode === 'VENDAS' ? (
+                      <>
+                        <span className="font-semibold text-emerald-700 block">
+                          R$ 8,20 / Conversão
+                        </span>
+                        <span className="text-emerald-700 text-[11px] block">
+                          +35,0% aumento de conversão
+                        </span>
+                      </>
                     ) : (
                       <>
                         <span className="font-semibold text-emerald-700 block">
@@ -1536,6 +1790,15 @@ function UnifiedCampaignCreator({
                     )}
                   </div>
                 </div>
+
+                {purposeCode === 'AGENDAMENTOS' && !skipAiOptimization && (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-950 flex items-center gap-2.5">
+                    <CalendarClock className="size-4 text-emerald-700 shrink-0" />
+                    <span>
+                      <strong>Régua de Agendamentos Ativa:</strong> Disparo automático de Lembrete 1 dia antes (D-1 com botões interativos de confirmação) e no dia (D-0 informativo 2h antes com localização e orientações).
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </Card>

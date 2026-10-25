@@ -7,6 +7,7 @@ import type {
   ColumnMapping,
   EnrollmentState,
   JourneyStep,
+  OperationPurpose,
   ReasonCode,
   Role,
   StrategyConfig,
@@ -147,6 +148,7 @@ export type OperationalState = 'WAITING_RELEASE' | 'WAITING_WINDOW' | 'WAITING_R
 export type CampaignSummary = {
   id: string;
   name: string;
+  purposeCode?: OperationPurpose;
   status: CampaignStatus;
   statusLabel: string;
   operationalState: OperationalState;

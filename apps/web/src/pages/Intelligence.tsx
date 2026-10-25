@@ -1669,6 +1669,7 @@ function OPERATING_PURPOSE_SHORT(p: OperationPurpose): string {
   const map: Record<OperationPurpose, string> = {
     COBRANCA: 'Cobrança',
     VENDAS: 'Vendas',
+    AGENDAMENTOS: 'Agendamento',
     ATENDIMENTO_SUPORTE: 'Suporte',
     CONFIRMACAO_SERVICO: 'Confirmação',
     PESQUISA_RELACIONAMENTO: 'Pesquisa',
