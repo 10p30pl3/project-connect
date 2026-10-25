@@ -235,11 +235,11 @@ export function Layout() {
   const loc = useLocation();
   const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
 
-  const isGroupOpen = (label: string, defaultOpen: boolean) => {
+  const isGroupOpen = (label: string, defaultOpen = true) => {
     return openMap[label] !== undefined ? openMap[label] : defaultOpen;
   };
 
-  const toggleGroup = (label: string, defaultOpen: boolean) => {
+  const toggleGroup = (label: string, defaultOpen = true) => {
     setOpenMap((prev) => ({
       ...prev,
       [label]: !isGroupOpen(label, defaultOpen),
@@ -266,7 +266,7 @@ export function Layout() {
                   const isParentDirectActive = isRouteActive(it.to, loc.pathname, loc.search, it.end);
                   const isPrefixMatched = it.matchPrefixes?.some((p) => loc.pathname === p || loc.pathname.startsWith(p + '/')) ?? false;
                   const isParentActive = isParentDirectActive || isAnySubActive || isPrefixMatched;
-                  const isOpen = isGroupOpen(it.label, isParentActive);
+                  const isOpen = isGroupOpen(it.label, true);
 
                   return (
                     <li key={it.to} className="space-y-0.5">
@@ -293,7 +293,7 @@ export function Layout() {
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              toggleGroup(it.label, isParentActive);
+                              toggleGroup(it.label, true);
                             }}
                             className="ml-1 rounded p-1 text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-700"
                             aria-label={`Alternar submenu de ${it.label}`}
