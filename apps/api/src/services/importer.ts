@@ -4,7 +4,7 @@ import type { ColumnMapping, MappingTarget } from '@voll/shared';
 import type { Client } from '../db/pool.js';
 import { normalizeEmail, normalizePhone } from '../lib/phone.js';
 
-export const MAX_ROWS = 2000;
+export const MAX_ROWS = 50000;
 const PREVIEW_ROWS = 200;
 
 export type ParsedRow = { rowNumber: number; values: Record<string, string> };
