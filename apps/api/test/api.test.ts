@@ -257,3 +257,110 @@ describe('ponta a ponta com o conector simulado', () => {
     setSimulationRandom(Math.random);
   });
 });
+
+describe('esteira de inteligência de contato & otimização de CPC (Produção + Laboratório)', () => {
+  const richCsv = [
+    'id;nome;telefone1;telefone2;whatsapp;idade;uf;cidade;valor;atraso',
+    '001001;Dona Maria Aparecida;(11) 3222-4455;(11) 98888-1001;11988881001;68;SP;São Paulo;1450,00;45',
+    '001002;Lucas Gabriel Silva;(71) 99111-2233;;71991112233;21;BA;Salvador;320,00;18',
+    '001003;Carlos Eduardo Souza;(21) 98765-4321;(21) 2233-4455;21987654321;41;RJ;Rio de Janeiro;2890,00;90',
+    '001004;Fernanda Oliveira;(92) 98111-3344;;92981113344;33;AM;Manaus;610,00;30',
+    '001005;Seu José Raimundo;(85) 3456-7890;(85) 98877-6655;;72;CE;Fortaleza;980,00;60',
+    '001006;Patrícia Costa;(41) 99988-7766;;41999887766;29;PR;Curitiba;540,00;15',
+  ].join('\n');
+
+  it('retorna o catálogo de estudo TIC Domicílios 2025, benchmark global e 29 hipóteses H-A..H-L', async () => {
+    const study = await a.get('/intelligence/study');
+    expect(study.status).toBe(200);
+    expect(study.body.studyReference.ticDomicilios2025.length).toBeGreaterThanOrEqual(5);
+    expect(study.body.studyReference.globalBenchmark.length).toBeGreaterThanOrEqual(8);
+    expect(study.body.hypotheses.length).toBe(29);
+
+    const hA4 = study.body.hypotheses.find((h: any) => h.code === 'H-A4');
+    expect(hA4).toBeTruthy();
+
+    const patched = await a.patch('/intelligence/hypotheses/H-A4', {
+      enabled: true,
+      productionWeight: 1.15,
+      labWeight: 1.25,
+    });
+    expect(patched.status).toBe(200);
+    expect(patched.body.productionWeight).toBe(1.15);
+    expect(patched.body.labWeight).toBe(1.25);
+  });
+
+  it('executa a esteira em PARALLEL_BOTH (Modo Produção + Modo Laboratório), gera 8 blocos, roda ondas e promove para Produção', async () => {
+    const imp = await importCsv(a, 'Carteira Brasil CPC', richCsv);
+    const mailingId = imp.result.body.mailingId as string;
+
+    const runRes = await a.post('/intelligence/runs', {
+      mailingId,
+      mode: 'PARALLEL_BOTH',
+      purposeCode: 'COBRANCA',
+      purposePrompt: 'Renegociação amigável de faturas em atraso; minimizar R$ por CPC confirmado por tabulação.',
+      labSamplePct: 35,
+      plannedDaysWaves: 2,
+      maxAttemptsPerContact: 4,
+      maxAcceptableCpcBrl: 1.9,
+    });
+    expect(runRes.status).toBe(201);
+    const run = runRes.body;
+    expect(run.mode).toBe('PARALLEL_BOTH');
+    expect(run.cohortSummary.totalReceived).toBe(6);
+    expect(run.cohortSummary.eligibleCount).toBe(6);
+    // Modo Produção envia imediatamente seus contatos para os acionadores (sem aguardar ondas de teste)
+    expect(run.productionSummary.trackCount).toBeGreaterThan(0);
+    expect(run.productionSummary.dispatchedToActuatorsCount).toBe(run.productionSummary.trackCount);
+    expect(run.labSummary.sampleCount).toBeGreaterThan(0);
+
+    // Consulta os planos individuais em 8 blocos
+    const plansRes = await a.get(`/intelligence/runs/${run.id}/plans`);
+    expect(plansRes.status).toBe(200);
+    expect(plansRes.body.items.length).toBe(6);
+    const firstPlan = plansRes.body.items[0];
+    expect(firstPlan.blocks.bloco1_status_decisao).toBeTruthy();
+    expect(firstPlan.blocks.bloco2_perfil_inferido).toBeTruthy();
+    expect(firstPlan.blocks.bloco3_recomendacao_canal).toBeTruthy();
+    expect(firstPlan.blocks.bloco4_janela_horaria).toBeTruthy();
+    expect(firstPlan.blocks.bloco5_sequencia_cadencia).toBeTruthy();
+    expect(firstPlan.blocks.bloco6_abordagem_linguagem).toBeTruthy();
+    expect(firstPlan.blocks.bloco7_economia_cpc).toBeTruthy();
+    expect(firstPlan.blocks.bloco8_explicabilidade_governanca).toBeTruthy();
+
+    // Executa Onda 1 e Onda 2 do Modo Laboratório
+    const w1 = await a.post(`/intelligence/runs/${run.id}/lab/next-wave`);
+    expect(w1.status).toBe(200);
+    expect(w1.body.completedWaves).toBe(1);
+
+    const w2 = await a.post(`/intelligence/runs/${run.id}/lab/next-wave`);
+    expect(w2.status).toBe(200);
+    expect(w2.body.completedWaves).toBe(2);
+    expect(w2.body.waves.length).toBe(2);
+    expect(w2.body.labSummary.readyToPromote).toBe(true);
+
+    // Aplica revisão humana (LGPD Art. 20) em um contato
+    const ovr = await a.post(`/intelligence/runs/${run.id}/plans/${firstPlan.contactId}/override`, {
+      decisionStatus: 'INCLUIDO_PRIORITARIO',
+      primaryChannel: 'VOICE',
+      reason: 'Cliente solicitou retorno exclusivamente por ligação matinal.',
+    });
+    expect(ovr.status).toBe(200);
+
+    // Promove os ganhos validados do Laboratório para a Produção ("Colocar em Produção")
+    const prom = await a.post(`/intelligence/runs/${run.id}/lab/promote`, {
+      reason: 'Ganhos estatisticamente validados após 2 ondas no Modo Laboratório.',
+    });
+    expect(prom.status).toBe(200);
+    expect(prom.body.status).toBe('PROMOTED_TO_PRODUCTION');
+    expect(prom.body.promotedAt).toBeTruthy();
+
+    // Exportações CSV e JSON
+    const csvExp = await app.inject({
+      method: 'GET',
+      url: `/api/intelligence/runs/${run.id}/export.csv`,
+      headers: { cookie: await login(app) },
+    });
+    expect(csvExp.statusCode).toBe(200);
+    expect(csvExp.body).toContain('external_id;nome;track;status_decisao');
+  });
+});

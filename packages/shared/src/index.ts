@@ -397,3 +397,138 @@ export function maskAddress(address: string): string {
   }
   return address.length <= 4 ? '****' : `${address.slice(0, 4)}****${address.slice(-2)}`;
 }
+
+// ==================================================================
+// VOLL CONNECT NEXT-GEN: ESTEIRA DE INTELIGÊNCIA DE CPC & OPERAÇÃO DUAL
+// ==================================================================
+
+export const OPERATING_MODES = ['PARALLEL_BOTH', 'PRODUCTION', 'LABORATORY'] as const;
+export type OperatingMode = (typeof OPERATING_MODES)[number];
+export const OPERATING_MODE_LABEL: Record<OperatingMode, string> = {
+  PARALLEL_BOTH: 'Paralelo: Produção + Laboratório (Recomendado)',
+  PRODUCTION: 'Modo Produção (Esteira Completa → Envio Imediato)',
+  LABORATORY: 'Modo Laboratório (Amostra Viável → Testes Reais em Ondas)',
+};
+
+export const OPERATION_PURPOSES = [
+  'COBRANCA',
+  'VENDAS',
+  'ATENDIMENTO_SUPORTE',
+  'CONFIRMACAO_SERVICO',
+  'PESQUISA_RELACIONAMENTO',
+] as const;
+export type OperationPurpose = (typeof OPERATION_PURPOSES)[number];
+export const OPERATION_PURPOSE_LABEL: Record<OperationPurpose, string> = {
+  COBRANCA: 'Cobrança e Renegociação de Crédito',
+  VENDAS: 'Vendas, Adesão e Renovação Comercial',
+  ATENDIMENTO_SUPORTE: 'Atendimento e Resolução de Problema Solicitado',
+  CONFIRMACAO_SERVICO: 'Confirmação Transacional / Agendamento de Serviço',
+  PESQUISA_RELACIONAMENTO: 'Pesquisa, Retenção e Relacionamento Preventivo',
+};
+
+export const CETIC_AGE_BRACKETS = ['16_24', '25_34', '35_44', '45_59', '60_PLUS', 'UNKNOWN'] as const;
+export type CeticAgeBracket = (typeof CETIC_AGE_BRACKETS)[number];
+export const CETIC_AGE_BRACKET_LABEL: Record<CeticAgeBracket, string> = {
+  '16_24': '16–24 anos (Geração Z)',
+  '25_34': '25–34 anos (Millennials Jovens / Gen Z)',
+  '35_44': '35–44 anos (Millennials Maduros)',
+  '45_59': '45–59 anos (Geração X)',
+  '60_PLUS': '60+ anos (Baby Boomers / Sênior)',
+  UNKNOWN: 'Idade não informada (Prior Contextual)',
+};
+
+export const MACRO_REGIONS = ['SUDESTE', 'SUL', 'NORDESTE', 'CENTRO_OESTE', 'NORTE'] as const;
+export type MacroRegion = (typeof MACRO_REGIONS)[number];
+
+export const IBGE_CITY_TIERS = ['METROPOLE', 'POLO_REGIONAL', 'INTERIOR_PEQUENO'] as const;
+export type IbgeCityTier = (typeof IBGE_CITY_TIERS)[number];
+export const IBGE_CITY_TIER_LABEL: Record<IbgeCityTier, string> = {
+  METROPOLE: 'Metrópole / Capital (> 1M hab.)',
+  POLO_REGIONAL: 'Polo Regional / Cidade Média (100k–1M hab.)',
+  INTERIOR_PEQUENO: 'Interior / Pequeno Porte (< 100k hab.)',
+};
+
+export const PHONE_INTENT_TIERS = [
+  'P1_VOZ_DIRETA',
+  'P2_VOZ_COM_WARMUP',
+  'P3_DIGITAL_ASSINCRONO',
+  'P4_BAIXO_ALCANCE',
+] as const;
+export type PhoneIntentTier = (typeof PHONE_INTENT_TIERS)[number];
+export const PHONE_INTENT_LABEL: Record<PhoneIntentTier, string> = {
+  P1_VOZ_DIRETA: 'P1 · Alta Propensão a Voz Direta (Local DID)',
+  P2_VOZ_COM_WARMUP: 'P2 · Voz Destravada por Warm-up Pré-Chamada',
+  P3_DIGITAL_ASSINCRONO: 'P3 · Digital-First Assíncrono (WhatsApp / E-mail)',
+  P4_BAIXO_ALCANCE: 'P4 · Baixo Alcance / Destino Frágil',
+};
+
+export const PLAN_DECISION_STATUS = [
+  'INCLUIDO_PRIORITARIO',
+  'INCLUIDO_PADRAO',
+  'INCLUIDO_ECONOMICO',
+  'SUSPENSO_TEMPORARIO',
+  'EXCLUIDO_SUPRESSAO',
+] as const;
+export type PlanDecisionStatus = (typeof PLAN_DECISION_STATUS)[number];
+export const PLAN_DECISION_LABEL: Record<PlanDecisionStatus, string> = {
+  INCLUIDO_PRIORITARIO: 'Incluído · Prioridade Ouro (Menor ECPC)',
+  INCLUIDO_PADRAO: 'Incluído · Prioridade Padrão',
+  INCLUIDO_ECONOMICO: 'Incluído · Trilha Econômica (Baixo Custo)',
+  SUSPENSO_TEMPORARIO: 'Suspenso Temporariamente (Retorno / Janela)',
+  EXCLUIDO_SUPRESSAO: 'Excluído (Supressão Obrigatória / Sem Destino)',
+};
+
+export const HYPOTHESIS_FAMILIES = ['H-A', 'H-G', 'H-C', 'H-T', 'H-L'] as const;
+export type HypothesisFamily = (typeof HYPOTHESIS_FAMILIES)[number];
+export const HYPOTHESIS_FAMILY_LABEL: Record<HypothesisFamily, string> = {
+  'H-A': '3.1 Idade, Geração e Maturidade Digital (H-A1..A6)',
+  'H-G': '3.2 Região, Município, Pacote de Dados e Contexto (H-G1..G5)',
+  'H-C': '3.3 Canal, Contexto, Warm-up e Identidade (H-C1..C8)',
+  'H-T': '3.4 Horário Local, Reciclagem de Turno e Sequência (H-T1..T6)',
+  'H-L': '3.5 Qualidade da Lista (Locator) e Custos Efetivos (H-L1..L6)',
+};
+
+export const StartIntelligenceRunSchema = z.object({
+  mailingId: z.string().uuid('Selecione um mailing válido'),
+  mode: z.enum(OPERATING_MODES).default('PARALLEL_BOTH'),
+  purposeCode: z.enum(OPERATION_PURPOSES).default('COBRANCA'),
+  purposePrompt: z
+    .string()
+    .min(5, 'Descreva a finalidade e o contexto da operação no prompt inicial')
+    .max(1000)
+    .default('Renegociação amigável de faturas em aberto com foco em encontrar o titular pelo menor custo de CPC.'),
+  referenceDate: z.string().optional(),
+  labSamplePct: z.number().min(5).max(50).default(25),
+  plannedDaysWaves: z.number().int().min(2).max(7).default(3),
+  maxAttemptsPerContact: z.number().int().min(1).max(10).default(4),
+  maxAcceptableCpcBrl: z.number().min(0.05).max(50).default(1.8),
+  autoDispatchProduction: z.boolean().default(true),
+  channelTariffs: z
+    .object({
+      VOICE: z.number().min(0).default(0.12),
+      WHATSAPP: z.number().min(0).default(0.28),
+      SMS: z.number().min(0).default(0.05),
+      EMAIL: z.number().min(0).default(0.01),
+    })
+    .optional(),
+});
+export type StartIntelligenceRunInput = z.infer<typeof StartIntelligenceRunSchema>;
+
+export const UpdateHypothesisSchema = z.object({
+  enabled: z.boolean().optional(),
+  productionWeight: z.number().min(0).max(3).optional(),
+  labWeight: z.number().min(0).max(3).optional(),
+  reason: z.string().min(3, 'Informe a justificativa do ajuste').optional(),
+});
+
+export const OverrideContactPlanSchema = z.object({
+  status: z.enum(PLAN_DECISION_STATUS).optional(),
+  primaryChannel: z.enum(CHANNEL_TYPES).optional(),
+  localTimeWindow: z.string().optional(),
+  reason: z.string().min(3, 'Informe o motivo da revisão humana (LGPD/ANPD)'),
+});
+
+export const PromoteLabToProductionSchema = z.object({
+  reason: z.string().min(3, 'Informe o motivo da promoção para Produção').default('Ganhos estatísticos validados nas ondas do Modo Laboratório'),
+});
+

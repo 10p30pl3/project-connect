@@ -7,6 +7,7 @@ import clsx from 'clsx';
 import {
   Activity,
   BookMarked,
+  BrainCircuit,
   Cable,
   ChevronDown,
   Compass,
@@ -50,6 +51,12 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: 'Inteligência & Governança',
     items: [
+      {
+        to: '/inteligencia',
+        label: 'Esteira de CPC & Lab',
+        icon: <BrainCircuit className={ico} aria-hidden />,
+        matchPrefixes: ['/inteligencia'],
+      },
       {
         to: '/otimizacao',
         label: 'Central de Decisão',

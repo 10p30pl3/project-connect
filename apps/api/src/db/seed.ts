@@ -6,6 +6,7 @@ import type { StrategyConfig } from '@voll/shared';
 import { getPool, one, tx, closePool, type Client } from './pool.js';
 import { config } from '../config.js';
 import { buildPreview, commitImport } from '../services/importer.js';
+import { runIntelligencePipeline } from '../intelligence/cpc-plan-engine.js';
 
 const RULES: StrategyConfig['tabulationRules'] = {
   CONVERSION: 'FINISH_SUCCESS',
@@ -69,24 +70,27 @@ const TABULATIONS = [
   { code: 'REPLIED', name: 'Respondeu', cpc: true, channels: ['WHATSAPP', 'SMS', 'EMAIL'] },
 ];
 
-const FIRST = ['Ana', 'Bruno', 'Carla', 'Diego', 'Elisa', 'Fábio', 'Gabriela', 'Heitor', 'Isabela', 'João', 'Larissa', 'Marcos', 'Natália', 'Otávio', 'Paula', 'Rafael', 'Sofia', 'Tiago', 'Vera', 'Wagner'];
+const FIRST = ['Ana', 'Bruno', 'Carla', 'Diego', 'Elisa', 'Fábio', 'Gabriela', 'Heitor', 'Isabela', 'João', 'Larissa', 'Marcos', 'Natália', 'Otávio', 'Paula', 'Rafael', 'Sofia', 'Tiago', 'Vera', 'Wagner', 'Sebastião', 'Aparecida', 'Enzo', 'Valentina'];
 const LAST = ['Almeida', 'Barbosa', 'Cardoso', 'Duarte', 'Esteves', 'Ferraz', 'Gomes', 'Henriques', 'Lima', 'Moraes'];
+const SAMPLE_DDDS = ['11', '21', '31', '41', '47', '51', '61', '62', '71', '81', '85', '91', '92'];
 
 export function sampleCsv(n = 40): string {
-  const lines = ['id;nome;telefone1;telefone2;telefone3;whatsapp1;email;valor_divida;dias_atraso;score;historico'];
+  const lines = ['id;nome;telefone1;telefone2;telefone3;whatsapp1;email;valor_divida;dias_atraso;score;historico;idade'];
   for (let i = 1; i <= n; i++) {
     const id = String(i).padStart(6, '0'); // zeros à esquerda preservados
     const name = `${FIRST[i % FIRST.length]} ${LAST[(i * 3) % LAST.length]}`;
-    const p = (k: number) => `(11) 90000-${String(i * 10 + k).padStart(4, '0')}`;
-    const t2 = i % 3 === 0 ? p(2) : '';
+    const ddd = SAMPLE_DDDS[i % SAMPLE_DDDS.length];
+    const p = (k: number) => `(${ddd}) 98800-${String(i * 10 + k).padStart(4, '0')}`;
+    const t2 = i % 3 === 0 ? `(${ddd}) 3220-${String(i * 10 + 2).padStart(4, '0')}` : '';
     const t3 = i % 7 === 0 ? p(3) : '';
     const wa = i % 2 === 0 ? p(5) : '';
-    const email = i % 4 === 0 ? `cliente${id}@exemplo.test` : '';
+    const email = i % 3 !== 0 ? `cliente${id}@exemplo.test` : '';
     const valor = (250 + ((i * 137) % 4800)).toFixed(2).replace('.', ',');
     const atraso = 5 + ((i * 17) % 180);
     const score = (i * 29) % 101;
     const hist = i % 5 === 0 ? '' : String((i * 3) % 4); // alguns sem histórico conhecido
-    lines.push([id, name, p(1), t2, t3, wa, email, valor, atraso, score, hist].join(';'));
+    const idade = i % 6 === 0 ? '' : String(20 + ((i * 11) % 52)); // algumas idades observadas e outras para inferência
+    lines.push([id, name, p(1), t2, t3, wa, email, valor, atraso, score, hist, idade].join(';'));
   }
   return lines.join('\n');
 }
@@ -165,16 +169,38 @@ export async function seed(opts: { withSampleMailing?: boolean } = {}) {
     }
 
     if (withSample) {
-      const ex = await one(c, `SELECT id FROM mailings WHERE workspace_id=$1 AND name='Carteira exemplo'`, [wsId]);
+      let ex = await one(c, `SELECT id FROM mailings WHERE workspace_id=$1 AND name='Carteira exemplo'`, [wsId]);
       if (!ex) {
         const preview = buildPreview(sampleCsv(), 'auto', true);
-        await commitImport(c, { id: wsId }, adminId, 'Carteira exemplo', preview);
+        const imported = await commitImport(c, { id: wsId }, adminId, 'Carteira exemplo', preview);
+        ex = { id: imported.mailingId };
         const dnc = await one(c, `SELECT id FROM contacts WHERE workspace_id=$1 AND external_id='000001'`, [wsId]);
         if (dnc)
           await c.query(
             `INSERT INTO blocks (workspace_id, scope, contact_id, reason, origin, created_by) VALUES ($1,'CONTACT',$2,'Solicitação registrada no SAC (exemplo)','MANUAL',$3)`,
             [wsId, dnc.id, adminId],
           );
+      }
+      const existingRun = await one(c, `SELECT id FROM mailing_intelligence_runs WHERE workspace_id=$1 LIMIT 1`, [wsId]);
+      if (!existingRun && ex?.id) {
+        await runIntelligencePipeline(
+          c,
+          wsId,
+          adminId,
+          {
+            mailingId: ex.id,
+            mode: 'PARALLEL_BOTH',
+            purposeCode: 'COBRANCA',
+            purposePrompt:
+              'Renegociação amigável de faturas em atraso; priorizar menor custo por CPC confirmado por tabulação, respeitando janela Wi-Fi no Norte/Nordeste e DDD local.',
+            labSamplePct: 25,
+            plannedDaysWaves: 3,
+            maxAttemptsPerContact: 4,
+            maxAcceptableCpcBrl: 1.8,
+            autoDispatchProduction: true,
+          },
+          { preSimulateLabWaves: 2 },
+        );
       }
     }
     return { organizationId: orgId, workspaceId: wsId, adminId };

@@ -71,9 +71,14 @@ export function MailingsSection() {
                     </td>
                     <td className="text-xs text-slate-600">{fmtDateTime(m.createdAt)}</td>
                     <td className="text-right">
-                      <Link to={`/listas/nova?mailing=${m.id}`} className="text-xs font-medium text-brand-700 hover:underline">
-                        Criar lista →
-                      </Link>
+                      <div className="inline-flex items-center gap-3">
+                        <Link to={`/inteligencia?mailing=${m.id}`} className="text-xs font-semibold text-brand-700 hover:underline">
+                          Esteira de CPC →
+                        </Link>
+                        <Link to={`/listas/nova?mailing=${m.id}`} className="text-xs font-medium text-slate-600 hover:underline">
+                          Criar lista →
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -144,9 +149,14 @@ export function MailingDetailPage() {
         title={m.name}
         subtitle={`${fmtNumber(m.recordCount)} registros · criado em ${fmtDateTime(m.createdAt)}`}
         actions={
-          <Link to={`/listas/nova?mailing=${m.id}`} className={btnClass('secondary')}>
-            Preparar lista
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link to={`/inteligencia?mailing=${m.id}`} className={btnClass('primary')}>
+              Processar na Esteira de CPC
+            </Link>
+            <Link to={`/listas/nova?mailing=${m.id}`} className={btnClass('secondary')}>
+              Preparar lista
+            </Link>
+          </div>
         }
       />
       <div className="space-y-4">

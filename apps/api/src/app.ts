@@ -17,6 +17,7 @@ import { controlRoutes } from './modules/control.js';
 import { connectorRoutes } from './modules/connectors.js';
 import { simRoutes } from './modules/sim.js';
 import { overviewRoutes } from './modules/overview.js';
+import { intelligenceRoutes } from './modules/intelligence.js';
 
 export type BuildOptions = { logger?: boolean; loginRateMax?: number };
 
@@ -100,6 +101,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
         await attemptRoutes(p);
         await contactRoutes(p);
         await controlRoutes(p);
+        await intelligenceRoutes(p);
         if (!config.isProduction) await simRoutes(p);
       });
     },

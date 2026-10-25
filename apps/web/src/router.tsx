@@ -23,6 +23,7 @@ import { CostsPage } from './pages/Costs';
 import { MorePage } from './pages/More';
 import { NotFoundPage } from './pages/NotFound';
 import { DecisionHubPage, PlaybookHubPage, PortfolioHubPage } from './pages/Hubs';
+import { IntelligencePage } from './pages/Intelligence';
 
 function RequireAuth() {
   const { me, loading } = useAuth();
@@ -79,6 +80,7 @@ export const router = createBrowserRouter([
           { path: '/tabulacoes', element: <PlaybookHubPage /> },
           { path: '/canais', element: <ChannelsPage /> },
           { path: '/controle', element: <ControlPage /> },
+          { path: '/inteligencia', element: <IntelligencePage /> },
           { path: '/experimentos', element: <DecisionHubPage /> },
           { path: '/otimizacao', element: <DecisionHubPage /> },
           { path: '/custos', element: <DecisionHubPage /> },

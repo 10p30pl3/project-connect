@@ -1,6 +1,6 @@
-import { useLocation, useNavigate } from 'react-router-dom';
-import { Compass, Database, DollarSign, FlaskConical, ListFilter, Route, SlidersHorizontal, Tags, Users } from 'lucide-react';
-import { PageHeader, Tabs } from '../components/ui';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { BrainCircuit, Compass, Database, DollarSign, FlaskConical, ListFilter, Route, SlidersHorizontal, Tags, Users } from 'lucide-react';
+import { btnClass, PageHeader, Tabs } from '../components/ui';
 import { MailingsSection } from './Mailings';
 import { ListsSection } from './Lists';
 import { ContactsSection } from './Contacts';
@@ -89,6 +89,20 @@ export function DecisionHubPage() {
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-200 bg-gradient-to-r from-brand-50/90 to-white px-4 py-3">
+        <div className="flex items-center gap-3">
+          <BrainCircuit className="size-5 text-brand-700" aria-hidden />
+          <div>
+            <div className="text-sm font-semibold text-slate-900">Motor de Inteligência de Contato & Otimização de CPC</div>
+            <div className="text-xs text-slate-600">
+              Execute a Esteira Autônoma em Modo Produção + Modo Laboratório (TIC Domicílios 2025, 29 Hipóteses H-A..H-L e Plano em 8 Blocos).
+            </div>
+          </div>
+        </div>
+        <Link to="/inteligencia" className={btnClass('primary', 'sm')}>
+          Abrir Esteira de CPC & Lab →
+        </Link>
+      </div>
       <Tabs
         value={activeTab}
         onValueChange={(v) => {

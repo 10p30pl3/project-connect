@@ -1570,5 +1570,364 @@ export async function handleMockApi<T = unknown>(
     return { ok: true } as T;
   }
 
+  // Esteira de Inteligência de Contato & CPC (/intelligence/*)
+  if (pathname === '/intelligence/study' && method === 'GET') {
+    return {
+      studyReference: {
+        title: 'Estudo de Inteligência de Contato & Otimização de CPC no Brasil',
+        definition: 'CPC = Contato com a Pessoa Certa confirmado por tabulação',
+        sources: ['TIC Domicílios 2025 (CETIC.br / NIC.br)', 'IBGE Censo 2022', 'Anatel / ABR Telecom', 'ANPD / LGPD Art. 20'],
+        ticDomicilios2025: [
+          {
+            ageBracket: 'AGE_16_24',
+            label: '16 a 24 anos (Geração Z)',
+            internetUsersPct: 96,
+            nonUsersPct: 4,
+            instantMessagingPct: 93,
+            socialNetworksPct: 90,
+            mobileOnlyPct: 68,
+            mobileDataCapExhaustedPct: 44,
+            primaryChannelRecommendation: 'WHATSAPP',
+            voiceRole: 'Evitar voz fria; usar WhatsApp ou RCS com autoatendimento',
+            operationalImplications: 'Rejeição severa a chamadas desconhecidas; alta resposta assíncrona em mensageria.',
+          },
+          {
+            ageBracket: 'AGE_35_44',
+            label: '35 a 44 anos (Adulto Economicamente Ativo)',
+            internetUsersPct: 93,
+            nonUsersPct: 7,
+            instantMessagingPct: 94,
+            socialNetworksPct: 82,
+            mobileOnlyPct: 58,
+            mobileDataCapExhaustedPct: 34,
+            primaryChannelRecommendation: 'WHATSAPP',
+            voiceRole: 'Voz eficaz em janela de almoço (12h-14h) e pós-18h com bina local',
+            operationalImplications: 'Equilíbrio entre WhatsApp comercial e voz consultiva.',
+          },
+          {
+            ageBracket: 'AGE_60_PLUS',
+            label: '60 anos ou mais (Idosos / Aposentados)',
+            internetUsersPct: 62,
+            nonUsersPct: 38,
+            instantMessagingPct: 83,
+            socialNetworksPct: 61,
+            mobileOnlyPct: 81,
+            mobileDataCapExhaustedPct: 29,
+            primaryChannelRecommendation: 'VOICE',
+            voiceRole: 'Canal soberano pela manhã (09h-11h30); fixo residencial ainda relevante',
+            operationalImplications: '38% desconectados exigem voz; entre os 62% conectados, 83% usam WhatsApp no celular.',
+          },
+        ],
+        macroRegions: [
+          {
+            region: 'SUDESTE',
+            label: 'Sudeste (DDD 11–19, 21–28, 31–38)',
+            states: ['SP', 'RJ', 'MG', 'ES'],
+            connectivityPct: 89,
+            mobileDataConstraintPct: 29,
+            preferredWindows: '10:00–12:00 / 14:00–17:30 / 18:30–19:45 (WhatsApp)',
+            channelMixGuidance: 'Alta saturação de chamadas spam (DDD 11). Exige bina local/Branded Call ou abertura via WhatsApp.',
+          },
+          {
+            region: 'NORDESTE',
+            label: 'Nordeste (DDD 71–79, 81–89)',
+            states: ['BA', 'SE', 'PE', 'AL', 'PB', 'RN', 'CE', 'PI', 'MA'],
+            connectivityPct: 81,
+            mobileDataConstraintPct: 48,
+            preferredWindows: '08:30–11:30 / 18:30–20:30 (Wi-Fi residencial)',
+            channelMixGuidance: 'WhatsApp texto leve (zero-rating) + Voz com DDD regional.',
+          },
+        ],
+        globalBenchmark: [
+          {
+            vendor: 'Aspect ALM / Alvaria',
+            countryOrigin: 'EUA (Global)',
+            flagshipCapability: 'Shift Matrix Recycling & Best-Time-to-Call (BTTC)',
+            coreConcept: 'Divide o dia em turnos e proíbe repetir tentativa no mesmo turno após Não Atende.',
+            vollConnectAdoption: 'Matriz de Reciclagem de Turno implementada no Bloco 4 do plano.',
+          },
+          {
+            vendor: 'Olos Tecnologia',
+            countryOrigin: 'Brasil',
+            flagshipCapability: 'Olos Locator & Olos Channel (Omnichannel)',
+            coreConcept: 'Higienização e ranking de telefones (Locator Score) acoplado a agente digital.',
+            vollConnectAdoption: 'Locator Score por destino + transbordo automático Voz <-> WhatsApp.',
+          },
+          {
+            vendor: 'TitanX',
+            countryOrigin: 'EUA',
+            flagshipCapability: 'Phone-Intent Scoring (P1..P4)',
+            coreConcept: 'Classifica propensão comportamental de atender telefone.',
+            vollConnectAdoption: 'Tiers P1_ALTA_PROPENSAO_VOZ a P4_QUARENTENA.',
+          },
+        ],
+        roadmapPhases: [
+          { phase: 'Fase 0', title: 'Saneamento e Definição Invariante de CPC', objective: 'CPC = Pessoa Certa confirmada por tabulação', deliverable: 'Base higienizada' },
+          { phase: 'Fase 5', title: 'Solver de Custo Esperado por CPC (ECPC)', objective: 'Minimizar R$/CPC confirmado', deliverable: 'Plano em 8 Blocos' },
+          { phase: 'Fase 6', title: 'Operação Dual: Produção + Laboratório', objective: 'Disparo imediato + ondas amostrais reais', deliverable: 'Promoção validada' },
+        ],
+      },
+      hypotheses: [
+        {
+          code: 'H-A1',
+          family: 'AGE_FINANCE',
+          title: 'Preferência Assíncrona Geração Z (16–24 anos)',
+          description: 'Jovens de 16–24 anos têm 96% de acesso à internet e 93% de uso de mensageria, mas rejeitam voz fria.',
+          publicEvidence: 'TIC Domicílios 2025 (C1/C5): 96% online, 93% mensageria instantânea.',
+          candidateVariables: 'idade, generation_inferred',
+          internalTest: 'Comparar CPC e R$/CPC entre WhatsApp-First vs. Voz Direta.',
+          allowedDecision: 'Canal Primário = WHATSAPP; suprimir 1ª tentativa em voz fria.',
+          benchmarkTool: 'TrueAccord HeartBeat / Genesys AI',
+          enabled: true,
+          productionWeight: 1.0,
+          labWeight: 1.15,
+        },
+        {
+          code: 'H-A4',
+          family: 'AGE_FINANCE',
+          title: 'Bimodalidade Sênior 60+ (38% Offline vs. 83% WhatsApp nos Conectados)',
+          description: 'No público 60+, 38% não usam internet, porém entre os 62% conectados, 83% usam WhatsApp.',
+          publicEvidence: 'TIC Domicílios 2025: 62% internet em 60+, 81% apenas celular.',
+          internalTest: 'Testar abertura matinal em Voz (fixo/móvel) com fallback WhatsApp.',
+          candidateVariables: 'idade >= 60, has_landline, has_whatsapp',
+          allowedDecision: 'Se possui fixo: Voz Manhã (09h–11h30); se móvel c/ WhatsApp: híbrido.',
+          benchmarkTool: 'Olos Locator / Altitude uCI',
+          enabled: true,
+          productionWeight: 1.0,
+          labWeight: 1.1,
+        },
+      ],
+    } as T;
+  }
+
+  if (pathname === '/intelligence/runs' && (method === 'GET' || method === 'POST')) {
+    const sampleRun = {
+      id: uuid(880),
+      mailingId: MAILINGS[0].detail.id,
+      mailingName: MAILINGS[0].detail.name,
+      mode: 'PARALLEL_BOTH',
+      purposeCode: 'COBRANCA',
+      purposePrompt: 'Renegociação amigável priorizando menor custo por CPC confirmado por tabulação.',
+      referenceDate: '2026-10-25',
+      labSamplePct: 25,
+      plannedDaysWaves: 3,
+      completedWaves: 2,
+      maxAttemptsPerContact: 4,
+      maxAcceptableCpcBrl: 1.8,
+      productionListVersionId: LIST_VER_ID,
+      sampleCalc: {
+        totalPopulation: 20,
+        sampleSize: 6,
+        samplePctEffective: 30,
+        perWaveSize: 2,
+        confidenceLevelPct: 95,
+        marginOfErrorPct: 5,
+        stratificationAxes: ['Macro-Região (DDD)', 'Faixa Etária TIC 2025', 'Tier de Intenção Telefônica (P1..P4)'],
+      },
+      cohortSummary: {
+        totalReceived: 20,
+        eligibleCount: 18,
+        excludedCount: 2,
+        coveragePct: 90,
+        estimatedCpcRatePct: 31.4,
+        expectedCostPerCpcBrl: 0.48,
+        bruteForceCostPerCpcBrl: 1.12,
+        savingsVsBruteForcePct: 57.1,
+        byAgeBracket: { AGE_16_24: 3, AGE_25_34: 5, AGE_35_44: 5, AGE_45_59: 4, AGE_60_PLUS: 3 },
+        byMacroRegion: { SUDESTE: 9, NORDESTE: 4, SUL: 3, CENTRO_OESTE: 2, NORTE: 2 },
+        byPrimaryChannel: { WHATSAPP: 11, VOICE: 6, SMS: 1 },
+        byPhoneIntentTier: { P1_ALTA_PROPENSAO_VOZ: 5, P2_HIBRIDO_DIGITAL_VOZ: 8, P3_DIGITAL_FIRST: 5, P4_QUARENTENA: 2 },
+      },
+      productionSummary: {
+        trackCount: 12,
+        dispatchedToActuatorsCount: 12,
+        expectedCostPerCpcBrl: 0.48,
+        estimatedCpcRatePct: 31.4,
+        status: 'DISPATCHED_TO_ACTUATORS',
+        note: 'Modo Produção passou por 100% da esteira de inteligência e enviou imediatamente 12 contatos elegíveis aos acionadores (sem aguardar ondas de teste).',
+      },
+      labSummary: {
+        sampleCount: 6,
+        plannedWaves: 3,
+        completedWaves: 2,
+        baselineProductionCpcBrl: 0.48,
+        currentLabCostPerCpcBrl: 0.37,
+        observedLabCpcRatePct: 38.2,
+        expectedCostReductionPct: 22.9,
+        expectedCpcRateLiftPp: 6.8,
+        projectedMonthlySavingsBrl: 1980,
+        readyToPromote: true,
+        promotedAt: null,
+        recommendation: 'O Laboratório reduziu o Custo por CPC Confirmado em 22.9% (R$ 0,37 vs R$ 0,48) e elevou a taxa de CPC em +6.8 p.p. Pronto para colocar em Produção.',
+      },
+      status: 'READY_TO_PROMOTE',
+      promotedAt: null,
+      createdAt: '2026-10-25T10:00:00Z',
+      waves: [
+        {
+          id: uuid(881),
+          waveNumber: 1,
+          dayOffset: 1,
+          status: 'COMPLETED',
+          sampleContactsCount: 3,
+          attemptsCount: 3,
+          confirmedCpcCount: 1,
+          cpcRate: 0.333,
+          totalCostBrl: 0.44,
+          costPerConfirmedCpcBrl: 0.44,
+          productionBaselineCpcBrl: 0.48,
+          costReductionPct: 8.3,
+          cpcLiftPp: 1.9,
+          adjustmentsApplied: ['H-C3 (Zero-Rating WhatsApp Norte/Nordeste): peso elevado de 1.00 para 1.18'],
+          executedAt: '2026-10-25T10:05:00Z',
+        },
+        {
+          id: uuid(882),
+          waveNumber: 2,
+          dayOffset: 2,
+          status: 'COMPLETED',
+          sampleContactsCount: 3,
+          attemptsCount: 3,
+          confirmedCpcCount: 2,
+          cpcRate: 0.667,
+          totalCostBrl: 0.3,
+          costPerConfirmedCpcBrl: 0.37,
+          productionBaselineCpcBrl: 0.48,
+          costReductionPct: 22.9,
+          cpcLiftPp: 6.8,
+          adjustmentsApplied: ['H-T1 (Reciclagem Estrita de Turno Aspect ALM): bloqueio de repetição no mesmo turno'],
+          executedAt: '2026-10-25T10:10:00Z',
+        },
+      ],
+    };
+    if (method === 'POST') return sampleRun as T;
+    return { items: [sampleRun] } as T;
+  }
+
+  if (pathname.match(/^\/intelligence\/runs\/([^/]+)$/) && method === 'GET') {
+    const res = await handleMockApi<{ items: any[] }>('/intelligence/runs', { method: 'GET' });
+    return res.items[0] as T;
+  }
+
+  if (pathname.match(/^\/intelligence\/runs\/([^/]+)\/plans$/) && method === 'GET') {
+    const items = CONTACTS.slice(0, 12).map((c, idx) => ({
+      id: uuid(890 + idx),
+      runId: uuid(880),
+      contactId: c.id,
+      externalId: c.externalId,
+      contactName: c.name,
+      track: idx < 8 ? 'PRODUCTION' : 'LABORATORY',
+      decisionStatus: idx === 11 ? 'SUPRIMIDO_DNC_LGPD' : idx < 5 ? 'INCLUIDO_PRIORITARIO' : 'INCLUIDO_PADRAO',
+      priorityRank: idx === 11 ? 9999 : idx + 1,
+      ddd: idx % 2 === 0 ? '11' : '71',
+      uf: idx % 2 === 0 ? 'SP' : 'BA',
+      macroRegion: idx % 2 === 0 ? 'SUDESTE' : 'NORDESTE',
+      ibgeCityTier: 'CAPITAL_METROPOLIS',
+      ceticAgeBracket: idx % 3 === 0 ? 'AGE_60_PLUS' : 'AGE_35_44',
+      inferredAge: idx % 3 === 0 ? 66 : 39,
+      locatorScore: 84,
+      phoneIntentTier: idx % 3 === 0 ? 'P1_ALTA_PROPENSAO_VOZ' : 'P2_HIBRIDO_DIGITAL_VOZ',
+      primaryChannel: idx % 3 === 0 ? 'VOICE' : 'WHATSAPP',
+      fallbackChannel: idx % 3 === 0 ? 'WHATSAPP' : 'VOICE',
+      bestShift: 'MANHA_09_12',
+      bestTimeWindow: '09:00 – 11:30',
+      maxAttempts: 3,
+      estimatedCpcProb: 0.34,
+      expectedCostPerCpcBrl: 0.42,
+      ConfidenceLevel: 'ALTO',
+      dispatchedToActuator: idx < 8,
+      blocks: {
+        bloco1_status_decisao: {
+          status: idx === 11 ? 'SUPRIMIDO_DNC_LGPD' : 'INCLUIDO_PRIORITARIO',
+          statusLabel: idx === 11 ? 'Suprimido (DNC / LGPD)' : 'Incluído · Prioridade Alta',
+          rankingPrioridade: idx + 1,
+          trilhaOperacional: idx < 8 ? 'PRODUCTION' : 'LABORATORY',
+          despachadoParaAcionador: idx < 8,
+          motivoDecisao: 'Score ECPC favorável para o propósito selecionado.',
+        },
+        bloco2_perfil_inferido: {
+          ddd: idx % 2 === 0 ? '11' : '71',
+          uf: idx % 2 === 0 ? 'SP' : 'BA',
+          macroRegiao: idx % 2 === 0 ? 'SUDESTE' : 'NORDESTE',
+          macroRegiaoLabel: idx % 2 === 0 ? 'Sudeste' : 'Nordeste',
+          porteMunicipioIbge: 'CAPITAL_METROPOLIS',
+          porteMunicipioLabel: 'Capital / Região Metropolitana',
+          idadeInferida: idx % 3 === 0 ? 66 : 39,
+          faixaEtariaCetic: idx % 3 === 0 ? 'AGE_60_PLUS' : 'AGE_35_44',
+          faixaEtariaLabel: idx % 3 === 0 ? '60 anos ou mais' : '35 a 44 anos',
+          probabilidadeConectividadePct: idx % 3 === 0 ? 62 : 93,
+          probabilidadeRestricaoPacoteDadosPct: idx % 2 === 0 ? 29 : 48,
+          locatorScore: 84,
+          phoneIntentTier: idx % 3 === 0 ? 'P1_ALTA_PROPENSAO_VOZ' : 'P2_HIBRIDO_DIGITAL_VOZ',
+          phoneIntentLabel: idx % 3 === 0 ? 'P1 · Alta Propensão a Voz' : 'P2 · Híbrido Digital + Voz',
+        },
+        bloco3_recomendacao_canal: {
+          canalPrimario: idx % 3 === 0 ? 'VOICE' : 'WHATSAPP',
+          canalPrimarioLabel: idx % 3 === 0 ? 'Discador (Voz)' : 'WhatsApp',
+          destinoPrimarioMascarado: c.destinations[0]?.addressMasked ?? '1198****01',
+          canalSecundarioFallback: idx % 3 === 0 ? 'WHATSAPP' : 'VOICE',
+          canalSecundarioLabel: idx % 3 === 0 ? 'WhatsApp' : 'Discador (Voz)',
+          destinoSecundarioMascarado: c.destinations[1]?.addressMasked ?? null,
+          exigeBinaLocalMatchDdd: true,
+          exigeBrandedCall: idx % 2 === 0,
+        },
+        bloco4_janela_horaria: {
+          melhorTurno: 'MANHA_09_12',
+          janelaPrimaria: '09:00 – 11:30',
+          janelaSecundaria: '14:30 – 17:00',
+          fusoHorarioUtcOffset: -3,
+          regraReciclagemTurno: 'Aspect ALM Shift Matrix: proibido repetir tentativa no mesmo turno após Não Atende.',
+        },
+        bloco5_sequencia_cadencia: {
+          maximoTentativas: 3,
+          intervaloMinimoHoras: 6,
+          regraParadaImediata: 'Parar imediatamente após CPC confirmado por tabulação.',
+          passos: [
+            { tentativa: 1, diaOffset: 1, turno: 'MANHA_09_12', janela: '09:00 – 11:30', canal: 'WHATSAPP', acao: 'Abertura contextual', condicaoTransicao: 'Aguardar 6h' },
+            { tentativa: 2, diaOffset: 1, turno: 'TARDE_14_17', janela: '14:30 – 17:00', canal: 'VOICE', acao: 'Voz com DDD local', condicaoTransicao: 'Reciclar turno' },
+          ],
+        },
+        bloco6_abordagem_linguagem: {
+          propositoOperacao: 'COBRANCA',
+          tomDeVoz: 'Consultivo, empático e direto',
+          comprimentoMensagem: 'Curto (até 240 caracteres, zero-rating friendly)',
+          roteiroAberturaSugerido: `Olá ${c.name}, temos uma condição especial para regularização com desconto à vista.`,
+          gatilhoPsicologico: 'Alívio imediato de restrição e transparência de valores',
+        },
+        bloco7_economia_cpc: {
+          probabilidadeCpcConfirmado: 0.34,
+          custoUnitarioCanalPrimarioBrl: 0.11,
+          custoEsperadoPorCpcConfirmadoBrl: 0.42,
+          custoBruteForceBaselineBrl: 1.08,
+          economiaEstimadaPct: 61.1,
+          tetoMaximoAceitavelBrl: 1.8,
+        },
+        bloco8_explicabilidade_governanca: {
+          hipotesesAtivadas: ['H-A4', 'H-G1', 'H-T1', 'H-L1'],
+          evidenciasPublicasCitadas: ['TIC Domicílios 2025 (CETIC.br)', 'Aspect ALM Shift Matrix'],
+          nivelConfianca: 'ALTO',
+          auditoriaLgpdArt20: 'Decisão automatizada auditável com opção de revisão humana imediata.',
+          revisaoHumanaAplicada: false,
+          notaRevisaoHumana: null,
+        },
+      },
+      humanOverride: null,
+    }));
+    return { items } as T;
+  }
+
+  if (pathname.match(/^\/intelligence\/runs\/([^/]+)\/lab\/next-wave$/) && method === 'POST') {
+    const res = await handleMockApi<any>('/intelligence/runs', { method: 'POST' });
+    return res as T;
+  }
+
+  if (pathname.match(/^\/intelligence\/runs\/([^/]+)\/lab\/promote$/) && method === 'POST') {
+    const res = await handleMockApi<any>('/intelligence/runs', { method: 'POST' });
+    res.status = 'PROMOTED_TO_PRODUCTION';
+    res.promotedAt = new Date().toISOString();
+    res.labSummary.promotedAt = res.promotedAt;
+    return res as T;
+  }
+
   return {} as T;
 }
