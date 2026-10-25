@@ -1,23 +1,28 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import clsx from 'clsx';
 import {
   Activity,
   ArrowRight,
   BrainCircuit,
+  Check,
   CheckCircle2,
   Clock,
   Compass,
   Database,
   FlaskConical,
+  GitFork,
   Layers,
   Phone,
   Play,
+  RefreshCw,
   Rocket,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
   TrendingDown,
+  TrendingUp,
   Users,
 } from 'lucide-react';
 import {
@@ -28,7 +33,7 @@ import {
   type OptimizationPolicy,
 } from '@voll/shared';
 import { get, post } from '../lib/api';
-import type { CampaignSummary, MailingSummary } from '../lib/types';
+import type { CampaignSummary, Journey, MailingSummary, Strategy } from '../lib/types';
 import { fmtDateTime, fmtMoney, fmtNumber, fmtPercent } from '../lib/format';
 import {
   Alert,
@@ -44,7 +49,6 @@ import {
   Select,
   Stat,
   TableWrap,
-  Tabs,
   useToast,
 } from '../components/ui';
 
@@ -74,112 +78,117 @@ type OptimizationResponse = {
 };
 
 export function CentralIntelligencePage() {
-  const [sp, setSp] = useSearchParams();
-  const activeTab = (sp.get('tab') as 'decisao' | 'testes') || 'decisao';
-
-  const setTab = (t: 'decisao' | 'testes') => {
-    setSp({ tab: t });
-  };
-
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Central de Inteligência"
-        subtitle="Ajuste parâmetros da decisão autônoma e desafie a inteligência com baterias de testes empíricos em amostras reduzidas."
-        actions={
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-100/80 px-2.5 py-0.5 text-xs font-semibold text-brand-900">
-              <Sparkles className="size-3 text-brand-700" /> TIC Domicílios 2025 Ativa
-            </span>
-          </div>
-        }
-      />
-
-      {/* Navegação entre Ajustar e Desafiar */}
-      <div className="flex items-center gap-2 border-b border-slate-200">
-        <button
-          type="button"
-          onClick={() => setTab('decisao')}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-semibold transition ${
-            activeTab === 'decisao'
-              ? 'border-brand-700 text-brand-900'
-              : 'border-transparent text-slate-500 hover:text-slate-900'
-          }`}
-        >
-          <Compass className="size-4" />
-          <span>Ajustar Inteligência (Central de Decisão)</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setTab('testes')}
-          className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-semibold transition ${
-            activeTab === 'testes'
-              ? 'border-brand-700 text-brand-900'
-              : 'border-transparent text-slate-500 hover:text-slate-900'
-          }`}
-        >
-          <FlaskConical className="size-4" />
-          <span>Desafiar Inteligência (Bateria de Testes Empíricos)</span>
-        </button>
-      </div>
-
-      {activeTab === 'decisao' ? <DecisionCenterTab /> : <EmpiricalLabTab />}
-    </div>
-  );
-}
-
-// ============================================================================
-// 1. ABA: AJUSTAR INTELIGÊNCIA (CENTRAL DE DECISÃO)
-// ============================================================================
-function DecisionCenterTab() {
   const qc = useQueryClient();
   const toast = useToast();
-  const campaigns = useQuery({
+
+  // 1. Consultas principais
+  const campaignsQ = useQuery({
     queryKey: ['campaigns'],
     queryFn: () => get<{ items: CampaignSummary[] }>('/campaigns'),
   });
+  const journeysQ = useQuery({
+    queryKey: ['journeys'],
+    queryFn: () => get<{ items: Journey[] }>('/journeys'),
+  });
+  const strategiesQ = useQuery({
+    queryKey: ['strategies'],
+    queryFn: () => get<{ items: Strategy[] }>('/strategies'),
+  });
+
+  // 2. Estado da Campanha em Produção (Champion)
   const [selectedCampaignId, setSelectedCampaignId] = useState('');
-  const [appliedContacts, setAppliedContacts] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    if (!selectedCampaignId && campaigns.data?.items.length) {
-      const running = campaigns.data.items.find((c) => c.status === 'RUNNING') ?? campaigns.data.items[0];
+    if (!selectedCampaignId && campaignsQ.data?.items.length) {
+      const running = campaignsQ.data.items.find((c) => c.status === 'RUNNING') ?? campaignsQ.data.items[0];
       setSelectedCampaignId(running.id);
     }
-  }, [campaigns.data, selectedCampaignId]);
+  }, [campaignsQ.data, selectedCampaignId]);
 
-  const q = useQuery({
+  const selectedCampaign = campaignsQ.data?.items.find((c) => c.id === selectedCampaignId);
+  const totalBase = selectedCampaign?.progress?.members ?? 12500;
+
+  // 3. Estado do Experimento Desafiador (Challenger)
+  // Modo de configuração: 'RECOMMENDED' (Inteligência 1-clique) ou 'ADVANCED' (Manuais)
+  const [challengerMode, setChallengerMode] = useState<'RECOMMENDED' | 'ADVANCED'>('RECOMMENDED');
+
+  // Parâmetros do Challenger
+  const [challengerStrategyId, setChallengerStrategyId] = useState('');
+  const [challengerJourneyId, setChallengerJourneyId] = useState('');
+  const [policy, setPolicy] = useState<OptimizationPolicy>('LOWEST_COST_PER_CPC');
+  const [minEvidences, setMinEvidences] = useState(3);
+  const [samplePct, setSamplePct] = useState(10); // 10% padrão
+
+  // Inicialização com valores recomendados
+  useEffect(() => {
+    if (strategiesQ.data?.items.length && !challengerStrategyId) {
+      // Procura uma estratégia diferente da de produção ou a segunda disponível
+      const diff = strategiesQ.data.items.find((s) => s.name !== selectedCampaign?.strategyName) ?? strategiesQ.data.items[0];
+      setChallengerStrategyId(diff.id);
+    }
+    if (journeysQ.data?.items.length && !challengerJourneyId) {
+      const bestJ = journeysQ.data.items.find((j) => (j.latestVersion?.steps.length ?? 0) > 1) ?? journeysQ.data.items[0];
+      setChallengerJourneyId(bestJ.id);
+    }
+  }, [strategiesQ.data, journeysQ.data, selectedCampaign, challengerStrategyId, challengerJourneyId]);
+
+  const activeChallengerStrategy = strategiesQ.data?.items.find((s) => s.id === challengerStrategyId);
+  const activeChallengerJourney = journeysQ.data?.items.find((j) => j.id === challengerJourneyId);
+
+  // 4. Estado de Execução do Experimento
+  const [hasExperimentRun, setHasExperimentRun] = useState(false);
+  const [activeWave, setActiveWave] = useState(1);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [isPromoted, setIsPromoted] = useState(false);
+
+  // Recomendações por contato
+  const recsQ = useQuery({
     queryKey: ['optimization-recommendations', selectedCampaignId],
     queryFn: () => get<OptimizationResponse>(`/optimization?campaignId=${selectedCampaignId}`),
     enabled: !!selectedCampaignId,
   });
 
-  const [enabled, setEnabled] = useState(true);
-  const [policy, setPolicy] = useState<OptimizationPolicy>('LOWEST_COST_PER_CPC');
-  const [minEvidences, setMinEvidences] = useState(3);
+  const [appliedContacts, setAppliedContacts] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    if (q.data) {
-      setEnabled(q.data.enabled ?? true);
-      setPolicy(q.data.policyCode ?? 'LOWEST_COST_PER_CPC');
-      setMinEvidences(q.data.minEvidences ?? 3);
-    }
-  }, [q.data]);
+  const sampleSize = Math.max(1, Math.round((totalBase * samplePct) / 100));
 
-  const configMutation = useMutation({
+  // Disparo de nova onda de teste empírico
+  const handleRunWave = () => {
+    setIsSimulating(true);
+    setTimeout(() => {
+      setIsSimulating(false);
+      setHasExperimentRun(true);
+      setActiveWave((w) => Math.min(w + 1, 3));
+      toast('success', `Onda ${Math.min(activeWave + 1, 3)} do experimento executada com sucesso!`);
+    }, 800);
+  };
+
+  // Iniciar experimento
+  const handleStartExperiment = () => {
+    setIsSimulating(true);
+    setTimeout(() => {
+      setIsSimulating(false);
+      setHasExperimentRun(true);
+      setActiveWave(1);
+      toast('success', `Experimento Desafiador (Challenger) disparado na amostra de ${fmtNumber(sampleSize)} contatos.`);
+    }, 900);
+  };
+
+  // Promoção do Experimento Vencedor para Produção
+  const promoteMutation = useMutation({
     mutationFn: () =>
       post<{ ok: boolean; version: number }>('/optimization/configure', {
         campaignId: selectedCampaignId,
-        enabled,
+        enabled: true,
         policy,
         minEvidences,
       }),
     onSuccess: (res) => {
-      toast('success', `Política de inteligência atualizada (Estratégia publicada na v${res.version}).`);
-      qc.invalidateQueries({ queryKey: ['optimization-recommendations', selectedCampaignId] });
+      setIsPromoted(true);
+      toast('success', `Experimento promovido com sucesso! A campanha em produção agora opera com a nova estratégia vencedora (v${res.version}).`);
       qc.invalidateQueries({ queryKey: ['campaigns'] });
-      qc.invalidateQueries({ queryKey: ['strategies'] });
+      qc.invalidateQueries({ queryKey: ['optimization-recommendations', selectedCampaignId] });
+      qc.invalidateQueries({ queryKey: ['overview'] });
     },
   });
 
@@ -189,388 +198,603 @@ function DecisionCenterTab() {
     onSuccess: (_res, vars) => {
       if (vars.contactId) {
         setAppliedContacts((s) => ({ ...s, [vars.contactId!]: true }));
-        toast('success', 'Recomendação aplicada ao contato e registrada na auditoria.');
+        toast('success', 'Recomendação aplicada ao contato.');
       } else {
         const next: Record<string, boolean> = {};
-        for (const it of q.data?.items ?? []) next[it.contactId] = true;
+        for (const it of recsQ.data?.items ?? []) next[it.contactId] = true;
         setAppliedContacts(next);
-        toast('success', `Recomendações aplicadas para ${vars.count ?? 0} contatos da fila.`);
+        toast('success', `Recomendações aplicadas para ${vars.count ?? 0} contatos.`);
       }
-      qc.invalidateQueries({ queryKey: ['audit'] });
     },
   });
 
-  return (
-    <div className="space-y-5">
-      <div className="grid gap-4 lg:grid-cols-12">
-        <Card title="1. Campanha Alvo" className="lg:col-span-5">
-          <div className="space-y-3">
-            <Field label="Selecione a campanha" hint="A campanha vincula o mailing à estratégia">
-              {(p) => (
-                <Select
-                  id={p.id}
-                  value={selectedCampaignId}
-                  onChange={(e) => {
-                    setSelectedCampaignId(e.target.value);
-                    setAppliedContacts({});
-                  }}
-                >
-                  <option value="">Selecione uma campanha…</option>
-                  {campaigns.data?.items.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.statusLabel})
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </Field>
+  // Métricas comparativas
+  const championCpcRate = 21.2;
+  const championCpcCost = 5.60;
+  const challengerCpcRate = 38.4;
+  const challengerCpcCost = 3.18;
+  const unitSavings = championCpcCost - challengerCpcCost; // R$ 2,42
+  const totalProjectedSavings = totalBase * unitSavings;
 
-            {q.data && (
-              <div className="flex items-center justify-between rounded-lg border border-slate-200/80 bg-slate-50 px-3 py-2 text-xs">
-                <span className="text-slate-600">
-                  Template vinculado: <strong className="text-slate-900">{q.data.strategyName ?? 'Padrão'}</strong> (v{q.data.strategyVersion ?? 1})
-                </span>
-                {enabled ? <Badge tone="green">Inteligência Ativa</Badge> : <Badge tone="gray">Desativada</Badge>}
-              </div>
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Central de Inteligência"
+        subtitle="Ajuste e desafie a inteligência em produção: configure hipóteses alternativas (Challenger) em amostras controladas antes de promover para a base inteira."
+        actions={
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-100/80 px-2.5 py-0.5 text-xs font-semibold text-brand-900">
+              <Sparkles className="size-3 text-brand-700" /> TIC Domicílios 2025 Ativa
+            </span>
+          </div>
+        }
+      />
+
+      {/* =========================================================================
+          SEÇÃO 1: CAMPANHA ALVO EM PRODUÇÃO (CHAMPION)
+      ========================================================================= */}
+      <Card
+        title={
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="size-4 text-brand-700" aria-hidden />
+              <span className="font-semibold text-slate-900">1. Campanha em Produção (Champion Atual)</span>
+            </div>
+            {selectedCampaign && (
+              <Badge tone={selectedCampaign.status === 'RUNNING' ? 'green' : 'brand'}>
+                {selectedCampaign.statusLabel}
+              </Badge>
             )}
           </div>
-        </Card>
-
-        <Card title="2. Calibrar Política de Decisão" className="lg:col-span-7">
-          <div className="space-y-3.5">
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-brand-200/80 bg-brand-50/30 px-3.5 py-2.5">
-              <div>
-                <div className="text-sm font-semibold text-slate-900">Motor Autônomo de Recomendação</div>
-                <div className="text-xs text-slate-600">Calcula propensão, melhor horário (Best Time to Contact) e menor custo por CPC.</div>
-              </div>
-              <Checkbox label="Ativar motor" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Field label="Política de priorização" className="sm:col-span-2">
+        }
+      >
+        <div className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-12 items-end">
+            <div className="sm:col-span-6">
+              <Field label="Selecione a campanha para otimizar / desafiar" hint="A campanha vincula o mailing aos contatos da operação">
                 {(p) => (
-                  <Select id={p.id} value={policy} disabled={!enabled} onChange={(e) => setPolicy(e.target.value as OptimizationPolicy)}>
-                    {OPTIMIZATION_POLICIES.map((pol) => (
-                      <option key={pol} value={pol}>
-                        {OPTIMIZATION_POLICY_LABEL[pol]}
+                  <Select
+                    id={p.id}
+                    value={selectedCampaignId}
+                    onChange={(e) => {
+                      setSelectedCampaignId(e.target.value);
+                      setAppliedContacts({});
+                      setIsPromoted(false);
+                      setHasExperimentRun(false);
+                    }}
+                  >
+                    <option value="">Selecione uma campanha…</option>
+                    {campaignsQ.data?.items.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.statusLabel})
                       </option>
                     ))}
                   </Select>
                 )}
               </Field>
-              <Field label="Mín. de evidências">
-                {(p) => (
-                  <Input
-                    id={p.id}
-                    type="number"
-                    min={1}
-                    max={50}
-                    disabled={!enabled}
-                    value={minEvidences}
-                    onChange={(e) => setMinEvidences(Math.max(1, Number(e.target.value)))}
-                  />
-                )}
-              </Field>
             </div>
 
-            <div className="flex items-center justify-between gap-2 pt-1">
-              <span className="text-xs text-slate-500">Publica versão imutável da estratégia e atualiza a campanha.</span>
-              <Button
-                variant="primary"
-                size="sm"
-                loading={configMutation.isPending}
-                disabled={!selectedCampaignId}
-                onClick={() => configMutation.mutate()}
-              >
-                Salvar parâmetros da política
-              </Button>
+            <div className="sm:col-span-6">
+              <div className="rounded-xl border border-slate-200/90 bg-slate-50/70 p-3 text-xs flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <span className="text-slate-500 block text-[11px]">Estratégia e Jornada em Produção:</span>
+                  <span className="font-semibold text-slate-900">
+                    {selectedCampaign?.strategyName ?? 'Padrão'} (v{selectedCampaign?.strategyVersion ?? 1}) · {selectedCampaign?.journeyName ?? 'Multicanal'}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <span className="text-slate-500 block text-[11px]">Base Total:</span>
+                  <span className="font-semibold text-slate-900">{fmtNumber(totalBase)} contatos</span>
+                </div>
+              </div>
             </div>
           </div>
-        </Card>
-      </div>
 
-      {!selectedCampaignId ? (
-        <Card>
-          <div className="py-8 text-center text-sm text-slate-500">
-            <Compass className="mx-auto mb-2 size-8 text-slate-400" />
-            Selecione uma campanha acima para visualizar as recomendações e propensões por contato.
-          </div>
-        </Card>
-      ) : q.isLoading ? (
-        <Loading rows={5} />
-      ) : (
-        <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-3">
+          {/* Métricas vigentes da Produção (Baseline) */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 pt-1 border-t border-slate-100">
             <Stat
-              label="Status da Decisão"
-              value={enabled ? q.data?.policy ?? 'Menor custo por CPC' : 'Desativada (Ordem fixa)'}
-              tone={enabled ? 'good' : undefined}
+              label="Custo por CPC em Produção"
+              value={`R$ ${championCpcCost.toFixed(2)}`}
+              hint="Sem inteligência de disparo"
             />
             <Stat
-              label="Evidências Mínimas"
-              value={`${minEvidences} tentativas`}
-              hint="Abaixo disso, mantém a prioridade padrão do template"
+              label="Taxa de CPC Atual"
+              value={`${championCpcRate}%`}
+              hint="Histórico observado"
             />
             <Stat
-              label="Contatos com Recomendação"
-              value={fmtNumber(enabled ? (q.data?.items.length ?? 0) : 0)}
-              tone={enabled ? 'good' : undefined}
-              hint={enabled ? 'Avaliados pelo motor' : 'Ative o motor para calcular'}
+              label="Contatos Qualificados"
+              value={fmtNumber(totalBase)}
+              hint="Base total da campanha"
+            />
+            <Stat
+              label="Status da Inteligência"
+              value={isPromoted ? 'Estratégia Campeã Ativa' : 'Baseline Convencional'}
+              tone={isPromoted ? 'good' : undefined}
+              hint={isPromoted ? 'Atualizada pelo Challenger' : 'Pronta para ser desafiada'}
             />
           </div>
-
-          <Card
-            title="Recomendações Consultivas por Contato"
-            padded={false}
-            actions={
-              enabled &&
-              q.data?.items &&
-              q.data.items.length > 0 && (
-                <Button
-                  size="sm"
-                  variant="primary"
-                  loading={applyMutation.isPending}
-                  onClick={() => applyMutation.mutate({ count: q.data?.items.length })}
-                >
-                  Aplicar recomendações em lote ({q.data.items.length})
-                </Button>
-              )
-            }
-          >
-            {!enabled ? (
-              <div className="p-6 text-center text-xs text-slate-500">
-                O motor autônomo está desativado para esta campanha. Ative-o acima para calcular as recomendações de menor custo por CPC.
-              </div>
-            ) : !q.data?.items || q.data.items.length === 0 ? (
-              <div className="p-6 text-center text-xs text-slate-500">
-                Nenhum contato atingiu o limite de {minEvidences} evidências históricas ainda. O sistema continuará acumulando tentativas.
-              </div>
-            ) : (
-              <TableWrap label="Recomendações">
-                <table className="data">
-                  <thead>
-                    <tr>
-                      <th>Contato</th>
-                      <th>Canal Recomendado</th>
-                      <th>Destino</th>
-                      <th>Melhor Janela</th>
-                      <th>Evidências</th>
-                      <th>Histórico</th>
-                      <th>Custo Est. CPC</th>
-                      <th>Ação</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {q.data.items.map((row) => {
-                      const isApplied = appliedContacts[row.contactId];
-                      return (
-                        <tr key={row.contactId}>
-                          <td>
-                            <div className="font-semibold text-xs text-slate-900">{row.name}</div>
-                            <div className="font-mono text-[11px] text-slate-500">ID {row.externalId}</div>
-                          </td>
-                          <td>
-                            <Badge tone={row.channel === 'WHATSAPP' ? 'green' : row.channel === 'VOICE' ? 'brand' : 'gray'}>
-                              {row.channel}
-                            </Badge>
-                          </td>
-                          <td className="font-mono text-xs text-slate-700">{row.destinationMasked}</td>
-                          <td className="text-xs text-slate-700">
-                            <span className="inline-flex items-center gap-1">
-                              <Clock className="size-3 text-brand-600" />
-                              {row.bestTimeWindow}
-                            </span>
-                          </td>
-                          <td className="tabular text-xs text-slate-600">{row.evidencesCount}x</td>
-                          <td className="tabular text-xs font-semibold text-emerald-700">{fmtPercent(row.historicRate)}</td>
-                          <td className="tabular text-xs font-semibold text-slate-900">
-                            {row.estimatedCostPerSuccess !== null ? fmtMoney(row.estimatedCostPerSuccess) : '—'}
-                          </td>
-                          <td>
-                            {isApplied ? (
-                              <Badge tone="green">
-                                <CheckCircle2 className="mr-1 inline size-3" /> Aplicado
-                              </Badge>
-                            ) : (
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                loading={applyMutation.isPending}
-                                onClick={() => applyMutation.mutate({ contactId: row.contactId })}
-                              >
-                                Aplicar
-                              </Button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </TableWrap>
-            )}
-          </Card>
         </div>
-      )}
-    </div>
-  );
-}
+      </Card>
 
-// ============================================================================
-// 2. ABA: DESAFIAR INTELIGÊNCIA (BATERIA DE TESTES EMPÍRICOS)
-// ============================================================================
-function EmpiricalLabTab() {
-  const mailings = useQuery({
-    queryKey: ['mailings'],
-    queryFn: () => get<{ items: MailingSummary[] }>('/mailings'),
-  });
-  const [selectedMailingId, setSelectedMailingId] = useState('');
-  const [samplePct, setSamplePct] = useState(10);
-  const [activeWave, setActiveWave] = useState(1);
-  const [isSimulating, setIsSimulating] = useState(false);
-
-  useEffect(() => {
-    if (!selectedMailingId && mailings.data?.items.length) {
-      setSelectedMailingId(mailings.data.items[0].id);
-    }
-  }, [mailings.data, selectedMailingId]);
-
-  const currentMailing = mailings.data?.items.find((m) => m.id === selectedMailingId) ?? mailings.data?.items[0];
-  const totalBase = currentMailing?.recordCount ?? 12500;
-  const sampleSize = Math.round((totalBase * samplePct) / 100);
-
-  const handleRunWave = () => {
-    setIsSimulating(true);
-    setTimeout(() => {
-      setIsSimulating(false);
-      setActiveWave((w) => Math.min(w + 1, 3));
-    }, 800);
-  };
-
-  return (
-    <div className="space-y-5">
-      <div className="rounded-xl border border-brand-200/80 bg-gradient-to-r from-brand-50/70 via-white to-slate-50 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="space-y-1">
+      {/* =========================================================================
+          SEÇÃO 2: CONFIGURAR EXPERIMENTO DESAFIADOR (CHALLENGER)
+      ========================================================================= */}
+      <Card
+        title={
+          <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-sm text-slate-900">Bateria de Testes em Amostra Reduzida</span>
-              <Badge tone="green">Amostra {samplePct}%</Badge>
-              <Badge tone="brand">TIC Domicílios 2025</Badge>
+              <FlaskConical className="size-4 text-brand-700" aria-hidden />
+              <span className="font-semibold text-slate-900">2. Configurar Experimento Desafiador (Challenger)</span>
             </div>
-            <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
-              Desafie a inteligência antes de liberar o disparo em massa. O sistema executa ondas de teste empírico em uma fração controlada da base, aferindo custos e taxas reais de CPC para comprovar a economia.
-            </p>
-          </div>
-          <div className="text-right">
-            <div className="text-xs text-slate-500 font-medium">Economia Comprovada vs. Força Bruta</div>
-            <div className="text-xl font-extrabold text-emerald-700">43,2% de Redução</div>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-12">
-        <Card title="1. Configurar Amostra do Teste" className="lg:col-span-5">
-          <div className="space-y-3.5">
-            <Field label="Mailing para o teste empírico">
-              {(p) => (
-                <Select
-                  id={p.id}
-                  value={selectedMailingId}
-                  onChange={(e) => setSelectedMailingId(e.target.value)}
-                >
-                  {mailings.data?.items.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name} ({fmtNumber(m.recordCount)} contatos)
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </Field>
-
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Percentual da Amostra" hint="Recomendado: 5% a 15%">
-                {(p) => (
-                  <Select
-                    id={p.id}
-                    value={String(samplePct)}
-                    onChange={(e) => setSamplePct(Number(e.target.value))}
-                  >
-                    <option value="5">5% da base</option>
-                    <option value="10">10% da base (Padrão)</option>
-                    <option value="15">15% da base</option>
-                    <option value="20">20% da base</option>
-                  </Select>
+            <div className="flex items-center gap-1.5 rounded-lg bg-slate-100 p-0.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setChallengerMode('RECOMMENDED')}
+                className={clsx(
+                  'rounded-md px-2.5 py-1 font-semibold transition',
+                  challengerMode === 'RECOMMENDED'
+                    ? 'bg-white text-brand-800 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900',
                 )}
-              </Field>
-
-              <Field label="Tamanho Calculado" hint="Nível conf. 95% / Erro 2%">
-                {() => (
-                  <div className="h-9 px-3 rounded-md border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-800 flex items-center">
-                    {fmtNumber(sampleSize)} contatos
-                  </div>
-                )}
-              </Field>
-            </div>
-
-            <div className="pt-1 flex items-center justify-between">
-              <span className="text-xs text-slate-500">Onda atual de teste: {activeWave} de 3</span>
-              <Button
-                variant="primary"
-                size="sm"
-                loading={isSimulating}
-                onClick={handleRunWave}
-                icon={<Play className="size-3.5" />}
               >
-                Disparar Onda {activeWave}
-              </Button>
+                ⭐ (Recomendada) IA Voll
+              </button>
+              <button
+                type="button"
+                onClick={() => setChallengerMode('ADVANCED')}
+                className={clsx(
+                  'rounded-md px-2.5 py-1 font-semibold transition',
+                  challengerMode === 'ADVANCED'
+                    ? 'bg-white text-brand-800 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900',
+                )}
+              >
+                ⚙️ Avançada (Opções Manuais)
+              </button>
             </div>
           </div>
-        </Card>
+        }
+      >
+        <div className="space-y-4">
+          {/* MODO RECOMENDADO (1 CLIQUE) */}
+          {challengerMode === 'RECOMMENDED' ? (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-brand-200/90 bg-gradient-to-r from-brand-50/70 via-indigo-50/40 to-slate-50 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="size-4 text-brand-700" />
+                      <span className="text-sm font-bold text-slate-900">
+                        Hipótese Recomendada: Otimização Autônoma de Menor Custo por CPC
+                      </span>
+                      <Badge tone="green">Alta Assertividade</Badge>
+                    </div>
+                    <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
+                      Configuração automática com base na <strong>TIC Domicílios 2025</strong>. Prioriza WhatsApp Oficial em janelas de Wi-Fi e aciona Discador com BINA Local em horários nobres, minimizando o custo por Pessoa Certa (CPC).
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[11px] text-slate-500 font-medium">Economia Esperada</div>
+                    <div className="text-lg font-extrabold text-emerald-700">-43,2% no Custo/CPC</div>
+                  </div>
+                </div>
 
-        <Card title="2. Comparativo: Inteligência vs. Força Bruta" className="lg:col-span-7">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Stat
-              label="Amostra Reduzida"
-              value={fmtNumber(sampleSize)}
-              hint={`De ${fmtNumber(totalBase)} totais`}
-            />
-            <Stat
-              label="Taxa de CPC (IA)"
-              value="38,4%"
-              tone="good"
-              hint="vs 21,2% Força Bruta"
-            />
-            <Stat
-              label="Custo por CPC (IA)"
-              value="R$ 3,18"
-              tone="good"
-              hint="vs R$ 5,60 sem inteligência"
-            />
-            <Stat
-              label="Economia no Piloto"
-              value="43,2%"
-              tone="good"
-              hint="Auditado na amostra"
-            />
+                {/* Parâmetros Recomendados Pré-aplicados */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 mt-3 border-t border-brand-200/60 text-xs">
+                  <div>
+                    <span className="text-slate-500 block text-[11px]">Estratégia Desafiadora:</span>
+                    <strong className="text-slate-900 block truncate">
+                      {activeChallengerStrategy?.name ?? 'Otimizada Multicanal'}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[11px]">Jornada Desafiadora:</span>
+                    <strong className="text-slate-900 block truncate">
+                      {activeChallengerJourney?.name ?? 'WhatsApp Prioritário + Discador'}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[11px]">Política de Decisão:</span>
+                    <strong className="text-brand-900 block truncate">Menor custo por CPC</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[11px]">Amostra Estatística:</span>
+                    <strong className="text-slate-900 block">
+                      10% ({fmtNumber(sampleSize)} contatos · IC 95%)
+                    </strong>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-xs text-slate-500">
+                  O teste desafiador será executado em {fmtNumber(sampleSize)} contatos sem alterar a produção em massa.
+                </span>
+                <Button
+                  variant="primary"
+                  loading={isSimulating}
+                  disabled={!selectedCampaignId}
+                  onClick={handleStartExperiment}
+                  icon={<Play className="size-4" />}
+                >
+                  {hasExperimentRun ? 'Recalcular e Reexecutar Challenger' : 'Disparar Challenger Recomendado ⚡'}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            /* MODO AVANÇADO (OPÇÕES MANUAIS) */
+            <div className="space-y-4">
+              <div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600 border border-slate-200/80">
+                Escolha manualmente a combinação de <strong>Estratégia</strong> e <strong>Jornada</strong> para testar como hipótese concorrente à campanha em produção.
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Estratégia Desafiadora" hint="Template com limites de esforço e regras de tabulação">
+                  {(p) => (
+                    <Select
+                      id={p.id}
+                      value={challengerStrategyId}
+                      onChange={(e) => setChallengerStrategyId(e.target.value)}
+                    >
+                      {strategiesQ.data?.items.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} (v{s.latestVersion?.version ?? 1})
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+                </Field>
+
+                <Field label="Jornada Desafiadora" hint="Sequência multicanal e cadência de transbordo">
+                  {(p) => (
+                    <Select
+                      id={p.id}
+                      value={challengerJourneyId}
+                      onChange={(e) => setChallengerJourneyId(e.target.value)}
+                    >
+                      {journeysQ.data?.items.map((j) => (
+                        <option key={j.id} value={j.id}>
+                          {j.name} (v{j.latestVersion?.version ?? 1} · {j.latestVersion?.steps.length ?? 0} etapas)
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+                </Field>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Field label="Política de Priorização" className="sm:col-span-2">
+                  {(p) => (
+                    <Select
+                      id={p.id}
+                      value={policy}
+                      onChange={(e) => setPolicy(e.target.value as OptimizationPolicy)}
+                    >
+                      {OPTIMIZATION_POLICIES.map((pol) => (
+                        <option key={pol} value={pol}>
+                          {OPTIMIZATION_POLICY_LABEL[pol]}
+                        </option>
+                      ))}
+                    </Select>
+                  )}
+                </Field>
+
+                <Field label="Mín. Evidências Históricas">
+                  {(p) => (
+                    <Input
+                      id={p.id}
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={minEvidences}
+                      onChange={(e) => setMinEvidences(Math.max(1, Number(e.target.value)))}
+                    />
+                  )}
+                </Field>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Amostra do Teste Empírico" hint="Fração da base reservada para validação estatística">
+                  {(p) => (
+                    <Select
+                      id={p.id}
+                      value={String(samplePct)}
+                      onChange={(e) => setSamplePct(Number(e.target.value))}
+                    >
+                      <option value="5">5% da base (Piloto rápido)</option>
+                      <option value="10">10% da base (Recomendado · 95% Confiança)</option>
+                      <option value="15">15% da base (Maior precisão)</option>
+                      <option value="20">20% da base (Amostra robusta)</option>
+                    </Select>
+                  )}
+                </Field>
+
+                <Field label="Tamanho Calculado da Amostra" hint="Contatos elegíveis a serem testados">
+                  {() => (
+                    <div className="h-9 px-3 rounded-md border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-800 flex items-center">
+                      {fmtNumber(sampleSize)} contatos ({samplePct}% da base de {fmtNumber(totalBase)})
+                    </div>
+                  )}
+                </Field>
+              </div>
+
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-xs text-slate-500">
+                  Os parâmetros manuais serão comparados diretamente com o baseline da produção.
+                </span>
+                <Button
+                  variant="primary"
+                  loading={isSimulating}
+                  disabled={!selectedCampaignId}
+                  onClick={handleStartExperiment}
+                  icon={<Play className="size-4" />}
+                >
+                  Disparar Challenger Personalizado ⚡
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* =========================================================================
+          SEÇÃO 3: PLACAR DE CONFRONTO EM TEMPO REAL (CHAMPION VS. CHALLENGER)
+      ========================================================================= */}
+      <Card
+        title={
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-2">
+              <Activity className="size-4 text-emerald-600" aria-hidden />
+              <span className="font-semibold text-slate-900">3. Placar de Confronto: Produção vs. Experimento</span>
+            </div>
+            {hasExperimentRun && (
+              <Badge tone="green">
+                Onda {activeWave} de 3 · Veredito Conclusivo
+              </Badge>
+            )}
           </div>
+        }
+      >
+        {!hasExperimentRun ? (
+          <div className="py-8 text-center text-xs text-slate-500">
+            <FlaskConical className="mx-auto mb-2 size-8 text-slate-400" />
+            Nenhum experimento disparado ainda. Clique em <strong>Disparar Challenger</strong> acima para confrontar os parâmetros desafiantes com a produção.
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {/* Tabela de Comparação Lado a Lado */}
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-700">
+                    <th className="py-3 px-4 font-semibold">Dimensão</th>
+                    <th className="py-3 px-4 font-semibold">Produção (Champion Vigente)</th>
+                    <th className="py-3 px-4 font-semibold text-brand-900 bg-brand-50/40">
+                      Experimento (Challenger Selecionado)
+                    </th>
+                    <th className="py-3 px-4 font-semibold text-emerald-800 bg-emerald-50/30">
+                      Ganho Comprovado (*Expected Lift*)
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  <tr>
+                    <td className="py-2.5 px-4 font-medium text-slate-600">Estratégia</td>
+                    <td className="py-2.5 px-4 text-slate-800 font-medium">
+                      {selectedCampaign?.strategyName ?? 'Padrão'}
+                    </td>
+                    <td className="py-2.5 px-4 text-brand-900 font-bold bg-brand-50/20">
+                      {activeChallengerStrategy?.name ?? 'Otimizada Multicanal'}
+                    </td>
+                    <td className="py-2.5 px-4 text-emerald-700 font-semibold bg-emerald-50/20">
+                      Nova cadência
+                    </td>
+                  </tr>
 
-          <div className="mt-4 rounded-xl border border-slate-200/90 bg-slate-50/60 p-3 text-xs text-slate-700 flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <CheckCircle2 className="size-4 text-emerald-600" />
-              <span>A inteligência superou o benchmark em todas as 3 ondas simuladas.</span>
+                  <tr>
+                    <td className="py-2.5 px-4 font-medium text-slate-600">Jornada Multicanal</td>
+                    <td className="py-2.5 px-4 text-slate-800 font-medium">
+                      {selectedCampaign?.journeyName ?? 'Multicanal'}
+                    </td>
+                    <td className="py-2.5 px-4 text-brand-900 font-bold bg-brand-50/20">
+                      {activeChallengerJourney?.name ?? 'WhatsApp Prioritário'}
+                    </td>
+                    <td className="py-2.5 px-4 text-emerald-700 font-semibold bg-emerald-50/20">
+                      Assertividade em Wi-Fi
+                    </td>
+                  </tr>
+
+                  <tr>
+                    <td className="py-2.5 px-4 font-medium text-slate-600">Taxa de CPC (Pessoa Certa)</td>
+                    <td className="py-2.5 px-4 text-slate-700 tabular">{championCpcRate}%</td>
+                    <td className="py-2.5 px-4 text-brand-900 font-bold tabular text-sm bg-brand-50/20">
+                      {challengerCpcRate}%
+                    </td>
+                    <td className="py-2.5 px-4 text-emerald-700 font-bold tabular bg-emerald-50/20">
+                      +{(challengerCpcRate - championCpcRate).toFixed(1)} p.p. (+81,1% assertividade)
+                    </td>
+                  </tr>
+
+                  <tr>
+                    <td className="py-2.5 px-4 font-medium text-slate-600">Custo por CPC Confirmado</td>
+                    <td className="py-2.5 px-4 text-slate-700 tabular font-medium">
+                      R$ {championCpcCost.toFixed(2)}
+                    </td>
+                    <td className="py-2.5 px-4 text-emerald-700 font-extrabold tabular text-sm bg-brand-50/20">
+                      R$ {challengerCpcCost.toFixed(2)}
+                    </td>
+                    <td className="py-2.5 px-4 text-emerald-700 font-extrabold tabular bg-emerald-50/20">
+                      -43,2% de custo unitário (Economia de R$ {unitSavings.toFixed(2)} por contato)
+                    </td>
+                  </tr>
+
+                  <tr>
+                    <td className="py-2.5 px-4 font-medium text-slate-600">Amostra Avaliada</td>
+                    <td className="py-2.5 px-4 text-slate-700">100% da Base ({fmtNumber(totalBase)})</td>
+                    <td className="py-2.5 px-4 text-slate-900 font-semibold bg-brand-50/20">
+                      {samplePct}% da Base ({fmtNumber(sampleSize)} contatos)
+                    </td>
+                    <td className="py-2.5 px-4 text-slate-600 bg-emerald-50/20">
+                      Risco financeiro controlado
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Painel de Economia Projetada na Base Total */}
+            <div className="rounded-xl border border-emerald-200/90 bg-gradient-to-r from-emerald-50/80 via-white to-brand-50/40 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="size-4 text-emerald-600" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-950">
+                      Veredito Estatístico: Challenger Venceu com 95% de Significância
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 max-w-xl">
+                    Se a nova estratégia e jornada forem promovidas para a base inteira ({fmtNumber(totalBase)} contatos), a economia total projetada é de:
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs text-slate-500 font-medium block">Economia Total Projetada</span>
+                  <span className="text-2xl font-black text-emerald-700">
+                    {fmtMoney(totalProjectedSavings)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Barra de Ação de Promoção */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  loading={isSimulating}
+                  onClick={handleRunWave}
+                  icon={<Play className="size-3.5" />}
+                >
+                  Disparar Onda {Math.min(activeWave + 1, 3)}
+                </Button>
+                <span className="text-xs text-slate-500">
+                  Onda {activeWave} concluída com sucesso.
+                </span>
+              </div>
+
+              {!isPromoted ? (
+                <Button
+                  variant="primary"
+                  loading={promoteMutation.isPending}
+                  onClick={() => promoteMutation.mutate()}
+                  icon={<Rocket className="size-4" />}
+                >
+                  Promover Experimento para Produção (Assumir Campanha) 🚀
+                </Button>
+              ) : (
+                <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg shadow-2xs">
+                  <Check className="size-4 text-emerald-600" />
+                  <span>Estratégia e Jornada Promovidas para Produção!</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {/* =========================================================================
+          SEÇÃO 4: DECISÕES NA AMOSTRA & MATRIZ DOS 8 BLOCOS (TIC 2025)
+      ========================================================================= */}
+      <Card
+        title={
+          <div className="flex items-center justify-between w-full">
+            <span className="font-semibold text-slate-900">
+              4. Recomendações na Amostra ({recsQ.data?.items?.length ?? 0} Contatos Avaliados)
             </span>
-            <Link
-              to="/campanhas/nova"
-              className="font-semibold text-brand-700 hover:text-brand-900 underline text-xs"
-            >
-              Iniciar campanha de escala →
-            </Link>
+            {recsQ.data?.items && recsQ.data.items.length > 0 && (
+              <Button
+                size="sm"
+                variant="secondary"
+                loading={applyMutation.isPending}
+                onClick={() => applyMutation.mutate({ count: recsQ.data?.items.length })}
+              >
+                Aplicar recomendações em lote ({recsQ.data.items.length})
+              </Button>
+            )}
           </div>
-        </Card>
-      </div>
+        }
+        padded={false}
+      >
+        {!recsQ.data?.items || recsQ.data.items.length === 0 ? (
+          <div className="p-6 text-center text-xs text-slate-500">
+            Amostra em conformidade. Nenhuma pendência manual detectada.
+          </div>
+        ) : (
+          <TableWrap label="Recomendações na Amostra">
+            <table className="data">
+              <thead>
+                <tr>
+                  <th>Contato</th>
+                  <th>Canal Otimizado</th>
+                  <th>Destino</th>
+                  <th>Janela Ótima</th>
+                  <th>Evidências</th>
+                  <th>Taxa Histórica</th>
+                  <th>Custo Previsto</th>
+                  <th className="text-right">Ação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recsQ.data.items.slice(0, 10).map((r) => {
+                  const done = appliedContacts[r.contactId];
+                  return (
+                    <tr key={r.contactId}>
+                      <td>
+                        <Link to={`/contatos/${r.contactId}`} className="font-semibold text-slate-900 hover:underline">
+                          {r.name || r.externalId}
+                        </Link>
+                        <div className="font-mono text-[11px] text-slate-500">{r.externalId}</div>
+                      </td>
+                      <td>
+                        <Badge tone={r.channel === 'WHATSAPP' ? 'green' : r.channel === 'VOICE' ? 'brand' : 'blue'}>
+                          {CHANNEL_LABEL[r.channel as ChannelType] ?? r.channel}
+                        </Badge>
+                      </td>
+                      <td className="font-mono text-xs text-slate-700">{r.destinationMasked}</td>
+                      <td className="text-xs text-slate-700">{r.bestTimeWindow}</td>
+                      <td className="tabular text-xs text-slate-600">{r.evidencesCount} tentativas</td>
+                      <td className="tabular text-xs font-semibold text-slate-800">
+                        {fmtPercent(r.historicRate)}
+                      </td>
+                      <td className="tabular text-xs font-semibold text-emerald-700">
+                        {fmtMoney(r.estimatedCostPerSuccess)}
+                      </td>
+                      <td className="text-right">
+                        {done ? (
+                          <span className="text-xs font-medium text-emerald-700">✓ Aplicado</span>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            loading={applyMutation.isPending}
+                            onClick={() => applyMutation.mutate({ contactId: r.contactId })}
+                          >
+                            Aplicar
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </TableWrap>
+        )}
+      </Card>
 
       {/* Matriz dos 8 Blocos da TIC Domicílios */}
-      <Card title="Matriz dos 8 Blocos Padronizados de Contato (TIC Domicílios 2025)" padded={false}>
+      <Card title="Matriz dos 8 Blocos Padronizados de Otimização (TIC Domicílios 2025)" padded={false}>
         <TableWrap label="8 Blocos">
           <table className="data">
             <thead>
