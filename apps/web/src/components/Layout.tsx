@@ -35,39 +35,27 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     items: [
       { to: '/', label: 'Painel operacional', icon: <Home className={ico} aria-hidden />, end: true, matchPrefixes: ['/tentativas'] },
       { to: '/campanhas', label: 'Campanhas', icon: <Megaphone className={ico} aria-hidden /> },
-    ],
-  },
-  {
-    title: 'Carteiras & Público',
-    items: [
       {
         to: '/mailings',
-        label: 'Bases & Listas',
+        label: 'Bases & Contatos',
         icon: <Database className={ico} aria-hidden />,
         matchPrefixes: ['/mailings', '/listas', '/contatos'],
       },
     ],
   },
   {
-    title: 'Inteligência & Governança',
+    title: 'Inteligência & Otimização',
     items: [
       {
         to: '/inteligencia',
-        label: 'Esteira de CPC & Lab',
+        label: 'Laboratório & Testes Empíricos',
         icon: <BrainCircuit className={ico} aria-hidden />,
         matchPrefixes: ['/inteligencia'],
       },
-      {
-        to: '/otimizacao',
-        label: 'Central de Decisão',
-        icon: <Compass className={ico} aria-hidden />,
-        matchPrefixes: ['/otimizacao', '/experimentos', '/custos'],
-      },
-      { to: '/controle', label: 'Controle central', icon: <ShieldAlert className={ico} aria-hidden /> },
     ],
   },
   {
-    title: 'Engenharia de Cobrança',
+    title: 'Configurações & Parâmetros',
     items: [
       {
         to: '/estrategias',
@@ -76,6 +64,13 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
         matchPrefixes: ['/estrategias', '/jornadas', '/tabulacoes'],
       },
       { to: '/canais', label: 'Canais & Conectores', icon: <Cable className={ico} aria-hidden /> },
+      {
+        to: '/otimizacao',
+        label: 'Central de Decisão & Custos',
+        icon: <Compass className={ico} aria-hidden />,
+        matchPrefixes: ['/otimizacao', '/experimentos', '/custos'],
+      },
+      { to: '/controle', label: 'Governança & Controle Central', icon: <ShieldAlert className={ico} aria-hidden /> },
     ],
   },
 ];

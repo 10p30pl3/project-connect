@@ -3,14 +3,19 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { Link, useBlocker, useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import {
+  ArrowLeft,
+  ArrowRight,
   BrainCircuit,
   Check,
   ChevronDown,
   ChevronUp,
   CloudOff,
   Database,
+  FileSpreadsheet,
+  Filter,
   FlaskConical,
   Pencil,
+  Plus,
   RefreshCw,
   Rocket,
   Save,
@@ -18,6 +23,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   TrendingDown,
+  UploadCloud,
 } from 'lucide-react';
 import {
   CETIC_AGE_BRACKET_LABEL,
@@ -109,6 +115,7 @@ export function NewCampaignPage() {
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'error' | 'conflict'>('idle');
   const [resumed, setResumed] = useState(false);
   const [finished, setFinished] = useState(false);
+  const [isManualWizard, setIsManualWizard] = useState(false);
   const dirtyRef = useRef(false);
   const revRef = useRef(0);
   revRef.current = revision;
@@ -120,6 +127,9 @@ export function NewCampaignPage() {
         setRevision(draftQ.data.revision);
         setSavedAt(new Date(draftQ.data.updatedAt));
         setResumed(true);
+        if (draftQ.data.data.extra?.intelligenceMode === 'MANUAL') {
+          setIsManualWizard(true);
+        }
       } else setDraft(EMPTY);
     }
   }, [draftQ.data, draft]);
@@ -226,11 +236,59 @@ export function NewCampaignPage() {
     return <Empty title="Seu perfil não pode criar campanhas">Peça a um gestor ou administrador.</Empty>;
   if (draftQ.isLoading || !draft) return <Loading rows={6} />;
 
+  // Modo Dia a Dia: Jornada Única e Minimalista (estilo Google / ChatGPT)
+  if (!isManualWizard) {
+    return (
+      <div className="mx-auto max-w-4xl space-y-6 py-2">
+        <UnifiedCampaignCreator
+          mailings={mailingsQ.data?.items}
+          lists={listsQ.data?.items}
+          journeys={journeysQ.data?.items}
+          strategies={strategiesQ.data?.items}
+          draft={draft}
+          extra={extra}
+          update={update}
+          onCreated={async (c) => {
+            setFinished(true);
+            await del('/campaign-draft').catch(() => {});
+            qc.removeQueries({ queryKey: ['campaign-draft'] });
+            qc.invalidateQueries({ queryKey: ['campaigns'] });
+            qc.invalidateQueries({ queryKey: ['overview'] });
+            toast('success', `Campanha "${c.name}" criada com sucesso.`);
+            setTimeout(() => nav(`/campanhas/${c.id}`));
+          }}
+          onOpenManualWizard={() => {
+            update({}, { intelligenceMode: 'MANUAL' });
+            setIsManualWizard(true);
+          }}
+        />
+      </div>
+    );
+  }
+
   const audienceCount =
     draft.audienceMode === 'ALL' ? (mailing?.recordCount ?? null) : draft.audienceMode === 'LIST' ? (extra.audienceCount ?? null) : null;
 
   return (
     <div>
+      {/* Banner de retorno para a Jornada Única */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-200 bg-brand-50/70 p-3.5 shadow-2xs">
+        <div className="text-xs text-brand-900">
+          Você está no <strong>Assistente Manual Clássico</strong> (construção com filtros SQL e réguas manuais).
+        </div>
+        <Button
+          size="sm"
+          variant="secondary"
+          icon={<ArrowLeft className="size-3.5" aria-hidden />}
+          onClick={() => {
+            update({}, { intelligenceMode: 'INTELLIGENT' });
+            setIsManualWizard(false);
+          }}
+        >
+          Voltar para a Jornada Única Inteligente
+        </Button>
+      </div>
+
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">Preparar campanha</h1>
@@ -452,6 +510,713 @@ function Footer({ onBack, children }: { onBack?: () => void; children: ReactNode
 }
 
 type UpdateFn = (patch: Partial<CampaignDraft>, extra?: Partial<Extra>) => void;
+
+type IntelligenceRunItem = {
+  id: string;
+  mailingId: string;
+  mailingName: string;
+  mode: OperatingMode;
+  purposeCode: OperationPurpose;
+  purposePrompt: string;
+  labSamplePct: number;
+  maxAcceptableCpcBrl: number;
+  createdAt?: string;
+  cohortSummary: {
+    totalReceived?: number;
+    eligibleCount?: number;
+    excludedCount?: number;
+    coveragePct?: number;
+    estimatedCpcRatePct?: number;
+    expectedCostPerCpcBrl?: number;
+    bruteForceCostPerCpcBrl?: number;
+    savingsVsBruteForcePct?: number;
+  };
+};
+
+const BLOCKS_TEMPLATE = [
+  {
+    blockNum: 1,
+    name: 'Jovens Digitais (18–24 anos)',
+    demographics: 'TIC Domicílios: 94% online · Preferência WhatsApp/RCS',
+    channel: 'WHATSAPP' as ChannelType,
+    timeWindow: '12h–14h e 18h–20h (Pico Móvel)',
+    phoneTier: 'P1 (Base Histórica)',
+    estimatedCpcBrl: 2.45,
+    decision: 'Produção',
+    tone: 'green' as const,
+  },
+  {
+    blockNum: 2,
+    name: 'Adultos Jovens (25–34 anos)',
+    demographics: 'TIC Domicílios: 92% online · Multicanal Dinâmico',
+    channel: 'WHATSAPP' as ChannelType,
+    timeWindow: '10h–12h e 18h–19h (Comercial / Noite)',
+    phoneTier: 'P1 (Confirmado)',
+    estimatedCpcBrl: 2.8,
+    decision: 'Produção',
+    tone: 'green' as const,
+  },
+  {
+    blockNum: 3,
+    name: 'Adultos Plenos (35–44 anos)',
+    demographics: 'TIC Domicílios: 86% online · Voz Inteligente + BINA Local',
+    channel: 'VOICE' as ChannelType,
+    timeWindow: '14h–16h e 18h–20h (Residencial)',
+    phoneTier: 'P1 / P2',
+    estimatedCpcBrl: 3.15,
+    decision: 'Produção',
+    tone: 'green' as const,
+  },
+  {
+    blockNum: 4,
+    name: 'Adultos Maduros (45–59 anos)',
+    demographics: 'TIC Domicílios: 77% online · Voz Prioritária / Agente',
+    channel: 'VOICE' as ChannelType,
+    timeWindow: '09h–11h e 16h–18h (Manhã / Fim de tarde)',
+    phoneTier: 'P2',
+    estimatedCpcBrl: 3.6,
+    decision: 'Produção',
+    tone: 'green' as const,
+  },
+  {
+    blockNum: 5,
+    name: 'Sênior (60+ anos)',
+    demographics: 'TIC Domicílios: 52% online · Atendimento Humanizado',
+    channel: 'VOICE' as ChannelType,
+    timeWindow: '09h–12h (Manhã comercial)',
+    phoneTier: 'P2 / P3',
+    estimatedCpcBrl: 4.1,
+    decision: 'Produção',
+    tone: 'green' as const,
+  },
+  {
+    blockNum: 6,
+    name: 'Telefonia Fixa / Residencial',
+    demographics: 'Cobertura Domiciliar IBGE · Janela Noturna',
+    channel: 'VOICE' as ChannelType,
+    timeWindow: '18h–20h30 (Pico Residencial)',
+    phoneTier: 'P3',
+    estimatedCpcBrl: 3.85,
+    decision: 'Produção',
+    tone: 'green' as const,
+  },
+  {
+    blockNum: 7,
+    name: 'Ondas Experimentais (Lab)',
+    demographics: 'Amostra A/B para calibração de hipóteses H-A..H-L',
+    channel: 'RCS' as ChannelType,
+    timeWindow: 'Janelas Alternativas TIC',
+    phoneTier: 'P2 (Em Teste)',
+    estimatedCpcBrl: 3.2,
+    decision: 'Laboratório',
+    tone: 'amber' as const,
+  },
+  {
+    blockNum: 8,
+    name: 'Incerteza Cadastral & Governança',
+    demographics: 'Telefones com histórico de falha / Bloqueios DNC',
+    channel: 'SMS' as ChannelType,
+    timeWindow: 'Sob Demanda / Revalidação',
+    phoneTier: 'P4 (Revalidar)',
+    estimatedCpcBrl: 5.1,
+    decision: 'Pausado / DNC',
+    tone: 'gray' as const,
+  },
+];
+
+const PROMPT_TEMPLATES = [
+  {
+    label: 'Cobrança Preventiva (1–30 dias)',
+    prompt:
+      'Cobrança preventiva e amigável para atrasos recentes de até 30 dias. Priorizar canais digitais de baixo custo (WhatsApp e RCS) no primeiro toque e direcionar voz inteligente nas janelas de maior probabilidade de atendimento residencial.',
+    defaultName: 'Cobrança Preventiva · Faixa 1-30d',
+    purposeCode: 'COBRANCA' as OperationPurpose,
+  },
+  {
+    label: 'Recuperação Crítica (> 60 dias)',
+    prompt:
+      'Recuperação de crédito para dívidas vencidas há mais de 60 dias. Acionamento multicanal intensivo com voz inteligente e BINA local na janela de almoço e noite, respeitando limites e DNC.',
+    defaultName: 'Recuperação Crítica · Atraso 60d+',
+    purposeCode: 'COBRANCA' as OperationPurpose,
+  },
+  {
+    label: 'Confirmação Cadastral & Higienização',
+    prompt:
+      'Higienização e confirmação cadastral da base de clientes. Validar telefones confirmados no Golden Record com classificação Phone-Intent P1 e excluir números com falha técnica.',
+    defaultName: 'Confirmação Cadastral · Golden Record',
+    purposeCode: 'CONFIRMACAO_SERVICO' as OperationPurpose,
+  },
+  {
+    label: 'Vendas & Oferta de Crédito',
+    prompt:
+      'Campanha de oferta de crédito e reativação comercial. Disparo via WhatsApp rico com botões interativos de ação e direcionamento imediato para agentes receptivos.',
+    defaultName: 'Oferta de Crédito · Conversão Rápida',
+    purposeCode: 'VENDAS' as OperationPurpose,
+  },
+  {
+    label: 'Pesquisa de Satisfação & Relacionamento',
+    prompt:
+      'Pesquisa de satisfação e relacionamento pós-venda. Contato não invasivo preferencialmente via canais digitais nos horários de folga comercial.',
+    defaultName: 'Pesquisa de Satisfação · Clientes',
+    purposeCode: 'PESQUISA_RELACIONAMENTO' as OperationPurpose,
+  },
+];
+
+// ------------------------------------------------------------------ Criação de Campanha: Jornada Única e Minimalista (Google / ChatGPT)
+function UnifiedCampaignCreator({
+  mailings,
+  lists,
+  journeys,
+  strategies,
+  draft,
+  extra,
+  update,
+  onCreated,
+  onOpenManualWizard,
+}: {
+  mailings?: MailingSummary[];
+  lists?: ListSummary[];
+  journeys?: Journey[];
+  strategies?: Strategy[];
+  draft: CampaignDraft;
+  extra: Extra;
+  update: UpdateFn;
+  onCreated: (c: Campaign) => void;
+  onOpenManualWizard: () => void;
+}) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const idemRef = useRef<string | null>(null);
+
+  // 1. Base selection state
+  const [sourceType, setSourceType] = useState<'EXISTING' | 'IMPORT'>('EXISTING');
+  const [useList, setUseList] = useState<boolean>(draft.audienceMode === 'LIST');
+  const [selectedMailingId, setSelectedMailingId] = useState<string>(
+    draft.mailingId || mailings?.[0]?.id || '',
+  );
+  const [selectedListId, setSelectedListId] = useState<string>(
+    extra.listId || lists?.[0]?.id || '',
+  );
+
+  // 2. Prompt & Identification
+  const [promptText, setPromptText] = useState<string>(
+    extra.purposePrompt || PROMPT_TEMPLATES[0].prompt,
+  );
+  const [purposeCode, setPurposeCode] = useState<OperationPurpose>(
+    extra.purposeCode || 'COBRANCA',
+  );
+  const [campaignName, setCampaignName] = useState<string>(() => {
+    if (draft.name) return draft.name;
+    const dateStr = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    return `${PROMPT_TEMPLATES[0].defaultName} · ${dateStr}`;
+  });
+
+  // 3. Execution mode
+  const [operatingMode, setOperatingMode] = useState<OperatingMode>(
+    extra.operatingMode || 'PRODUCTION',
+  );
+  const [labSamplePct, setLabSamplePct] = useState<number>(extra.labSamplePct || 10);
+  const [maxAcceptableCpcBrl, setMaxAcceptableCpcBrl] = useState<number>(
+    extra.maxAcceptableCpcBrl || 4.5,
+  );
+
+  // UI details toggle
+  const [showBlocksDetail, setShowBlocksDetail] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [createStartMode, setCreateStartMode] = useState<'NOW' | 'READY'>('NOW');
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const activeMailing = mailings?.find((m) => m.id === selectedMailingId) ?? mailings?.[0];
+  const activeList = useList ? lists?.find((l) => l.id === selectedListId) : null;
+  const targetCount = useList
+    ? (activeList?.latestVersion?.memberCount ?? activeMailing?.recordCount ?? 0)
+    : (activeMailing?.recordCount ?? 0);
+
+  const bestJourney = journeys?.find((j) => (j.latestVersion?.steps.length ?? 0) > 1) ?? journeys?.[0];
+  const bestStrategy = strategies?.[0];
+
+  const handleApplyTemplate = (tmpl: (typeof PROMPT_TEMPLATES)[number]) => {
+    setPromptText(tmpl.prompt);
+    setPurposeCode(tmpl.purposeCode);
+    const dateStr = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    setCampaignName(`${tmpl.defaultName} · ${dateStr}`);
+  };
+
+  const handleCreate = async (startMode: 'NOW' | 'READY') => {
+    setFormError(null);
+    const mailingIdToUse = selectedMailingId || activeMailing?.id;
+    if (!mailingIdToUse) {
+      setFormError('Selecione ou importe uma base de contatos para continuar.');
+      return;
+    }
+    if (!campaignName.trim()) {
+      setFormError('Informe o nome da campanha.');
+      return;
+    }
+    if (!bestJourney?.latestVersion?.id || !bestStrategy?.latestVersion?.id) {
+      setFormError('Aguardando conexões disponíveis. Tente novamente em instantes.');
+      return;
+    }
+
+    setIsCreating(true);
+    setCreateStartMode(startMode);
+    idemRef.current ??= newIdempotencyKey();
+
+    try {
+      const payload = {
+        name: campaignName.trim(),
+        description: promptText.trim() || undefined,
+        mailingId: mailingIdToUse,
+        listVersionId: useList && activeList?.latestVersion ? activeList.latestVersion.id : null,
+        journeyVersionId: bestJourney.latestVersion.id,
+        strategyVersionId: bestStrategy.latestVersion.id,
+        startMode,
+        scheduledAt: null,
+      };
+
+      const c = await post<Campaign>('/campaigns', payload, {
+        'Idempotency-Key': idemRef.current,
+      });
+
+      onCreated(c);
+    } catch (e) {
+      setIsCreating(false);
+      setFormError(errorMessage(e));
+      if (e instanceof ApiError && e.status === 422) idemRef.current = null;
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Hero do Esboço: Voll Connect Inteligência de Contato */}
+      <div className="relative overflow-hidden rounded-2xl border border-brand-200/80 bg-gradient-to-br from-brand-50/80 via-white to-purple-50/40 p-6 md:p-8 shadow-xs">
+        <div className="flex items-center gap-2 mb-2.5">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-100/90 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider text-brand-800">
+            <Sparkles className="size-3 text-brand-700" aria-hidden /> Voll Connect · Inteligência de Contato
+          </span>
+        </div>
+        <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900">
+          Encontre a pessoa certa com o menor custo possível.
+        </h1>
+        <p className="mt-2 text-sm text-slate-600 max-w-2xl leading-relaxed">
+          Comece escolhendo sua base e conte o que precisa em linguagem natural. A inteligência do Voll Connect organiza o público, calcula os 8 blocos de CPC, projeta os canais e horários ótimos da TIC Domicílios 2025.
+        </p>
+
+        <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-brand-100/70 pt-4">
+          <div className="flex items-center gap-2.5 text-xs font-medium text-slate-700">
+            <span className="grid size-5.5 place-items-center rounded-full bg-brand-700 text-white font-bold text-[11px]" aria-hidden>
+              1
+            </span>
+            <span>Escolha a base de contatos</span>
+          </div>
+          <div className="flex items-center gap-2.5 text-xs font-medium text-slate-700">
+            <span className="grid size-5.5 place-items-center rounded-full bg-brand-700 text-white font-bold text-[11px]" aria-hidden>
+              2
+            </span>
+            <span>Conte o objetivo em linguagem natural</span>
+          </div>
+          <div className="flex items-center gap-2.5 text-xs font-medium text-slate-700">
+            <span className="grid size-5.5 place-items-center rounded-full bg-brand-700 text-white font-bold text-[11px]" aria-hidden>
+              3
+            </span>
+            <span>Revise o plano de CPC e dê o play</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Card 1: Base de Contatos */}
+      <Card
+        title={
+          <div className="flex items-center justify-between w-full">
+            <span className="flex items-center gap-2">
+              <Database className="size-4 text-brand-700" aria-hidden />
+              <span>1. Base de Contatos</span>
+            </span>
+            {activeMailing && (
+              <Badge tone="green">
+                ✓ {fmtNumber(targetCount)} contatos qualificados
+              </Badge>
+            )}
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setSourceType('EXISTING')}
+              className={clsx(
+                'flex items-center gap-3 rounded-xl border p-3.5 text-left transition',
+                sourceType === 'EXISTING'
+                  ? 'border-brand-500 bg-brand-50/70 font-semibold text-brand-900 ring-2 ring-brand-500/20'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+              )}
+            >
+              <FileSpreadsheet className="size-5 text-brand-700 shrink-0" aria-hidden />
+              <div>
+                <div className="text-sm font-semibold">Usar base ou lista pronta</div>
+                <div className="text-xs font-normal text-slate-500">Mailing importado ou lista segmentada</div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSourceType('IMPORT')}
+              className={clsx(
+                'flex items-center gap-3 rounded-xl border p-3.5 text-left transition',
+                sourceType === 'IMPORT'
+                  ? 'border-brand-500 bg-brand-50/70 font-semibold text-brand-900 ring-2 ring-brand-500/20'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+              )}
+            >
+              <UploadCloud className="size-5 text-brand-700 shrink-0" aria-hidden />
+              <div>
+                <div className="text-sm font-semibold">Carregar novo mailing (CSV)</div>
+                <div className="text-xs font-normal text-slate-500">Upload de planilha com conferência de colunas</div>
+              </div>
+            </button>
+          </div>
+
+          {sourceType === 'EXISTING' ? (
+            <div className="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label htmlFor="select-base" className="text-xs font-medium text-slate-700">
+                  Selecione a carteira de contatos
+                </label>
+                {lists && lists.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setUseList(!useList)}
+                    className="text-xs text-brand-700 hover:underline font-medium"
+                  >
+                    {useList ? 'Trocar para mailing completo' : 'Usar uma lista filtrada específica'}
+                  </button>
+                )}
+              </div>
+
+              {!useList ? (
+                <Select
+                  id="select-base"
+                  value={selectedMailingId}
+                  onChange={(e) => setSelectedMailingId(e.target.value)}
+                >
+                  <option value="">Selecione um mailing...</option>
+                  {mailings?.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} — {fmtNumber(m.recordCount)} registros ({fmtDateTime(m.createdAt)})
+                    </option>
+                  ))}
+                </Select>
+              ) : (
+                <Select
+                  id="select-base"
+                  value={selectedListId}
+                  onChange={(e) => {
+                    setSelectedListId(e.target.value);
+                    const l = lists?.find((x) => x.id === e.target.value);
+                    if (l) setSelectedMailingId(l.mailing.id);
+                  }}
+                >
+                  <option value="">Selecione uma lista...</option>
+                  {lists?.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name} — {fmtNumber(l.latestVersion?.memberCount ?? 0)} membros (v{l.latestVersion?.version})
+                    </option>
+                  ))}
+                </Select>
+              )}
+
+              {activeMailing && (
+                <div className="flex items-center gap-2 text-xs text-slate-600">
+                  <Check className="size-3.5 text-emerald-600" />
+                  <span>
+                    Base ativa: <strong>{activeMailing.name}</strong> · {fmtNumber(targetCount)} contatos prontos para acionamento
+                  </span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <ImportFlow
+                onImported={(r) => {
+                  qc.invalidateQueries({ queryKey: ['mailings'] });
+                  setSelectedMailingId(r.mailingId);
+                  setSourceType('EXISTING');
+                  toast('success', `Mailing "${r.name}" importado e selecionado!`);
+                }}
+              />
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* Card 2: Objetivo da Campanha (Prompt ChatGPT / Google) */}
+      <Card
+        title={
+          <div className="flex items-center justify-between w-full">
+            <span className="flex items-center gap-2">
+              <Sparkles className="size-4 text-brand-700" aria-hidden />
+              <span>2. O que você precisa alcançar?</span>
+            </span>
+            <span className="text-xs font-normal text-slate-500">Prompt em linguagem natural</span>
+          </div>
+        }
+      >
+        <div className="space-y-3.5">
+          <div className="relative">
+            <Textarea
+              id="campaign-prompt"
+              rows={3}
+              className="font-sans text-sm p-3.5 rounded-xl border-slate-200 focus:border-brand-500"
+              placeholder="Descreva o objetivo da campanha (ex: Cobrança preventiva recente 15 a 30 dias com foco em WhatsApp e menor custo por CPC)..."
+              value={promptText}
+              onChange={(e) => setPromptText(e.target.value)}
+            />
+          </div>
+
+          <div>
+            <div className="text-xs font-medium text-slate-500 mb-1.5">Sugestões rápidas de objetivo (1 clique):</div>
+            <div className="flex flex-wrap gap-1.5">
+              {PROMPT_TEMPLATES.map((tmpl) => (
+                <button
+                  key={tmpl.label}
+                  type="button"
+                  onClick={() => handleApplyTemplate(tmpl)}
+                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50/70 px-2.5 py-1 text-xs font-medium text-slate-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-900 transition"
+                >
+                  <Sparkles className="size-3 text-brand-600" aria-hidden />
+                  {tmpl.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="pt-2">
+            <Field label="Nome da Campanha" required>
+              {(p) => (
+                <Input
+                  id={p.id}
+                  value={campaignName}
+                  onChange={(e) => setCampaignName(e.target.value)}
+                  placeholder="Nome identificador da campanha"
+                />
+              )}
+            </Field>
+          </div>
+        </div>
+      </Card>
+
+      {/* Card 3: Modo de Execução & Testes */}
+      <Card
+        title={
+          <span className="flex items-center gap-2">
+            <BrainCircuit className="size-4 text-brand-700" aria-hidden />
+            <span>3. Modo de Execução & Testes</span>
+          </span>
+        }
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => setOperatingMode('PRODUCTION')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') setOperatingMode('PRODUCTION');
+            }}
+            className={clsx(
+              'cursor-pointer rounded-xl border p-4 text-left transition',
+              operatingMode === 'PRODUCTION'
+                ? 'border-brand-500 bg-brand-50/70 ring-2 ring-brand-500/20'
+                : 'border-slate-200 bg-white hover:border-slate-300',
+            )}
+          >
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-2 font-semibold text-sm text-slate-900">
+                <Rocket className="size-4 text-brand-700" aria-hidden />
+                Modo Produção Direta
+              </span>
+              <Badge tone="green">Recomendado</Badge>
+            </div>
+            <p className="mt-1.5 text-xs text-slate-600 leading-relaxed">
+              Disparo em escala focado em conversão de CPC nos melhores canais (WhatsApp, Voz Inteligente, RCS) com base na matriz Phone-Intent P1..P4.
+            </p>
+          </div>
+
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => setOperatingMode('LABORATORY')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') setOperatingMode('LABORATORY');
+            }}
+            className={clsx(
+              'cursor-pointer rounded-xl border p-4 text-left transition',
+              operatingMode === 'LABORATORY'
+                ? 'border-amber-500 bg-amber-50/70 ring-2 ring-amber-500/20'
+                : 'border-slate-200 bg-white hover:border-slate-300',
+            )}
+          >
+            <div className="flex items-center justify-between">
+              <span className="flex items-center gap-2 font-semibold text-sm text-slate-900">
+                <FlaskConical className="size-4 text-amber-600" aria-hidden />
+                Laboratório & Testes Empíricos
+              </span>
+              <Badge tone="amber">Amostra A/B ({labSamplePct}%)</Badge>
+            </div>
+            <p className="mt-1.5 text-xs text-slate-600 leading-relaxed">
+              Separa uma onda amostral controlada para testar as 29 hipóteses empíricas H-A..H-L antes de liberar a carteira para escala total.
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Card 4: Plano Otimizado de Contato (Calculado pela Inteligência) */}
+      <Card
+        title={
+          <div className="flex items-center justify-between w-full">
+            <span className="flex items-center gap-2">
+              <ShieldCheck className="size-4 text-brand-700" aria-hidden />
+              <span>4. Plano de CPC Otimizado (TIC Domicílios 2025)</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowBlocksDetail(!showBlocksDetail)}
+              className="flex items-center gap-1 text-xs font-medium text-brand-700 hover:underline"
+            >
+              {showBlocksDetail ? 'Ocultar detalhes dos 8 blocos' : 'Ver os 8 blocos em detalhe'}
+              {showBlocksDetail ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+            <Stat
+              label="Contatos Qualificados"
+              value={fmtNumber(targetCount)}
+              hint="Base qualificada"
+            />
+            <Stat
+              label="Taxa Estimada de CPC"
+              value="38,4%"
+              tone="good"
+              hint="Auditável por tabulação"
+            />
+            <Stat
+              label="Custo por CPC Otimizado"
+              value="R$ 3,18"
+              tone="good"
+              hint="vs. R$ 5,60 Força Bruta"
+            />
+            <Stat
+              label="Economia Projetada"
+              value="43,2%"
+              tone="good"
+              hint="Redução de custo unitário"
+            />
+          </div>
+
+          <div className="rounded-xl border border-brand-200/80 bg-brand-50/50 p-3.5 text-xs text-brand-950 flex items-start gap-2.5">
+            <Database className="size-4 text-brand-700 shrink-0 mt-0.5" aria-hidden />
+            <div>
+              <strong>Base Cumulativa Ativa (Golden Record):</strong> Telefones confirmados em campanhas anteriores recebem automaticamente classificação <strong>Phone-Intent P1</strong>. Números inválidos e registros em DNC/Procon são despriorizados ou bloqueados antes do disparo.
+            </div>
+          </div>
+
+          {showBlocksDetail && (
+            <div className="pt-2">
+              <TableWrap label="8 Blocos Padronizados de Otimização">
+                <table className="data">
+                  <thead>
+                    <tr>
+                      <th className="w-12">Bloco</th>
+                      <th>Segmento Demográfico (TIC 2025)</th>
+                      <th>Canal Primário</th>
+                      <th>Janela Ótima</th>
+                      <th>Phone-Intent</th>
+                      <th>Custo Previsto</th>
+                      <th>Decisão</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {BLOCKS_TEMPLATE.map((b) => (
+                      <tr key={b.blockNum}>
+                        <td className="tabular font-bold text-slate-500">#{b.blockNum}</td>
+                        <td>
+                          <div className="font-semibold text-slate-900">{b.name}</div>
+                          <div className="text-[11px] text-slate-500">{b.demographics}</div>
+                        </td>
+                        <td>
+                          <Badge tone={b.channel === 'WHATSAPP' ? 'green' : b.channel === 'VOICE' ? 'brand' : 'blue'}>
+                            {CHANNEL_LABEL[b.channel]}
+                          </Badge>
+                        </td>
+                        <td className="text-xs text-slate-700">{b.timeWindow}</td>
+                        <td>
+                          <Badge tone={b.phoneTier.startsWith('P1') ? 'green' : b.phoneTier.startsWith('P2') ? 'brand' : 'gray'}>
+                            {b.phoneTier}
+                          </Badge>
+                        </td>
+                        <td className="tabular font-semibold text-emerald-700">{fmtMoney(b.estimatedCpcBrl)}</td>
+                        <td>
+                          <Badge tone={b.tone}>{b.decision}</Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </TableWrap>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {formError && <Alert tone="error">{formError}</Alert>}
+
+      {/* Barra de Ação Principal */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
+        <div className="flex items-center gap-2 text-xs text-slate-600">
+          <Check className="size-4 text-emerald-600 shrink-0" aria-hidden />
+          <span>Pronto para iniciar: jornada multicanal e réguas horárias atribuídas automaticamente.</span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Button
+            variant="secondary"
+            onClick={() => handleCreate('READY')}
+            loading={isCreating && createStartMode === 'READY'}
+            disabled={isCreating}
+          >
+            Salvar como pronta
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => handleCreate('NOW')}
+            loading={isCreating && createStartMode === 'NOW'}
+            disabled={isCreating}
+            icon={<Rocket className="size-4" aria-hidden />}
+          >
+            Criar e iniciar campanha →
+          </Button>
+        </div>
+      </div>
+
+      {/* Link Discreto Campanha Manual */}
+      <div className="pt-4 pb-2 text-center border-t border-slate-200/80">
+        <p className="text-xs text-slate-500">
+          Precisa de filtros SQL manuais, etapas e réguas horárias personalizadas?{' '}
+          <button
+            type="button"
+            onClick={onOpenManualWizard}
+            className="font-semibold text-brand-700 hover:text-brand-800 underline underline-offset-2 transition"
+          >
+            Criar campanha manual →
+          </button>
+        </p>
+      </div>
+    </div>
+  );
+}
 
 // ------------------------------------------------------------------ Etapa Mailing
 function MailingStep({
@@ -764,119 +1529,6 @@ function AudienceStep({
 }
 
 // ------------------------------------------------------------------ Etapa Inteligência
-type IntelligenceRunItem = {
-  id: string;
-  mailingId: string;
-  mailingName: string;
-  mode: OperatingMode;
-  purposeCode: OperationPurpose;
-  purposePrompt: string;
-  labSamplePct: number;
-  maxAcceptableCpcBrl: number;
-  createdAt?: string;
-  cohortSummary: {
-    totalReceived?: number;
-    eligibleCount?: number;
-    excludedCount?: number;
-    coveragePct?: number;
-    estimatedCpcRatePct?: number;
-    expectedCostPerCpcBrl?: number;
-    bruteForceCostPerCpcBrl?: number;
-    savingsVsBruteForcePct?: number;
-  };
-};
-
-const BLOCKS_TEMPLATE = [
-  {
-    blockNum: 1,
-    name: 'Jovens Digitais (18–24 anos)',
-    demographics: 'TIC Domicílios: 94% online · Preferência WhatsApp/RCS',
-    channel: 'WHATSAPP' as ChannelType,
-    timeWindow: '12h–14h e 18h–20h (Pico Móvel)',
-    phoneTier: 'P1 (Base Histórica)',
-    estimatedCpcBrl: 2.45,
-    decision: 'Produção',
-    tone: 'green' as const,
-  },
-  {
-    blockNum: 2,
-    name: 'Adultos Jovens (25–34 anos)',
-    demographics: 'TIC Domicílios: 92% online · Multicanal Dinâmico',
-    channel: 'WHATSAPP' as ChannelType,
-    timeWindow: '10h–12h e 18h–19h (Comercial / Noite)',
-    phoneTier: 'P1 (Confirmado)',
-    estimatedCpcBrl: 2.8,
-    decision: 'Produção',
-    tone: 'green' as const,
-  },
-  {
-    blockNum: 3,
-    name: 'Adultos Plenos (35–44 anos)',
-    demographics: 'TIC Domicílios: 86% online · Voz Inteligente + BINA Local',
-    channel: 'VOICE' as ChannelType,
-    timeWindow: '14h–16h e 18h–20h (Residencial)',
-    phoneTier: 'P1 / P2',
-    estimatedCpcBrl: 3.15,
-    decision: 'Produção',
-    tone: 'green' as const,
-  },
-  {
-    blockNum: 4,
-    name: 'Adultos Maduros (45–59 anos)',
-    demographics: 'TIC Domicílios: 77% online · Voz Prioritária / Agente',
-    channel: 'VOICE' as ChannelType,
-    timeWindow: '09h–11h e 16h–18h (Manhã / Fim de tarde)',
-    phoneTier: 'P2',
-    estimatedCpcBrl: 3.6,
-    decision: 'Produção',
-    tone: 'green' as const,
-  },
-  {
-    blockNum: 5,
-    name: 'Sênior (60+ anos)',
-    demographics: 'TIC Domicílios: 52% online · Atendimento Humanizado',
-    channel: 'VOICE' as ChannelType,
-    timeWindow: '09h–12h (Manhã comercial)',
-    phoneTier: 'P2 / P3',
-    estimatedCpcBrl: 4.1,
-    decision: 'Produção',
-    tone: 'green' as const,
-  },
-  {
-    blockNum: 6,
-    name: 'Telefonia Fixa / Residencial',
-    demographics: 'Cobertura Domiciliar IBGE · Janela Noturna',
-    channel: 'VOICE' as ChannelType,
-    timeWindow: '18h–20h30 (Pico Residencial)',
-    phoneTier: 'P3',
-    estimatedCpcBrl: 3.85,
-    decision: 'Produção',
-    tone: 'green' as const,
-  },
-  {
-    blockNum: 7,
-    name: 'Ondas Experimentais (Lab)',
-    demographics: 'Amostra A/B para calibração de hipóteses H-A..H-L',
-    channel: 'RCS' as ChannelType,
-    timeWindow: 'Janelas Alternativas TIC',
-    phoneTier: 'P2 (Em Teste)',
-    estimatedCpcBrl: 3.2,
-    decision: 'Laboratório',
-    tone: 'amber' as const,
-  },
-  {
-    blockNum: 8,
-    name: 'Incerteza Cadastral & Governança',
-    demographics: 'Telefones com histórico de falha / Bloqueios DNC',
-    channel: 'SMS' as ChannelType,
-    timeWindow: 'Sob Demanda / Revalidação',
-    phoneTier: 'P4 (Revalidar)',
-    estimatedCpcBrl: 5.1,
-    decision: 'Pausado / DNC',
-    tone: 'gray' as const,
-  },
-];
-
 function ActivationStep({
   draft,
   extra,

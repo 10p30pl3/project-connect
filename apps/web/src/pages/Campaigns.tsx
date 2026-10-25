@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Archive, ArrowRight, Database, ListFilter, Megaphone, Pause, Play, Plus, Square } from 'lucide-react';
+import { Archive, ArrowRight, BrainCircuit, Database, ListFilter, Megaphone, Pause, Play, Plus, Sparkles, Square } from 'lucide-react';
 import { CAMPAIGN_STATUS, CAMPAIGN_STATUS_LABEL, type CampaignStatus } from '@voll/shared';
 import { errorMessage, get, post, qs } from '../lib/api';
 import type { CampaignSummary } from '../lib/types';
@@ -47,9 +47,9 @@ export function CampaignsPage() {
   });
 
   const shortcuts = [
-    { to: '/campanhas/nova', label: 'Nova campanha', desc: 'Mailing, público, acionamento e revisão em 4 etapas.', icon: Megaphone, perm: 'campaigns.create' as const },
-    { to: '/mailings/importar', label: 'Importar mailing', desc: 'CSV ou conteúdo colado, com conferência por linha.', icon: Database, perm: 'mailings.write' as const },
-    { to: '/listas/nova', label: 'Preparar lista', desc: 'Filtros, ordenação e modalidade sobre um mailing.', icon: ListFilter, perm: 'lists.write' as const },
+    { to: '/campanhas/nova', label: 'Nova campanha', desc: 'Jornada única: defina a base e o objetivo para a IA estruturar o plano de CPC.', icon: Sparkles, perm: 'campaigns.create' as const },
+    { to: '/inteligencia', label: 'Laboratório & Testes Empíricos', desc: 'Ondas amostrais, calibração de hipóteses H-A..H-L e testes empíricos de CPC.', icon: BrainCircuit, perm: 'campaigns.create' as const },
+    { to: '/mailings/importar', label: 'Importar mailing', desc: 'CSV ou conteúdo colado, com conferência por linha e validação automática.', icon: Database, perm: 'mailings.write' as const },
   ];
 
   const canOperate = can('campaigns.operate');
