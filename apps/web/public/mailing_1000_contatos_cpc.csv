@@ -1,0 +1,1001 @@
+id;nome;telefone1;telefone2;whatsapp1;email;cidade;uf;idade;valor_divida;dias_atraso;score;phone_intent
+000001;Lucas Souza Lima;(21) 98000-0179;;(21) 98000-0179;lucas.souza1@exemplo.com.br;Rio de Janeiro;RJ;23;413,00;28;357;P3_DIGITAL_FIRST
+000002;Carlos Alves Lopes;(31) 98000-0358;;(31) 98000-0358;carlos.alves2@exemplo.com.br;Belo Horizonte;MG;28;646,00;41;394;P1_ALTA_PROPENSAO_VOZ
+000003;Fernanda Gomes Nascimento;(41) 98000-0537;;(41) 98000-0537;fernanda.gomes3@exemplo.com.br;Curitiba;PR;31;879,00;54;431;P2_HIBRIDO_DIGITAL_VOZ
+000004;José Martins Freitas;(51) 98000-0716;;(51) 98000-0716;;Porto Alegre;RS;34;1112,00;67;468;P1_ALTA_PROPENSAO_VOZ
+000005;Patrícia Lopes Moraes;(71) 98000-0895;;(71) 98000-0895;patrícia.lopes5@exemplo.com.br;Salvador;BA;38;1345,00;80;505;P1_ALTA_PROPENSAO_VOZ
+000006;Antônio Vieira Souza;(81) 98000-1074;;(81) 98000-1074;antônio.vieira6@exemplo.com.br;Recife;PE;42;1578,00;93;542;P2_HIBRIDO_DIGITAL_VOZ
+000007;Beatriz Dias Costa;(85) 98000-1253;;(85) 98000-1253;beatriz.dias7@exemplo.com.br;Fortaleza;CE;49;1811,00;106;579;P1_ALTA_PROPENSAO_VOZ
+000008;Rodrigo Moreira Fernandes;(61) 98000-1432;;(61) 98000-1432;;Brasília;DF;54;2044,00;119;616;P1_ALTA_PROPENSAO_VOZ
+000009;Silvia Machado Moreira;(62) 98000-1611;;;silvia.machado9@exemplo.com.br;Goiânia;GO;63;2277,00;132;653;P1_ALTA_PROPENSAO_VOZ
+000010;Felipe Cardoso Ramos;(91) 98000-1790;(91) 3200-0100;(91) 98000-1790;felipe.cardoso10@exemplo.com.br;Belém;PA;68;2510,00;145;690;P1_ALTA_PROPENSAO_VOZ
+000011;Helena Santana Pinto;(92) 98000-1969;;(92) 98000-1969;helena.santana11@exemplo.com.br;Manaus;AM;74;2743,00;158;727;P1_ALTA_PROPENSAO_VOZ
+000012;Marcos Moraes Ferreira;(19) 98000-2148;;(19) 98000-2148;;Campinas;SP;21;2976,00;171;764;P1_ALTA_PROPENSAO_VOZ
+000013;Camila Monteiro Martins;(47) 98000-2327;;(47) 98000-2327;camila.monteiro13@exemplo.com.br;Joinville;SC;23;3209,00;19;801;P3_DIGITAL_FIRST
+000014;Gabriel Oliveira Barbosa;(11) 98000-2506;;(11) 98000-2506;gabriel.oliveira14@exemplo.com.br;São Paulo;SP;28;3442,00;32;838;P1_ALTA_PROPENSAO_VOZ
+000015;Juliana Ferreira Marques;(21) 98000-2685;;(21) 98000-2685;juliana.ferreira15@exemplo.com.br;Rio de Janeiro;RJ;31;3675,00;45;875;P2_HIBRIDO_DIGITAL_VOZ
+000016;Rafael Lima Santana;(31) 98000-2864;;(31) 98000-2864;;Belo Horizonte;MG;34;3908,00;58;332;P1_ALTA_PROPENSAO_VOZ
+000017;Mariana Ribeiro Silva;(41) 98000-3043;;(41) 98000-3043;mariana.ribeiro17@exemplo.com.br;Curitiba;PR;38;4141,00;71;369;P1_ALTA_PROPENSAO_VOZ
+000018;Thiago Almeida Pereira;(51) 98000-3222;;(51) 98000-3222;thiago.almeida18@exemplo.com.br;Porto Alegre;RS;42;4374,00;84;406;P2_HIBRIDO_DIGITAL_VOZ
+000019;Aline Fernandes Almeida;(71) 98000-3401;;(71) 98000-3401;aline.fernandes19@exemplo.com.br;Salvador;BA;49;4607,00;97;443;P1_ALTA_PROPENSAO_VOZ
+000020;Matheus Rocha Dias;(81) 98000-3580;;(81) 98000-3580;;Recife;PE;54;4840,00;110;480;P1_ALTA_PROPENSAO_VOZ
+000021;Renata Andrade Mendes;(85) 98000-3759;;;renata.andrade21@exemplo.com.br;Fortaleza;CE;63;5073,00;123;517;P1_ALTA_PROPENSAO_VOZ
+000022;Gustavo Marques Castro;(61) 98000-3938;(61) 3200-0220;(61) 98000-3938;gustavo.marques22@exemplo.com.br;Brasília;DF;68;5306,00;136;554;P1_ALTA_PROPENSAO_VOZ
+000023;Larissa Freitas Oliveira;(62) 98000-4117;;(62) 98000-4117;larissa.freitas23@exemplo.com.br;Goiânia;GO;74;5539,00;149;591;P1_ALTA_PROPENSAO_VOZ
+000024;Eduardo Gonçalves Gomes;(91) 98000-4296;;(91) 98000-4296;;Belém;PA;21;5772,00;162;628;P1_ALTA_PROPENSAO_VOZ
+000025;Vanessa Castro Soares;(92) 98000-4475;;(92) 98000-4475;vanessa.castro25@exemplo.com.br;Manaus;AM;23;6005,00;175;665;P3_DIGITAL_FIRST
+000026;Vinícius Pinto Andrade;(19) 98000-4654;;(19) 98000-4654;vinícius.pinto26@exemplo.com.br;Campinas;SP;28;6238,00;23;702;P1_ALTA_PROPENSAO_VOZ
+000027;Amanda Santos Cardoso;(47) 98000-4833;;(47) 98000-4833;amanda.santos27@exemplo.com.br;Joinville;SC;31;6471,00;36;739;P2_HIBRIDO_DIGITAL_VOZ
+000028;Leonardo Rodrigues Cavalcanti;(11) 98000-5012;;(11) 98000-5012;;São Paulo;SP;34;6704,00;49;776;P1_ALTA_PROPENSAO_VOZ
+000029;Bruna Pereira Rodrigues;(21) 98000-5191;;(21) 98000-5191;bruna.pereira29@exemplo.com.br;Rio de Janeiro;RJ;38;6937,00;62;813;P1_ALTA_PROPENSAO_VOZ
+000030;Marcelo Costa Ribeiro;(31) 98000-5370;;(31) 98000-5370;marcelo.costa30@exemplo.com.br;Belo Horizonte;MG;42;7170,00;75;850;P2_HIBRIDO_DIGITAL_VOZ
+000031;Tatiane Carvalho Vieira;(41) 98000-5549;;(41) 98000-5549;tatiane.carvalho31@exemplo.com.br;Curitiba;PR;49;7403,00;88;887;P1_ALTA_PROPENSAO_VOZ
+000032;Diego Soares Nunes;(51) 98000-5728;;(51) 98000-5728;;Porto Alegre;RS;54;7636,00;101;344;P1_ALTA_PROPENSAO_VOZ
+000033;Priscila Barbosa Gonçalves;(71) 98000-5907;;;priscila.barbosa33@exemplo.com.br;Salvador;BA;63;7869,00;114;381;P1_ALTA_PROPENSAO_VOZ
+000034;Danilo Nascimento Monteiro;(81) 98000-6086;(81) 3200-0340;(81) 98000-6086;danilo.nascimento34@exemplo.com.br;Recife;PE;68;302,00;127;418;P1_ALTA_PROPENSAO_VOZ
+000035;Letícia Nunes Alves;(85) 98000-6265;;(85) 98000-6265;letícia.nunes35@exemplo.com.br;Fortaleza;CE;74;535,00;140;455;P1_ALTA_PROPENSAO_VOZ
+000036;Fábio Mendes Carvalho;(61) 98000-6444;;(61) 98000-6444;;Brasília;DF;21;768,00;153;492;P1_ALTA_PROPENSAO_VOZ
+000037;Sabrina Ramos Rocha;(62) 98000-6623;;(62) 98000-6623;sabrina.ramos37@exemplo.com.br;Goiânia;GO;23;1001,00;166;529;P3_DIGITAL_FIRST
+000038;Ricardo Teixeira Machado;(91) 98000-6802;;(91) 98000-6802;ricardo.teixeira38@exemplo.com.br;Belém;PA;28;1234,00;179;566;P1_ALTA_PROPENSAO_VOZ
+000039;Carolina Cavalcanti Teixeira;(92) 98000-6981;;(92) 98000-6981;carolina.cavalcanti39@exemplo.com.br;Manaus;AM;31;1467,00;27;603;P2_HIBRIDO_DIGITAL_VOZ
+000040;Sebastião Silva Santos;(19) 98000-7160;;(19) 98000-7160;;Campinas;SP;34;1700,00;40;640;P1_ALTA_PROPENSAO_VOZ
+000041;Aparecida Souza Lima;(47) 98000-7339;;(47) 98000-7339;aparecida.souza41@exemplo.com.br;Joinville;SC;38;1933,00;53;677;P1_ALTA_PROPENSAO_VOZ
+000042;Raimundo Alves Lopes;(11) 98000-7518;;(11) 98000-7518;raimundo.alves42@exemplo.com.br;São Paulo;SP;42;2166,00;66;714;P2_HIBRIDO_DIGITAL_VOZ
+000043;Francisca Gomes Nascimento;(21) 98000-7697;;(21) 98000-7697;francisca.gomes43@exemplo.com.br;Rio de Janeiro;RJ;49;2399,00;79;751;P1_ALTA_PROPENSAO_VOZ
+000044;Geraldo Martins Freitas;(31) 98000-7876;;(31) 98000-7876;;Belo Horizonte;MG;54;2632,00;92;788;P1_ALTA_PROPENSAO_VOZ
+000045;Maria Lopes Moraes;(41) 98000-8055;;;maria.lopes45@exemplo.com.br;Curitiba;PR;63;2865,00;105;825;P1_ALTA_PROPENSAO_VOZ
+000046;João Vieira Souza;(51) 98000-8234;(51) 3200-0460;(51) 98000-8234;joão.vieira46@exemplo.com.br;Porto Alegre;RS;68;3098,00;118;862;P1_ALTA_PROPENSAO_VOZ
+000047;Pedro Dias Costa;(71) 98000-8413;;(71) 98000-8413;pedro.dias47@exemplo.com.br;Salvador;BA;74;3331,00;131;899;P1_ALTA_PROPENSAO_VOZ
+000048;Luiz Moreira Fernandes;(81) 98000-8592;;(81) 98000-8592;;Recife;PE;21;3564,00;144;356;P1_ALTA_PROPENSAO_VOZ
+000049;Vera Machado Moreira;(85) 98000-8771;;(85) 98000-8771;vera.machado49@exemplo.com.br;Fortaleza;CE;23;3797,00;157;393;P3_DIGITAL_FIRST
+000050;Wagner Cardoso Ramos;(61) 98000-8950;;(61) 98000-8950;wagner.cardoso50@exemplo.com.br;Brasília;DF;28;4030,00;170;430;P1_ALTA_PROPENSAO_VOZ
+000051;Sônia Santana Pinto;(62) 98000-9129;;(62) 98000-9129;sônia.santana51@exemplo.com.br;Goiânia;GO;31;4263,00;18;467;P2_HIBRIDO_DIGITAL_VOZ
+000052;Cláudio Moraes Ferreira;(91) 98000-9308;;(91) 98000-9308;;Belém;PA;34;4496,00;31;504;P1_ALTA_PROPENSAO_VOZ
+000053;Eliane Monteiro Martins;(92) 98000-9487;;(92) 98000-9487;eliane.monteiro53@exemplo.com.br;Manaus;AM;38;4729,00;44;541;P1_ALTA_PROPENSAO_VOZ
+000054;Sérgio Oliveira Barbosa;(19) 98000-9666;;(19) 98000-9666;sérgio.oliveira54@exemplo.com.br;Campinas;SP;42;4962,00;57;578;P2_HIBRIDO_DIGITAL_VOZ
+000055;Marlene Ferreira Marques;(47) 98000-9845;;(47) 98000-9845;marlene.ferreira55@exemplo.com.br;Joinville;SC;49;5195,00;70;615;P1_ALTA_PROPENSAO_VOZ
+000056;Jorge Lima Santana;(11) 98001-0024;;(11) 98001-0024;;São Paulo;SP;54;5428,00;83;652;P1_ALTA_PROPENSAO_VOZ
+000057;Rosa Ribeiro Silva;(21) 98001-0203;;;rosa.ribeiro57@exemplo.com.br;Rio de Janeiro;RJ;63;5661,00;96;689;P1_ALTA_PROPENSAO_VOZ
+000058;Ana Almeida Pereira;(31) 98001-0382;(31) 3200-0580;(31) 98001-0382;ana.almeida58@exemplo.com.br;Belo Horizonte;MG;68;5894,00;109;726;P1_ALTA_PROPENSAO_VOZ
+000059;Lucas Fernandes Almeida;(41) 98001-0561;;(41) 98001-0561;lucas.fernandes59@exemplo.com.br;Curitiba;PR;74;6127,00;122;763;P1_ALTA_PROPENSAO_VOZ
+000060;Carlos Rocha Dias;(51) 98001-0740;;(51) 98001-0740;;Porto Alegre;RS;21;6360,00;135;800;P1_ALTA_PROPENSAO_VOZ
+000061;Fernanda Andrade Mendes;(71) 98001-0919;;(71) 98001-0919;fernanda.andrade61@exemplo.com.br;Salvador;BA;23;6593,00;148;837;P3_DIGITAL_FIRST
+000062;José Marques Castro;(81) 98001-1098;;(81) 98001-1098;josé.marques62@exemplo.com.br;Recife;PE;28;6826,00;161;874;P1_ALTA_PROPENSAO_VOZ
+000063;Patrícia Freitas Oliveira;(85) 98001-1277;;(85) 98001-1277;patrícia.freitas63@exemplo.com.br;Fortaleza;CE;31;7059,00;174;331;P2_HIBRIDO_DIGITAL_VOZ
+000064;Antônio Gonçalves Gomes;(61) 98001-1456;;(61) 98001-1456;;Brasília;DF;34;7292,00;22;368;P1_ALTA_PROPENSAO_VOZ
+000065;Beatriz Castro Soares;(62) 98001-1635;;(62) 98001-1635;beatriz.castro65@exemplo.com.br;Goiânia;GO;38;7525,00;35;405;P1_ALTA_PROPENSAO_VOZ
+000066;Rodrigo Pinto Andrade;(91) 98001-1814;;(91) 98001-1814;rodrigo.pinto66@exemplo.com.br;Belém;PA;42;7758,00;48;442;P2_HIBRIDO_DIGITAL_VOZ
+000067;Silvia Santos Cardoso;(92) 98001-1993;;(92) 98001-1993;silvia.santos67@exemplo.com.br;Manaus;AM;49;191,00;61;479;P1_ALTA_PROPENSAO_VOZ
+000068;Felipe Rodrigues Cavalcanti;(19) 98001-2172;;(19) 98001-2172;;Campinas;SP;54;424,00;74;516;P1_ALTA_PROPENSAO_VOZ
+000069;Helena Pereira Rodrigues;(47) 98001-2351;;;helena.pereira69@exemplo.com.br;Joinville;SC;63;657,00;87;553;P1_ALTA_PROPENSAO_VOZ
+000070;Marcos Costa Ribeiro;(11) 98001-2530;(11) 3200-0700;(11) 98001-2530;marcos.costa70@exemplo.com.br;São Paulo;SP;68;890,00;100;590;P1_ALTA_PROPENSAO_VOZ
+000071;Camila Carvalho Vieira;(21) 98001-2709;;(21) 98001-2709;camila.carvalho71@exemplo.com.br;Rio de Janeiro;RJ;74;1123,00;113;627;P1_ALTA_PROPENSAO_VOZ
+000072;Gabriel Soares Nunes;(31) 98001-2888;;(31) 98001-2888;;Belo Horizonte;MG;21;1356,00;126;664;P1_ALTA_PROPENSAO_VOZ
+000073;Juliana Barbosa Gonçalves;(41) 98001-3067;;(41) 98001-3067;juliana.barbosa73@exemplo.com.br;Curitiba;PR;23;1589,00;139;701;P3_DIGITAL_FIRST
+000074;Rafael Nascimento Monteiro;(51) 98001-3246;;(51) 98001-3246;rafael.nascimento74@exemplo.com.br;Porto Alegre;RS;28;1822,00;152;738;P1_ALTA_PROPENSAO_VOZ
+000075;Mariana Nunes Alves;(71) 98001-3425;;(71) 98001-3425;mariana.nunes75@exemplo.com.br;Salvador;BA;31;2055,00;165;775;P2_HIBRIDO_DIGITAL_VOZ
+000076;Thiago Mendes Carvalho;(81) 98001-3604;;(81) 98001-3604;;Recife;PE;34;2288,00;178;812;P1_ALTA_PROPENSAO_VOZ
+000077;Aline Ramos Rocha;(85) 98001-3783;;(85) 98001-3783;aline.ramos77@exemplo.com.br;Fortaleza;CE;38;2521,00;26;849;P1_ALTA_PROPENSAO_VOZ
+000078;Matheus Teixeira Machado;(61) 98001-3962;;(61) 98001-3962;matheus.teixeira78@exemplo.com.br;Brasília;DF;42;2754,00;39;886;P2_HIBRIDO_DIGITAL_VOZ
+000079;Renata Cavalcanti Teixeira;(62) 98001-4141;;(62) 98001-4141;renata.cavalcanti79@exemplo.com.br;Goiânia;GO;49;2987,00;52;343;P1_ALTA_PROPENSAO_VOZ
+000080;Gustavo Silva Santos;(91) 98001-4320;;(91) 98001-4320;;Belém;PA;54;3220,00;65;380;P1_ALTA_PROPENSAO_VOZ
+000081;Larissa Souza Lima;(92) 98001-4499;;;larissa.souza81@exemplo.com.br;Manaus;AM;63;3453,00;78;417;P1_ALTA_PROPENSAO_VOZ
+000082;Eduardo Alves Lopes;(19) 98001-4678;(19) 3200-0820;(19) 98001-4678;eduardo.alves82@exemplo.com.br;Campinas;SP;68;3686,00;91;454;P1_ALTA_PROPENSAO_VOZ
+000083;Vanessa Gomes Nascimento;(47) 98001-4857;;(47) 98001-4857;vanessa.gomes83@exemplo.com.br;Joinville;SC;74;3919,00;104;491;P1_ALTA_PROPENSAO_VOZ
+000084;Vinícius Martins Freitas;(11) 98001-5036;;(11) 98001-5036;;São Paulo;SP;21;4152,00;117;528;P1_ALTA_PROPENSAO_VOZ
+000085;Amanda Lopes Moraes;(21) 98001-5215;;(21) 98001-5215;amanda.lopes85@exemplo.com.br;Rio de Janeiro;RJ;23;4385,00;130;565;P3_DIGITAL_FIRST
+000086;Leonardo Vieira Souza;(31) 98001-5394;;(31) 98001-5394;leonardo.vieira86@exemplo.com.br;Belo Horizonte;MG;28;4618,00;143;602;P1_ALTA_PROPENSAO_VOZ
+000087;Bruna Dias Costa;(41) 98001-5573;;(41) 98001-5573;bruna.dias87@exemplo.com.br;Curitiba;PR;31;4851,00;156;639;P2_HIBRIDO_DIGITAL_VOZ
+000088;Marcelo Moreira Fernandes;(51) 98001-5752;;(51) 98001-5752;;Porto Alegre;RS;34;5084,00;169;676;P1_ALTA_PROPENSAO_VOZ
+000089;Tatiane Machado Moreira;(71) 98001-5931;;(71) 98001-5931;tatiane.machado89@exemplo.com.br;Salvador;BA;38;5317,00;17;713;P1_ALTA_PROPENSAO_VOZ
+000090;Diego Cardoso Ramos;(81) 98001-6110;;(81) 98001-6110;diego.cardoso90@exemplo.com.br;Recife;PE;42;5550,00;30;750;P2_HIBRIDO_DIGITAL_VOZ
+000091;Priscila Santana Pinto;(85) 98001-6289;;(85) 98001-6289;priscila.santana91@exemplo.com.br;Fortaleza;CE;49;5783,00;43;787;P1_ALTA_PROPENSAO_VOZ
+000092;Danilo Moraes Ferreira;(61) 98001-6468;;(61) 98001-6468;;Brasília;DF;54;6016,00;56;824;P1_ALTA_PROPENSAO_VOZ
+000093;Letícia Monteiro Martins;(62) 98001-6647;;;letícia.monteiro93@exemplo.com.br;Goiânia;GO;63;6249,00;69;861;P1_ALTA_PROPENSAO_VOZ
+000094;Fábio Oliveira Barbosa;(91) 98001-6826;(91) 3200-0940;(91) 98001-6826;fábio.oliveira94@exemplo.com.br;Belém;PA;68;6482,00;82;898;P1_ALTA_PROPENSAO_VOZ
+000095;Sabrina Ferreira Marques;(92) 98001-7005;;(92) 98001-7005;sabrina.ferreira95@exemplo.com.br;Manaus;AM;74;6715,00;95;355;P1_ALTA_PROPENSAO_VOZ
+000096;Ricardo Lima Santana;(19) 98001-7184;;(19) 98001-7184;;Campinas;SP;21;6948,00;108;392;P1_ALTA_PROPENSAO_VOZ
+000097;Carolina Ribeiro Silva;(47) 98001-7363;;(47) 98001-7363;carolina.ribeiro97@exemplo.com.br;Joinville;SC;23;7181,00;121;429;P3_DIGITAL_FIRST
+000098;Sebastião Almeida Pereira;(11) 98001-7542;;(11) 98001-7542;sebastião.almeida98@exemplo.com.br;São Paulo;SP;28;7414,00;134;466;P1_ALTA_PROPENSAO_VOZ
+000099;Aparecida Fernandes Almeida;(21) 98001-7721;;(21) 98001-7721;aparecida.fernandes99@exemplo.com.br;Rio de Janeiro;RJ;31;7647,00;147;503;P2_HIBRIDO_DIGITAL_VOZ
+000100;Raimundo Rocha Dias;(31) 98001-7900;;(31) 98001-7900;;Belo Horizonte;MG;34;7880,00;160;540;P1_ALTA_PROPENSAO_VOZ
+000101;Francisca Andrade Mendes;(41) 98001-8079;;(41) 98001-8079;francisca.andrade101@exemplo.com.br;Curitiba;PR;38;313,00;173;577;P1_ALTA_PROPENSAO_VOZ
+000102;Geraldo Marques Castro;(51) 98001-8258;;(51) 98001-8258;geraldo.marques102@exemplo.com.br;Porto Alegre;RS;42;546,00;21;614;P2_HIBRIDO_DIGITAL_VOZ
+000103;Maria Freitas Oliveira;(71) 98001-8437;;(71) 98001-8437;maria.freitas103@exemplo.com.br;Salvador;BA;49;779,00;34;651;P1_ALTA_PROPENSAO_VOZ
+000104;João Gonçalves Gomes;(81) 98001-8616;;(81) 98001-8616;;Recife;PE;54;1012,00;47;688;P1_ALTA_PROPENSAO_VOZ
+000105;Pedro Castro Soares;(85) 98001-8795;;;pedro.castro105@exemplo.com.br;Fortaleza;CE;63;1245,00;60;725;P1_ALTA_PROPENSAO_VOZ
+000106;Luiz Pinto Andrade;(61) 98001-8974;(61) 3200-1060;(61) 98001-8974;luiz.pinto106@exemplo.com.br;Brasília;DF;68;1478,00;73;762;P1_ALTA_PROPENSAO_VOZ
+000107;Vera Santos Cardoso;(62) 98001-9153;;(62) 98001-9153;vera.santos107@exemplo.com.br;Goiânia;GO;74;1711,00;86;799;P1_ALTA_PROPENSAO_VOZ
+000108;Wagner Rodrigues Cavalcanti;(91) 98001-9332;;(91) 98001-9332;;Belém;PA;21;1944,00;99;836;P1_ALTA_PROPENSAO_VOZ
+000109;Sônia Pereira Rodrigues;(92) 98001-9511;;(92) 98001-9511;sônia.pereira109@exemplo.com.br;Manaus;AM;23;2177,00;112;873;P3_DIGITAL_FIRST
+000110;Cláudio Costa Ribeiro;(19) 98001-9690;;(19) 98001-9690;cláudio.costa110@exemplo.com.br;Campinas;SP;28;2410,00;125;330;P1_ALTA_PROPENSAO_VOZ
+000111;Eliane Carvalho Vieira;(47) 98001-9869;;(47) 98001-9869;eliane.carvalho111@exemplo.com.br;Joinville;SC;31;2643,00;138;367;P2_HIBRIDO_DIGITAL_VOZ
+000112;Sérgio Soares Nunes;(11) 98002-0048;;(11) 98002-0048;;São Paulo;SP;34;2876,00;151;404;P1_ALTA_PROPENSAO_VOZ
+000113;Marlene Barbosa Gonçalves;(21) 98002-0227;;(21) 98002-0227;marlene.barbosa113@exemplo.com.br;Rio de Janeiro;RJ;38;3109,00;164;441;P1_ALTA_PROPENSAO_VOZ
+000114;Jorge Nascimento Monteiro;(31) 98002-0406;;(31) 98002-0406;jorge.nascimento114@exemplo.com.br;Belo Horizonte;MG;42;3342,00;177;478;P2_HIBRIDO_DIGITAL_VOZ
+000115;Rosa Nunes Alves;(41) 98002-0585;;(41) 98002-0585;rosa.nunes115@exemplo.com.br;Curitiba;PR;49;3575,00;25;515;P1_ALTA_PROPENSAO_VOZ
+000116;Ana Mendes Carvalho;(51) 98002-0764;;(51) 98002-0764;;Porto Alegre;RS;54;3808,00;38;552;P1_ALTA_PROPENSAO_VOZ
+000117;Lucas Ramos Rocha;(71) 98002-0943;;;lucas.ramos117@exemplo.com.br;Salvador;BA;63;4041,00;51;589;P1_ALTA_PROPENSAO_VOZ
+000118;Carlos Teixeira Machado;(81) 98002-1122;(81) 3200-1180;(81) 98002-1122;carlos.teixeira118@exemplo.com.br;Recife;PE;68;4274,00;64;626;P1_ALTA_PROPENSAO_VOZ
+000119;Fernanda Cavalcanti Teixeira;(85) 98002-1301;;(85) 98002-1301;fernanda.cavalcanti119@exemplo.com.br;Fortaleza;CE;74;4507,00;77;663;P1_ALTA_PROPENSAO_VOZ
+000120;José Silva Santos;(61) 98002-1480;;(61) 98002-1480;;Brasília;DF;21;4740,00;90;700;P1_ALTA_PROPENSAO_VOZ
+000121;Patrícia Souza Lima;(62) 98002-1659;;(62) 98002-1659;patrícia.souza121@exemplo.com.br;Goiânia;GO;23;4973,00;103;737;P3_DIGITAL_FIRST
+000122;Antônio Alves Lopes;(91) 98002-1838;;(91) 98002-1838;antônio.alves122@exemplo.com.br;Belém;PA;28;5206,00;116;774;P1_ALTA_PROPENSAO_VOZ
+000123;Beatriz Gomes Nascimento;(92) 98002-2017;;(92) 98002-2017;beatriz.gomes123@exemplo.com.br;Manaus;AM;31;5439,00;129;811;P2_HIBRIDO_DIGITAL_VOZ
+000124;Rodrigo Martins Freitas;(19) 98002-2196;;(19) 98002-2196;;Campinas;SP;34;5672,00;142;848;P1_ALTA_PROPENSAO_VOZ
+000125;Silvia Lopes Moraes;(47) 98002-2375;;(47) 98002-2375;silvia.lopes125@exemplo.com.br;Joinville;SC;38;5905,00;155;885;P1_ALTA_PROPENSAO_VOZ
+000126;Felipe Vieira Souza;(11) 98002-2554;;(11) 98002-2554;felipe.vieira126@exemplo.com.br;São Paulo;SP;42;6138,00;168;342;P2_HIBRIDO_DIGITAL_VOZ
+000127;Helena Dias Costa;(21) 98002-2733;;(21) 98002-2733;helena.dias127@exemplo.com.br;Rio de Janeiro;RJ;49;6371,00;16;379;P1_ALTA_PROPENSAO_VOZ
+000128;Marcos Moreira Fernandes;(31) 98002-2912;;(31) 98002-2912;;Belo Horizonte;MG;54;6604,00;29;416;P1_ALTA_PROPENSAO_VOZ
+000129;Camila Machado Moreira;(41) 98002-3091;;;camila.machado129@exemplo.com.br;Curitiba;PR;63;6837,00;42;453;P1_ALTA_PROPENSAO_VOZ
+000130;Gabriel Cardoso Ramos;(51) 98002-3270;(51) 3201-1300;(51) 98002-3270;gabriel.cardoso130@exemplo.com.br;Porto Alegre;RS;68;7070,00;55;490;P1_ALTA_PROPENSAO_VOZ
+000131;Juliana Santana Pinto;(71) 98002-3449;;(71) 98002-3449;juliana.santana131@exemplo.com.br;Salvador;BA;74;7303,00;68;527;P1_ALTA_PROPENSAO_VOZ
+000132;Rafael Moraes Ferreira;(81) 98002-3628;;(81) 98002-3628;;Recife;PE;21;7536,00;81;564;P1_ALTA_PROPENSAO_VOZ
+000133;Mariana Monteiro Martins;(85) 98002-3807;;(85) 98002-3807;mariana.monteiro133@exemplo.com.br;Fortaleza;CE;23;7769,00;94;601;P3_DIGITAL_FIRST
+000134;Thiago Oliveira Barbosa;(61) 98002-3986;;(61) 98002-3986;thiago.oliveira134@exemplo.com.br;Brasília;DF;28;202,00;107;638;P1_ALTA_PROPENSAO_VOZ
+000135;Aline Ferreira Marques;(62) 98002-4165;;(62) 98002-4165;aline.ferreira135@exemplo.com.br;Goiânia;GO;31;435,00;120;675;P2_HIBRIDO_DIGITAL_VOZ
+000136;Matheus Lima Santana;(91) 98002-4344;;(91) 98002-4344;;Belém;PA;34;668,00;133;712;P1_ALTA_PROPENSAO_VOZ
+000137;Renata Ribeiro Silva;(92) 98002-4523;;(92) 98002-4523;renata.ribeiro137@exemplo.com.br;Manaus;AM;38;901,00;146;749;P1_ALTA_PROPENSAO_VOZ
+000138;Gustavo Almeida Pereira;(19) 98002-4702;;(19) 98002-4702;gustavo.almeida138@exemplo.com.br;Campinas;SP;42;1134,00;159;786;P2_HIBRIDO_DIGITAL_VOZ
+000139;Larissa Fernandes Almeida;(47) 98002-4881;;(47) 98002-4881;larissa.fernandes139@exemplo.com.br;Joinville;SC;49;1367,00;172;823;P1_ALTA_PROPENSAO_VOZ
+000140;Eduardo Rocha Dias;(11) 98002-5060;;(11) 98002-5060;;São Paulo;SP;54;1600,00;20;860;P1_ALTA_PROPENSAO_VOZ
+000141;Vanessa Andrade Mendes;(21) 98002-5239;;;vanessa.andrade141@exemplo.com.br;Rio de Janeiro;RJ;63;1833,00;33;897;P1_ALTA_PROPENSAO_VOZ
+000142;Vinícius Marques Castro;(31) 98002-5418;(31) 3201-1420;(31) 98002-5418;vinícius.marques142@exemplo.com.br;Belo Horizonte;MG;68;2066,00;46;354;P1_ALTA_PROPENSAO_VOZ
+000143;Amanda Freitas Oliveira;(41) 98002-5597;;(41) 98002-5597;amanda.freitas143@exemplo.com.br;Curitiba;PR;74;2299,00;59;391;P1_ALTA_PROPENSAO_VOZ
+000144;Leonardo Gonçalves Gomes;(51) 98002-5776;;(51) 98002-5776;;Porto Alegre;RS;21;2532,00;72;428;P1_ALTA_PROPENSAO_VOZ
+000145;Bruna Castro Soares;(71) 98002-5955;;(71) 98002-5955;bruna.castro145@exemplo.com.br;Salvador;BA;23;2765,00;85;465;P3_DIGITAL_FIRST
+000146;Marcelo Pinto Andrade;(81) 98002-6134;;(81) 98002-6134;marcelo.pinto146@exemplo.com.br;Recife;PE;28;2998,00;98;502;P1_ALTA_PROPENSAO_VOZ
+000147;Tatiane Santos Cardoso;(85) 98002-6313;;(85) 98002-6313;tatiane.santos147@exemplo.com.br;Fortaleza;CE;31;3231,00;111;539;P2_HIBRIDO_DIGITAL_VOZ
+000148;Diego Rodrigues Cavalcanti;(61) 98002-6492;;(61) 98002-6492;;Brasília;DF;34;3464,00;124;576;P1_ALTA_PROPENSAO_VOZ
+000149;Priscila Pereira Rodrigues;(62) 98002-6671;;(62) 98002-6671;priscila.pereira149@exemplo.com.br;Goiânia;GO;38;3697,00;137;613;P1_ALTA_PROPENSAO_VOZ
+000150;Danilo Costa Ribeiro;(91) 98002-6850;;(91) 98002-6850;danilo.costa150@exemplo.com.br;Belém;PA;42;3930,00;150;650;P2_HIBRIDO_DIGITAL_VOZ
+000151;Letícia Carvalho Vieira;(92) 98002-7029;;(92) 98002-7029;letícia.carvalho151@exemplo.com.br;Manaus;AM;49;4163,00;163;687;P1_ALTA_PROPENSAO_VOZ
+000152;Fábio Soares Nunes;(19) 98002-7208;;(19) 98002-7208;;Campinas;SP;54;4396,00;176;724;P1_ALTA_PROPENSAO_VOZ
+000153;Sabrina Barbosa Gonçalves;(47) 98002-7387;;;sabrina.barbosa153@exemplo.com.br;Joinville;SC;63;4629,00;24;761;P1_ALTA_PROPENSAO_VOZ
+000154;Ricardo Nascimento Monteiro;(11) 98002-7566;(11) 3201-1540;(11) 98002-7566;ricardo.nascimento154@exemplo.com.br;São Paulo;SP;68;4862,00;37;798;P1_ALTA_PROPENSAO_VOZ
+000155;Carolina Nunes Alves;(21) 98002-7745;;(21) 98002-7745;carolina.nunes155@exemplo.com.br;Rio de Janeiro;RJ;74;5095,00;50;835;P1_ALTA_PROPENSAO_VOZ
+000156;Sebastião Mendes Carvalho;(31) 98002-7924;;(31) 98002-7924;;Belo Horizonte;MG;21;5328,00;63;872;P1_ALTA_PROPENSAO_VOZ
+000157;Aparecida Ramos Rocha;(41) 98002-8103;;(41) 98002-8103;aparecida.ramos157@exemplo.com.br;Curitiba;PR;23;5561,00;76;329;P3_DIGITAL_FIRST
+000158;Raimundo Teixeira Machado;(51) 98002-8282;;(51) 98002-8282;raimundo.teixeira158@exemplo.com.br;Porto Alegre;RS;28;5794,00;89;366;P1_ALTA_PROPENSAO_VOZ
+000159;Francisca Cavalcanti Teixeira;(71) 98002-8461;;(71) 98002-8461;francisca.cavalcanti159@exemplo.com.br;Salvador;BA;31;6027,00;102;403;P2_HIBRIDO_DIGITAL_VOZ
+000160;Geraldo Silva Santos;(81) 98002-8640;;(81) 98002-8640;;Recife;PE;34;6260,00;115;440;P1_ALTA_PROPENSAO_VOZ
+000161;Maria Souza Lima;(85) 98002-8819;;(85) 98002-8819;maria.souza161@exemplo.com.br;Fortaleza;CE;38;6493,00;128;477;P1_ALTA_PROPENSAO_VOZ
+000162;João Alves Lopes;(61) 98002-8998;;(61) 98002-8998;joão.alves162@exemplo.com.br;Brasília;DF;42;6726,00;141;514;P2_HIBRIDO_DIGITAL_VOZ
+000163;Pedro Gomes Nascimento;(62) 98002-9177;;(62) 98002-9177;pedro.gomes163@exemplo.com.br;Goiânia;GO;49;6959,00;154;551;P1_ALTA_PROPENSAO_VOZ
+000164;Luiz Martins Freitas;(91) 98002-9356;;(91) 98002-9356;;Belém;PA;54;7192,00;167;588;P1_ALTA_PROPENSAO_VOZ
+000165;Vera Lopes Moraes;(92) 98002-9535;;;vera.lopes165@exemplo.com.br;Manaus;AM;63;7425,00;15;625;P1_ALTA_PROPENSAO_VOZ
+000166;Wagner Vieira Souza;(19) 98002-9714;(19) 3201-1660;(19) 98002-9714;wagner.vieira166@exemplo.com.br;Campinas;SP;68;7658,00;28;662;P1_ALTA_PROPENSAO_VOZ
+000167;Sônia Dias Costa;(47) 98002-9893;;(47) 98002-9893;sônia.dias167@exemplo.com.br;Joinville;SC;74;7891,00;41;699;P1_ALTA_PROPENSAO_VOZ
+000168;Cláudio Moreira Fernandes;(11) 98003-0072;;(11) 98003-0072;;São Paulo;SP;21;324,00;54;736;P1_ALTA_PROPENSAO_VOZ
+000169;Eliane Machado Moreira;(21) 98003-0251;;(21) 98003-0251;eliane.machado169@exemplo.com.br;Rio de Janeiro;RJ;23;557,00;67;773;P3_DIGITAL_FIRST
+000170;Sérgio Cardoso Ramos;(31) 98003-0430;;(31) 98003-0430;sérgio.cardoso170@exemplo.com.br;Belo Horizonte;MG;28;790,00;80;810;P1_ALTA_PROPENSAO_VOZ
+000171;Marlene Santana Pinto;(41) 98003-0609;;(41) 98003-0609;marlene.santana171@exemplo.com.br;Curitiba;PR;31;1023,00;93;847;P2_HIBRIDO_DIGITAL_VOZ
+000172;Jorge Moraes Ferreira;(51) 98003-0788;;(51) 98003-0788;;Porto Alegre;RS;34;1256,00;106;884;P1_ALTA_PROPENSAO_VOZ
+000173;Rosa Monteiro Martins;(71) 98003-0967;;(71) 98003-0967;rosa.monteiro173@exemplo.com.br;Salvador;BA;38;1489,00;119;341;P1_ALTA_PROPENSAO_VOZ
+000174;Ana Oliveira Barbosa;(81) 98003-1146;;(81) 98003-1146;ana.oliveira174@exemplo.com.br;Recife;PE;42;1722,00;132;378;P2_HIBRIDO_DIGITAL_VOZ
+000175;Lucas Ferreira Marques;(85) 98003-1325;;(85) 98003-1325;lucas.ferreira175@exemplo.com.br;Fortaleza;CE;49;1955,00;145;415;P1_ALTA_PROPENSAO_VOZ
+000176;Carlos Lima Santana;(61) 98003-1504;;(61) 98003-1504;;Brasília;DF;54;2188,00;158;452;P1_ALTA_PROPENSAO_VOZ
+000177;Fernanda Ribeiro Silva;(62) 98003-1683;;;fernanda.ribeiro177@exemplo.com.br;Goiânia;GO;63;2421,00;171;489;P1_ALTA_PROPENSAO_VOZ
+000178;José Almeida Pereira;(91) 98003-1862;(91) 3201-1780;(91) 98003-1862;josé.almeida178@exemplo.com.br;Belém;PA;68;2654,00;19;526;P1_ALTA_PROPENSAO_VOZ
+000179;Patrícia Fernandes Almeida;(92) 98003-2041;;(92) 98003-2041;patrícia.fernandes179@exemplo.com.br;Manaus;AM;74;2887,00;32;563;P1_ALTA_PROPENSAO_VOZ
+000180;Antônio Rocha Dias;(19) 98003-2220;;(19) 98003-2220;;Campinas;SP;21;3120,00;45;600;P1_ALTA_PROPENSAO_VOZ
+000181;Beatriz Andrade Mendes;(47) 98003-2399;;(47) 98003-2399;beatriz.andrade181@exemplo.com.br;Joinville;SC;23;3353,00;58;637;P3_DIGITAL_FIRST
+000182;Rodrigo Marques Castro;(11) 98003-2578;;(11) 98003-2578;rodrigo.marques182@exemplo.com.br;São Paulo;SP;28;3586,00;71;674;P1_ALTA_PROPENSAO_VOZ
+000183;Silvia Freitas Oliveira;(21) 98003-2757;;(21) 98003-2757;silvia.freitas183@exemplo.com.br;Rio de Janeiro;RJ;31;3819,00;84;711;P2_HIBRIDO_DIGITAL_VOZ
+000184;Felipe Gonçalves Gomes;(31) 98003-2936;;(31) 98003-2936;;Belo Horizonte;MG;34;4052,00;97;748;P1_ALTA_PROPENSAO_VOZ
+000185;Helena Castro Soares;(41) 98003-3115;;(41) 98003-3115;helena.castro185@exemplo.com.br;Curitiba;PR;38;4285,00;110;785;P1_ALTA_PROPENSAO_VOZ
+000186;Marcos Pinto Andrade;(51) 98003-3294;;(51) 98003-3294;marcos.pinto186@exemplo.com.br;Porto Alegre;RS;42;4518,00;123;822;P2_HIBRIDO_DIGITAL_VOZ
+000187;Camila Santos Cardoso;(71) 98003-3473;;(71) 98003-3473;camila.santos187@exemplo.com.br;Salvador;BA;49;4751,00;136;859;P1_ALTA_PROPENSAO_VOZ
+000188;Gabriel Rodrigues Cavalcanti;(81) 98003-3652;;(81) 98003-3652;;Recife;PE;54;4984,00;149;896;P1_ALTA_PROPENSAO_VOZ
+000189;Juliana Pereira Rodrigues;(85) 98003-3831;;;juliana.pereira189@exemplo.com.br;Fortaleza;CE;63;5217,00;162;353;P1_ALTA_PROPENSAO_VOZ
+000190;Rafael Costa Ribeiro;(61) 98003-4010;(61) 3201-1900;(61) 98003-4010;rafael.costa190@exemplo.com.br;Brasília;DF;68;5450,00;175;390;P1_ALTA_PROPENSAO_VOZ
+000191;Mariana Carvalho Vieira;(62) 98003-4189;;(62) 98003-4189;mariana.carvalho191@exemplo.com.br;Goiânia;GO;74;5683,00;23;427;P1_ALTA_PROPENSAO_VOZ
+000192;Thiago Soares Nunes;(91) 98003-4368;;(91) 98003-4368;;Belém;PA;21;5916,00;36;464;P1_ALTA_PROPENSAO_VOZ
+000193;Aline Barbosa Gonçalves;(92) 98003-4547;;(92) 98003-4547;aline.barbosa193@exemplo.com.br;Manaus;AM;23;6149,00;49;501;P3_DIGITAL_FIRST
+000194;Matheus Nascimento Monteiro;(19) 98003-4726;;(19) 98003-4726;matheus.nascimento194@exemplo.com.br;Campinas;SP;28;6382,00;62;538;P1_ALTA_PROPENSAO_VOZ
+000195;Renata Nunes Alves;(47) 98003-4905;;(47) 98003-4905;renata.nunes195@exemplo.com.br;Joinville;SC;31;6615,00;75;575;P2_HIBRIDO_DIGITAL_VOZ
+000196;Gustavo Mendes Carvalho;(11) 98003-5084;;(11) 98003-5084;;São Paulo;SP;34;6848,00;88;612;P1_ALTA_PROPENSAO_VOZ
+000197;Larissa Ramos Rocha;(21) 98003-5263;;(21) 98003-5263;larissa.ramos197@exemplo.com.br;Rio de Janeiro;RJ;38;7081,00;101;649;P1_ALTA_PROPENSAO_VOZ
+000198;Eduardo Teixeira Machado;(31) 98003-5442;;(31) 98003-5442;eduardo.teixeira198@exemplo.com.br;Belo Horizonte;MG;42;7314,00;114;686;P2_HIBRIDO_DIGITAL_VOZ
+000199;Vanessa Cavalcanti Teixeira;(41) 98003-5621;;(41) 98003-5621;vanessa.cavalcanti199@exemplo.com.br;Curitiba;PR;49;7547,00;127;723;P1_ALTA_PROPENSAO_VOZ
+000200;Vinícius Silva Santos;(51) 98003-5800;;(51) 98003-5800;;Porto Alegre;RS;54;7780,00;140;760;P1_ALTA_PROPENSAO_VOZ
+000201;Amanda Souza Lima;(71) 98003-5979;;;amanda.souza201@exemplo.com.br;Salvador;BA;63;213,00;153;797;P1_ALTA_PROPENSAO_VOZ
+000202;Leonardo Alves Lopes;(81) 98003-6158;(81) 3201-2020;(81) 98003-6158;leonardo.alves202@exemplo.com.br;Recife;PE;68;446,00;166;834;P1_ALTA_PROPENSAO_VOZ
+000203;Bruna Gomes Nascimento;(85) 98003-6337;;(85) 98003-6337;bruna.gomes203@exemplo.com.br;Fortaleza;CE;74;679,00;179;871;P1_ALTA_PROPENSAO_VOZ
+000204;Marcelo Martins Freitas;(61) 98003-6516;;(61) 98003-6516;;Brasília;DF;21;912,00;27;328;P1_ALTA_PROPENSAO_VOZ
+000205;Tatiane Lopes Moraes;(62) 98003-6695;;(62) 98003-6695;tatiane.lopes205@exemplo.com.br;Goiânia;GO;23;1145,00;40;365;P3_DIGITAL_FIRST
+000206;Diego Vieira Souza;(91) 98003-6874;;(91) 98003-6874;diego.vieira206@exemplo.com.br;Belém;PA;28;1378,00;53;402;P1_ALTA_PROPENSAO_VOZ
+000207;Priscila Dias Costa;(92) 98003-7053;;(92) 98003-7053;priscila.dias207@exemplo.com.br;Manaus;AM;31;1611,00;66;439;P2_HIBRIDO_DIGITAL_VOZ
+000208;Danilo Moreira Fernandes;(19) 98003-7232;;(19) 98003-7232;;Campinas;SP;34;1844,00;79;476;P1_ALTA_PROPENSAO_VOZ
+000209;Letícia Machado Moreira;(47) 98003-7411;;(47) 98003-7411;letícia.machado209@exemplo.com.br;Joinville;SC;38;2077,00;92;513;P1_ALTA_PROPENSAO_VOZ
+000210;Fábio Cardoso Ramos;(11) 98003-7590;;(11) 98003-7590;fábio.cardoso210@exemplo.com.br;São Paulo;SP;42;2310,00;105;550;P2_HIBRIDO_DIGITAL_VOZ
+000211;Sabrina Santana Pinto;(21) 98003-7769;;(21) 98003-7769;sabrina.santana211@exemplo.com.br;Rio de Janeiro;RJ;49;2543,00;118;587;P1_ALTA_PROPENSAO_VOZ
+000212;Ricardo Moraes Ferreira;(31) 98003-7948;;(31) 98003-7948;;Belo Horizonte;MG;54;2776,00;131;624;P1_ALTA_PROPENSAO_VOZ
+000213;Carolina Monteiro Martins;(41) 98003-8127;;;carolina.monteiro213@exemplo.com.br;Curitiba;PR;63;3009,00;144;661;P1_ALTA_PROPENSAO_VOZ
+000214;Sebastião Oliveira Barbosa;(51) 98003-8306;(51) 3201-2140;(51) 98003-8306;sebastião.oliveira214@exemplo.com.br;Porto Alegre;RS;68;3242,00;157;698;P1_ALTA_PROPENSAO_VOZ
+000215;Aparecida Ferreira Marques;(71) 98003-8485;;(71) 98003-8485;aparecida.ferreira215@exemplo.com.br;Salvador;BA;74;3475,00;170;735;P1_ALTA_PROPENSAO_VOZ
+000216;Raimundo Lima Santana;(81) 98003-8664;;(81) 98003-8664;;Recife;PE;21;3708,00;18;772;P1_ALTA_PROPENSAO_VOZ
+000217;Francisca Ribeiro Silva;(85) 98003-8843;;(85) 98003-8843;francisca.ribeiro217@exemplo.com.br;Fortaleza;CE;23;3941,00;31;809;P3_DIGITAL_FIRST
+000218;Geraldo Almeida Pereira;(61) 98003-9022;;(61) 98003-9022;geraldo.almeida218@exemplo.com.br;Brasília;DF;28;4174,00;44;846;P1_ALTA_PROPENSAO_VOZ
+000219;Maria Fernandes Almeida;(62) 98003-9201;;(62) 98003-9201;maria.fernandes219@exemplo.com.br;Goiânia;GO;31;4407,00;57;883;P2_HIBRIDO_DIGITAL_VOZ
+000220;João Rocha Dias;(91) 98003-9380;;(91) 98003-9380;;Belém;PA;34;4640,00;70;340;P1_ALTA_PROPENSAO_VOZ
+000221;Pedro Andrade Mendes;(92) 98003-9559;;(92) 98003-9559;pedro.andrade221@exemplo.com.br;Manaus;AM;38;4873,00;83;377;P1_ALTA_PROPENSAO_VOZ
+000222;Luiz Marques Castro;(19) 98003-9738;;(19) 98003-9738;luiz.marques222@exemplo.com.br;Campinas;SP;42;5106,00;96;414;P2_HIBRIDO_DIGITAL_VOZ
+000223;Vera Freitas Oliveira;(47) 98003-9917;;(47) 98003-9917;vera.freitas223@exemplo.com.br;Joinville;SC;49;5339,00;109;451;P1_ALTA_PROPENSAO_VOZ
+000224;Wagner Gonçalves Gomes;(11) 98004-0096;;(11) 98004-0096;;São Paulo;SP;54;5572,00;122;488;P1_ALTA_PROPENSAO_VOZ
+000225;Sônia Castro Soares;(21) 98004-0275;;;sônia.castro225@exemplo.com.br;Rio de Janeiro;RJ;63;5805,00;135;525;P1_ALTA_PROPENSAO_VOZ
+000226;Cláudio Pinto Andrade;(31) 98004-0454;(31) 3201-2260;(31) 98004-0454;cláudio.pinto226@exemplo.com.br;Belo Horizonte;MG;68;6038,00;148;562;P1_ALTA_PROPENSAO_VOZ
+000227;Eliane Santos Cardoso;(41) 98004-0633;;(41) 98004-0633;eliane.santos227@exemplo.com.br;Curitiba;PR;74;6271,00;161;599;P1_ALTA_PROPENSAO_VOZ
+000228;Sérgio Rodrigues Cavalcanti;(51) 98004-0812;;(51) 98004-0812;;Porto Alegre;RS;21;6504,00;174;636;P1_ALTA_PROPENSAO_VOZ
+000229;Marlene Pereira Rodrigues;(71) 98004-0991;;(71) 98004-0991;marlene.pereira229@exemplo.com.br;Salvador;BA;23;6737,00;22;673;P3_DIGITAL_FIRST
+000230;Jorge Costa Ribeiro;(81) 98004-1170;;(81) 98004-1170;jorge.costa230@exemplo.com.br;Recife;PE;28;6970,00;35;710;P1_ALTA_PROPENSAO_VOZ
+000231;Rosa Carvalho Vieira;(85) 98004-1349;;(85) 98004-1349;rosa.carvalho231@exemplo.com.br;Fortaleza;CE;31;7203,00;48;747;P2_HIBRIDO_DIGITAL_VOZ
+000232;Ana Soares Nunes;(61) 98004-1528;;(61) 98004-1528;;Brasília;DF;34;7436,00;61;784;P1_ALTA_PROPENSAO_VOZ
+000233;Lucas Barbosa Gonçalves;(62) 98004-1707;;(62) 98004-1707;lucas.barbosa233@exemplo.com.br;Goiânia;GO;38;7669,00;74;821;P1_ALTA_PROPENSAO_VOZ
+000234;Carlos Nascimento Monteiro;(91) 98004-1886;;(91) 98004-1886;carlos.nascimento234@exemplo.com.br;Belém;PA;42;7902,00;87;858;P2_HIBRIDO_DIGITAL_VOZ
+000235;Fernanda Nunes Alves;(92) 98004-2065;;(92) 98004-2065;fernanda.nunes235@exemplo.com.br;Manaus;AM;49;335,00;100;895;P1_ALTA_PROPENSAO_VOZ
+000236;José Mendes Carvalho;(19) 98004-2244;;(19) 98004-2244;;Campinas;SP;54;568,00;113;352;P1_ALTA_PROPENSAO_VOZ
+000237;Patrícia Ramos Rocha;(47) 98004-2423;;;patrícia.ramos237@exemplo.com.br;Joinville;SC;63;801,00;126;389;P1_ALTA_PROPENSAO_VOZ
+000238;Antônio Teixeira Machado;(11) 98004-2602;(11) 3201-2380;(11) 98004-2602;antônio.teixeira238@exemplo.com.br;São Paulo;SP;68;1034,00;139;426;P1_ALTA_PROPENSAO_VOZ
+000239;Beatriz Cavalcanti Teixeira;(21) 98004-2781;;(21) 98004-2781;beatriz.cavalcanti239@exemplo.com.br;Rio de Janeiro;RJ;74;1267,00;152;463;P1_ALTA_PROPENSAO_VOZ
+000240;Rodrigo Silva Santos;(31) 98004-2960;;(31) 98004-2960;;Belo Horizonte;MG;21;1500,00;165;500;P1_ALTA_PROPENSAO_VOZ
+000241;Silvia Souza Lima;(41) 98004-3139;;(41) 98004-3139;silvia.souza241@exemplo.com.br;Curitiba;PR;23;1733,00;178;537;P3_DIGITAL_FIRST
+000242;Felipe Alves Lopes;(51) 98004-3318;;(51) 98004-3318;felipe.alves242@exemplo.com.br;Porto Alegre;RS;28;1966,00;26;574;P1_ALTA_PROPENSAO_VOZ
+000243;Helena Gomes Nascimento;(71) 98004-3497;;(71) 98004-3497;helena.gomes243@exemplo.com.br;Salvador;BA;31;2199,00;39;611;P2_HIBRIDO_DIGITAL_VOZ
+000244;Marcos Martins Freitas;(81) 98004-3676;;(81) 98004-3676;;Recife;PE;34;2432,00;52;648;P1_ALTA_PROPENSAO_VOZ
+000245;Camila Lopes Moraes;(85) 98004-3855;;(85) 98004-3855;camila.lopes245@exemplo.com.br;Fortaleza;CE;38;2665,00;65;685;P1_ALTA_PROPENSAO_VOZ
+000246;Gabriel Vieira Souza;(61) 98004-4034;;(61) 98004-4034;gabriel.vieira246@exemplo.com.br;Brasília;DF;42;2898,00;78;722;P2_HIBRIDO_DIGITAL_VOZ
+000247;Juliana Dias Costa;(62) 98004-4213;;(62) 98004-4213;juliana.dias247@exemplo.com.br;Goiânia;GO;49;3131,00;91;759;P1_ALTA_PROPENSAO_VOZ
+000248;Rafael Moreira Fernandes;(91) 98004-4392;;(91) 98004-4392;;Belém;PA;54;3364,00;104;796;P1_ALTA_PROPENSAO_VOZ
+000249;Mariana Machado Moreira;(92) 98004-4571;;;mariana.machado249@exemplo.com.br;Manaus;AM;63;3597,00;117;833;P1_ALTA_PROPENSAO_VOZ
+000250;Thiago Cardoso Ramos;(19) 98004-4750;(19) 3202-2500;(19) 98004-4750;thiago.cardoso250@exemplo.com.br;Campinas;SP;68;3830,00;130;870;P1_ALTA_PROPENSAO_VOZ
+000251;Aline Santana Pinto;(47) 98004-4929;;(47) 98004-4929;aline.santana251@exemplo.com.br;Joinville;SC;74;4063,00;143;327;P1_ALTA_PROPENSAO_VOZ
+000252;Matheus Moraes Ferreira;(11) 98004-5108;;(11) 98004-5108;;São Paulo;SP;21;4296,00;156;364;P1_ALTA_PROPENSAO_VOZ
+000253;Renata Monteiro Martins;(21) 98004-5287;;(21) 98004-5287;renata.monteiro253@exemplo.com.br;Rio de Janeiro;RJ;23;4529,00;169;401;P3_DIGITAL_FIRST
+000254;Gustavo Oliveira Barbosa;(31) 98004-5466;;(31) 98004-5466;gustavo.oliveira254@exemplo.com.br;Belo Horizonte;MG;28;4762,00;17;438;P1_ALTA_PROPENSAO_VOZ
+000255;Larissa Ferreira Marques;(41) 98004-5645;;(41) 98004-5645;larissa.ferreira255@exemplo.com.br;Curitiba;PR;31;4995,00;30;475;P2_HIBRIDO_DIGITAL_VOZ
+000256;Eduardo Lima Santana;(51) 98004-5824;;(51) 98004-5824;;Porto Alegre;RS;34;5228,00;43;512;P1_ALTA_PROPENSAO_VOZ
+000257;Vanessa Ribeiro Silva;(71) 98004-6003;;(71) 98004-6003;vanessa.ribeiro257@exemplo.com.br;Salvador;BA;38;5461,00;56;549;P1_ALTA_PROPENSAO_VOZ
+000258;Vinícius Almeida Pereira;(81) 98004-6182;;(81) 98004-6182;vinícius.almeida258@exemplo.com.br;Recife;PE;42;5694,00;69;586;P2_HIBRIDO_DIGITAL_VOZ
+000259;Amanda Fernandes Almeida;(85) 98004-6361;;(85) 98004-6361;amanda.fernandes259@exemplo.com.br;Fortaleza;CE;49;5927,00;82;623;P1_ALTA_PROPENSAO_VOZ
+000260;Leonardo Rocha Dias;(61) 98004-6540;;(61) 98004-6540;;Brasília;DF;54;6160,00;95;660;P1_ALTA_PROPENSAO_VOZ
+000261;Bruna Andrade Mendes;(62) 98004-6719;;;bruna.andrade261@exemplo.com.br;Goiânia;GO;63;6393,00;108;697;P1_ALTA_PROPENSAO_VOZ
+000262;Marcelo Marques Castro;(91) 98004-6898;(91) 3202-2620;(91) 98004-6898;marcelo.marques262@exemplo.com.br;Belém;PA;68;6626,00;121;734;P1_ALTA_PROPENSAO_VOZ
+000263;Tatiane Freitas Oliveira;(92) 98004-7077;;(92) 98004-7077;tatiane.freitas263@exemplo.com.br;Manaus;AM;74;6859,00;134;771;P1_ALTA_PROPENSAO_VOZ
+000264;Diego Gonçalves Gomes;(19) 98004-7256;;(19) 98004-7256;;Campinas;SP;21;7092,00;147;808;P1_ALTA_PROPENSAO_VOZ
+000265;Priscila Castro Soares;(47) 98004-7435;;(47) 98004-7435;priscila.castro265@exemplo.com.br;Joinville;SC;23;7325,00;160;845;P3_DIGITAL_FIRST
+000266;Danilo Pinto Andrade;(11) 98004-7614;;(11) 98004-7614;danilo.pinto266@exemplo.com.br;São Paulo;SP;28;7558,00;173;882;P1_ALTA_PROPENSAO_VOZ
+000267;Letícia Santos Cardoso;(21) 98004-7793;;(21) 98004-7793;letícia.santos267@exemplo.com.br;Rio de Janeiro;RJ;31;7791,00;21;339;P2_HIBRIDO_DIGITAL_VOZ
+000268;Fábio Rodrigues Cavalcanti;(31) 98004-7972;;(31) 98004-7972;;Belo Horizonte;MG;34;224,00;34;376;P1_ALTA_PROPENSAO_VOZ
+000269;Sabrina Pereira Rodrigues;(41) 98004-8151;;(41) 98004-8151;sabrina.pereira269@exemplo.com.br;Curitiba;PR;38;457,00;47;413;P1_ALTA_PROPENSAO_VOZ
+000270;Ricardo Costa Ribeiro;(51) 98004-8330;;(51) 98004-8330;ricardo.costa270@exemplo.com.br;Porto Alegre;RS;42;690,00;60;450;P2_HIBRIDO_DIGITAL_VOZ
+000271;Carolina Carvalho Vieira;(71) 98004-8509;;(71) 98004-8509;carolina.carvalho271@exemplo.com.br;Salvador;BA;49;923,00;73;487;P1_ALTA_PROPENSAO_VOZ
+000272;Sebastião Soares Nunes;(81) 98004-8688;;(81) 98004-8688;;Recife;PE;54;1156,00;86;524;P1_ALTA_PROPENSAO_VOZ
+000273;Aparecida Barbosa Gonçalves;(85) 98004-8867;;;aparecida.barbosa273@exemplo.com.br;Fortaleza;CE;63;1389,00;99;561;P1_ALTA_PROPENSAO_VOZ
+000274;Raimundo Nascimento Monteiro;(61) 98004-9046;(61) 3202-2740;(61) 98004-9046;raimundo.nascimento274@exemplo.com.br;Brasília;DF;68;1622,00;112;598;P1_ALTA_PROPENSAO_VOZ
+000275;Francisca Nunes Alves;(62) 98004-9225;;(62) 98004-9225;francisca.nunes275@exemplo.com.br;Goiânia;GO;74;1855,00;125;635;P1_ALTA_PROPENSAO_VOZ
+000276;Geraldo Mendes Carvalho;(91) 98004-9404;;(91) 98004-9404;;Belém;PA;21;2088,00;138;672;P1_ALTA_PROPENSAO_VOZ
+000277;Maria Ramos Rocha;(92) 98004-9583;;(92) 98004-9583;maria.ramos277@exemplo.com.br;Manaus;AM;23;2321,00;151;709;P3_DIGITAL_FIRST
+000278;João Teixeira Machado;(19) 98004-9762;;(19) 98004-9762;joão.teixeira278@exemplo.com.br;Campinas;SP;28;2554,00;164;746;P1_ALTA_PROPENSAO_VOZ
+000279;Pedro Cavalcanti Teixeira;(47) 98004-9941;;(47) 98004-9941;pedro.cavalcanti279@exemplo.com.br;Joinville;SC;31;2787,00;177;783;P2_HIBRIDO_DIGITAL_VOZ
+000280;Luiz Silva Santos;(11) 98005-0120;;(11) 98005-0120;;São Paulo;SP;34;3020,00;25;820;P1_ALTA_PROPENSAO_VOZ
+000281;Vera Souza Lima;(21) 98005-0299;;(21) 98005-0299;vera.souza281@exemplo.com.br;Rio de Janeiro;RJ;38;3253,00;38;857;P1_ALTA_PROPENSAO_VOZ
+000282;Wagner Alves Lopes;(31) 98005-0478;;(31) 98005-0478;wagner.alves282@exemplo.com.br;Belo Horizonte;MG;42;3486,00;51;894;P2_HIBRIDO_DIGITAL_VOZ
+000283;Sônia Gomes Nascimento;(41) 98005-0657;;(41) 98005-0657;sônia.gomes283@exemplo.com.br;Curitiba;PR;49;3719,00;64;351;P1_ALTA_PROPENSAO_VOZ
+000284;Cláudio Martins Freitas;(51) 98005-0836;;(51) 98005-0836;;Porto Alegre;RS;54;3952,00;77;388;P1_ALTA_PROPENSAO_VOZ
+000285;Eliane Lopes Moraes;(71) 98005-1015;;;eliane.lopes285@exemplo.com.br;Salvador;BA;63;4185,00;90;425;P1_ALTA_PROPENSAO_VOZ
+000286;Sérgio Vieira Souza;(81) 98005-1194;(81) 3202-2860;(81) 98005-1194;sérgio.vieira286@exemplo.com.br;Recife;PE;68;4418,00;103;462;P1_ALTA_PROPENSAO_VOZ
+000287;Marlene Dias Costa;(85) 98005-1373;;(85) 98005-1373;marlene.dias287@exemplo.com.br;Fortaleza;CE;74;4651,00;116;499;P1_ALTA_PROPENSAO_VOZ
+000288;Jorge Moreira Fernandes;(61) 98005-1552;;(61) 98005-1552;;Brasília;DF;21;4884,00;129;536;P1_ALTA_PROPENSAO_VOZ
+000289;Rosa Machado Moreira;(62) 98005-1731;;(62) 98005-1731;rosa.machado289@exemplo.com.br;Goiânia;GO;23;5117,00;142;573;P3_DIGITAL_FIRST
+000290;Ana Cardoso Ramos;(91) 98005-1910;;(91) 98005-1910;ana.cardoso290@exemplo.com.br;Belém;PA;28;5350,00;155;610;P1_ALTA_PROPENSAO_VOZ
+000291;Lucas Santana Pinto;(92) 98005-2089;;(92) 98005-2089;lucas.santana291@exemplo.com.br;Manaus;AM;31;5583,00;168;647;P2_HIBRIDO_DIGITAL_VOZ
+000292;Carlos Moraes Ferreira;(19) 98005-2268;;(19) 98005-2268;;Campinas;SP;34;5816,00;16;684;P1_ALTA_PROPENSAO_VOZ
+000293;Fernanda Monteiro Martins;(47) 98005-2447;;(47) 98005-2447;fernanda.monteiro293@exemplo.com.br;Joinville;SC;38;6049,00;29;721;P1_ALTA_PROPENSAO_VOZ
+000294;José Oliveira Barbosa;(11) 98005-2626;;(11) 98005-2626;josé.oliveira294@exemplo.com.br;São Paulo;SP;42;6282,00;42;758;P2_HIBRIDO_DIGITAL_VOZ
+000295;Patrícia Ferreira Marques;(21) 98005-2805;;(21) 98005-2805;patrícia.ferreira295@exemplo.com.br;Rio de Janeiro;RJ;49;6515,00;55;795;P1_ALTA_PROPENSAO_VOZ
+000296;Antônio Lima Santana;(31) 98005-2984;;(31) 98005-2984;;Belo Horizonte;MG;54;6748,00;68;832;P1_ALTA_PROPENSAO_VOZ
+000297;Beatriz Ribeiro Silva;(41) 98005-3163;;;beatriz.ribeiro297@exemplo.com.br;Curitiba;PR;63;6981,00;81;869;P1_ALTA_PROPENSAO_VOZ
+000298;Rodrigo Almeida Pereira;(51) 98005-3342;(51) 3202-2980;(51) 98005-3342;rodrigo.almeida298@exemplo.com.br;Porto Alegre;RS;68;7214,00;94;326;P1_ALTA_PROPENSAO_VOZ
+000299;Silvia Fernandes Almeida;(71) 98005-3521;;(71) 98005-3521;silvia.fernandes299@exemplo.com.br;Salvador;BA;74;7447,00;107;363;P1_ALTA_PROPENSAO_VOZ
+000300;Felipe Rocha Dias;(81) 98005-3700;;(81) 98005-3700;;Recife;PE;21;7680,00;120;400;P1_ALTA_PROPENSAO_VOZ
+000301;Helena Andrade Mendes;(85) 98005-3879;;(85) 98005-3879;helena.andrade301@exemplo.com.br;Fortaleza;CE;23;7913,00;133;437;P3_DIGITAL_FIRST
+000302;Marcos Marques Castro;(61) 98005-4058;;(61) 98005-4058;marcos.marques302@exemplo.com.br;Brasília;DF;28;346,00;146;474;P1_ALTA_PROPENSAO_VOZ
+000303;Camila Freitas Oliveira;(62) 98005-4237;;(62) 98005-4237;camila.freitas303@exemplo.com.br;Goiânia;GO;31;579,00;159;511;P2_HIBRIDO_DIGITAL_VOZ
+000304;Gabriel Gonçalves Gomes;(91) 98005-4416;;(91) 98005-4416;;Belém;PA;34;812,00;172;548;P1_ALTA_PROPENSAO_VOZ
+000305;Juliana Castro Soares;(92) 98005-4595;;(92) 98005-4595;juliana.castro305@exemplo.com.br;Manaus;AM;38;1045,00;20;585;P1_ALTA_PROPENSAO_VOZ
+000306;Rafael Pinto Andrade;(19) 98005-4774;;(19) 98005-4774;rafael.pinto306@exemplo.com.br;Campinas;SP;42;1278,00;33;622;P2_HIBRIDO_DIGITAL_VOZ
+000307;Mariana Santos Cardoso;(47) 98005-4953;;(47) 98005-4953;mariana.santos307@exemplo.com.br;Joinville;SC;49;1511,00;46;659;P1_ALTA_PROPENSAO_VOZ
+000308;Thiago Rodrigues Cavalcanti;(11) 98005-5132;;(11) 98005-5132;;São Paulo;SP;54;1744,00;59;696;P1_ALTA_PROPENSAO_VOZ
+000309;Aline Pereira Rodrigues;(21) 98005-5311;;;aline.pereira309@exemplo.com.br;Rio de Janeiro;RJ;63;1977,00;72;733;P1_ALTA_PROPENSAO_VOZ
+000310;Matheus Costa Ribeiro;(31) 98005-5490;(31) 3202-3100;(31) 98005-5490;matheus.costa310@exemplo.com.br;Belo Horizonte;MG;68;2210,00;85;770;P1_ALTA_PROPENSAO_VOZ
+000311;Renata Carvalho Vieira;(41) 98005-5669;;(41) 98005-5669;renata.carvalho311@exemplo.com.br;Curitiba;PR;74;2443,00;98;807;P1_ALTA_PROPENSAO_VOZ
+000312;Gustavo Soares Nunes;(51) 98005-5848;;(51) 98005-5848;;Porto Alegre;RS;21;2676,00;111;844;P1_ALTA_PROPENSAO_VOZ
+000313;Larissa Barbosa Gonçalves;(71) 98005-6027;;(71) 98005-6027;larissa.barbosa313@exemplo.com.br;Salvador;BA;23;2909,00;124;881;P3_DIGITAL_FIRST
+000314;Eduardo Nascimento Monteiro;(81) 98005-6206;;(81) 98005-6206;eduardo.nascimento314@exemplo.com.br;Recife;PE;28;3142,00;137;338;P1_ALTA_PROPENSAO_VOZ
+000315;Vanessa Nunes Alves;(85) 98005-6385;;(85) 98005-6385;vanessa.nunes315@exemplo.com.br;Fortaleza;CE;31;3375,00;150;375;P2_HIBRIDO_DIGITAL_VOZ
+000316;Vinícius Mendes Carvalho;(61) 98005-6564;;(61) 98005-6564;;Brasília;DF;34;3608,00;163;412;P1_ALTA_PROPENSAO_VOZ
+000317;Amanda Ramos Rocha;(62) 98005-6743;;(62) 98005-6743;amanda.ramos317@exemplo.com.br;Goiânia;GO;38;3841,00;176;449;P1_ALTA_PROPENSAO_VOZ
+000318;Leonardo Teixeira Machado;(91) 98005-6922;;(91) 98005-6922;leonardo.teixeira318@exemplo.com.br;Belém;PA;42;4074,00;24;486;P2_HIBRIDO_DIGITAL_VOZ
+000319;Bruna Cavalcanti Teixeira;(92) 98005-7101;;(92) 98005-7101;bruna.cavalcanti319@exemplo.com.br;Manaus;AM;49;4307,00;37;523;P1_ALTA_PROPENSAO_VOZ
+000320;Marcelo Silva Santos;(19) 98005-7280;;(19) 98005-7280;;Campinas;SP;54;4540,00;50;560;P1_ALTA_PROPENSAO_VOZ
+000321;Tatiane Souza Lima;(47) 98005-7459;;;tatiane.souza321@exemplo.com.br;Joinville;SC;63;4773,00;63;597;P1_ALTA_PROPENSAO_VOZ
+000322;Diego Alves Lopes;(11) 98005-7638;(11) 3202-3220;(11) 98005-7638;diego.alves322@exemplo.com.br;São Paulo;SP;68;5006,00;76;634;P1_ALTA_PROPENSAO_VOZ
+000323;Priscila Gomes Nascimento;(21) 98005-7817;;(21) 98005-7817;priscila.gomes323@exemplo.com.br;Rio de Janeiro;RJ;74;5239,00;89;671;P1_ALTA_PROPENSAO_VOZ
+000324;Danilo Martins Freitas;(31) 98005-7996;;(31) 98005-7996;;Belo Horizonte;MG;21;5472,00;102;708;P1_ALTA_PROPENSAO_VOZ
+000325;Letícia Lopes Moraes;(41) 98005-8175;;(41) 98005-8175;letícia.lopes325@exemplo.com.br;Curitiba;PR;23;5705,00;115;745;P3_DIGITAL_FIRST
+000326;Fábio Vieira Souza;(51) 98005-8354;;(51) 98005-8354;fábio.vieira326@exemplo.com.br;Porto Alegre;RS;28;5938,00;128;782;P1_ALTA_PROPENSAO_VOZ
+000327;Sabrina Dias Costa;(71) 98005-8533;;(71) 98005-8533;sabrina.dias327@exemplo.com.br;Salvador;BA;31;6171,00;141;819;P2_HIBRIDO_DIGITAL_VOZ
+000328;Ricardo Moreira Fernandes;(81) 98005-8712;;(81) 98005-8712;;Recife;PE;34;6404,00;154;856;P1_ALTA_PROPENSAO_VOZ
+000329;Carolina Machado Moreira;(85) 98005-8891;;(85) 98005-8891;carolina.machado329@exemplo.com.br;Fortaleza;CE;38;6637,00;167;893;P1_ALTA_PROPENSAO_VOZ
+000330;Sebastião Cardoso Ramos;(61) 98005-9070;;(61) 98005-9070;sebastião.cardoso330@exemplo.com.br;Brasília;DF;42;6870,00;15;350;P2_HIBRIDO_DIGITAL_VOZ
+000331;Aparecida Santana Pinto;(62) 98005-9249;;(62) 98005-9249;aparecida.santana331@exemplo.com.br;Goiânia;GO;49;7103,00;28;387;P1_ALTA_PROPENSAO_VOZ
+000332;Raimundo Moraes Ferreira;(91) 98005-9428;;(91) 98005-9428;;Belém;PA;54;7336,00;41;424;P1_ALTA_PROPENSAO_VOZ
+000333;Francisca Monteiro Martins;(92) 98005-9607;;;francisca.monteiro333@exemplo.com.br;Manaus;AM;63;7569,00;54;461;P1_ALTA_PROPENSAO_VOZ
+000334;Geraldo Oliveira Barbosa;(19) 98005-9786;(19) 3202-3340;(19) 98005-9786;geraldo.oliveira334@exemplo.com.br;Campinas;SP;68;7802,00;67;498;P1_ALTA_PROPENSAO_VOZ
+000335;Maria Ferreira Marques;(47) 98005-9965;;(47) 98005-9965;maria.ferreira335@exemplo.com.br;Joinville;SC;74;235,00;80;535;P1_ALTA_PROPENSAO_VOZ
+000336;João Lima Santana;(11) 98006-0144;;(11) 98006-0144;;São Paulo;SP;21;468,00;93;572;P1_ALTA_PROPENSAO_VOZ
+000337;Pedro Ribeiro Silva;(21) 98006-0323;;(21) 98006-0323;pedro.ribeiro337@exemplo.com.br;Rio de Janeiro;RJ;23;701,00;106;609;P3_DIGITAL_FIRST
+000338;Luiz Almeida Pereira;(31) 98006-0502;;(31) 98006-0502;luiz.almeida338@exemplo.com.br;Belo Horizonte;MG;28;934,00;119;646;P1_ALTA_PROPENSAO_VOZ
+000339;Vera Fernandes Almeida;(41) 98006-0681;;(41) 98006-0681;vera.fernandes339@exemplo.com.br;Curitiba;PR;31;1167,00;132;683;P2_HIBRIDO_DIGITAL_VOZ
+000340;Wagner Rocha Dias;(51) 98006-0860;;(51) 98006-0860;;Porto Alegre;RS;34;1400,00;145;720;P1_ALTA_PROPENSAO_VOZ
+000341;Sônia Andrade Mendes;(71) 98006-1039;;(71) 98006-1039;sônia.andrade341@exemplo.com.br;Salvador;BA;38;1633,00;158;757;P1_ALTA_PROPENSAO_VOZ
+000342;Cláudio Marques Castro;(81) 98006-1218;;(81) 98006-1218;cláudio.marques342@exemplo.com.br;Recife;PE;42;1866,00;171;794;P2_HIBRIDO_DIGITAL_VOZ
+000343;Eliane Freitas Oliveira;(85) 98006-1397;;(85) 98006-1397;eliane.freitas343@exemplo.com.br;Fortaleza;CE;49;2099,00;19;831;P1_ALTA_PROPENSAO_VOZ
+000344;Sérgio Gonçalves Gomes;(61) 98006-1576;;(61) 98006-1576;;Brasília;DF;54;2332,00;32;868;P1_ALTA_PROPENSAO_VOZ
+000345;Marlene Castro Soares;(62) 98006-1755;;;marlene.castro345@exemplo.com.br;Goiânia;GO;63;2565,00;45;325;P1_ALTA_PROPENSAO_VOZ
+000346;Jorge Pinto Andrade;(91) 98006-1934;(91) 3202-3460;(91) 98006-1934;jorge.pinto346@exemplo.com.br;Belém;PA;68;2798,00;58;362;P1_ALTA_PROPENSAO_VOZ
+000347;Rosa Santos Cardoso;(92) 98006-2113;;(92) 98006-2113;rosa.santos347@exemplo.com.br;Manaus;AM;74;3031,00;71;399;P1_ALTA_PROPENSAO_VOZ
+000348;Ana Rodrigues Cavalcanti;(19) 98006-2292;;(19) 98006-2292;;Campinas;SP;21;3264,00;84;436;P1_ALTA_PROPENSAO_VOZ
+000349;Lucas Pereira Rodrigues;(47) 98006-2471;;(47) 98006-2471;lucas.pereira349@exemplo.com.br;Joinville;SC;23;3497,00;97;473;P3_DIGITAL_FIRST
+000350;Carlos Costa Ribeiro;(11) 98006-2650;;(11) 98006-2650;carlos.costa350@exemplo.com.br;São Paulo;SP;28;3730,00;110;510;P1_ALTA_PROPENSAO_VOZ
+000351;Fernanda Carvalho Vieira;(21) 98006-2829;;(21) 98006-2829;fernanda.carvalho351@exemplo.com.br;Rio de Janeiro;RJ;31;3963,00;123;547;P2_HIBRIDO_DIGITAL_VOZ
+000352;José Soares Nunes;(31) 98006-3008;;(31) 98006-3008;;Belo Horizonte;MG;34;4196,00;136;584;P1_ALTA_PROPENSAO_VOZ
+000353;Patrícia Barbosa Gonçalves;(41) 98006-3187;;(41) 98006-3187;patrícia.barbosa353@exemplo.com.br;Curitiba;PR;38;4429,00;149;621;P1_ALTA_PROPENSAO_VOZ
+000354;Antônio Nascimento Monteiro;(51) 98006-3366;;(51) 98006-3366;antônio.nascimento354@exemplo.com.br;Porto Alegre;RS;42;4662,00;162;658;P2_HIBRIDO_DIGITAL_VOZ
+000355;Beatriz Nunes Alves;(71) 98006-3545;;(71) 98006-3545;beatriz.nunes355@exemplo.com.br;Salvador;BA;49;4895,00;175;695;P1_ALTA_PROPENSAO_VOZ
+000356;Rodrigo Mendes Carvalho;(81) 98006-3724;;(81) 98006-3724;;Recife;PE;54;5128,00;23;732;P1_ALTA_PROPENSAO_VOZ
+000357;Silvia Ramos Rocha;(85) 98006-3903;;;silvia.ramos357@exemplo.com.br;Fortaleza;CE;63;5361,00;36;769;P1_ALTA_PROPENSAO_VOZ
+000358;Felipe Teixeira Machado;(61) 98006-4082;(61) 3202-3580;(61) 98006-4082;felipe.teixeira358@exemplo.com.br;Brasília;DF;68;5594,00;49;806;P1_ALTA_PROPENSAO_VOZ
+000359;Helena Cavalcanti Teixeira;(62) 98006-4261;;(62) 98006-4261;helena.cavalcanti359@exemplo.com.br;Goiânia;GO;74;5827,00;62;843;P1_ALTA_PROPENSAO_VOZ
+000360;Marcos Silva Santos;(91) 98006-4440;;(91) 98006-4440;;Belém;PA;21;6060,00;75;880;P1_ALTA_PROPENSAO_VOZ
+000361;Camila Souza Lima;(92) 98006-4619;;(92) 98006-4619;camila.souza361@exemplo.com.br;Manaus;AM;23;6293,00;88;337;P3_DIGITAL_FIRST
+000362;Gabriel Alves Lopes;(19) 98006-4798;;(19) 98006-4798;gabriel.alves362@exemplo.com.br;Campinas;SP;28;6526,00;101;374;P1_ALTA_PROPENSAO_VOZ
+000363;Juliana Gomes Nascimento;(47) 98006-4977;;(47) 98006-4977;juliana.gomes363@exemplo.com.br;Joinville;SC;31;6759,00;114;411;P2_HIBRIDO_DIGITAL_VOZ
+000364;Rafael Martins Freitas;(11) 98006-5156;;(11) 98006-5156;;São Paulo;SP;34;6992,00;127;448;P1_ALTA_PROPENSAO_VOZ
+000365;Mariana Lopes Moraes;(21) 98006-5335;;(21) 98006-5335;mariana.lopes365@exemplo.com.br;Rio de Janeiro;RJ;38;7225,00;140;485;P1_ALTA_PROPENSAO_VOZ
+000366;Thiago Vieira Souza;(31) 98006-5514;;(31) 98006-5514;thiago.vieira366@exemplo.com.br;Belo Horizonte;MG;42;7458,00;153;522;P2_HIBRIDO_DIGITAL_VOZ
+000367;Aline Dias Costa;(41) 98006-5693;;(41) 98006-5693;aline.dias367@exemplo.com.br;Curitiba;PR;49;7691,00;166;559;P1_ALTA_PROPENSAO_VOZ
+000368;Matheus Moreira Fernandes;(51) 98006-5872;;(51) 98006-5872;;Porto Alegre;RS;54;7924,00;179;596;P1_ALTA_PROPENSAO_VOZ
+000369;Renata Machado Moreira;(71) 98006-6051;;;renata.machado369@exemplo.com.br;Salvador;BA;63;357,00;27;633;P1_ALTA_PROPENSAO_VOZ
+000370;Gustavo Cardoso Ramos;(81) 98006-6230;(81) 3203-3700;(81) 98006-6230;gustavo.cardoso370@exemplo.com.br;Recife;PE;68;590,00;40;670;P1_ALTA_PROPENSAO_VOZ
+000371;Larissa Santana Pinto;(85) 98006-6409;;(85) 98006-6409;larissa.santana371@exemplo.com.br;Fortaleza;CE;74;823,00;53;707;P1_ALTA_PROPENSAO_VOZ
+000372;Eduardo Moraes Ferreira;(61) 98006-6588;;(61) 98006-6588;;Brasília;DF;21;1056,00;66;744;P1_ALTA_PROPENSAO_VOZ
+000373;Vanessa Monteiro Martins;(62) 98006-6767;;(62) 98006-6767;vanessa.monteiro373@exemplo.com.br;Goiânia;GO;23;1289,00;79;781;P3_DIGITAL_FIRST
+000374;Vinícius Oliveira Barbosa;(91) 98006-6946;;(91) 98006-6946;vinícius.oliveira374@exemplo.com.br;Belém;PA;28;1522,00;92;818;P1_ALTA_PROPENSAO_VOZ
+000375;Amanda Ferreira Marques;(92) 98006-7125;;(92) 98006-7125;amanda.ferreira375@exemplo.com.br;Manaus;AM;31;1755,00;105;855;P2_HIBRIDO_DIGITAL_VOZ
+000376;Leonardo Lima Santana;(19) 98006-7304;;(19) 98006-7304;;Campinas;SP;34;1988,00;118;892;P1_ALTA_PROPENSAO_VOZ
+000377;Bruna Ribeiro Silva;(47) 98006-7483;;(47) 98006-7483;bruna.ribeiro377@exemplo.com.br;Joinville;SC;38;2221,00;131;349;P1_ALTA_PROPENSAO_VOZ
+000378;Marcelo Almeida Pereira;(11) 98006-7662;;(11) 98006-7662;marcelo.almeida378@exemplo.com.br;São Paulo;SP;42;2454,00;144;386;P2_HIBRIDO_DIGITAL_VOZ
+000379;Tatiane Fernandes Almeida;(21) 98006-7841;;(21) 98006-7841;tatiane.fernandes379@exemplo.com.br;Rio de Janeiro;RJ;49;2687,00;157;423;P1_ALTA_PROPENSAO_VOZ
+000380;Diego Rocha Dias;(31) 98006-8020;;(31) 98006-8020;;Belo Horizonte;MG;54;2920,00;170;460;P1_ALTA_PROPENSAO_VOZ
+000381;Priscila Andrade Mendes;(41) 98006-8199;;;priscila.andrade381@exemplo.com.br;Curitiba;PR;63;3153,00;18;497;P1_ALTA_PROPENSAO_VOZ
+000382;Danilo Marques Castro;(51) 98006-8378;(51) 3203-3820;(51) 98006-8378;danilo.marques382@exemplo.com.br;Porto Alegre;RS;68;3386,00;31;534;P1_ALTA_PROPENSAO_VOZ
+000383;Letícia Freitas Oliveira;(71) 98006-8557;;(71) 98006-8557;letícia.freitas383@exemplo.com.br;Salvador;BA;74;3619,00;44;571;P1_ALTA_PROPENSAO_VOZ
+000384;Fábio Gonçalves Gomes;(81) 98006-8736;;(81) 98006-8736;;Recife;PE;21;3852,00;57;608;P1_ALTA_PROPENSAO_VOZ
+000385;Sabrina Castro Soares;(85) 98006-8915;;(85) 98006-8915;sabrina.castro385@exemplo.com.br;Fortaleza;CE;23;4085,00;70;645;P3_DIGITAL_FIRST
+000386;Ricardo Pinto Andrade;(61) 98006-9094;;(61) 98006-9094;ricardo.pinto386@exemplo.com.br;Brasília;DF;28;4318,00;83;682;P1_ALTA_PROPENSAO_VOZ
+000387;Carolina Santos Cardoso;(62) 98006-9273;;(62) 98006-9273;carolina.santos387@exemplo.com.br;Goiânia;GO;31;4551,00;96;719;P2_HIBRIDO_DIGITAL_VOZ
+000388;Sebastião Rodrigues Cavalcanti;(91) 98006-9452;;(91) 98006-9452;;Belém;PA;34;4784,00;109;756;P1_ALTA_PROPENSAO_VOZ
+000389;Aparecida Pereira Rodrigues;(92) 98006-9631;;(92) 98006-9631;aparecida.pereira389@exemplo.com.br;Manaus;AM;38;5017,00;122;793;P1_ALTA_PROPENSAO_VOZ
+000390;Raimundo Costa Ribeiro;(19) 98006-9810;;(19) 98006-9810;raimundo.costa390@exemplo.com.br;Campinas;SP;42;5250,00;135;830;P2_HIBRIDO_DIGITAL_VOZ
+000391;Francisca Carvalho Vieira;(47) 98006-9989;;(47) 98006-9989;francisca.carvalho391@exemplo.com.br;Joinville;SC;49;5483,00;148;867;P1_ALTA_PROPENSAO_VOZ
+000392;Geraldo Soares Nunes;(11) 98007-0168;;(11) 98007-0168;;São Paulo;SP;54;5716,00;161;324;P1_ALTA_PROPENSAO_VOZ
+000393;Maria Barbosa Gonçalves;(21) 98007-0347;;;maria.barbosa393@exemplo.com.br;Rio de Janeiro;RJ;63;5949,00;174;361;P1_ALTA_PROPENSAO_VOZ
+000394;João Nascimento Monteiro;(31) 98007-0526;(31) 3203-3940;(31) 98007-0526;joão.nascimento394@exemplo.com.br;Belo Horizonte;MG;68;6182,00;22;398;P1_ALTA_PROPENSAO_VOZ
+000395;Pedro Nunes Alves;(41) 98007-0705;;(41) 98007-0705;pedro.nunes395@exemplo.com.br;Curitiba;PR;74;6415,00;35;435;P1_ALTA_PROPENSAO_VOZ
+000396;Luiz Mendes Carvalho;(51) 98007-0884;;(51) 98007-0884;;Porto Alegre;RS;21;6648,00;48;472;P1_ALTA_PROPENSAO_VOZ
+000397;Vera Ramos Rocha;(71) 98007-1063;;(71) 98007-1063;vera.ramos397@exemplo.com.br;Salvador;BA;23;6881,00;61;509;P3_DIGITAL_FIRST
+000398;Wagner Teixeira Machado;(81) 98007-1242;;(81) 98007-1242;wagner.teixeira398@exemplo.com.br;Recife;PE;28;7114,00;74;546;P1_ALTA_PROPENSAO_VOZ
+000399;Sônia Cavalcanti Teixeira;(85) 98007-1421;;(85) 98007-1421;sônia.cavalcanti399@exemplo.com.br;Fortaleza;CE;31;7347,00;87;583;P2_HIBRIDO_DIGITAL_VOZ
+000400;Cláudio Silva Santos;(61) 98007-1600;;(61) 98007-1600;;Brasília;DF;34;7580,00;100;620;P1_ALTA_PROPENSAO_VOZ
+000401;Eliane Souza Lima;(62) 98007-1779;;(62) 98007-1779;eliane.souza401@exemplo.com.br;Goiânia;GO;38;7813,00;113;657;P1_ALTA_PROPENSAO_VOZ
+000402;Sérgio Alves Lopes;(91) 98007-1958;;(91) 98007-1958;sérgio.alves402@exemplo.com.br;Belém;PA;42;246,00;126;694;P2_HIBRIDO_DIGITAL_VOZ
+000403;Marlene Gomes Nascimento;(92) 98007-2137;;(92) 98007-2137;marlene.gomes403@exemplo.com.br;Manaus;AM;49;479,00;139;731;P1_ALTA_PROPENSAO_VOZ
+000404;Jorge Martins Freitas;(19) 98007-2316;;(19) 98007-2316;;Campinas;SP;54;712,00;152;768;P1_ALTA_PROPENSAO_VOZ
+000405;Rosa Lopes Moraes;(47) 98007-2495;;;rosa.lopes405@exemplo.com.br;Joinville;SC;63;945,00;165;805;P1_ALTA_PROPENSAO_VOZ
+000406;Ana Vieira Souza;(11) 98007-2674;(11) 3203-4060;(11) 98007-2674;ana.vieira406@exemplo.com.br;São Paulo;SP;68;1178,00;178;842;P1_ALTA_PROPENSAO_VOZ
+000407;Lucas Dias Costa;(21) 98007-2853;;(21) 98007-2853;lucas.dias407@exemplo.com.br;Rio de Janeiro;RJ;74;1411,00;26;879;P1_ALTA_PROPENSAO_VOZ
+000408;Carlos Moreira Fernandes;(31) 98007-3032;;(31) 98007-3032;;Belo Horizonte;MG;21;1644,00;39;336;P1_ALTA_PROPENSAO_VOZ
+000409;Fernanda Machado Moreira;(41) 98007-3211;;(41) 98007-3211;fernanda.machado409@exemplo.com.br;Curitiba;PR;23;1877,00;52;373;P3_DIGITAL_FIRST
+000410;José Cardoso Ramos;(51) 98007-3390;;(51) 98007-3390;josé.cardoso410@exemplo.com.br;Porto Alegre;RS;28;2110,00;65;410;P1_ALTA_PROPENSAO_VOZ
+000411;Patrícia Santana Pinto;(71) 98007-3569;;(71) 98007-3569;patrícia.santana411@exemplo.com.br;Salvador;BA;31;2343,00;78;447;P2_HIBRIDO_DIGITAL_VOZ
+000412;Antônio Moraes Ferreira;(81) 98007-3748;;(81) 98007-3748;;Recife;PE;34;2576,00;91;484;P1_ALTA_PROPENSAO_VOZ
+000413;Beatriz Monteiro Martins;(85) 98007-3927;;(85) 98007-3927;beatriz.monteiro413@exemplo.com.br;Fortaleza;CE;38;2809,00;104;521;P1_ALTA_PROPENSAO_VOZ
+000414;Rodrigo Oliveira Barbosa;(61) 98007-4106;;(61) 98007-4106;rodrigo.oliveira414@exemplo.com.br;Brasília;DF;42;3042,00;117;558;P2_HIBRIDO_DIGITAL_VOZ
+000415;Silvia Ferreira Marques;(62) 98007-4285;;(62) 98007-4285;silvia.ferreira415@exemplo.com.br;Goiânia;GO;49;3275,00;130;595;P1_ALTA_PROPENSAO_VOZ
+000416;Felipe Lima Santana;(91) 98007-4464;;(91) 98007-4464;;Belém;PA;54;3508,00;143;632;P1_ALTA_PROPENSAO_VOZ
+000417;Helena Ribeiro Silva;(92) 98007-4643;;;helena.ribeiro417@exemplo.com.br;Manaus;AM;63;3741,00;156;669;P1_ALTA_PROPENSAO_VOZ
+000418;Marcos Almeida Pereira;(19) 98007-4822;(19) 3203-4180;(19) 98007-4822;marcos.almeida418@exemplo.com.br;Campinas;SP;68;3974,00;169;706;P1_ALTA_PROPENSAO_VOZ
+000419;Camila Fernandes Almeida;(47) 98007-5001;;(47) 98007-5001;camila.fernandes419@exemplo.com.br;Joinville;SC;74;4207,00;17;743;P1_ALTA_PROPENSAO_VOZ
+000420;Gabriel Rocha Dias;(11) 98007-5180;;(11) 98007-5180;;São Paulo;SP;21;4440,00;30;780;P1_ALTA_PROPENSAO_VOZ
+000421;Juliana Andrade Mendes;(21) 98007-5359;;(21) 98007-5359;juliana.andrade421@exemplo.com.br;Rio de Janeiro;RJ;23;4673,00;43;817;P3_DIGITAL_FIRST
+000422;Rafael Marques Castro;(31) 98007-5538;;(31) 98007-5538;rafael.marques422@exemplo.com.br;Belo Horizonte;MG;28;4906,00;56;854;P1_ALTA_PROPENSAO_VOZ
+000423;Mariana Freitas Oliveira;(41) 98007-5717;;(41) 98007-5717;mariana.freitas423@exemplo.com.br;Curitiba;PR;31;5139,00;69;891;P2_HIBRIDO_DIGITAL_VOZ
+000424;Thiago Gonçalves Gomes;(51) 98007-5896;;(51) 98007-5896;;Porto Alegre;RS;34;5372,00;82;348;P1_ALTA_PROPENSAO_VOZ
+000425;Aline Castro Soares;(71) 98007-6075;;(71) 98007-6075;aline.castro425@exemplo.com.br;Salvador;BA;38;5605,00;95;385;P1_ALTA_PROPENSAO_VOZ
+000426;Matheus Pinto Andrade;(81) 98007-6254;;(81) 98007-6254;matheus.pinto426@exemplo.com.br;Recife;PE;42;5838,00;108;422;P2_HIBRIDO_DIGITAL_VOZ
+000427;Renata Santos Cardoso;(85) 98007-6433;;(85) 98007-6433;renata.santos427@exemplo.com.br;Fortaleza;CE;49;6071,00;121;459;P1_ALTA_PROPENSAO_VOZ
+000428;Gustavo Rodrigues Cavalcanti;(61) 98007-6612;;(61) 98007-6612;;Brasília;DF;54;6304,00;134;496;P1_ALTA_PROPENSAO_VOZ
+000429;Larissa Pereira Rodrigues;(62) 98007-6791;;;larissa.pereira429@exemplo.com.br;Goiânia;GO;63;6537,00;147;533;P1_ALTA_PROPENSAO_VOZ
+000430;Eduardo Costa Ribeiro;(91) 98007-6970;(91) 3203-4300;(91) 98007-6970;eduardo.costa430@exemplo.com.br;Belém;PA;68;6770,00;160;570;P1_ALTA_PROPENSAO_VOZ
+000431;Vanessa Carvalho Vieira;(92) 98007-7149;;(92) 98007-7149;vanessa.carvalho431@exemplo.com.br;Manaus;AM;74;7003,00;173;607;P1_ALTA_PROPENSAO_VOZ
+000432;Vinícius Soares Nunes;(19) 98007-7328;;(19) 98007-7328;;Campinas;SP;21;7236,00;21;644;P1_ALTA_PROPENSAO_VOZ
+000433;Amanda Barbosa Gonçalves;(47) 98007-7507;;(47) 98007-7507;amanda.barbosa433@exemplo.com.br;Joinville;SC;23;7469,00;34;681;P3_DIGITAL_FIRST
+000434;Leonardo Nascimento Monteiro;(11) 98007-7686;;(11) 98007-7686;leonardo.nascimento434@exemplo.com.br;São Paulo;SP;28;7702,00;47;718;P1_ALTA_PROPENSAO_VOZ
+000435;Bruna Nunes Alves;(21) 98007-7865;;(21) 98007-7865;bruna.nunes435@exemplo.com.br;Rio de Janeiro;RJ;31;7935,00;60;755;P2_HIBRIDO_DIGITAL_VOZ
+000436;Marcelo Mendes Carvalho;(31) 98007-8044;;(31) 98007-8044;;Belo Horizonte;MG;34;368,00;73;792;P1_ALTA_PROPENSAO_VOZ
+000437;Tatiane Ramos Rocha;(41) 98007-8223;;(41) 98007-8223;tatiane.ramos437@exemplo.com.br;Curitiba;PR;38;601,00;86;829;P1_ALTA_PROPENSAO_VOZ
+000438;Diego Teixeira Machado;(51) 98007-8402;;(51) 98007-8402;diego.teixeira438@exemplo.com.br;Porto Alegre;RS;42;834,00;99;866;P2_HIBRIDO_DIGITAL_VOZ
+000439;Priscila Cavalcanti Teixeira;(71) 98007-8581;;(71) 98007-8581;priscila.cavalcanti439@exemplo.com.br;Salvador;BA;49;1067,00;112;323;P1_ALTA_PROPENSAO_VOZ
+000440;Danilo Silva Santos;(81) 98007-8760;;(81) 98007-8760;;Recife;PE;54;1300,00;125;360;P1_ALTA_PROPENSAO_VOZ
+000441;Letícia Souza Lima;(85) 98007-8939;;;letícia.souza441@exemplo.com.br;Fortaleza;CE;63;1533,00;138;397;P1_ALTA_PROPENSAO_VOZ
+000442;Fábio Alves Lopes;(61) 98007-9118;(61) 3203-4420;(61) 98007-9118;fábio.alves442@exemplo.com.br;Brasília;DF;68;1766,00;151;434;P1_ALTA_PROPENSAO_VOZ
+000443;Sabrina Gomes Nascimento;(62) 98007-9297;;(62) 98007-9297;sabrina.gomes443@exemplo.com.br;Goiânia;GO;74;1999,00;164;471;P1_ALTA_PROPENSAO_VOZ
+000444;Ricardo Martins Freitas;(91) 98007-9476;;(91) 98007-9476;;Belém;PA;21;2232,00;177;508;P1_ALTA_PROPENSAO_VOZ
+000445;Carolina Lopes Moraes;(92) 98007-9655;;(92) 98007-9655;carolina.lopes445@exemplo.com.br;Manaus;AM;23;2465,00;25;545;P3_DIGITAL_FIRST
+000446;Sebastião Vieira Souza;(19) 98007-9834;;(19) 98007-9834;sebastião.vieira446@exemplo.com.br;Campinas;SP;28;2698,00;38;582;P1_ALTA_PROPENSAO_VOZ
+000447;Aparecida Dias Costa;(47) 98008-0013;;(47) 98008-0013;aparecida.dias447@exemplo.com.br;Joinville;SC;31;2931,00;51;619;P2_HIBRIDO_DIGITAL_VOZ
+000448;Raimundo Moreira Fernandes;(11) 98008-0192;;(11) 98008-0192;;São Paulo;SP;34;3164,00;64;656;P1_ALTA_PROPENSAO_VOZ
+000449;Francisca Machado Moreira;(21) 98008-0371;;(21) 98008-0371;francisca.machado449@exemplo.com.br;Rio de Janeiro;RJ;38;3397,00;77;693;P1_ALTA_PROPENSAO_VOZ
+000450;Geraldo Cardoso Ramos;(31) 98008-0550;;(31) 98008-0550;geraldo.cardoso450@exemplo.com.br;Belo Horizonte;MG;42;3630,00;90;730;P2_HIBRIDO_DIGITAL_VOZ
+000451;Maria Santana Pinto;(41) 98008-0729;;(41) 98008-0729;maria.santana451@exemplo.com.br;Curitiba;PR;49;3863,00;103;767;P1_ALTA_PROPENSAO_VOZ
+000452;João Moraes Ferreira;(51) 98008-0908;;(51) 98008-0908;;Porto Alegre;RS;54;4096,00;116;804;P1_ALTA_PROPENSAO_VOZ
+000453;Pedro Monteiro Martins;(71) 98008-1087;;;pedro.monteiro453@exemplo.com.br;Salvador;BA;63;4329,00;129;841;P1_ALTA_PROPENSAO_VOZ
+000454;Luiz Oliveira Barbosa;(81) 98008-1266;(81) 3203-4540;(81) 98008-1266;luiz.oliveira454@exemplo.com.br;Recife;PE;68;4562,00;142;878;P1_ALTA_PROPENSAO_VOZ
+000455;Vera Ferreira Marques;(85) 98008-1445;;(85) 98008-1445;vera.ferreira455@exemplo.com.br;Fortaleza;CE;74;4795,00;155;335;P1_ALTA_PROPENSAO_VOZ
+000456;Wagner Lima Santana;(61) 98008-1624;;(61) 98008-1624;;Brasília;DF;21;5028,00;168;372;P1_ALTA_PROPENSAO_VOZ
+000457;Sônia Ribeiro Silva;(62) 98008-1803;;(62) 98008-1803;sônia.ribeiro457@exemplo.com.br;Goiânia;GO;23;5261,00;16;409;P3_DIGITAL_FIRST
+000458;Cláudio Almeida Pereira;(91) 98008-1982;;(91) 98008-1982;cláudio.almeida458@exemplo.com.br;Belém;PA;28;5494,00;29;446;P1_ALTA_PROPENSAO_VOZ
+000459;Eliane Fernandes Almeida;(92) 98008-2161;;(92) 98008-2161;eliane.fernandes459@exemplo.com.br;Manaus;AM;31;5727,00;42;483;P2_HIBRIDO_DIGITAL_VOZ
+000460;Sérgio Rocha Dias;(19) 98008-2340;;(19) 98008-2340;;Campinas;SP;34;5960,00;55;520;P1_ALTA_PROPENSAO_VOZ
+000461;Marlene Andrade Mendes;(47) 98008-2519;;(47) 98008-2519;marlene.andrade461@exemplo.com.br;Joinville;SC;38;6193,00;68;557;P1_ALTA_PROPENSAO_VOZ
+000462;Jorge Marques Castro;(11) 98008-2698;;(11) 98008-2698;jorge.marques462@exemplo.com.br;São Paulo;SP;42;6426,00;81;594;P2_HIBRIDO_DIGITAL_VOZ
+000463;Rosa Freitas Oliveira;(21) 98008-2877;;(21) 98008-2877;rosa.freitas463@exemplo.com.br;Rio de Janeiro;RJ;49;6659,00;94;631;P1_ALTA_PROPENSAO_VOZ
+000464;Ana Gonçalves Gomes;(31) 98008-3056;;(31) 98008-3056;;Belo Horizonte;MG;54;6892,00;107;668;P1_ALTA_PROPENSAO_VOZ
+000465;Lucas Castro Soares;(41) 98008-3235;;;lucas.castro465@exemplo.com.br;Curitiba;PR;63;7125,00;120;705;P1_ALTA_PROPENSAO_VOZ
+000466;Carlos Pinto Andrade;(51) 98008-3414;(51) 3203-4660;(51) 98008-3414;carlos.pinto466@exemplo.com.br;Porto Alegre;RS;68;7358,00;133;742;P1_ALTA_PROPENSAO_VOZ
+000467;Fernanda Santos Cardoso;(71) 98008-3593;;(71) 98008-3593;fernanda.santos467@exemplo.com.br;Salvador;BA;74;7591,00;146;779;P1_ALTA_PROPENSAO_VOZ
+000468;José Rodrigues Cavalcanti;(81) 98008-3772;;(81) 98008-3772;;Recife;PE;21;7824,00;159;816;P1_ALTA_PROPENSAO_VOZ
+000469;Patrícia Pereira Rodrigues;(85) 98008-3951;;(85) 98008-3951;patrícia.pereira469@exemplo.com.br;Fortaleza;CE;23;257,00;172;853;P3_DIGITAL_FIRST
+000470;Antônio Costa Ribeiro;(61) 98008-4130;;(61) 98008-4130;antônio.costa470@exemplo.com.br;Brasília;DF;28;490,00;20;890;P1_ALTA_PROPENSAO_VOZ
+000471;Beatriz Carvalho Vieira;(62) 98008-4309;;(62) 98008-4309;beatriz.carvalho471@exemplo.com.br;Goiânia;GO;31;723,00;33;347;P2_HIBRIDO_DIGITAL_VOZ
+000472;Rodrigo Soares Nunes;(91) 98008-4488;;(91) 98008-4488;;Belém;PA;34;956,00;46;384;P1_ALTA_PROPENSAO_VOZ
+000473;Silvia Barbosa Gonçalves;(92) 98008-4667;;(92) 98008-4667;silvia.barbosa473@exemplo.com.br;Manaus;AM;38;1189,00;59;421;P1_ALTA_PROPENSAO_VOZ
+000474;Felipe Nascimento Monteiro;(19) 98008-4846;;(19) 98008-4846;felipe.nascimento474@exemplo.com.br;Campinas;SP;42;1422,00;72;458;P2_HIBRIDO_DIGITAL_VOZ
+000475;Helena Nunes Alves;(47) 98008-5025;;(47) 98008-5025;helena.nunes475@exemplo.com.br;Joinville;SC;49;1655,00;85;495;P1_ALTA_PROPENSAO_VOZ
+000476;Marcos Mendes Carvalho;(11) 98008-5204;;(11) 98008-5204;;São Paulo;SP;54;1888,00;98;532;P1_ALTA_PROPENSAO_VOZ
+000477;Camila Ramos Rocha;(21) 98008-5383;;;camila.ramos477@exemplo.com.br;Rio de Janeiro;RJ;63;2121,00;111;569;P1_ALTA_PROPENSAO_VOZ
+000478;Gabriel Teixeira Machado;(31) 98008-5562;(31) 3203-4780;(31) 98008-5562;gabriel.teixeira478@exemplo.com.br;Belo Horizonte;MG;68;2354,00;124;606;P1_ALTA_PROPENSAO_VOZ
+000479;Juliana Cavalcanti Teixeira;(41) 98008-5741;;(41) 98008-5741;juliana.cavalcanti479@exemplo.com.br;Curitiba;PR;74;2587,00;137;643;P1_ALTA_PROPENSAO_VOZ
+000480;Rafael Silva Santos;(51) 98008-5920;;(51) 98008-5920;;Porto Alegre;RS;21;2820,00;150;680;P1_ALTA_PROPENSAO_VOZ
+000481;Mariana Souza Lima;(71) 98008-6099;;(71) 98008-6099;mariana.souza481@exemplo.com.br;Salvador;BA;23;3053,00;163;717;P3_DIGITAL_FIRST
+000482;Thiago Alves Lopes;(81) 98008-6278;;(81) 98008-6278;thiago.alves482@exemplo.com.br;Recife;PE;28;3286,00;176;754;P1_ALTA_PROPENSAO_VOZ
+000483;Aline Gomes Nascimento;(85) 98008-6457;;(85) 98008-6457;aline.gomes483@exemplo.com.br;Fortaleza;CE;31;3519,00;24;791;P2_HIBRIDO_DIGITAL_VOZ
+000484;Matheus Martins Freitas;(61) 98008-6636;;(61) 98008-6636;;Brasília;DF;34;3752,00;37;828;P1_ALTA_PROPENSAO_VOZ
+000485;Renata Lopes Moraes;(62) 98008-6815;;(62) 98008-6815;renata.lopes485@exemplo.com.br;Goiânia;GO;38;3985,00;50;865;P1_ALTA_PROPENSAO_VOZ
+000486;Gustavo Vieira Souza;(91) 98008-6994;;(91) 98008-6994;gustavo.vieira486@exemplo.com.br;Belém;PA;42;4218,00;63;322;P2_HIBRIDO_DIGITAL_VOZ
+000487;Larissa Dias Costa;(92) 98008-7173;;(92) 98008-7173;larissa.dias487@exemplo.com.br;Manaus;AM;49;4451,00;76;359;P1_ALTA_PROPENSAO_VOZ
+000488;Eduardo Moreira Fernandes;(19) 98008-7352;;(19) 98008-7352;;Campinas;SP;54;4684,00;89;396;P1_ALTA_PROPENSAO_VOZ
+000489;Vanessa Machado Moreira;(47) 98008-7531;;;vanessa.machado489@exemplo.com.br;Joinville;SC;63;4917,00;102;433;P1_ALTA_PROPENSAO_VOZ
+000490;Vinícius Cardoso Ramos;(11) 98008-7710;(11) 3204-4900;(11) 98008-7710;vinícius.cardoso490@exemplo.com.br;São Paulo;SP;68;5150,00;115;470;P1_ALTA_PROPENSAO_VOZ
+000491;Amanda Santana Pinto;(21) 98008-7889;;(21) 98008-7889;amanda.santana491@exemplo.com.br;Rio de Janeiro;RJ;74;5383,00;128;507;P1_ALTA_PROPENSAO_VOZ
+000492;Leonardo Moraes Ferreira;(31) 98008-8068;;(31) 98008-8068;;Belo Horizonte;MG;21;5616,00;141;544;P1_ALTA_PROPENSAO_VOZ
+000493;Bruna Monteiro Martins;(41) 98008-8247;;(41) 98008-8247;bruna.monteiro493@exemplo.com.br;Curitiba;PR;23;5849,00;154;581;P3_DIGITAL_FIRST
+000494;Marcelo Oliveira Barbosa;(51) 98008-8426;;(51) 98008-8426;marcelo.oliveira494@exemplo.com.br;Porto Alegre;RS;28;6082,00;167;618;P1_ALTA_PROPENSAO_VOZ
+000495;Tatiane Ferreira Marques;(71) 98008-8605;;(71) 98008-8605;tatiane.ferreira495@exemplo.com.br;Salvador;BA;31;6315,00;15;655;P2_HIBRIDO_DIGITAL_VOZ
+000496;Diego Lima Santana;(81) 98008-8784;;(81) 98008-8784;;Recife;PE;34;6548,00;28;692;P1_ALTA_PROPENSAO_VOZ
+000497;Priscila Ribeiro Silva;(85) 98008-8963;;(85) 98008-8963;priscila.ribeiro497@exemplo.com.br;Fortaleza;CE;38;6781,00;41;729;P1_ALTA_PROPENSAO_VOZ
+000498;Danilo Almeida Pereira;(61) 98008-9142;;(61) 98008-9142;danilo.almeida498@exemplo.com.br;Brasília;DF;42;7014,00;54;766;P2_HIBRIDO_DIGITAL_VOZ
+000499;Letícia Fernandes Almeida;(62) 98008-9321;;(62) 98008-9321;letícia.fernandes499@exemplo.com.br;Goiânia;GO;49;7247,00;67;803;P1_ALTA_PROPENSAO_VOZ
+000500;Fábio Rocha Dias;(91) 98008-9500;;(91) 98008-9500;;Belém;PA;54;7480,00;80;840;P1_ALTA_PROPENSAO_VOZ
+000501;Sabrina Andrade Mendes;(92) 98008-9679;;;sabrina.andrade501@exemplo.com.br;Manaus;AM;63;7713,00;93;877;P1_ALTA_PROPENSAO_VOZ
+000502;Ricardo Marques Castro;(19) 98008-9858;(19) 3204-5020;(19) 98008-9858;ricardo.marques502@exemplo.com.br;Campinas;SP;68;7946,00;106;334;P1_ALTA_PROPENSAO_VOZ
+000503;Carolina Freitas Oliveira;(47) 98009-0037;;(47) 98009-0037;carolina.freitas503@exemplo.com.br;Joinville;SC;74;379,00;119;371;P1_ALTA_PROPENSAO_VOZ
+000504;Sebastião Gonçalves Gomes;(11) 98009-0216;;(11) 98009-0216;;São Paulo;SP;21;612,00;132;408;P1_ALTA_PROPENSAO_VOZ
+000505;Aparecida Castro Soares;(21) 98009-0395;;(21) 98009-0395;aparecida.castro505@exemplo.com.br;Rio de Janeiro;RJ;23;845,00;145;445;P3_DIGITAL_FIRST
+000506;Raimundo Pinto Andrade;(31) 98009-0574;;(31) 98009-0574;raimundo.pinto506@exemplo.com.br;Belo Horizonte;MG;28;1078,00;158;482;P1_ALTA_PROPENSAO_VOZ
+000507;Francisca Santos Cardoso;(41) 98009-0753;;(41) 98009-0753;francisca.santos507@exemplo.com.br;Curitiba;PR;31;1311,00;171;519;P2_HIBRIDO_DIGITAL_VOZ
+000508;Geraldo Rodrigues Cavalcanti;(51) 98009-0932;;(51) 98009-0932;;Porto Alegre;RS;34;1544,00;19;556;P1_ALTA_PROPENSAO_VOZ
+000509;Maria Pereira Rodrigues;(71) 98009-1111;;(71) 98009-1111;maria.pereira509@exemplo.com.br;Salvador;BA;38;1777,00;32;593;P1_ALTA_PROPENSAO_VOZ
+000510;João Costa Ribeiro;(81) 98009-1290;;(81) 98009-1290;joão.costa510@exemplo.com.br;Recife;PE;42;2010,00;45;630;P2_HIBRIDO_DIGITAL_VOZ
+000511;Pedro Carvalho Vieira;(85) 98009-1469;;(85) 98009-1469;pedro.carvalho511@exemplo.com.br;Fortaleza;CE;49;2243,00;58;667;P1_ALTA_PROPENSAO_VOZ
+000512;Luiz Soares Nunes;(61) 98009-1648;;(61) 98009-1648;;Brasília;DF;54;2476,00;71;704;P1_ALTA_PROPENSAO_VOZ
+000513;Vera Barbosa Gonçalves;(62) 98009-1827;;;vera.barbosa513@exemplo.com.br;Goiânia;GO;63;2709,00;84;741;P1_ALTA_PROPENSAO_VOZ
+000514;Wagner Nascimento Monteiro;(91) 98009-2006;(91) 3204-5140;(91) 98009-2006;wagner.nascimento514@exemplo.com.br;Belém;PA;68;2942,00;97;778;P1_ALTA_PROPENSAO_VOZ
+000515;Sônia Nunes Alves;(92) 98009-2185;;(92) 98009-2185;sônia.nunes515@exemplo.com.br;Manaus;AM;74;3175,00;110;815;P1_ALTA_PROPENSAO_VOZ
+000516;Cláudio Mendes Carvalho;(19) 98009-2364;;(19) 98009-2364;;Campinas;SP;21;3408,00;123;852;P1_ALTA_PROPENSAO_VOZ
+000517;Eliane Ramos Rocha;(47) 98009-2543;;(47) 98009-2543;eliane.ramos517@exemplo.com.br;Joinville;SC;23;3641,00;136;889;P3_DIGITAL_FIRST
+000518;Sérgio Teixeira Machado;(11) 98009-2722;;(11) 98009-2722;sérgio.teixeira518@exemplo.com.br;São Paulo;SP;28;3874,00;149;346;P1_ALTA_PROPENSAO_VOZ
+000519;Marlene Cavalcanti Teixeira;(21) 98009-2901;;(21) 98009-2901;marlene.cavalcanti519@exemplo.com.br;Rio de Janeiro;RJ;31;4107,00;162;383;P2_HIBRIDO_DIGITAL_VOZ
+000520;Jorge Silva Santos;(31) 98009-3080;;(31) 98009-3080;;Belo Horizonte;MG;34;4340,00;175;420;P1_ALTA_PROPENSAO_VOZ
+000521;Rosa Souza Lima;(41) 98009-3259;;(41) 98009-3259;rosa.souza521@exemplo.com.br;Curitiba;PR;38;4573,00;23;457;P1_ALTA_PROPENSAO_VOZ
+000522;Ana Alves Lopes;(51) 98009-3438;;(51) 98009-3438;ana.alves522@exemplo.com.br;Porto Alegre;RS;42;4806,00;36;494;P2_HIBRIDO_DIGITAL_VOZ
+000523;Lucas Gomes Nascimento;(71) 98009-3617;;(71) 98009-3617;lucas.gomes523@exemplo.com.br;Salvador;BA;49;5039,00;49;531;P1_ALTA_PROPENSAO_VOZ
+000524;Carlos Martins Freitas;(81) 98009-3796;;(81) 98009-3796;;Recife;PE;54;5272,00;62;568;P1_ALTA_PROPENSAO_VOZ
+000525;Fernanda Lopes Moraes;(85) 98009-3975;;;fernanda.lopes525@exemplo.com.br;Fortaleza;CE;63;5505,00;75;605;P1_ALTA_PROPENSAO_VOZ
+000526;José Vieira Souza;(61) 98009-4154;(61) 3204-5260;(61) 98009-4154;josé.vieira526@exemplo.com.br;Brasília;DF;68;5738,00;88;642;P1_ALTA_PROPENSAO_VOZ
+000527;Patrícia Dias Costa;(62) 98009-4333;;(62) 98009-4333;patrícia.dias527@exemplo.com.br;Goiânia;GO;74;5971,00;101;679;P1_ALTA_PROPENSAO_VOZ
+000528;Antônio Moreira Fernandes;(91) 98009-4512;;(91) 98009-4512;;Belém;PA;21;6204,00;114;716;P1_ALTA_PROPENSAO_VOZ
+000529;Beatriz Machado Moreira;(92) 98009-4691;;(92) 98009-4691;beatriz.machado529@exemplo.com.br;Manaus;AM;23;6437,00;127;753;P3_DIGITAL_FIRST
+000530;Rodrigo Cardoso Ramos;(19) 98009-4870;;(19) 98009-4870;rodrigo.cardoso530@exemplo.com.br;Campinas;SP;28;6670,00;140;790;P1_ALTA_PROPENSAO_VOZ
+000531;Silvia Santana Pinto;(47) 98009-5049;;(47) 98009-5049;silvia.santana531@exemplo.com.br;Joinville;SC;31;6903,00;153;827;P2_HIBRIDO_DIGITAL_VOZ
+000532;Felipe Moraes Ferreira;(11) 98009-5228;;(11) 98009-5228;;São Paulo;SP;34;7136,00;166;864;P1_ALTA_PROPENSAO_VOZ
+000533;Helena Monteiro Martins;(21) 98009-5407;;(21) 98009-5407;helena.monteiro533@exemplo.com.br;Rio de Janeiro;RJ;38;7369,00;179;321;P1_ALTA_PROPENSAO_VOZ
+000534;Marcos Oliveira Barbosa;(31) 98009-5586;;(31) 98009-5586;marcos.oliveira534@exemplo.com.br;Belo Horizonte;MG;42;7602,00;27;358;P2_HIBRIDO_DIGITAL_VOZ
+000535;Camila Ferreira Marques;(41) 98009-5765;;(41) 98009-5765;camila.ferreira535@exemplo.com.br;Curitiba;PR;49;7835,00;40;395;P1_ALTA_PROPENSAO_VOZ
+000536;Gabriel Lima Santana;(51) 98009-5944;;(51) 98009-5944;;Porto Alegre;RS;54;268,00;53;432;P1_ALTA_PROPENSAO_VOZ
+000537;Juliana Ribeiro Silva;(71) 98009-6123;;;juliana.ribeiro537@exemplo.com.br;Salvador;BA;63;501,00;66;469;P1_ALTA_PROPENSAO_VOZ
+000538;Rafael Almeida Pereira;(81) 98009-6302;(81) 3204-5380;(81) 98009-6302;rafael.almeida538@exemplo.com.br;Recife;PE;68;734,00;79;506;P1_ALTA_PROPENSAO_VOZ
+000539;Mariana Fernandes Almeida;(85) 98009-6481;;(85) 98009-6481;mariana.fernandes539@exemplo.com.br;Fortaleza;CE;74;967,00;92;543;P1_ALTA_PROPENSAO_VOZ
+000540;Thiago Rocha Dias;(61) 98009-6660;;(61) 98009-6660;;Brasília;DF;21;1200,00;105;580;P1_ALTA_PROPENSAO_VOZ
+000541;Aline Andrade Mendes;(62) 98009-6839;;(62) 98009-6839;aline.andrade541@exemplo.com.br;Goiânia;GO;23;1433,00;118;617;P3_DIGITAL_FIRST
+000542;Matheus Marques Castro;(91) 98009-7018;;(91) 98009-7018;matheus.marques542@exemplo.com.br;Belém;PA;28;1666,00;131;654;P1_ALTA_PROPENSAO_VOZ
+000543;Renata Freitas Oliveira;(92) 98009-7197;;(92) 98009-7197;renata.freitas543@exemplo.com.br;Manaus;AM;31;1899,00;144;691;P2_HIBRIDO_DIGITAL_VOZ
+000544;Gustavo Gonçalves Gomes;(19) 98009-7376;;(19) 98009-7376;;Campinas;SP;34;2132,00;157;728;P1_ALTA_PROPENSAO_VOZ
+000545;Larissa Castro Soares;(47) 98009-7555;;(47) 98009-7555;larissa.castro545@exemplo.com.br;Joinville;SC;38;2365,00;170;765;P1_ALTA_PROPENSAO_VOZ
+000546;Eduardo Pinto Andrade;(11) 98009-7734;;(11) 98009-7734;eduardo.pinto546@exemplo.com.br;São Paulo;SP;42;2598,00;18;802;P2_HIBRIDO_DIGITAL_VOZ
+000547;Vanessa Santos Cardoso;(21) 98009-7913;;(21) 98009-7913;vanessa.santos547@exemplo.com.br;Rio de Janeiro;RJ;49;2831,00;31;839;P1_ALTA_PROPENSAO_VOZ
+000548;Vinícius Rodrigues Cavalcanti;(31) 98009-8092;;(31) 98009-8092;;Belo Horizonte;MG;54;3064,00;44;876;P1_ALTA_PROPENSAO_VOZ
+000549;Amanda Pereira Rodrigues;(41) 98009-8271;;;amanda.pereira549@exemplo.com.br;Curitiba;PR;63;3297,00;57;333;P1_ALTA_PROPENSAO_VOZ
+000550;Leonardo Costa Ribeiro;(51) 98009-8450;(51) 3204-5500;(51) 98009-8450;leonardo.costa550@exemplo.com.br;Porto Alegre;RS;68;3530,00;70;370;P1_ALTA_PROPENSAO_VOZ
+000551;Bruna Carvalho Vieira;(71) 98009-8629;;(71) 98009-8629;bruna.carvalho551@exemplo.com.br;Salvador;BA;74;3763,00;83;407;P1_ALTA_PROPENSAO_VOZ
+000552;Marcelo Soares Nunes;(81) 98009-8808;;(81) 98009-8808;;Recife;PE;21;3996,00;96;444;P1_ALTA_PROPENSAO_VOZ
+000553;Tatiane Barbosa Gonçalves;(85) 98009-8987;;(85) 98009-8987;tatiane.barbosa553@exemplo.com.br;Fortaleza;CE;23;4229,00;109;481;P3_DIGITAL_FIRST
+000554;Diego Nascimento Monteiro;(61) 98009-9166;;(61) 98009-9166;diego.nascimento554@exemplo.com.br;Brasília;DF;28;4462,00;122;518;P1_ALTA_PROPENSAO_VOZ
+000555;Priscila Nunes Alves;(62) 98009-9345;;(62) 98009-9345;priscila.nunes555@exemplo.com.br;Goiânia;GO;31;4695,00;135;555;P2_HIBRIDO_DIGITAL_VOZ
+000556;Danilo Mendes Carvalho;(91) 98009-9524;;(91) 98009-9524;;Belém;PA;34;4928,00;148;592;P1_ALTA_PROPENSAO_VOZ
+000557;Letícia Ramos Rocha;(92) 98009-9703;;(92) 98009-9703;letícia.ramos557@exemplo.com.br;Manaus;AM;38;5161,00;161;629;P1_ALTA_PROPENSAO_VOZ
+000558;Fábio Teixeira Machado;(19) 98009-9882;;(19) 98009-9882;fábio.teixeira558@exemplo.com.br;Campinas;SP;42;5394,00;174;666;P2_HIBRIDO_DIGITAL_VOZ
+000559;Sabrina Cavalcanti Teixeira;(47) 98010-0061;;(47) 98010-0061;sabrina.cavalcanti559@exemplo.com.br;Joinville;SC;49;5627,00;22;703;P1_ALTA_PROPENSAO_VOZ
+000560;Ricardo Silva Santos;(11) 98010-0240;;(11) 98010-0240;;São Paulo;SP;54;5860,00;35;740;P1_ALTA_PROPENSAO_VOZ
+000561;Carolina Souza Lima;(21) 98010-0419;;;carolina.souza561@exemplo.com.br;Rio de Janeiro;RJ;63;6093,00;48;777;P1_ALTA_PROPENSAO_VOZ
+000562;Sebastião Alves Lopes;(31) 98010-0598;(31) 3204-5620;(31) 98010-0598;sebastião.alves562@exemplo.com.br;Belo Horizonte;MG;68;6326,00;61;814;P1_ALTA_PROPENSAO_VOZ
+000563;Aparecida Gomes Nascimento;(41) 98010-0777;;(41) 98010-0777;aparecida.gomes563@exemplo.com.br;Curitiba;PR;74;6559,00;74;851;P1_ALTA_PROPENSAO_VOZ
+000564;Raimundo Martins Freitas;(51) 98010-0956;;(51) 98010-0956;;Porto Alegre;RS;21;6792,00;87;888;P1_ALTA_PROPENSAO_VOZ
+000565;Francisca Lopes Moraes;(71) 98010-1135;;(71) 98010-1135;francisca.lopes565@exemplo.com.br;Salvador;BA;23;7025,00;100;345;P3_DIGITAL_FIRST
+000566;Geraldo Vieira Souza;(81) 98010-1314;;(81) 98010-1314;geraldo.vieira566@exemplo.com.br;Recife;PE;28;7258,00;113;382;P1_ALTA_PROPENSAO_VOZ
+000567;Maria Dias Costa;(85) 98010-1493;;(85) 98010-1493;maria.dias567@exemplo.com.br;Fortaleza;CE;31;7491,00;126;419;P2_HIBRIDO_DIGITAL_VOZ
+000568;João Moreira Fernandes;(61) 98010-1672;;(61) 98010-1672;;Brasília;DF;34;7724,00;139;456;P1_ALTA_PROPENSAO_VOZ
+000569;Pedro Machado Moreira;(62) 98010-1851;;(62) 98010-1851;pedro.machado569@exemplo.com.br;Goiânia;GO;38;7957,00;152;493;P1_ALTA_PROPENSAO_VOZ
+000570;Luiz Cardoso Ramos;(91) 98010-2030;;(91) 98010-2030;luiz.cardoso570@exemplo.com.br;Belém;PA;42;390,00;165;530;P2_HIBRIDO_DIGITAL_VOZ
+000571;Vera Santana Pinto;(92) 98010-2209;;(92) 98010-2209;vera.santana571@exemplo.com.br;Manaus;AM;49;623,00;178;567;P1_ALTA_PROPENSAO_VOZ
+000572;Wagner Moraes Ferreira;(19) 98010-2388;;(19) 98010-2388;;Campinas;SP;54;856,00;26;604;P1_ALTA_PROPENSAO_VOZ
+000573;Sônia Monteiro Martins;(47) 98010-2567;;;sônia.monteiro573@exemplo.com.br;Joinville;SC;63;1089,00;39;641;P1_ALTA_PROPENSAO_VOZ
+000574;Cláudio Oliveira Barbosa;(11) 98010-2746;(11) 3204-5740;(11) 98010-2746;cláudio.oliveira574@exemplo.com.br;São Paulo;SP;68;1322,00;52;678;P1_ALTA_PROPENSAO_VOZ
+000575;Eliane Ferreira Marques;(21) 98010-2925;;(21) 98010-2925;eliane.ferreira575@exemplo.com.br;Rio de Janeiro;RJ;74;1555,00;65;715;P1_ALTA_PROPENSAO_VOZ
+000576;Sérgio Lima Santana;(31) 98010-3104;;(31) 98010-3104;;Belo Horizonte;MG;21;1788,00;78;752;P1_ALTA_PROPENSAO_VOZ
+000577;Marlene Ribeiro Silva;(41) 98010-3283;;(41) 98010-3283;marlene.ribeiro577@exemplo.com.br;Curitiba;PR;23;2021,00;91;789;P3_DIGITAL_FIRST
+000578;Jorge Almeida Pereira;(51) 98010-3462;;(51) 98010-3462;jorge.almeida578@exemplo.com.br;Porto Alegre;RS;28;2254,00;104;826;P1_ALTA_PROPENSAO_VOZ
+000579;Rosa Fernandes Almeida;(71) 98010-3641;;(71) 98010-3641;rosa.fernandes579@exemplo.com.br;Salvador;BA;31;2487,00;117;863;P2_HIBRIDO_DIGITAL_VOZ
+000580;Ana Rocha Dias;(81) 98010-3820;;(81) 98010-3820;;Recife;PE;34;2720,00;130;320;P1_ALTA_PROPENSAO_VOZ
+000581;Lucas Andrade Mendes;(85) 98010-3999;;(85) 98010-3999;lucas.andrade581@exemplo.com.br;Fortaleza;CE;38;2953,00;143;357;P1_ALTA_PROPENSAO_VOZ
+000582;Carlos Marques Castro;(61) 98010-4178;;(61) 98010-4178;carlos.marques582@exemplo.com.br;Brasília;DF;42;3186,00;156;394;P2_HIBRIDO_DIGITAL_VOZ
+000583;Fernanda Freitas Oliveira;(62) 98010-4357;;(62) 98010-4357;fernanda.freitas583@exemplo.com.br;Goiânia;GO;49;3419,00;169;431;P1_ALTA_PROPENSAO_VOZ
+000584;José Gonçalves Gomes;(91) 98010-4536;;(91) 98010-4536;;Belém;PA;54;3652,00;17;468;P1_ALTA_PROPENSAO_VOZ
+000585;Patrícia Castro Soares;(92) 98010-4715;;;patrícia.castro585@exemplo.com.br;Manaus;AM;63;3885,00;30;505;P1_ALTA_PROPENSAO_VOZ
+000586;Antônio Pinto Andrade;(19) 98010-4894;(19) 3204-5860;(19) 98010-4894;antônio.pinto586@exemplo.com.br;Campinas;SP;68;4118,00;43;542;P1_ALTA_PROPENSAO_VOZ
+000587;Beatriz Santos Cardoso;(47) 98010-5073;;(47) 98010-5073;beatriz.santos587@exemplo.com.br;Joinville;SC;74;4351,00;56;579;P1_ALTA_PROPENSAO_VOZ
+000588;Rodrigo Rodrigues Cavalcanti;(11) 98010-5252;;(11) 98010-5252;;São Paulo;SP;21;4584,00;69;616;P1_ALTA_PROPENSAO_VOZ
+000589;Silvia Pereira Rodrigues;(21) 98010-5431;;(21) 98010-5431;silvia.pereira589@exemplo.com.br;Rio de Janeiro;RJ;23;4817,00;82;653;P3_DIGITAL_FIRST
+000590;Felipe Costa Ribeiro;(31) 98010-5610;;(31) 98010-5610;felipe.costa590@exemplo.com.br;Belo Horizonte;MG;28;5050,00;95;690;P1_ALTA_PROPENSAO_VOZ
+000591;Helena Carvalho Vieira;(41) 98010-5789;;(41) 98010-5789;helena.carvalho591@exemplo.com.br;Curitiba;PR;31;5283,00;108;727;P2_HIBRIDO_DIGITAL_VOZ
+000592;Marcos Soares Nunes;(51) 98010-5968;;(51) 98010-5968;;Porto Alegre;RS;34;5516,00;121;764;P1_ALTA_PROPENSAO_VOZ
+000593;Camila Barbosa Gonçalves;(71) 98010-6147;;(71) 98010-6147;camila.barbosa593@exemplo.com.br;Salvador;BA;38;5749,00;134;801;P1_ALTA_PROPENSAO_VOZ
+000594;Gabriel Nascimento Monteiro;(81) 98010-6326;;(81) 98010-6326;gabriel.nascimento594@exemplo.com.br;Recife;PE;42;5982,00;147;838;P2_HIBRIDO_DIGITAL_VOZ
+000595;Juliana Nunes Alves;(85) 98010-6505;;(85) 98010-6505;juliana.nunes595@exemplo.com.br;Fortaleza;CE;49;6215,00;160;875;P1_ALTA_PROPENSAO_VOZ
+000596;Rafael Mendes Carvalho;(61) 98010-6684;;(61) 98010-6684;;Brasília;DF;54;6448,00;173;332;P1_ALTA_PROPENSAO_VOZ
+000597;Mariana Ramos Rocha;(62) 98010-6863;;;mariana.ramos597@exemplo.com.br;Goiânia;GO;63;6681,00;21;369;P1_ALTA_PROPENSAO_VOZ
+000598;Thiago Teixeira Machado;(91) 98010-7042;(91) 3204-5980;(91) 98010-7042;thiago.teixeira598@exemplo.com.br;Belém;PA;68;6914,00;34;406;P1_ALTA_PROPENSAO_VOZ
+000599;Aline Cavalcanti Teixeira;(92) 98010-7221;;(92) 98010-7221;aline.cavalcanti599@exemplo.com.br;Manaus;AM;74;7147,00;47;443;P1_ALTA_PROPENSAO_VOZ
+000600;Matheus Silva Santos;(19) 98010-7400;;(19) 98010-7400;;Campinas;SP;21;7380,00;60;480;P1_ALTA_PROPENSAO_VOZ
+000601;Renata Souza Lima;(47) 98010-7579;;(47) 98010-7579;renata.souza601@exemplo.com.br;Joinville;SC;23;7613,00;73;517;P3_DIGITAL_FIRST
+000602;Gustavo Alves Lopes;(11) 98010-7758;;(11) 98010-7758;gustavo.alves602@exemplo.com.br;São Paulo;SP;28;7846,00;86;554;P1_ALTA_PROPENSAO_VOZ
+000603;Larissa Gomes Nascimento;(21) 98010-7937;;(21) 98010-7937;larissa.gomes603@exemplo.com.br;Rio de Janeiro;RJ;31;279,00;99;591;P2_HIBRIDO_DIGITAL_VOZ
+000604;Eduardo Martins Freitas;(31) 98010-8116;;(31) 98010-8116;;Belo Horizonte;MG;34;512,00;112;628;P1_ALTA_PROPENSAO_VOZ
+000605;Vanessa Lopes Moraes;(41) 98010-8295;;(41) 98010-8295;vanessa.lopes605@exemplo.com.br;Curitiba;PR;38;745,00;125;665;P1_ALTA_PROPENSAO_VOZ
+000606;Vinícius Vieira Souza;(51) 98010-8474;;(51) 98010-8474;vinícius.vieira606@exemplo.com.br;Porto Alegre;RS;42;978,00;138;702;P2_HIBRIDO_DIGITAL_VOZ
+000607;Amanda Dias Costa;(71) 98010-8653;;(71) 98010-8653;amanda.dias607@exemplo.com.br;Salvador;BA;49;1211,00;151;739;P1_ALTA_PROPENSAO_VOZ
+000608;Leonardo Moreira Fernandes;(81) 98010-8832;;(81) 98010-8832;;Recife;PE;54;1444,00;164;776;P1_ALTA_PROPENSAO_VOZ
+000609;Bruna Machado Moreira;(85) 98010-9011;;;bruna.machado609@exemplo.com.br;Fortaleza;CE;63;1677,00;177;813;P1_ALTA_PROPENSAO_VOZ
+000610;Marcelo Cardoso Ramos;(61) 98010-9190;(61) 3205-6100;(61) 98010-9190;marcelo.cardoso610@exemplo.com.br;Brasília;DF;68;1910,00;25;850;P1_ALTA_PROPENSAO_VOZ
+000611;Tatiane Santana Pinto;(62) 98010-9369;;(62) 98010-9369;tatiane.santana611@exemplo.com.br;Goiânia;GO;74;2143,00;38;887;P1_ALTA_PROPENSAO_VOZ
+000612;Diego Moraes Ferreira;(91) 98010-9548;;(91) 98010-9548;;Belém;PA;21;2376,00;51;344;P1_ALTA_PROPENSAO_VOZ
+000613;Priscila Monteiro Martins;(92) 98010-9727;;(92) 98010-9727;priscila.monteiro613@exemplo.com.br;Manaus;AM;23;2609,00;64;381;P3_DIGITAL_FIRST
+000614;Danilo Oliveira Barbosa;(19) 98010-9906;;(19) 98010-9906;danilo.oliveira614@exemplo.com.br;Campinas;SP;28;2842,00;77;418;P1_ALTA_PROPENSAO_VOZ
+000615;Letícia Ferreira Marques;(47) 98011-0085;;(47) 98011-0085;letícia.ferreira615@exemplo.com.br;Joinville;SC;31;3075,00;90;455;P2_HIBRIDO_DIGITAL_VOZ
+000616;Fábio Lima Santana;(11) 98011-0264;;(11) 98011-0264;;São Paulo;SP;34;3308,00;103;492;P1_ALTA_PROPENSAO_VOZ
+000617;Sabrina Ribeiro Silva;(21) 98011-0443;;(21) 98011-0443;sabrina.ribeiro617@exemplo.com.br;Rio de Janeiro;RJ;38;3541,00;116;529;P1_ALTA_PROPENSAO_VOZ
+000618;Ricardo Almeida Pereira;(31) 98011-0622;;(31) 98011-0622;ricardo.almeida618@exemplo.com.br;Belo Horizonte;MG;42;3774,00;129;566;P2_HIBRIDO_DIGITAL_VOZ
+000619;Carolina Fernandes Almeida;(41) 98011-0801;;(41) 98011-0801;carolina.fernandes619@exemplo.com.br;Curitiba;PR;49;4007,00;142;603;P1_ALTA_PROPENSAO_VOZ
+000620;Sebastião Rocha Dias;(51) 98011-0980;;(51) 98011-0980;;Porto Alegre;RS;54;4240,00;155;640;P1_ALTA_PROPENSAO_VOZ
+000621;Aparecida Andrade Mendes;(71) 98011-1159;;;aparecida.andrade621@exemplo.com.br;Salvador;BA;63;4473,00;168;677;P1_ALTA_PROPENSAO_VOZ
+000622;Raimundo Marques Castro;(81) 98011-1338;(81) 3205-6220;(81) 98011-1338;raimundo.marques622@exemplo.com.br;Recife;PE;68;4706,00;16;714;P1_ALTA_PROPENSAO_VOZ
+000623;Francisca Freitas Oliveira;(85) 98011-1517;;(85) 98011-1517;francisca.freitas623@exemplo.com.br;Fortaleza;CE;74;4939,00;29;751;P1_ALTA_PROPENSAO_VOZ
+000624;Geraldo Gonçalves Gomes;(61) 98011-1696;;(61) 98011-1696;;Brasília;DF;21;5172,00;42;788;P1_ALTA_PROPENSAO_VOZ
+000625;Maria Castro Soares;(62) 98011-1875;;(62) 98011-1875;maria.castro625@exemplo.com.br;Goiânia;GO;23;5405,00;55;825;P3_DIGITAL_FIRST
+000626;João Pinto Andrade;(91) 98011-2054;;(91) 98011-2054;joão.pinto626@exemplo.com.br;Belém;PA;28;5638,00;68;862;P1_ALTA_PROPENSAO_VOZ
+000627;Pedro Santos Cardoso;(92) 98011-2233;;(92) 98011-2233;pedro.santos627@exemplo.com.br;Manaus;AM;31;5871,00;81;899;P2_HIBRIDO_DIGITAL_VOZ
+000628;Luiz Rodrigues Cavalcanti;(19) 98011-2412;;(19) 98011-2412;;Campinas;SP;34;6104,00;94;356;P1_ALTA_PROPENSAO_VOZ
+000629;Vera Pereira Rodrigues;(47) 98011-2591;;(47) 98011-2591;vera.pereira629@exemplo.com.br;Joinville;SC;38;6337,00;107;393;P1_ALTA_PROPENSAO_VOZ
+000630;Wagner Costa Ribeiro;(11) 98011-2770;;(11) 98011-2770;wagner.costa630@exemplo.com.br;São Paulo;SP;42;6570,00;120;430;P2_HIBRIDO_DIGITAL_VOZ
+000631;Sônia Carvalho Vieira;(21) 98011-2949;;(21) 98011-2949;sônia.carvalho631@exemplo.com.br;Rio de Janeiro;RJ;49;6803,00;133;467;P1_ALTA_PROPENSAO_VOZ
+000632;Cláudio Soares Nunes;(31) 98011-3128;;(31) 98011-3128;;Belo Horizonte;MG;54;7036,00;146;504;P1_ALTA_PROPENSAO_VOZ
+000633;Eliane Barbosa Gonçalves;(41) 98011-3307;;;eliane.barbosa633@exemplo.com.br;Curitiba;PR;63;7269,00;159;541;P1_ALTA_PROPENSAO_VOZ
+000634;Sérgio Nascimento Monteiro;(51) 98011-3486;(51) 3205-6340;(51) 98011-3486;sérgio.nascimento634@exemplo.com.br;Porto Alegre;RS;68;7502,00;172;578;P1_ALTA_PROPENSAO_VOZ
+000635;Marlene Nunes Alves;(71) 98011-3665;;(71) 98011-3665;marlene.nunes635@exemplo.com.br;Salvador;BA;74;7735,00;20;615;P1_ALTA_PROPENSAO_VOZ
+000636;Jorge Mendes Carvalho;(81) 98011-3844;;(81) 98011-3844;;Recife;PE;21;7968,00;33;652;P1_ALTA_PROPENSAO_VOZ
+000637;Rosa Ramos Rocha;(85) 98011-4023;;(85) 98011-4023;rosa.ramos637@exemplo.com.br;Fortaleza;CE;23;401,00;46;689;P3_DIGITAL_FIRST
+000638;Ana Teixeira Machado;(61) 98011-4202;;(61) 98011-4202;ana.teixeira638@exemplo.com.br;Brasília;DF;28;634,00;59;726;P1_ALTA_PROPENSAO_VOZ
+000639;Lucas Cavalcanti Teixeira;(62) 98011-4381;;(62) 98011-4381;lucas.cavalcanti639@exemplo.com.br;Goiânia;GO;31;867,00;72;763;P2_HIBRIDO_DIGITAL_VOZ
+000640;Carlos Silva Santos;(91) 98011-4560;;(91) 98011-4560;;Belém;PA;34;1100,00;85;800;P1_ALTA_PROPENSAO_VOZ
+000641;Fernanda Souza Lima;(92) 98011-4739;;(92) 98011-4739;fernanda.souza641@exemplo.com.br;Manaus;AM;38;1333,00;98;837;P1_ALTA_PROPENSAO_VOZ
+000642;José Alves Lopes;(19) 98011-4918;;(19) 98011-4918;josé.alves642@exemplo.com.br;Campinas;SP;42;1566,00;111;874;P2_HIBRIDO_DIGITAL_VOZ
+000643;Patrícia Gomes Nascimento;(47) 98011-5097;;(47) 98011-5097;patrícia.gomes643@exemplo.com.br;Joinville;SC;49;1799,00;124;331;P1_ALTA_PROPENSAO_VOZ
+000644;Antônio Martins Freitas;(11) 98011-5276;;(11) 98011-5276;;São Paulo;SP;54;2032,00;137;368;P1_ALTA_PROPENSAO_VOZ
+000645;Beatriz Lopes Moraes;(21) 98011-5455;;;beatriz.lopes645@exemplo.com.br;Rio de Janeiro;RJ;63;2265,00;150;405;P1_ALTA_PROPENSAO_VOZ
+000646;Rodrigo Vieira Souza;(31) 98011-5634;(31) 3205-6460;(31) 98011-5634;rodrigo.vieira646@exemplo.com.br;Belo Horizonte;MG;68;2498,00;163;442;P1_ALTA_PROPENSAO_VOZ
+000647;Silvia Dias Costa;(41) 98011-5813;;(41) 98011-5813;silvia.dias647@exemplo.com.br;Curitiba;PR;74;2731,00;176;479;P1_ALTA_PROPENSAO_VOZ
+000648;Felipe Moreira Fernandes;(51) 98011-5992;;(51) 98011-5992;;Porto Alegre;RS;21;2964,00;24;516;P1_ALTA_PROPENSAO_VOZ
+000649;Helena Machado Moreira;(71) 98011-6171;;(71) 98011-6171;helena.machado649@exemplo.com.br;Salvador;BA;23;3197,00;37;553;P3_DIGITAL_FIRST
+000650;Marcos Cardoso Ramos;(81) 98011-6350;;(81) 98011-6350;marcos.cardoso650@exemplo.com.br;Recife;PE;28;3430,00;50;590;P1_ALTA_PROPENSAO_VOZ
+000651;Camila Santana Pinto;(85) 98011-6529;;(85) 98011-6529;camila.santana651@exemplo.com.br;Fortaleza;CE;31;3663,00;63;627;P2_HIBRIDO_DIGITAL_VOZ
+000652;Gabriel Moraes Ferreira;(61) 98011-6708;;(61) 98011-6708;;Brasília;DF;34;3896,00;76;664;P1_ALTA_PROPENSAO_VOZ
+000653;Juliana Monteiro Martins;(62) 98011-6887;;(62) 98011-6887;juliana.monteiro653@exemplo.com.br;Goiânia;GO;38;4129,00;89;701;P1_ALTA_PROPENSAO_VOZ
+000654;Rafael Oliveira Barbosa;(91) 98011-7066;;(91) 98011-7066;rafael.oliveira654@exemplo.com.br;Belém;PA;42;4362,00;102;738;P2_HIBRIDO_DIGITAL_VOZ
+000655;Mariana Ferreira Marques;(92) 98011-7245;;(92) 98011-7245;mariana.ferreira655@exemplo.com.br;Manaus;AM;49;4595,00;115;775;P1_ALTA_PROPENSAO_VOZ
+000656;Thiago Lima Santana;(19) 98011-7424;;(19) 98011-7424;;Campinas;SP;54;4828,00;128;812;P1_ALTA_PROPENSAO_VOZ
+000657;Aline Ribeiro Silva;(47) 98011-7603;;;aline.ribeiro657@exemplo.com.br;Joinville;SC;63;5061,00;141;849;P1_ALTA_PROPENSAO_VOZ
+000658;Matheus Almeida Pereira;(11) 98011-7782;(11) 3205-6580;(11) 98011-7782;matheus.almeida658@exemplo.com.br;São Paulo;SP;68;5294,00;154;886;P1_ALTA_PROPENSAO_VOZ
+000659;Renata Fernandes Almeida;(21) 98011-7961;;(21) 98011-7961;renata.fernandes659@exemplo.com.br;Rio de Janeiro;RJ;74;5527,00;167;343;P1_ALTA_PROPENSAO_VOZ
+000660;Gustavo Rocha Dias;(31) 98011-8140;;(31) 98011-8140;;Belo Horizonte;MG;21;5760,00;15;380;P1_ALTA_PROPENSAO_VOZ
+000661;Larissa Andrade Mendes;(41) 98011-8319;;(41) 98011-8319;larissa.andrade661@exemplo.com.br;Curitiba;PR;23;5993,00;28;417;P3_DIGITAL_FIRST
+000662;Eduardo Marques Castro;(51) 98011-8498;;(51) 98011-8498;eduardo.marques662@exemplo.com.br;Porto Alegre;RS;28;6226,00;41;454;P1_ALTA_PROPENSAO_VOZ
+000663;Vanessa Freitas Oliveira;(71) 98011-8677;;(71) 98011-8677;vanessa.freitas663@exemplo.com.br;Salvador;BA;31;6459,00;54;491;P2_HIBRIDO_DIGITAL_VOZ
+000664;Vinícius Gonçalves Gomes;(81) 98011-8856;;(81) 98011-8856;;Recife;PE;34;6692,00;67;528;P1_ALTA_PROPENSAO_VOZ
+000665;Amanda Castro Soares;(85) 98011-9035;;(85) 98011-9035;amanda.castro665@exemplo.com.br;Fortaleza;CE;38;6925,00;80;565;P1_ALTA_PROPENSAO_VOZ
+000666;Leonardo Pinto Andrade;(61) 98011-9214;;(61) 98011-9214;leonardo.pinto666@exemplo.com.br;Brasília;DF;42;7158,00;93;602;P2_HIBRIDO_DIGITAL_VOZ
+000667;Bruna Santos Cardoso;(62) 98011-9393;;(62) 98011-9393;bruna.santos667@exemplo.com.br;Goiânia;GO;49;7391,00;106;639;P1_ALTA_PROPENSAO_VOZ
+000668;Marcelo Rodrigues Cavalcanti;(91) 98011-9572;;(91) 98011-9572;;Belém;PA;54;7624,00;119;676;P1_ALTA_PROPENSAO_VOZ
+000669;Tatiane Pereira Rodrigues;(92) 98011-9751;;;tatiane.pereira669@exemplo.com.br;Manaus;AM;63;7857,00;132;713;P1_ALTA_PROPENSAO_VOZ
+000670;Diego Costa Ribeiro;(19) 98011-9930;(19) 3205-6700;(19) 98011-9930;diego.costa670@exemplo.com.br;Campinas;SP;68;290,00;145;750;P1_ALTA_PROPENSAO_VOZ
+000671;Priscila Carvalho Vieira;(47) 98012-0109;;(47) 98012-0109;priscila.carvalho671@exemplo.com.br;Joinville;SC;74;523,00;158;787;P1_ALTA_PROPENSAO_VOZ
+000672;Danilo Soares Nunes;(11) 98012-0288;;(11) 98012-0288;;São Paulo;SP;21;756,00;171;824;P1_ALTA_PROPENSAO_VOZ
+000673;Letícia Barbosa Gonçalves;(21) 98012-0467;;(21) 98012-0467;letícia.barbosa673@exemplo.com.br;Rio de Janeiro;RJ;23;989,00;19;861;P3_DIGITAL_FIRST
+000674;Fábio Nascimento Monteiro;(31) 98012-0646;;(31) 98012-0646;fábio.nascimento674@exemplo.com.br;Belo Horizonte;MG;28;1222,00;32;898;P1_ALTA_PROPENSAO_VOZ
+000675;Sabrina Nunes Alves;(41) 98012-0825;;(41) 98012-0825;sabrina.nunes675@exemplo.com.br;Curitiba;PR;31;1455,00;45;355;P2_HIBRIDO_DIGITAL_VOZ
+000676;Ricardo Mendes Carvalho;(51) 98012-1004;;(51) 98012-1004;;Porto Alegre;RS;34;1688,00;58;392;P1_ALTA_PROPENSAO_VOZ
+000677;Carolina Ramos Rocha;(71) 98012-1183;;(71) 98012-1183;carolina.ramos677@exemplo.com.br;Salvador;BA;38;1921,00;71;429;P1_ALTA_PROPENSAO_VOZ
+000678;Sebastião Teixeira Machado;(81) 98012-1362;;(81) 98012-1362;sebastião.teixeira678@exemplo.com.br;Recife;PE;42;2154,00;84;466;P2_HIBRIDO_DIGITAL_VOZ
+000679;Aparecida Cavalcanti Teixeira;(85) 98012-1541;;(85) 98012-1541;aparecida.cavalcanti679@exemplo.com.br;Fortaleza;CE;49;2387,00;97;503;P1_ALTA_PROPENSAO_VOZ
+000680;Raimundo Silva Santos;(61) 98012-1720;;(61) 98012-1720;;Brasília;DF;54;2620,00;110;540;P1_ALTA_PROPENSAO_VOZ
+000681;Francisca Souza Lima;(62) 98012-1899;;;francisca.souza681@exemplo.com.br;Goiânia;GO;63;2853,00;123;577;P1_ALTA_PROPENSAO_VOZ
+000682;Geraldo Alves Lopes;(91) 98012-2078;(91) 3205-6820;(91) 98012-2078;geraldo.alves682@exemplo.com.br;Belém;PA;68;3086,00;136;614;P1_ALTA_PROPENSAO_VOZ
+000683;Maria Gomes Nascimento;(92) 98012-2257;;(92) 98012-2257;maria.gomes683@exemplo.com.br;Manaus;AM;74;3319,00;149;651;P1_ALTA_PROPENSAO_VOZ
+000684;João Martins Freitas;(19) 98012-2436;;(19) 98012-2436;;Campinas;SP;21;3552,00;162;688;P1_ALTA_PROPENSAO_VOZ
+000685;Pedro Lopes Moraes;(47) 98012-2615;;(47) 98012-2615;pedro.lopes685@exemplo.com.br;Joinville;SC;23;3785,00;175;725;P3_DIGITAL_FIRST
+000686;Luiz Vieira Souza;(11) 98012-2794;;(11) 98012-2794;luiz.vieira686@exemplo.com.br;São Paulo;SP;28;4018,00;23;762;P1_ALTA_PROPENSAO_VOZ
+000687;Vera Dias Costa;(21) 98012-2973;;(21) 98012-2973;vera.dias687@exemplo.com.br;Rio de Janeiro;RJ;31;4251,00;36;799;P2_HIBRIDO_DIGITAL_VOZ
+000688;Wagner Moreira Fernandes;(31) 98012-3152;;(31) 98012-3152;;Belo Horizonte;MG;34;4484,00;49;836;P1_ALTA_PROPENSAO_VOZ
+000689;Sônia Machado Moreira;(41) 98012-3331;;(41) 98012-3331;sônia.machado689@exemplo.com.br;Curitiba;PR;38;4717,00;62;873;P1_ALTA_PROPENSAO_VOZ
+000690;Cláudio Cardoso Ramos;(51) 98012-3510;;(51) 98012-3510;cláudio.cardoso690@exemplo.com.br;Porto Alegre;RS;42;4950,00;75;330;P2_HIBRIDO_DIGITAL_VOZ
+000691;Eliane Santana Pinto;(71) 98012-3689;;(71) 98012-3689;eliane.santana691@exemplo.com.br;Salvador;BA;49;5183,00;88;367;P1_ALTA_PROPENSAO_VOZ
+000692;Sérgio Moraes Ferreira;(81) 98012-3868;;(81) 98012-3868;;Recife;PE;54;5416,00;101;404;P1_ALTA_PROPENSAO_VOZ
+000693;Marlene Monteiro Martins;(85) 98012-4047;;;marlene.monteiro693@exemplo.com.br;Fortaleza;CE;63;5649,00;114;441;P1_ALTA_PROPENSAO_VOZ
+000694;Jorge Oliveira Barbosa;(61) 98012-4226;(61) 3205-6940;(61) 98012-4226;jorge.oliveira694@exemplo.com.br;Brasília;DF;68;5882,00;127;478;P1_ALTA_PROPENSAO_VOZ
+000695;Rosa Ferreira Marques;(62) 98012-4405;;(62) 98012-4405;rosa.ferreira695@exemplo.com.br;Goiânia;GO;74;6115,00;140;515;P1_ALTA_PROPENSAO_VOZ
+000696;Ana Lima Santana;(91) 98012-4584;;(91) 98012-4584;;Belém;PA;21;6348,00;153;552;P1_ALTA_PROPENSAO_VOZ
+000697;Lucas Ribeiro Silva;(92) 98012-4763;;(92) 98012-4763;lucas.ribeiro697@exemplo.com.br;Manaus;AM;23;6581,00;166;589;P3_DIGITAL_FIRST
+000698;Carlos Almeida Pereira;(19) 98012-4942;;(19) 98012-4942;carlos.almeida698@exemplo.com.br;Campinas;SP;28;6814,00;179;626;P1_ALTA_PROPENSAO_VOZ
+000699;Fernanda Fernandes Almeida;(47) 98012-5121;;(47) 98012-5121;fernanda.fernandes699@exemplo.com.br;Joinville;SC;31;7047,00;27;663;P2_HIBRIDO_DIGITAL_VOZ
+000700;José Rocha Dias;(11) 98012-5300;;(11) 98012-5300;;São Paulo;SP;34;7280,00;40;700;P1_ALTA_PROPENSAO_VOZ
+000701;Patrícia Andrade Mendes;(21) 98012-5479;;(21) 98012-5479;patrícia.andrade701@exemplo.com.br;Rio de Janeiro;RJ;38;7513,00;53;737;P1_ALTA_PROPENSAO_VOZ
+000702;Antônio Marques Castro;(31) 98012-5658;;(31) 98012-5658;antônio.marques702@exemplo.com.br;Belo Horizonte;MG;42;7746,00;66;774;P2_HIBRIDO_DIGITAL_VOZ
+000703;Beatriz Freitas Oliveira;(41) 98012-5837;;(41) 98012-5837;beatriz.freitas703@exemplo.com.br;Curitiba;PR;49;7979,00;79;811;P1_ALTA_PROPENSAO_VOZ
+000704;Rodrigo Gonçalves Gomes;(51) 98012-6016;;(51) 98012-6016;;Porto Alegre;RS;54;412,00;92;848;P1_ALTA_PROPENSAO_VOZ
+000705;Silvia Castro Soares;(71) 98012-6195;;;silvia.castro705@exemplo.com.br;Salvador;BA;63;645,00;105;885;P1_ALTA_PROPENSAO_VOZ
+000706;Felipe Pinto Andrade;(81) 98012-6374;(81) 3205-7060;(81) 98012-6374;felipe.pinto706@exemplo.com.br;Recife;PE;68;878,00;118;342;P1_ALTA_PROPENSAO_VOZ
+000707;Helena Santos Cardoso;(85) 98012-6553;;(85) 98012-6553;helena.santos707@exemplo.com.br;Fortaleza;CE;74;1111,00;131;379;P1_ALTA_PROPENSAO_VOZ
+000708;Marcos Rodrigues Cavalcanti;(61) 98012-6732;;(61) 98012-6732;;Brasília;DF;21;1344,00;144;416;P1_ALTA_PROPENSAO_VOZ
+000709;Camila Pereira Rodrigues;(62) 98012-6911;;(62) 98012-6911;camila.pereira709@exemplo.com.br;Goiânia;GO;23;1577,00;157;453;P3_DIGITAL_FIRST
+000710;Gabriel Costa Ribeiro;(91) 98012-7090;;(91) 98012-7090;gabriel.costa710@exemplo.com.br;Belém;PA;28;1810,00;170;490;P1_ALTA_PROPENSAO_VOZ
+000711;Juliana Carvalho Vieira;(92) 98012-7269;;(92) 98012-7269;juliana.carvalho711@exemplo.com.br;Manaus;AM;31;2043,00;18;527;P2_HIBRIDO_DIGITAL_VOZ
+000712;Rafael Soares Nunes;(19) 98012-7448;;(19) 98012-7448;;Campinas;SP;34;2276,00;31;564;P1_ALTA_PROPENSAO_VOZ
+000713;Mariana Barbosa Gonçalves;(47) 98012-7627;;(47) 98012-7627;mariana.barbosa713@exemplo.com.br;Joinville;SC;38;2509,00;44;601;P1_ALTA_PROPENSAO_VOZ
+000714;Thiago Nascimento Monteiro;(11) 98012-7806;;(11) 98012-7806;thiago.nascimento714@exemplo.com.br;São Paulo;SP;42;2742,00;57;638;P2_HIBRIDO_DIGITAL_VOZ
+000715;Aline Nunes Alves;(21) 98012-7985;;(21) 98012-7985;aline.nunes715@exemplo.com.br;Rio de Janeiro;RJ;49;2975,00;70;675;P1_ALTA_PROPENSAO_VOZ
+000716;Matheus Mendes Carvalho;(31) 98012-8164;;(31) 98012-8164;;Belo Horizonte;MG;54;3208,00;83;712;P1_ALTA_PROPENSAO_VOZ
+000717;Renata Ramos Rocha;(41) 98012-8343;;;renata.ramos717@exemplo.com.br;Curitiba;PR;63;3441,00;96;749;P1_ALTA_PROPENSAO_VOZ
+000718;Gustavo Teixeira Machado;(51) 98012-8522;(51) 3205-7180;(51) 98012-8522;gustavo.teixeira718@exemplo.com.br;Porto Alegre;RS;68;3674,00;109;786;P1_ALTA_PROPENSAO_VOZ
+000719;Larissa Cavalcanti Teixeira;(71) 98012-8701;;(71) 98012-8701;larissa.cavalcanti719@exemplo.com.br;Salvador;BA;74;3907,00;122;823;P1_ALTA_PROPENSAO_VOZ
+000720;Eduardo Silva Santos;(81) 98012-8880;;(81) 98012-8880;;Recife;PE;21;4140,00;135;860;P1_ALTA_PROPENSAO_VOZ
+000721;Vanessa Souza Lima;(85) 98012-9059;;(85) 98012-9059;vanessa.souza721@exemplo.com.br;Fortaleza;CE;23;4373,00;148;897;P3_DIGITAL_FIRST
+000722;Vinícius Alves Lopes;(61) 98012-9238;;(61) 98012-9238;vinícius.alves722@exemplo.com.br;Brasília;DF;28;4606,00;161;354;P1_ALTA_PROPENSAO_VOZ
+000723;Amanda Gomes Nascimento;(62) 98012-9417;;(62) 98012-9417;amanda.gomes723@exemplo.com.br;Goiânia;GO;31;4839,00;174;391;P2_HIBRIDO_DIGITAL_VOZ
+000724;Leonardo Martins Freitas;(91) 98012-9596;;(91) 98012-9596;;Belém;PA;34;5072,00;22;428;P1_ALTA_PROPENSAO_VOZ
+000725;Bruna Lopes Moraes;(92) 98012-9775;;(92) 98012-9775;bruna.lopes725@exemplo.com.br;Manaus;AM;38;5305,00;35;465;P1_ALTA_PROPENSAO_VOZ
+000726;Marcelo Vieira Souza;(19) 98012-9954;;(19) 98012-9954;marcelo.vieira726@exemplo.com.br;Campinas;SP;42;5538,00;48;502;P2_HIBRIDO_DIGITAL_VOZ
+000727;Tatiane Dias Costa;(47) 98013-0133;;(47) 98013-0133;tatiane.dias727@exemplo.com.br;Joinville;SC;49;5771,00;61;539;P1_ALTA_PROPENSAO_VOZ
+000728;Diego Moreira Fernandes;(11) 98013-0312;;(11) 98013-0312;;São Paulo;SP;54;6004,00;74;576;P1_ALTA_PROPENSAO_VOZ
+000729;Priscila Machado Moreira;(21) 98013-0491;;;priscila.machado729@exemplo.com.br;Rio de Janeiro;RJ;63;6237,00;87;613;P1_ALTA_PROPENSAO_VOZ
+000730;Danilo Cardoso Ramos;(31) 98013-0670;(31) 3206-7300;(31) 98013-0670;danilo.cardoso730@exemplo.com.br;Belo Horizonte;MG;68;6470,00;100;650;P1_ALTA_PROPENSAO_VOZ
+000731;Letícia Santana Pinto;(41) 98013-0849;;(41) 98013-0849;letícia.santana731@exemplo.com.br;Curitiba;PR;74;6703,00;113;687;P1_ALTA_PROPENSAO_VOZ
+000732;Fábio Moraes Ferreira;(51) 98013-1028;;(51) 98013-1028;;Porto Alegre;RS;21;6936,00;126;724;P1_ALTA_PROPENSAO_VOZ
+000733;Sabrina Monteiro Martins;(71) 98013-1207;;(71) 98013-1207;sabrina.monteiro733@exemplo.com.br;Salvador;BA;23;7169,00;139;761;P3_DIGITAL_FIRST
+000734;Ricardo Oliveira Barbosa;(81) 98013-1386;;(81) 98013-1386;ricardo.oliveira734@exemplo.com.br;Recife;PE;28;7402,00;152;798;P1_ALTA_PROPENSAO_VOZ
+000735;Carolina Ferreira Marques;(85) 98013-1565;;(85) 98013-1565;carolina.ferreira735@exemplo.com.br;Fortaleza;CE;31;7635,00;165;835;P2_HIBRIDO_DIGITAL_VOZ
+000736;Sebastião Lima Santana;(61) 98013-1744;;(61) 98013-1744;;Brasília;DF;34;7868,00;178;872;P1_ALTA_PROPENSAO_VOZ
+000737;Aparecida Ribeiro Silva;(62) 98013-1923;;(62) 98013-1923;aparecida.ribeiro737@exemplo.com.br;Goiânia;GO;38;301,00;26;329;P1_ALTA_PROPENSAO_VOZ
+000738;Raimundo Almeida Pereira;(91) 98013-2102;;(91) 98013-2102;raimundo.almeida738@exemplo.com.br;Belém;PA;42;534,00;39;366;P2_HIBRIDO_DIGITAL_VOZ
+000739;Francisca Fernandes Almeida;(92) 98013-2281;;(92) 98013-2281;francisca.fernandes739@exemplo.com.br;Manaus;AM;49;767,00;52;403;P1_ALTA_PROPENSAO_VOZ
+000740;Geraldo Rocha Dias;(19) 98013-2460;;(19) 98013-2460;;Campinas;SP;54;1000,00;65;440;P1_ALTA_PROPENSAO_VOZ
+000741;Maria Andrade Mendes;(47) 98013-2639;;;maria.andrade741@exemplo.com.br;Joinville;SC;63;1233,00;78;477;P1_ALTA_PROPENSAO_VOZ
+000742;João Marques Castro;(11) 98013-2818;(11) 3206-7420;(11) 98013-2818;joão.marques742@exemplo.com.br;São Paulo;SP;68;1466,00;91;514;P1_ALTA_PROPENSAO_VOZ
+000743;Pedro Freitas Oliveira;(21) 98013-2997;;(21) 98013-2997;pedro.freitas743@exemplo.com.br;Rio de Janeiro;RJ;74;1699,00;104;551;P1_ALTA_PROPENSAO_VOZ
+000744;Luiz Gonçalves Gomes;(31) 98013-3176;;(31) 98013-3176;;Belo Horizonte;MG;21;1932,00;117;588;P1_ALTA_PROPENSAO_VOZ
+000745;Vera Castro Soares;(41) 98013-3355;;(41) 98013-3355;vera.castro745@exemplo.com.br;Curitiba;PR;23;2165,00;130;625;P3_DIGITAL_FIRST
+000746;Wagner Pinto Andrade;(51) 98013-3534;;(51) 98013-3534;wagner.pinto746@exemplo.com.br;Porto Alegre;RS;28;2398,00;143;662;P1_ALTA_PROPENSAO_VOZ
+000747;Sônia Santos Cardoso;(71) 98013-3713;;(71) 98013-3713;sônia.santos747@exemplo.com.br;Salvador;BA;31;2631,00;156;699;P2_HIBRIDO_DIGITAL_VOZ
+000748;Cláudio Rodrigues Cavalcanti;(81) 98013-3892;;(81) 98013-3892;;Recife;PE;34;2864,00;169;736;P1_ALTA_PROPENSAO_VOZ
+000749;Eliane Pereira Rodrigues;(85) 98013-4071;;(85) 98013-4071;eliane.pereira749@exemplo.com.br;Fortaleza;CE;38;3097,00;17;773;P1_ALTA_PROPENSAO_VOZ
+000750;Sérgio Costa Ribeiro;(61) 98013-4250;;(61) 98013-4250;sérgio.costa750@exemplo.com.br;Brasília;DF;42;3330,00;30;810;P2_HIBRIDO_DIGITAL_VOZ
+000751;Marlene Carvalho Vieira;(62) 98013-4429;;(62) 98013-4429;marlene.carvalho751@exemplo.com.br;Goiânia;GO;49;3563,00;43;847;P1_ALTA_PROPENSAO_VOZ
+000752;Jorge Soares Nunes;(91) 98013-4608;;(91) 98013-4608;;Belém;PA;54;3796,00;56;884;P1_ALTA_PROPENSAO_VOZ
+000753;Rosa Barbosa Gonçalves;(92) 98013-4787;;;rosa.barbosa753@exemplo.com.br;Manaus;AM;63;4029,00;69;341;P1_ALTA_PROPENSAO_VOZ
+000754;Ana Nascimento Monteiro;(19) 98013-4966;(19) 3206-7540;(19) 98013-4966;ana.nascimento754@exemplo.com.br;Campinas;SP;68;4262,00;82;378;P1_ALTA_PROPENSAO_VOZ
+000755;Lucas Nunes Alves;(47) 98013-5145;;(47) 98013-5145;lucas.nunes755@exemplo.com.br;Joinville;SC;74;4495,00;95;415;P1_ALTA_PROPENSAO_VOZ
+000756;Carlos Mendes Carvalho;(11) 98013-5324;;(11) 98013-5324;;São Paulo;SP;21;4728,00;108;452;P1_ALTA_PROPENSAO_VOZ
+000757;Fernanda Ramos Rocha;(21) 98013-5503;;(21) 98013-5503;fernanda.ramos757@exemplo.com.br;Rio de Janeiro;RJ;23;4961,00;121;489;P3_DIGITAL_FIRST
+000758;José Teixeira Machado;(31) 98013-5682;;(31) 98013-5682;josé.teixeira758@exemplo.com.br;Belo Horizonte;MG;28;5194,00;134;526;P1_ALTA_PROPENSAO_VOZ
+000759;Patrícia Cavalcanti Teixeira;(41) 98013-5861;;(41) 98013-5861;patrícia.cavalcanti759@exemplo.com.br;Curitiba;PR;31;5427,00;147;563;P2_HIBRIDO_DIGITAL_VOZ
+000760;Antônio Silva Santos;(51) 98013-6040;;(51) 98013-6040;;Porto Alegre;RS;34;5660,00;160;600;P1_ALTA_PROPENSAO_VOZ
+000761;Beatriz Souza Lima;(71) 98013-6219;;(71) 98013-6219;beatriz.souza761@exemplo.com.br;Salvador;BA;38;5893,00;173;637;P1_ALTA_PROPENSAO_VOZ
+000762;Rodrigo Alves Lopes;(81) 98013-6398;;(81) 98013-6398;rodrigo.alves762@exemplo.com.br;Recife;PE;42;6126,00;21;674;P2_HIBRIDO_DIGITAL_VOZ
+000763;Silvia Gomes Nascimento;(85) 98013-6577;;(85) 98013-6577;silvia.gomes763@exemplo.com.br;Fortaleza;CE;49;6359,00;34;711;P1_ALTA_PROPENSAO_VOZ
+000764;Felipe Martins Freitas;(61) 98013-6756;;(61) 98013-6756;;Brasília;DF;54;6592,00;47;748;P1_ALTA_PROPENSAO_VOZ
+000765;Helena Lopes Moraes;(62) 98013-6935;;;helena.lopes765@exemplo.com.br;Goiânia;GO;63;6825,00;60;785;P1_ALTA_PROPENSAO_VOZ
+000766;Marcos Vieira Souza;(91) 98013-7114;(91) 3206-7660;(91) 98013-7114;marcos.vieira766@exemplo.com.br;Belém;PA;68;7058,00;73;822;P1_ALTA_PROPENSAO_VOZ
+000767;Camila Dias Costa;(92) 98013-7293;;(92) 98013-7293;camila.dias767@exemplo.com.br;Manaus;AM;74;7291,00;86;859;P1_ALTA_PROPENSAO_VOZ
+000768;Gabriel Moreira Fernandes;(19) 98013-7472;;(19) 98013-7472;;Campinas;SP;21;7524,00;99;896;P1_ALTA_PROPENSAO_VOZ
+000769;Juliana Machado Moreira;(47) 98013-7651;;(47) 98013-7651;juliana.machado769@exemplo.com.br;Joinville;SC;23;7757,00;112;353;P3_DIGITAL_FIRST
+000770;Rafael Cardoso Ramos;(11) 98013-7830;;(11) 98013-7830;rafael.cardoso770@exemplo.com.br;São Paulo;SP;28;190,00;125;390;P1_ALTA_PROPENSAO_VOZ
+000771;Mariana Santana Pinto;(21) 98013-8009;;(21) 98013-8009;mariana.santana771@exemplo.com.br;Rio de Janeiro;RJ;31;423,00;138;427;P2_HIBRIDO_DIGITAL_VOZ
+000772;Thiago Moraes Ferreira;(31) 98013-8188;;(31) 98013-8188;;Belo Horizonte;MG;34;656,00;151;464;P1_ALTA_PROPENSAO_VOZ
+000773;Aline Monteiro Martins;(41) 98013-8367;;(41) 98013-8367;aline.monteiro773@exemplo.com.br;Curitiba;PR;38;889,00;164;501;P1_ALTA_PROPENSAO_VOZ
+000774;Matheus Oliveira Barbosa;(51) 98013-8546;;(51) 98013-8546;matheus.oliveira774@exemplo.com.br;Porto Alegre;RS;42;1122,00;177;538;P2_HIBRIDO_DIGITAL_VOZ
+000775;Renata Ferreira Marques;(71) 98013-8725;;(71) 98013-8725;renata.ferreira775@exemplo.com.br;Salvador;BA;49;1355,00;25;575;P1_ALTA_PROPENSAO_VOZ
+000776;Gustavo Lima Santana;(81) 98013-8904;;(81) 98013-8904;;Recife;PE;54;1588,00;38;612;P1_ALTA_PROPENSAO_VOZ
+000777;Larissa Ribeiro Silva;(85) 98013-9083;;;larissa.ribeiro777@exemplo.com.br;Fortaleza;CE;63;1821,00;51;649;P1_ALTA_PROPENSAO_VOZ
+000778;Eduardo Almeida Pereira;(61) 98013-9262;(61) 3206-7780;(61) 98013-9262;eduardo.almeida778@exemplo.com.br;Brasília;DF;68;2054,00;64;686;P1_ALTA_PROPENSAO_VOZ
+000779;Vanessa Fernandes Almeida;(62) 98013-9441;;(62) 98013-9441;vanessa.fernandes779@exemplo.com.br;Goiânia;GO;74;2287,00;77;723;P1_ALTA_PROPENSAO_VOZ
+000780;Vinícius Rocha Dias;(91) 98013-9620;;(91) 98013-9620;;Belém;PA;21;2520,00;90;760;P1_ALTA_PROPENSAO_VOZ
+000781;Amanda Andrade Mendes;(92) 98013-9799;;(92) 98013-9799;amanda.andrade781@exemplo.com.br;Manaus;AM;23;2753,00;103;797;P3_DIGITAL_FIRST
+000782;Leonardo Marques Castro;(19) 98013-9978;;(19) 98013-9978;leonardo.marques782@exemplo.com.br;Campinas;SP;28;2986,00;116;834;P1_ALTA_PROPENSAO_VOZ
+000783;Bruna Freitas Oliveira;(47) 98014-0157;;(47) 98014-0157;bruna.freitas783@exemplo.com.br;Joinville;SC;31;3219,00;129;871;P2_HIBRIDO_DIGITAL_VOZ
+000784;Marcelo Gonçalves Gomes;(11) 98014-0336;;(11) 98014-0336;;São Paulo;SP;34;3452,00;142;328;P1_ALTA_PROPENSAO_VOZ
+000785;Tatiane Castro Soares;(21) 98014-0515;;(21) 98014-0515;tatiane.castro785@exemplo.com.br;Rio de Janeiro;RJ;38;3685,00;155;365;P1_ALTA_PROPENSAO_VOZ
+000786;Diego Pinto Andrade;(31) 98014-0694;;(31) 98014-0694;diego.pinto786@exemplo.com.br;Belo Horizonte;MG;42;3918,00;168;402;P2_HIBRIDO_DIGITAL_VOZ
+000787;Priscila Santos Cardoso;(41) 98014-0873;;(41) 98014-0873;priscila.santos787@exemplo.com.br;Curitiba;PR;49;4151,00;16;439;P1_ALTA_PROPENSAO_VOZ
+000788;Danilo Rodrigues Cavalcanti;(51) 98014-1052;;(51) 98014-1052;;Porto Alegre;RS;54;4384,00;29;476;P1_ALTA_PROPENSAO_VOZ
+000789;Letícia Pereira Rodrigues;(71) 98014-1231;;;letícia.pereira789@exemplo.com.br;Salvador;BA;63;4617,00;42;513;P1_ALTA_PROPENSAO_VOZ
+000790;Fábio Costa Ribeiro;(81) 98014-1410;(81) 3206-7900;(81) 98014-1410;fábio.costa790@exemplo.com.br;Recife;PE;68;4850,00;55;550;P1_ALTA_PROPENSAO_VOZ
+000791;Sabrina Carvalho Vieira;(85) 98014-1589;;(85) 98014-1589;sabrina.carvalho791@exemplo.com.br;Fortaleza;CE;74;5083,00;68;587;P1_ALTA_PROPENSAO_VOZ
+000792;Ricardo Soares Nunes;(61) 98014-1768;;(61) 98014-1768;;Brasília;DF;21;5316,00;81;624;P1_ALTA_PROPENSAO_VOZ
+000793;Carolina Barbosa Gonçalves;(62) 98014-1947;;(62) 98014-1947;carolina.barbosa793@exemplo.com.br;Goiânia;GO;23;5549,00;94;661;P3_DIGITAL_FIRST
+000794;Sebastião Nascimento Monteiro;(91) 98014-2126;;(91) 98014-2126;sebastião.nascimento794@exemplo.com.br;Belém;PA;28;5782,00;107;698;P1_ALTA_PROPENSAO_VOZ
+000795;Aparecida Nunes Alves;(92) 98014-2305;;(92) 98014-2305;aparecida.nunes795@exemplo.com.br;Manaus;AM;31;6015,00;120;735;P2_HIBRIDO_DIGITAL_VOZ
+000796;Raimundo Mendes Carvalho;(19) 98014-2484;;(19) 98014-2484;;Campinas;SP;34;6248,00;133;772;P1_ALTA_PROPENSAO_VOZ
+000797;Francisca Ramos Rocha;(47) 98014-2663;;(47) 98014-2663;francisca.ramos797@exemplo.com.br;Joinville;SC;38;6481,00;146;809;P1_ALTA_PROPENSAO_VOZ
+000798;Geraldo Teixeira Machado;(11) 98014-2842;;(11) 98014-2842;geraldo.teixeira798@exemplo.com.br;São Paulo;SP;42;6714,00;159;846;P2_HIBRIDO_DIGITAL_VOZ
+000799;Maria Cavalcanti Teixeira;(21) 98014-3021;;(21) 98014-3021;maria.cavalcanti799@exemplo.com.br;Rio de Janeiro;RJ;49;6947,00;172;883;P1_ALTA_PROPENSAO_VOZ
+000800;João Silva Santos;(31) 98014-3200;;(31) 98014-3200;;Belo Horizonte;MG;54;7180,00;20;340;P1_ALTA_PROPENSAO_VOZ
+000801;Pedro Souza Lima;(41) 98014-3379;;;pedro.souza801@exemplo.com.br;Curitiba;PR;63;7413,00;33;377;P1_ALTA_PROPENSAO_VOZ
+000802;Luiz Alves Lopes;(51) 98014-3558;(51) 3206-8020;(51) 98014-3558;luiz.alves802@exemplo.com.br;Porto Alegre;RS;68;7646,00;46;414;P1_ALTA_PROPENSAO_VOZ
+000803;Vera Gomes Nascimento;(71) 98014-3737;;(71) 98014-3737;vera.gomes803@exemplo.com.br;Salvador;BA;74;7879,00;59;451;P1_ALTA_PROPENSAO_VOZ
+000804;Wagner Martins Freitas;(81) 98014-3916;;(81) 98014-3916;;Recife;PE;21;312,00;72;488;P1_ALTA_PROPENSAO_VOZ
+000805;Sônia Lopes Moraes;(85) 98014-4095;;(85) 98014-4095;sônia.lopes805@exemplo.com.br;Fortaleza;CE;23;545,00;85;525;P3_DIGITAL_FIRST
+000806;Cláudio Vieira Souza;(61) 98014-4274;;(61) 98014-4274;cláudio.vieira806@exemplo.com.br;Brasília;DF;28;778,00;98;562;P1_ALTA_PROPENSAO_VOZ
+000807;Eliane Dias Costa;(62) 98014-4453;;(62) 98014-4453;eliane.dias807@exemplo.com.br;Goiânia;GO;31;1011,00;111;599;P2_HIBRIDO_DIGITAL_VOZ
+000808;Sérgio Moreira Fernandes;(91) 98014-4632;;(91) 98014-4632;;Belém;PA;34;1244,00;124;636;P1_ALTA_PROPENSAO_VOZ
+000809;Marlene Machado Moreira;(92) 98014-4811;;(92) 98014-4811;marlene.machado809@exemplo.com.br;Manaus;AM;38;1477,00;137;673;P1_ALTA_PROPENSAO_VOZ
+000810;Jorge Cardoso Ramos;(19) 98014-4990;;(19) 98014-4990;jorge.cardoso810@exemplo.com.br;Campinas;SP;42;1710,00;150;710;P2_HIBRIDO_DIGITAL_VOZ
+000811;Rosa Santana Pinto;(47) 98014-5169;;(47) 98014-5169;rosa.santana811@exemplo.com.br;Joinville;SC;49;1943,00;163;747;P1_ALTA_PROPENSAO_VOZ
+000812;Ana Moraes Ferreira;(11) 98014-5348;;(11) 98014-5348;;São Paulo;SP;54;2176,00;176;784;P1_ALTA_PROPENSAO_VOZ
+000813;Lucas Monteiro Martins;(21) 98014-5527;;;lucas.monteiro813@exemplo.com.br;Rio de Janeiro;RJ;63;2409,00;24;821;P1_ALTA_PROPENSAO_VOZ
+000814;Carlos Oliveira Barbosa;(31) 98014-5706;(31) 3206-8140;(31) 98014-5706;carlos.oliveira814@exemplo.com.br;Belo Horizonte;MG;68;2642,00;37;858;P1_ALTA_PROPENSAO_VOZ
+000815;Fernanda Ferreira Marques;(41) 98014-5885;;(41) 98014-5885;fernanda.ferreira815@exemplo.com.br;Curitiba;PR;74;2875,00;50;895;P1_ALTA_PROPENSAO_VOZ
+000816;José Lima Santana;(51) 98014-6064;;(51) 98014-6064;;Porto Alegre;RS;21;3108,00;63;352;P1_ALTA_PROPENSAO_VOZ
+000817;Patrícia Ribeiro Silva;(71) 98014-6243;;(71) 98014-6243;patrícia.ribeiro817@exemplo.com.br;Salvador;BA;23;3341,00;76;389;P3_DIGITAL_FIRST
+000818;Antônio Almeida Pereira;(81) 98014-6422;;(81) 98014-6422;antônio.almeida818@exemplo.com.br;Recife;PE;28;3574,00;89;426;P1_ALTA_PROPENSAO_VOZ
+000819;Beatriz Fernandes Almeida;(85) 98014-6601;;(85) 98014-6601;beatriz.fernandes819@exemplo.com.br;Fortaleza;CE;31;3807,00;102;463;P2_HIBRIDO_DIGITAL_VOZ
+000820;Rodrigo Rocha Dias;(61) 98014-6780;;(61) 98014-6780;;Brasília;DF;34;4040,00;115;500;P1_ALTA_PROPENSAO_VOZ
+000821;Silvia Andrade Mendes;(62) 98014-6959;;(62) 98014-6959;silvia.andrade821@exemplo.com.br;Goiânia;GO;38;4273,00;128;537;P1_ALTA_PROPENSAO_VOZ
+000822;Felipe Marques Castro;(91) 98014-7138;;(91) 98014-7138;felipe.marques822@exemplo.com.br;Belém;PA;42;4506,00;141;574;P2_HIBRIDO_DIGITAL_VOZ
+000823;Helena Freitas Oliveira;(92) 98014-7317;;(92) 98014-7317;helena.freitas823@exemplo.com.br;Manaus;AM;49;4739,00;154;611;P1_ALTA_PROPENSAO_VOZ
+000824;Marcos Gonçalves Gomes;(19) 98014-7496;;(19) 98014-7496;;Campinas;SP;54;4972,00;167;648;P1_ALTA_PROPENSAO_VOZ
+000825;Camila Castro Soares;(47) 98014-7675;;;camila.castro825@exemplo.com.br;Joinville;SC;63;5205,00;15;685;P1_ALTA_PROPENSAO_VOZ
+000826;Gabriel Pinto Andrade;(11) 98014-7854;(11) 3206-8260;(11) 98014-7854;gabriel.pinto826@exemplo.com.br;São Paulo;SP;68;5438,00;28;722;P1_ALTA_PROPENSAO_VOZ
+000827;Juliana Santos Cardoso;(21) 98014-8033;;(21) 98014-8033;juliana.santos827@exemplo.com.br;Rio de Janeiro;RJ;74;5671,00;41;759;P1_ALTA_PROPENSAO_VOZ
+000828;Rafael Rodrigues Cavalcanti;(31) 98014-8212;;(31) 98014-8212;;Belo Horizonte;MG;21;5904,00;54;796;P1_ALTA_PROPENSAO_VOZ
+000829;Mariana Pereira Rodrigues;(41) 98014-8391;;(41) 98014-8391;mariana.pereira829@exemplo.com.br;Curitiba;PR;23;6137,00;67;833;P3_DIGITAL_FIRST
+000830;Thiago Costa Ribeiro;(51) 98014-8570;;(51) 98014-8570;thiago.costa830@exemplo.com.br;Porto Alegre;RS;28;6370,00;80;870;P1_ALTA_PROPENSAO_VOZ
+000831;Aline Carvalho Vieira;(71) 98014-8749;;(71) 98014-8749;aline.carvalho831@exemplo.com.br;Salvador;BA;31;6603,00;93;327;P2_HIBRIDO_DIGITAL_VOZ
+000832;Matheus Soares Nunes;(81) 98014-8928;;(81) 98014-8928;;Recife;PE;34;6836,00;106;364;P1_ALTA_PROPENSAO_VOZ
+000833;Renata Barbosa Gonçalves;(85) 98014-9107;;(85) 98014-9107;renata.barbosa833@exemplo.com.br;Fortaleza;CE;38;7069,00;119;401;P1_ALTA_PROPENSAO_VOZ
+000834;Gustavo Nascimento Monteiro;(61) 98014-9286;;(61) 98014-9286;gustavo.nascimento834@exemplo.com.br;Brasília;DF;42;7302,00;132;438;P2_HIBRIDO_DIGITAL_VOZ
+000835;Larissa Nunes Alves;(62) 98014-9465;;(62) 98014-9465;larissa.nunes835@exemplo.com.br;Goiânia;GO;49;7535,00;145;475;P1_ALTA_PROPENSAO_VOZ
+000836;Eduardo Mendes Carvalho;(91) 98014-9644;;(91) 98014-9644;;Belém;PA;54;7768,00;158;512;P1_ALTA_PROPENSAO_VOZ
+000837;Vanessa Ramos Rocha;(92) 98014-9823;;;vanessa.ramos837@exemplo.com.br;Manaus;AM;63;201,00;171;549;P1_ALTA_PROPENSAO_VOZ
+000838;Vinícius Teixeira Machado;(19) 98015-0002;(19) 3206-8380;(19) 98015-0002;vinícius.teixeira838@exemplo.com.br;Campinas;SP;68;434,00;19;586;P1_ALTA_PROPENSAO_VOZ
+000839;Amanda Cavalcanti Teixeira;(47) 98015-0181;;(47) 98015-0181;amanda.cavalcanti839@exemplo.com.br;Joinville;SC;74;667,00;32;623;P1_ALTA_PROPENSAO_VOZ
+000840;Leonardo Silva Santos;(11) 98015-0360;;(11) 98015-0360;;São Paulo;SP;21;900,00;45;660;P1_ALTA_PROPENSAO_VOZ
+000841;Bruna Souza Lima;(21) 98015-0539;;(21) 98015-0539;bruna.souza841@exemplo.com.br;Rio de Janeiro;RJ;23;1133,00;58;697;P3_DIGITAL_FIRST
+000842;Marcelo Alves Lopes;(31) 98015-0718;;(31) 98015-0718;marcelo.alves842@exemplo.com.br;Belo Horizonte;MG;28;1366,00;71;734;P1_ALTA_PROPENSAO_VOZ
+000843;Tatiane Gomes Nascimento;(41) 98015-0897;;(41) 98015-0897;tatiane.gomes843@exemplo.com.br;Curitiba;PR;31;1599,00;84;771;P2_HIBRIDO_DIGITAL_VOZ
+000844;Diego Martins Freitas;(51) 98015-1076;;(51) 98015-1076;;Porto Alegre;RS;34;1832,00;97;808;P1_ALTA_PROPENSAO_VOZ
+000845;Priscila Lopes Moraes;(71) 98015-1255;;(71) 98015-1255;priscila.lopes845@exemplo.com.br;Salvador;BA;38;2065,00;110;845;P1_ALTA_PROPENSAO_VOZ
+000846;Danilo Vieira Souza;(81) 98015-1434;;(81) 98015-1434;danilo.vieira846@exemplo.com.br;Recife;PE;42;2298,00;123;882;P2_HIBRIDO_DIGITAL_VOZ
+000847;Letícia Dias Costa;(85) 98015-1613;;(85) 98015-1613;letícia.dias847@exemplo.com.br;Fortaleza;CE;49;2531,00;136;339;P1_ALTA_PROPENSAO_VOZ
+000848;Fábio Moreira Fernandes;(61) 98015-1792;;(61) 98015-1792;;Brasília;DF;54;2764,00;149;376;P1_ALTA_PROPENSAO_VOZ
+000849;Sabrina Machado Moreira;(62) 98015-1971;;;sabrina.machado849@exemplo.com.br;Goiânia;GO;63;2997,00;162;413;P1_ALTA_PROPENSAO_VOZ
+000850;Ricardo Cardoso Ramos;(91) 98015-2150;(91) 3207-8500;(91) 98015-2150;ricardo.cardoso850@exemplo.com.br;Belém;PA;68;3230,00;175;450;P1_ALTA_PROPENSAO_VOZ
+000851;Carolina Santana Pinto;(92) 98015-2329;;(92) 98015-2329;carolina.santana851@exemplo.com.br;Manaus;AM;74;3463,00;23;487;P1_ALTA_PROPENSAO_VOZ
+000852;Sebastião Moraes Ferreira;(19) 98015-2508;;(19) 98015-2508;;Campinas;SP;21;3696,00;36;524;P1_ALTA_PROPENSAO_VOZ
+000853;Aparecida Monteiro Martins;(47) 98015-2687;;(47) 98015-2687;aparecida.monteiro853@exemplo.com.br;Joinville;SC;23;3929,00;49;561;P3_DIGITAL_FIRST
+000854;Raimundo Oliveira Barbosa;(11) 98015-2866;;(11) 98015-2866;raimundo.oliveira854@exemplo.com.br;São Paulo;SP;28;4162,00;62;598;P1_ALTA_PROPENSAO_VOZ
+000855;Francisca Ferreira Marques;(21) 98015-3045;;(21) 98015-3045;francisca.ferreira855@exemplo.com.br;Rio de Janeiro;RJ;31;4395,00;75;635;P2_HIBRIDO_DIGITAL_VOZ
+000856;Geraldo Lima Santana;(31) 98015-3224;;(31) 98015-3224;;Belo Horizonte;MG;34;4628,00;88;672;P1_ALTA_PROPENSAO_VOZ
+000857;Maria Ribeiro Silva;(41) 98015-3403;;(41) 98015-3403;maria.ribeiro857@exemplo.com.br;Curitiba;PR;38;4861,00;101;709;P1_ALTA_PROPENSAO_VOZ
+000858;João Almeida Pereira;(51) 98015-3582;;(51) 98015-3582;joão.almeida858@exemplo.com.br;Porto Alegre;RS;42;5094,00;114;746;P2_HIBRIDO_DIGITAL_VOZ
+000859;Pedro Fernandes Almeida;(71) 98015-3761;;(71) 98015-3761;pedro.fernandes859@exemplo.com.br;Salvador;BA;49;5327,00;127;783;P1_ALTA_PROPENSAO_VOZ
+000860;Luiz Rocha Dias;(81) 98015-3940;;(81) 98015-3940;;Recife;PE;54;5560,00;140;820;P1_ALTA_PROPENSAO_VOZ
+000861;Vera Andrade Mendes;(85) 98015-4119;;;vera.andrade861@exemplo.com.br;Fortaleza;CE;63;5793,00;153;857;P1_ALTA_PROPENSAO_VOZ
+000862;Wagner Marques Castro;(61) 98015-4298;(61) 3207-8620;(61) 98015-4298;wagner.marques862@exemplo.com.br;Brasília;DF;68;6026,00;166;894;P1_ALTA_PROPENSAO_VOZ
+000863;Sônia Freitas Oliveira;(62) 98015-4477;;(62) 98015-4477;sônia.freitas863@exemplo.com.br;Goiânia;GO;74;6259,00;179;351;P1_ALTA_PROPENSAO_VOZ
+000864;Cláudio Gonçalves Gomes;(91) 98015-4656;;(91) 98015-4656;;Belém;PA;21;6492,00;27;388;P1_ALTA_PROPENSAO_VOZ
+000865;Eliane Castro Soares;(92) 98015-4835;;(92) 98015-4835;eliane.castro865@exemplo.com.br;Manaus;AM;23;6725,00;40;425;P3_DIGITAL_FIRST
+000866;Sérgio Pinto Andrade;(19) 98015-5014;;(19) 98015-5014;sérgio.pinto866@exemplo.com.br;Campinas;SP;28;6958,00;53;462;P1_ALTA_PROPENSAO_VOZ
+000867;Marlene Santos Cardoso;(47) 98015-5193;;(47) 98015-5193;marlene.santos867@exemplo.com.br;Joinville;SC;31;7191,00;66;499;P2_HIBRIDO_DIGITAL_VOZ
+000868;Jorge Rodrigues Cavalcanti;(11) 98015-5372;;(11) 98015-5372;;São Paulo;SP;34;7424,00;79;536;P1_ALTA_PROPENSAO_VOZ
+000869;Rosa Pereira Rodrigues;(21) 98015-5551;;(21) 98015-5551;rosa.pereira869@exemplo.com.br;Rio de Janeiro;RJ;38;7657,00;92;573;P1_ALTA_PROPENSAO_VOZ
+000870;Ana Costa Ribeiro;(31) 98015-5730;;(31) 98015-5730;ana.costa870@exemplo.com.br;Belo Horizonte;MG;42;7890,00;105;610;P2_HIBRIDO_DIGITAL_VOZ
+000871;Lucas Carvalho Vieira;(41) 98015-5909;;(41) 98015-5909;lucas.carvalho871@exemplo.com.br;Curitiba;PR;49;323,00;118;647;P1_ALTA_PROPENSAO_VOZ
+000872;Carlos Soares Nunes;(51) 98015-6088;;(51) 98015-6088;;Porto Alegre;RS;54;556,00;131;684;P1_ALTA_PROPENSAO_VOZ
+000873;Fernanda Barbosa Gonçalves;(71) 98015-6267;;;fernanda.barbosa873@exemplo.com.br;Salvador;BA;63;789,00;144;721;P1_ALTA_PROPENSAO_VOZ
+000874;José Nascimento Monteiro;(81) 98015-6446;(81) 3207-8740;(81) 98015-6446;josé.nascimento874@exemplo.com.br;Recife;PE;68;1022,00;157;758;P1_ALTA_PROPENSAO_VOZ
+000875;Patrícia Nunes Alves;(85) 98015-6625;;(85) 98015-6625;patrícia.nunes875@exemplo.com.br;Fortaleza;CE;74;1255,00;170;795;P1_ALTA_PROPENSAO_VOZ
+000876;Antônio Mendes Carvalho;(61) 98015-6804;;(61) 98015-6804;;Brasília;DF;21;1488,00;18;832;P1_ALTA_PROPENSAO_VOZ
+000877;Beatriz Ramos Rocha;(62) 98015-6983;;(62) 98015-6983;beatriz.ramos877@exemplo.com.br;Goiânia;GO;23;1721,00;31;869;P3_DIGITAL_FIRST
+000878;Rodrigo Teixeira Machado;(91) 98015-7162;;(91) 98015-7162;rodrigo.teixeira878@exemplo.com.br;Belém;PA;28;1954,00;44;326;P1_ALTA_PROPENSAO_VOZ
+000879;Silvia Cavalcanti Teixeira;(92) 98015-7341;;(92) 98015-7341;silvia.cavalcanti879@exemplo.com.br;Manaus;AM;31;2187,00;57;363;P2_HIBRIDO_DIGITAL_VOZ
+000880;Felipe Silva Santos;(19) 98015-7520;;(19) 98015-7520;;Campinas;SP;34;2420,00;70;400;P1_ALTA_PROPENSAO_VOZ
+000881;Helena Souza Lima;(47) 98015-7699;;(47) 98015-7699;helena.souza881@exemplo.com.br;Joinville;SC;38;2653,00;83;437;P1_ALTA_PROPENSAO_VOZ
+000882;Marcos Alves Lopes;(11) 98015-7878;;(11) 98015-7878;marcos.alves882@exemplo.com.br;São Paulo;SP;42;2886,00;96;474;P2_HIBRIDO_DIGITAL_VOZ
+000883;Camila Gomes Nascimento;(21) 98015-8057;;(21) 98015-8057;camila.gomes883@exemplo.com.br;Rio de Janeiro;RJ;49;3119,00;109;511;P1_ALTA_PROPENSAO_VOZ
+000884;Gabriel Martins Freitas;(31) 98015-8236;;(31) 98015-8236;;Belo Horizonte;MG;54;3352,00;122;548;P1_ALTA_PROPENSAO_VOZ
+000885;Juliana Lopes Moraes;(41) 98015-8415;;;juliana.lopes885@exemplo.com.br;Curitiba;PR;63;3585,00;135;585;P1_ALTA_PROPENSAO_VOZ
+000886;Rafael Vieira Souza;(51) 98015-8594;(51) 3207-8860;(51) 98015-8594;rafael.vieira886@exemplo.com.br;Porto Alegre;RS;68;3818,00;148;622;P1_ALTA_PROPENSAO_VOZ
+000887;Mariana Dias Costa;(71) 98015-8773;;(71) 98015-8773;mariana.dias887@exemplo.com.br;Salvador;BA;74;4051,00;161;659;P1_ALTA_PROPENSAO_VOZ
+000888;Thiago Moreira Fernandes;(81) 98015-8952;;(81) 98015-8952;;Recife;PE;21;4284,00;174;696;P1_ALTA_PROPENSAO_VOZ
+000889;Aline Machado Moreira;(85) 98015-9131;;(85) 98015-9131;aline.machado889@exemplo.com.br;Fortaleza;CE;23;4517,00;22;733;P3_DIGITAL_FIRST
+000890;Matheus Cardoso Ramos;(61) 98015-9310;;(61) 98015-9310;matheus.cardoso890@exemplo.com.br;Brasília;DF;28;4750,00;35;770;P1_ALTA_PROPENSAO_VOZ
+000891;Renata Santana Pinto;(62) 98015-9489;;(62) 98015-9489;renata.santana891@exemplo.com.br;Goiânia;GO;31;4983,00;48;807;P2_HIBRIDO_DIGITAL_VOZ
+000892;Gustavo Moraes Ferreira;(91) 98015-9668;;(91) 98015-9668;;Belém;PA;34;5216,00;61;844;P1_ALTA_PROPENSAO_VOZ
+000893;Larissa Monteiro Martins;(92) 98015-9847;;(92) 98015-9847;larissa.monteiro893@exemplo.com.br;Manaus;AM;38;5449,00;74;881;P1_ALTA_PROPENSAO_VOZ
+000894;Eduardo Oliveira Barbosa;(19) 98016-0026;;(19) 98016-0026;eduardo.oliveira894@exemplo.com.br;Campinas;SP;42;5682,00;87;338;P2_HIBRIDO_DIGITAL_VOZ
+000895;Vanessa Ferreira Marques;(47) 98016-0205;;(47) 98016-0205;vanessa.ferreira895@exemplo.com.br;Joinville;SC;49;5915,00;100;375;P1_ALTA_PROPENSAO_VOZ
+000896;Vinícius Lima Santana;(11) 98016-0384;;(11) 98016-0384;;São Paulo;SP;54;6148,00;113;412;P1_ALTA_PROPENSAO_VOZ
+000897;Amanda Ribeiro Silva;(21) 98016-0563;;;amanda.ribeiro897@exemplo.com.br;Rio de Janeiro;RJ;63;6381,00;126;449;P1_ALTA_PROPENSAO_VOZ
+000898;Leonardo Almeida Pereira;(31) 98016-0742;(31) 3207-8980;(31) 98016-0742;leonardo.almeida898@exemplo.com.br;Belo Horizonte;MG;68;6614,00;139;486;P1_ALTA_PROPENSAO_VOZ
+000899;Bruna Fernandes Almeida;(41) 98016-0921;;(41) 98016-0921;bruna.fernandes899@exemplo.com.br;Curitiba;PR;74;6847,00;152;523;P1_ALTA_PROPENSAO_VOZ
+000900;Marcelo Rocha Dias;(51) 98016-1100;;(51) 98016-1100;;Porto Alegre;RS;21;7080,00;165;560;P1_ALTA_PROPENSAO_VOZ
+000901;Tatiane Andrade Mendes;(71) 98016-1279;;(71) 98016-1279;tatiane.andrade901@exemplo.com.br;Salvador;BA;23;7313,00;178;597;P3_DIGITAL_FIRST
+000902;Diego Marques Castro;(81) 98016-1458;;(81) 98016-1458;diego.marques902@exemplo.com.br;Recife;PE;28;7546,00;26;634;P1_ALTA_PROPENSAO_VOZ
+000903;Priscila Freitas Oliveira;(85) 98016-1637;;(85) 98016-1637;priscila.freitas903@exemplo.com.br;Fortaleza;CE;31;7779,00;39;671;P2_HIBRIDO_DIGITAL_VOZ
+000904;Danilo Gonçalves Gomes;(61) 98016-1816;;(61) 98016-1816;;Brasília;DF;34;212,00;52;708;P1_ALTA_PROPENSAO_VOZ
+000905;Letícia Castro Soares;(62) 98016-1995;;(62) 98016-1995;letícia.castro905@exemplo.com.br;Goiânia;GO;38;445,00;65;745;P1_ALTA_PROPENSAO_VOZ
+000906;Fábio Pinto Andrade;(91) 98016-2174;;(91) 98016-2174;fábio.pinto906@exemplo.com.br;Belém;PA;42;678,00;78;782;P2_HIBRIDO_DIGITAL_VOZ
+000907;Sabrina Santos Cardoso;(92) 98016-2353;;(92) 98016-2353;sabrina.santos907@exemplo.com.br;Manaus;AM;49;911,00;91;819;P1_ALTA_PROPENSAO_VOZ
+000908;Ricardo Rodrigues Cavalcanti;(19) 98016-2532;;(19) 98016-2532;;Campinas;SP;54;1144,00;104;856;P1_ALTA_PROPENSAO_VOZ
+000909;Carolina Pereira Rodrigues;(47) 98016-2711;;;carolina.pereira909@exemplo.com.br;Joinville;SC;63;1377,00;117;893;P1_ALTA_PROPENSAO_VOZ
+000910;Sebastião Costa Ribeiro;(11) 98016-2890;(11) 3207-9100;(11) 98016-2890;sebastião.costa910@exemplo.com.br;São Paulo;SP;68;1610,00;130;350;P1_ALTA_PROPENSAO_VOZ
+000911;Aparecida Carvalho Vieira;(21) 98016-3069;;(21) 98016-3069;aparecida.carvalho911@exemplo.com.br;Rio de Janeiro;RJ;74;1843,00;143;387;P1_ALTA_PROPENSAO_VOZ
+000912;Raimundo Soares Nunes;(31) 98016-3248;;(31) 98016-3248;;Belo Horizonte;MG;21;2076,00;156;424;P1_ALTA_PROPENSAO_VOZ
+000913;Francisca Barbosa Gonçalves;(41) 98016-3427;;(41) 98016-3427;francisca.barbosa913@exemplo.com.br;Curitiba;PR;23;2309,00;169;461;P3_DIGITAL_FIRST
+000914;Geraldo Nascimento Monteiro;(51) 98016-3606;;(51) 98016-3606;geraldo.nascimento914@exemplo.com.br;Porto Alegre;RS;28;2542,00;17;498;P1_ALTA_PROPENSAO_VOZ
+000915;Maria Nunes Alves;(71) 98016-3785;;(71) 98016-3785;maria.nunes915@exemplo.com.br;Salvador;BA;31;2775,00;30;535;P2_HIBRIDO_DIGITAL_VOZ
+000916;João Mendes Carvalho;(81) 98016-3964;;(81) 98016-3964;;Recife;PE;34;3008,00;43;572;P1_ALTA_PROPENSAO_VOZ
+000917;Pedro Ramos Rocha;(85) 98016-4143;;(85) 98016-4143;pedro.ramos917@exemplo.com.br;Fortaleza;CE;38;3241,00;56;609;P1_ALTA_PROPENSAO_VOZ
+000918;Luiz Teixeira Machado;(61) 98016-4322;;(61) 98016-4322;luiz.teixeira918@exemplo.com.br;Brasília;DF;42;3474,00;69;646;P2_HIBRIDO_DIGITAL_VOZ
+000919;Vera Cavalcanti Teixeira;(62) 98016-4501;;(62) 98016-4501;vera.cavalcanti919@exemplo.com.br;Goiânia;GO;49;3707,00;82;683;P1_ALTA_PROPENSAO_VOZ
+000920;Wagner Silva Santos;(91) 98016-4680;;(91) 98016-4680;;Belém;PA;54;3940,00;95;720;P1_ALTA_PROPENSAO_VOZ
+000921;Sônia Souza Lima;(92) 98016-4859;;;sônia.souza921@exemplo.com.br;Manaus;AM;63;4173,00;108;757;P1_ALTA_PROPENSAO_VOZ
+000922;Cláudio Alves Lopes;(19) 98016-5038;(19) 3207-9220;(19) 98016-5038;cláudio.alves922@exemplo.com.br;Campinas;SP;68;4406,00;121;794;P1_ALTA_PROPENSAO_VOZ
+000923;Eliane Gomes Nascimento;(47) 98016-5217;;(47) 98016-5217;eliane.gomes923@exemplo.com.br;Joinville;SC;74;4639,00;134;831;P1_ALTA_PROPENSAO_VOZ
+000924;Sérgio Martins Freitas;(11) 98016-5396;;(11) 98016-5396;;São Paulo;SP;21;4872,00;147;868;P1_ALTA_PROPENSAO_VOZ
+000925;Marlene Lopes Moraes;(21) 98016-5575;;(21) 98016-5575;marlene.lopes925@exemplo.com.br;Rio de Janeiro;RJ;23;5105,00;160;325;P3_DIGITAL_FIRST
+000926;Jorge Vieira Souza;(31) 98016-5754;;(31) 98016-5754;jorge.vieira926@exemplo.com.br;Belo Horizonte;MG;28;5338,00;173;362;P1_ALTA_PROPENSAO_VOZ
+000927;Rosa Dias Costa;(41) 98016-5933;;(41) 98016-5933;rosa.dias927@exemplo.com.br;Curitiba;PR;31;5571,00;21;399;P2_HIBRIDO_DIGITAL_VOZ
+000928;Ana Moreira Fernandes;(51) 98016-6112;;(51) 98016-6112;;Porto Alegre;RS;34;5804,00;34;436;P1_ALTA_PROPENSAO_VOZ
+000929;Lucas Machado Moreira;(71) 98016-6291;;(71) 98016-6291;lucas.machado929@exemplo.com.br;Salvador;BA;38;6037,00;47;473;P1_ALTA_PROPENSAO_VOZ
+000930;Carlos Cardoso Ramos;(81) 98016-6470;;(81) 98016-6470;carlos.cardoso930@exemplo.com.br;Recife;PE;42;6270,00;60;510;P2_HIBRIDO_DIGITAL_VOZ
+000931;Fernanda Santana Pinto;(85) 98016-6649;;(85) 98016-6649;fernanda.santana931@exemplo.com.br;Fortaleza;CE;49;6503,00;73;547;P1_ALTA_PROPENSAO_VOZ
+000932;José Moraes Ferreira;(61) 98016-6828;;(61) 98016-6828;;Brasília;DF;54;6736,00;86;584;P1_ALTA_PROPENSAO_VOZ
+000933;Patrícia Monteiro Martins;(62) 98016-7007;;;patrícia.monteiro933@exemplo.com.br;Goiânia;GO;63;6969,00;99;621;P1_ALTA_PROPENSAO_VOZ
+000934;Antônio Oliveira Barbosa;(91) 98016-7186;(91) 3207-9340;(91) 98016-7186;antônio.oliveira934@exemplo.com.br;Belém;PA;68;7202,00;112;658;P1_ALTA_PROPENSAO_VOZ
+000935;Beatriz Ferreira Marques;(92) 98016-7365;;(92) 98016-7365;beatriz.ferreira935@exemplo.com.br;Manaus;AM;74;7435,00;125;695;P1_ALTA_PROPENSAO_VOZ
+000936;Rodrigo Lima Santana;(19) 98016-7544;;(19) 98016-7544;;Campinas;SP;21;7668,00;138;732;P1_ALTA_PROPENSAO_VOZ
+000937;Silvia Ribeiro Silva;(47) 98016-7723;;(47) 98016-7723;silvia.ribeiro937@exemplo.com.br;Joinville;SC;23;7901,00;151;769;P3_DIGITAL_FIRST
+000938;Felipe Almeida Pereira;(11) 98016-7902;;(11) 98016-7902;felipe.almeida938@exemplo.com.br;São Paulo;SP;28;334,00;164;806;P1_ALTA_PROPENSAO_VOZ
+000939;Helena Fernandes Almeida;(21) 98016-8081;;(21) 98016-8081;helena.fernandes939@exemplo.com.br;Rio de Janeiro;RJ;31;567,00;177;843;P2_HIBRIDO_DIGITAL_VOZ
+000940;Marcos Rocha Dias;(31) 98016-8260;;(31) 98016-8260;;Belo Horizonte;MG;34;800,00;25;880;P1_ALTA_PROPENSAO_VOZ
+000941;Camila Andrade Mendes;(41) 98016-8439;;(41) 98016-8439;camila.andrade941@exemplo.com.br;Curitiba;PR;38;1033,00;38;337;P1_ALTA_PROPENSAO_VOZ
+000942;Gabriel Marques Castro;(51) 98016-8618;;(51) 98016-8618;gabriel.marques942@exemplo.com.br;Porto Alegre;RS;42;1266,00;51;374;P2_HIBRIDO_DIGITAL_VOZ
+000943;Juliana Freitas Oliveira;(71) 98016-8797;;(71) 98016-8797;juliana.freitas943@exemplo.com.br;Salvador;BA;49;1499,00;64;411;P1_ALTA_PROPENSAO_VOZ
+000944;Rafael Gonçalves Gomes;(81) 98016-8976;;(81) 98016-8976;;Recife;PE;54;1732,00;77;448;P1_ALTA_PROPENSAO_VOZ
+000945;Mariana Castro Soares;(85) 98016-9155;;;mariana.castro945@exemplo.com.br;Fortaleza;CE;63;1965,00;90;485;P1_ALTA_PROPENSAO_VOZ
+000946;Thiago Pinto Andrade;(61) 98016-9334;(61) 3207-9460;(61) 98016-9334;thiago.pinto946@exemplo.com.br;Brasília;DF;68;2198,00;103;522;P1_ALTA_PROPENSAO_VOZ
+000947;Aline Santos Cardoso;(62) 98016-9513;;(62) 98016-9513;aline.santos947@exemplo.com.br;Goiânia;GO;74;2431,00;116;559;P1_ALTA_PROPENSAO_VOZ
+000948;Matheus Rodrigues Cavalcanti;(91) 98016-9692;;(91) 98016-9692;;Belém;PA;21;2664,00;129;596;P1_ALTA_PROPENSAO_VOZ
+000949;Renata Pereira Rodrigues;(92) 98016-9871;;(92) 98016-9871;renata.pereira949@exemplo.com.br;Manaus;AM;23;2897,00;142;633;P3_DIGITAL_FIRST
+000950;Gustavo Costa Ribeiro;(19) 98017-0050;;(19) 98017-0050;gustavo.costa950@exemplo.com.br;Campinas;SP;28;3130,00;155;670;P1_ALTA_PROPENSAO_VOZ
+000951;Larissa Carvalho Vieira;(47) 98017-0229;;(47) 98017-0229;larissa.carvalho951@exemplo.com.br;Joinville;SC;31;3363,00;168;707;P2_HIBRIDO_DIGITAL_VOZ
+000952;Eduardo Soares Nunes;(11) 98017-0408;;(11) 98017-0408;;São Paulo;SP;34;3596,00;16;744;P1_ALTA_PROPENSAO_VOZ
+000953;Vanessa Barbosa Gonçalves;(21) 98017-0587;;(21) 98017-0587;vanessa.barbosa953@exemplo.com.br;Rio de Janeiro;RJ;38;3829,00;29;781;P1_ALTA_PROPENSAO_VOZ
+000954;Vinícius Nascimento Monteiro;(31) 98017-0766;;(31) 98017-0766;vinícius.nascimento954@exemplo.com.br;Belo Horizonte;MG;42;4062,00;42;818;P2_HIBRIDO_DIGITAL_VOZ
+000955;Amanda Nunes Alves;(41) 98017-0945;;(41) 98017-0945;amanda.nunes955@exemplo.com.br;Curitiba;PR;49;4295,00;55;855;P1_ALTA_PROPENSAO_VOZ
+000956;Leonardo Mendes Carvalho;(51) 98017-1124;;(51) 98017-1124;;Porto Alegre;RS;54;4528,00;68;892;P1_ALTA_PROPENSAO_VOZ
+000957;Bruna Ramos Rocha;(71) 98017-1303;;;bruna.ramos957@exemplo.com.br;Salvador;BA;63;4761,00;81;349;P1_ALTA_PROPENSAO_VOZ
+000958;Marcelo Teixeira Machado;(81) 98017-1482;(81) 3207-9580;(81) 98017-1482;marcelo.teixeira958@exemplo.com.br;Recife;PE;68;4994,00;94;386;P1_ALTA_PROPENSAO_VOZ
+000959;Tatiane Cavalcanti Teixeira;(85) 98017-1661;;(85) 98017-1661;tatiane.cavalcanti959@exemplo.com.br;Fortaleza;CE;74;5227,00;107;423;P1_ALTA_PROPENSAO_VOZ
+000960;Diego Silva Santos;(61) 98017-1840;;(61) 98017-1840;;Brasília;DF;21;5460,00;120;460;P1_ALTA_PROPENSAO_VOZ
+000961;Priscila Souza Lima;(62) 98017-2019;;(62) 98017-2019;priscila.souza961@exemplo.com.br;Goiânia;GO;23;5693,00;133;497;P3_DIGITAL_FIRST
+000962;Danilo Alves Lopes;(91) 98017-2198;;(91) 98017-2198;danilo.alves962@exemplo.com.br;Belém;PA;28;5926,00;146;534;P1_ALTA_PROPENSAO_VOZ
+000963;Letícia Gomes Nascimento;(92) 98017-2377;;(92) 98017-2377;letícia.gomes963@exemplo.com.br;Manaus;AM;31;6159,00;159;571;P2_HIBRIDO_DIGITAL_VOZ
+000964;Fábio Martins Freitas;(19) 98017-2556;;(19) 98017-2556;;Campinas;SP;34;6392,00;172;608;P1_ALTA_PROPENSAO_VOZ
+000965;Sabrina Lopes Moraes;(47) 98017-2735;;(47) 98017-2735;sabrina.lopes965@exemplo.com.br;Joinville;SC;38;6625,00;20;645;P1_ALTA_PROPENSAO_VOZ
+000966;Ricardo Vieira Souza;(11) 98017-2914;;(11) 98017-2914;ricardo.vieira966@exemplo.com.br;São Paulo;SP;42;6858,00;33;682;P2_HIBRIDO_DIGITAL_VOZ
+000967;Carolina Dias Costa;(21) 98017-3093;;(21) 98017-3093;carolina.dias967@exemplo.com.br;Rio de Janeiro;RJ;49;7091,00;46;719;P1_ALTA_PROPENSAO_VOZ
+000968;Sebastião Moreira Fernandes;(31) 98017-3272;;(31) 98017-3272;;Belo Horizonte;MG;54;7324,00;59;756;P1_ALTA_PROPENSAO_VOZ
+000969;Aparecida Machado Moreira;(41) 98017-3451;;;aparecida.machado969@exemplo.com.br;Curitiba;PR;63;7557,00;72;793;P1_ALTA_PROPENSAO_VOZ
+000970;Raimundo Cardoso Ramos;(51) 98017-3630;(51) 3208-9700;(51) 98017-3630;raimundo.cardoso970@exemplo.com.br;Porto Alegre;RS;68;7790,00;85;830;P1_ALTA_PROPENSAO_VOZ
+000971;Francisca Santana Pinto;(71) 98017-3809;;(71) 98017-3809;francisca.santana971@exemplo.com.br;Salvador;BA;74;223,00;98;867;P1_ALTA_PROPENSAO_VOZ
+000972;Geraldo Moraes Ferreira;(81) 98017-3988;;(81) 98017-3988;;Recife;PE;21;456,00;111;324;P1_ALTA_PROPENSAO_VOZ
+000973;Maria Monteiro Martins;(85) 98017-4167;;(85) 98017-4167;maria.monteiro973@exemplo.com.br;Fortaleza;CE;23;689,00;124;361;P3_DIGITAL_FIRST
+000974;João Oliveira Barbosa;(61) 98017-4346;;(61) 98017-4346;joão.oliveira974@exemplo.com.br;Brasília;DF;28;922,00;137;398;P1_ALTA_PROPENSAO_VOZ
+000975;Pedro Ferreira Marques;(62) 98017-4525;;(62) 98017-4525;pedro.ferreira975@exemplo.com.br;Goiânia;GO;31;1155,00;150;435;P2_HIBRIDO_DIGITAL_VOZ
+000976;Luiz Lima Santana;(91) 98017-4704;;(91) 98017-4704;;Belém;PA;34;1388,00;163;472;P1_ALTA_PROPENSAO_VOZ
+000977;Vera Ribeiro Silva;(92) 98017-4883;;(92) 98017-4883;vera.ribeiro977@exemplo.com.br;Manaus;AM;38;1621,00;176;509;P1_ALTA_PROPENSAO_VOZ
+000978;Wagner Almeida Pereira;(19) 98017-5062;;(19) 98017-5062;wagner.almeida978@exemplo.com.br;Campinas;SP;42;1854,00;24;546;P2_HIBRIDO_DIGITAL_VOZ
+000979;Sônia Fernandes Almeida;(47) 98017-5241;;(47) 98017-5241;sônia.fernandes979@exemplo.com.br;Joinville;SC;49;2087,00;37;583;P1_ALTA_PROPENSAO_VOZ
+000980;Cláudio Rocha Dias;(11) 98017-5420;;(11) 98017-5420;;São Paulo;SP;54;2320,00;50;620;P1_ALTA_PROPENSAO_VOZ
+000981;Eliane Andrade Mendes;(21) 98017-5599;;;eliane.andrade981@exemplo.com.br;Rio de Janeiro;RJ;63;2553,00;63;657;P1_ALTA_PROPENSAO_VOZ
+000982;Sérgio Marques Castro;(31) 98017-5778;(31) 3208-9820;(31) 98017-5778;sérgio.marques982@exemplo.com.br;Belo Horizonte;MG;68;2786,00;76;694;P1_ALTA_PROPENSAO_VOZ
+000983;Marlene Freitas Oliveira;(41) 98017-5957;;(41) 98017-5957;marlene.freitas983@exemplo.com.br;Curitiba;PR;74;3019,00;89;731;P1_ALTA_PROPENSAO_VOZ
+000984;Jorge Gonçalves Gomes;(51) 98017-6136;;(51) 98017-6136;;Porto Alegre;RS;21;3252,00;102;768;P1_ALTA_PROPENSAO_VOZ
+000985;Rosa Castro Soares;(71) 98017-6315;;(71) 98017-6315;rosa.castro985@exemplo.com.br;Salvador;BA;23;3485,00;115;805;P3_DIGITAL_FIRST
+000986;Ana Pinto Andrade;(81) 98017-6494;;(81) 98017-6494;ana.pinto986@exemplo.com.br;Recife;PE;28;3718,00;128;842;P1_ALTA_PROPENSAO_VOZ
+000987;Lucas Santos Cardoso;(85) 98017-6673;;(85) 98017-6673;lucas.santos987@exemplo.com.br;Fortaleza;CE;31;3951,00;141;879;P2_HIBRIDO_DIGITAL_VOZ
+000988;Carlos Rodrigues Cavalcanti;(61) 98017-6852;;(61) 98017-6852;;Brasília;DF;34;4184,00;154;336;P1_ALTA_PROPENSAO_VOZ
+000989;Fernanda Pereira Rodrigues;(62) 98017-7031;;(62) 98017-7031;fernanda.pereira989@exemplo.com.br;Goiânia;GO;38;4417,00;167;373;P1_ALTA_PROPENSAO_VOZ
+000990;José Costa Ribeiro;(91) 98017-7210;;(91) 98017-7210;josé.costa990@exemplo.com.br;Belém;PA;42;4650,00;15;410;P2_HIBRIDO_DIGITAL_VOZ
+000991;Patrícia Carvalho Vieira;(92) 98017-7389;;(92) 98017-7389;patrícia.carvalho991@exemplo.com.br;Manaus;AM;49;4883,00;28;447;P1_ALTA_PROPENSAO_VOZ
+000992;Antônio Soares Nunes;(19) 98017-7568;;(19) 98017-7568;;Campinas;SP;54;5116,00;41;484;P1_ALTA_PROPENSAO_VOZ
+000993;Beatriz Barbosa Gonçalves;(47) 98017-7747;;;beatriz.barbosa993@exemplo.com.br;Joinville;SC;63;5349,00;54;521;P1_ALTA_PROPENSAO_VOZ
+000994;Rodrigo Nascimento Monteiro;(11) 98017-7926;(11) 3208-9940;(11) 98017-7926;rodrigo.nascimento994@exemplo.com.br;São Paulo;SP;68;5582,00;67;558;P1_ALTA_PROPENSAO_VOZ
+000995;Silvia Nunes Alves;(21) 98017-8105;;(21) 98017-8105;silvia.nunes995@exemplo.com.br;Rio de Janeiro;RJ;74;5815,00;80;595;P1_ALTA_PROPENSAO_VOZ
+000996;Felipe Mendes Carvalho;(31) 98017-8284;;(31) 98017-8284;;Belo Horizonte;MG;21;6048,00;93;632;P1_ALTA_PROPENSAO_VOZ
+000997;Helena Ramos Rocha;(41) 98017-8463;;(41) 98017-8463;helena.ramos997@exemplo.com.br;Curitiba;PR;23;6281,00;106;669;P3_DIGITAL_FIRST
+000998;Marcos Teixeira Machado;(51) 98017-8642;;(51) 98017-8642;marcos.teixeira998@exemplo.com.br;Porto Alegre;RS;28;6514,00;119;706;P1_ALTA_PROPENSAO_VOZ
+000999;Camila Cavalcanti Teixeira;(71) 98017-8821;;(71) 98017-8821;camila.cavalcanti999@exemplo.com.br;Salvador;BA;31;6747,00;132;743;P2_HIBRIDO_DIGITAL_VOZ
+001000;Gabriel Silva Santos;(81) 98017-9000;;(81) 98017-9000;;Recife;PE;34;6980,00;145;780;P1_ALTA_PROPENSAO_VOZ

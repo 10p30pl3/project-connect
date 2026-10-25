@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
-import { Ban, Sparkles } from 'lucide-react';
+import { Ban, Download, Sparkles } from 'lucide-react';
 import { CHANNEL_LABEL } from '@voll/shared';
 import clsx from 'clsx';
 import { get, qs } from '../lib/api';
@@ -27,20 +27,30 @@ export function ContactsSection() {
           <h2 className="text-sm font-semibold text-slate-800">Contatos e Bloqueios (DNC)</h2>
           <p className="text-xs text-slate-500">Identidade persistente do cliente em todas as cargas e campanhas, com contadores compartilhados.</p>
         </div>
-        <Field label="Buscar por nome ou ID" className="w-full sm:w-80">
-          {(p) => (
-            <Input
-              id={p.id}
-              type="search"
-              placeholder="Digite nome ou código do cliente…"
-              value={text}
-              onChange={(e) => {
-                setText(e.target.value);
-                pager.reset();
-              }}
-            />
-          )}
-        </Field>
+        <div className="flex flex-wrap items-end gap-2">
+          <Field label="Buscar por nome ou ID" className="w-full sm:w-80">
+            {(p) => (
+              <Input
+                id={p.id}
+                type="search"
+                placeholder="Digite nome ou código do cliente…"
+                value={text}
+                onChange={(e) => {
+                  setText(e.target.value);
+                  pager.reset();
+                }}
+              />
+            )}
+          </Field>
+          <a
+            href="/mailing_1000_contatos_cpc.csv"
+            download="mailing_1000_contatos_cpc.csv"
+            className="inline-flex h-9 items-center gap-1.5 rounded border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-brand-600"
+            title="Baixar CSV piloto com 1.000 contatos fictícios para inteligência de CPC"
+          >
+            <Download className="size-4 text-brand-600" aria-hidden /> Baixar CSV (1.000)
+          </a>
+        </div>
       </div>
       <Card padded={false}>
         {data.isLoading ? (

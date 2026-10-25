@@ -74,7 +74,7 @@ const FIRST = ['Ana', 'Bruno', 'Carla', 'Diego', 'Elisa', 'Fábio', 'Gabriela', 
 const LAST = ['Almeida', 'Barbosa', 'Cardoso', 'Duarte', 'Esteves', 'Ferraz', 'Gomes', 'Henriques', 'Lima', 'Moraes'];
 const SAMPLE_DDDS = ['11', '21', '31', '41', '47', '51', '61', '62', '71', '81', '85', '91', '92'];
 
-export function sampleCsv(n = 40): string {
+export function sampleCsv(n = 1000): string {
   const lines = ['id;nome;telefone1;telefone2;telefone3;whatsapp1;email;valor_divida;dias_atraso;score;historico;idade'];
   for (let i = 1; i <= n; i++) {
     const id = String(i).padStart(6, '0'); // zeros à esquerda preservados

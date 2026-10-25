@@ -241,67 +241,155 @@ type FullContact = {
   blocks: Block[];
 };
 
-const BRAZILIAN_PROFILES = [
-  { name: 'Maria Aparecida Santos', age: 67, ddd: '11', uf: 'SP', city: 'São Paulo', debt: 1450.00, overdue: 45, phone: '551132224455', wa: '5511988881001', email: 'maria.santos@uol.com.br', bracket: 'AGE_60_PLUS' as const, intent: 'P1_ALTA_PROPENSAO_VOZ' as const, channel: 'VOICE' as const, window: '09:00 – 11:30' },
-  { name: 'Lucas Gabriel Silva', age: 22, ddd: '71', uf: 'BA', city: 'Salvador', debt: 320.00, overdue: 18, phone: '5571991112233', wa: '5571991112233', email: 'lucas.g@gmail.com', bracket: 'AGE_16_24' as const, intent: 'P3_DIGITAL_FIRST' as const, channel: 'WHATSAPP' as const, window: '12:00 – 13:30 (Wi-Fi)' },
-  { name: 'Carlos Eduardo Souza', age: 41, ddd: '21', uf: 'RJ', city: 'Rio de Janeiro', debt: 2890.00, overdue: 90, phone: '5521987654321', wa: '5521987654321', email: 'carlos.edu@globo.com', bracket: 'AGE_35_44' as const, intent: 'P2_HIBRIDO_DIGITAL_VOZ' as const, channel: 'WHATSAPP' as const, window: '17:30 – 19:30' },
-  { name: 'Fernanda Cristina Oliveira', age: 33, ddd: '92', uf: 'AM', city: 'Manaus', debt: 610.00, overdue: 30, phone: '5592981113344', wa: '5592981113344', email: 'fernanda.am@hotmail.com', bracket: 'AGE_25_34' as const, intent: 'P2_HIBRIDO_DIGITAL_VOZ' as const, channel: 'WHATSAPP' as const, window: '19:00 – 20:45 (Wi-Fi)' },
-  { name: 'Seu José Raimundo Pereira', age: 72, ddd: '85', uf: 'CE', city: 'Fortaleza', debt: 980.00, overdue: 60, phone: '558534567890', wa: '5585988776655', email: 'jose.pereira@gmail.com', bracket: 'AGE_60_PLUS' as const, intent: 'P1_ALTA_PROPENSAO_VOZ' as const, channel: 'VOICE' as const, window: '08:30 – 11:15' },
-  { name: 'Patrícia da Costa Lima', age: 29, ddd: '41', uf: 'PR', city: 'Curitiba', debt: 540.00, overdue: 15, phone: '5541999887766', wa: '5541999887766', email: 'patricia.costa@adv.com.br', bracket: 'AGE_25_34' as const, intent: 'P3_DIGITAL_FIRST' as const, channel: 'WHATSAPP' as const, window: '11:45 – 13:15' },
-  { name: 'Antônio Marcos Ferreira', age: 58, ddd: '31', uf: 'MG', city: 'Belo Horizonte', debt: 3400.00, overdue: 120, phone: '5531984445566', wa: '5531984445566', email: 'marcos.ferreira@terra.com.br', bracket: 'AGE_45_59' as const, intent: 'P2_HIBRIDO_DIGITAL_VOZ' as const, channel: 'VOICE' as const, window: '10:00 – 12:00' },
-  { name: 'Beatriz Helena Rocha', age: 24, ddd: '51', uf: 'RS', city: 'Porto Alegre', debt: 410.00, overdue: 22, phone: '5551992223344', wa: '5551992223344', email: 'bia.rocha@icloud.com', bracket: 'AGE_16_24' as const, intent: 'P3_DIGITAL_FIRST' as const, channel: 'WHATSAPP' as const, window: '18:00 – 19:30' },
-  { name: 'Rodrigo Henrique Castro', age: 38, ddd: '61', uf: 'DF', city: 'Brasília', debt: 1780.00, overdue: 40, phone: '5561993334455', wa: '5561993334455', email: 'rodrigo.castro@bb.com.br', bracket: 'AGE_35_44' as const, intent: 'P2_HIBRIDO_DIGITAL_VOZ' as const, channel: 'WHATSAPP' as const, window: '12:00 – 14:00' },
-  { name: 'Silvia Regina Andrade', age: 63, ddd: '19', uf: 'SP', city: 'Campinas', debt: 2150.00, overdue: 75, phone: '551932334455', wa: '5519987778899', email: 'silvia.andrade@gmail.com', bracket: 'AGE_60_PLUS' as const, intent: 'P1_ALTA_PROPENSAO_VOZ' as const, channel: 'VOICE' as const, window: '09:00 – 11:30' },
-  { name: 'Felipe Augusto Nogueira', age: 31, ddd: '62', uf: 'GO', city: 'Goiânia', debt: 890.00, overdue: 35, phone: '5562985556677', wa: '5562985556677', email: 'felipe.agro@gmail.com', bracket: 'AGE_25_34' as const, intent: 'P2_HIBRIDO_DIGITAL_VOZ' as const, channel: 'WHATSAPP' as const, window: '17:00 – 18:45' },
-  { name: 'Dona Helena Vasconcelos', age: 79, ddd: '81', uf: 'PE', city: 'Recife', debt: 1200.00, overdue: 80, phone: '558134221100', wa: '', email: '', bracket: 'AGE_60_PLUS' as const, intent: 'P1_ALTA_PROPENSAO_VOZ' as const, channel: 'VOICE' as const, window: '08:30 – 11:00' },
+const FIRST_NAMES = [
+  'Ana', 'Lucas', 'Carlos', 'Fernanda', 'José', 'Patrícia', 'Antônio', 'Beatriz',
+  'Rodrigo', 'Silvia', 'Felipe', 'Helena', 'Marcos', 'Camila', 'Gabriel', 'Juliana',
+  'Rafael', 'Mariana', 'Thiago', 'Aline', 'Matheus', 'Renata', 'Gustavo', 'Larissa',
+  'Eduardo', 'Vanessa', 'Vinícius', 'Amanda', 'Leonardo', 'Bruna', 'Marcelo', 'Tatiane',
+  'Diego', 'Priscila', 'Danilo', 'Letícia', 'Fábio', 'Sabrina', 'Ricardo', 'Carolina',
+  'Sebastião', 'Aparecida', 'Raimundo', 'Francisca', 'Geraldo', 'Maria', 'João', 'Pedro',
+  'Luiz', 'Vera', 'Wagner', 'Sônia', 'Cláudio', 'Eliane', 'Sérgio', 'Marlene', 'Jorge', 'Rosa',
 ];
 
-const CONTACTS: FullContact[] = Array.from({ length: 24 }, (_, idx) => {
+const LAST_NAMES = [
+  'Silva', 'Santos', 'Oliveira', 'Souza', 'Rodrigues', 'Ferreira', 'Alves', 'Pereira',
+  'Lima', 'Gomes', 'Costa', 'Ribeiro', 'Martins', 'Carvalho', 'Almeida', 'Lopes',
+  'Soares', 'Fernandes', 'Vieira', 'Barbosa', 'Rocha', 'Dias', 'Nascimento', 'Andrade',
+  'Moreira', 'Nunes', 'Marques', 'Machado', 'Mendes', 'Freitas', 'Cardoso', 'Ramos',
+  'Gonçalves', 'Santana', 'Teixeira', 'Castro', 'Moraes', 'Cavalcanti', 'Pinto', 'Monteiro',
+];
+
+const HUBS = [
+  { ddd: '11', uf: 'SP', city: 'São Paulo' },
+  { ddd: '21', uf: 'RJ', city: 'Rio de Janeiro' },
+  { ddd: '31', uf: 'MG', city: 'Belo Horizonte' },
+  { ddd: '41', uf: 'PR', city: 'Curitiba' },
+  { ddd: '51', uf: 'RS', city: 'Porto Alegre' },
+  { ddd: '71', uf: 'BA', city: 'Salvador' },
+  { ddd: '81', uf: 'PE', city: 'Recife' },
+  { ddd: '85', uf: 'CE', city: 'Fortaleza' },
+  { ddd: '61', uf: 'DF', city: 'Brasília' },
+  { ddd: '62', uf: 'GO', city: 'Goiânia' },
+  { ddd: '91', uf: 'PA', city: 'Belém' },
+  { ddd: '92', uf: 'AM', city: 'Manaus' },
+  { ddd: '19', uf: 'SP', city: 'Campinas' },
+  { ddd: '47', uf: 'SC', city: 'Joinville' },
+];
+
+const AGES = [21, 23, 28, 31, 34, 38, 42, 49, 54, 63, 68, 74];
+
+const CONTACTS: FullContact[] = Array.from({ length: 1000 }, (_, idx) => {
   const i = idx + 1;
   const id = uuid(100 + i);
-  const p = BRAZILIAN_PROFILES[idx % BRAZILIAN_PROFILES.length];
-  const externalId = `${p.ddd}${String(i * 12345).padStart(6, '0')}`;
-  const name = `${p.name} ${idx >= BRAZILIAN_PROFILES.length ? '(Filial)' : ''}`.trim();
-  const phone1 = p.phone;
-  const wa = p.wa || p.phone;
+  const externalId = String(i).padStart(6, '0');
+  const fn = FIRST_NAMES[i % FIRST_NAMES.length];
+  const ln1 = LAST_NAMES[(i * 3) % LAST_NAMES.length];
+  const ln2 = LAST_NAMES[(i * 7 + 1) % LAST_NAMES.length];
+  const name = `${fn} ${ln1} ${ln2}`;
+  const hub = HUBS[i % HUBS.length];
+  const age = AGES[i % AGES.length];
+
+  let intent = 'P2_HIBRIDO_DIGITAL_VOZ';
+  if (age < 25) intent = i % 3 === 0 ? 'P1_ALTA_PROPENSAO_VOZ' : 'P3_DIGITAL_FIRST';
+  else if (age < 35) intent = i % 2 === 0 ? 'P1_ALTA_PROPENSAO_VOZ' : 'P2_HIBRIDO_DIGITAL_VOZ';
+  else if (age < 60) intent = i % 3 === 0 ? 'P2_HIBRIDO_DIGITAL_VOZ' : 'P1_ALTA_PROPENSAO_VOZ';
+  else intent = 'P1_ALTA_PROPENSAO_VOZ';
+
+  const numPart = String(80000000 + ((i * 179) % 19999999)).slice(0, 8);
+  const phoneRaw = `55${hub.ddd}9${numPart}`;
+  const phoneMasked = `(${hub.ddd}) 9${numPart.slice(0, 4)}-${numPart.slice(4)}`;
+
   const destinations: Destination[] = [
-    { id: uuid(200 + i * 2), channelType: 'VOICE', address: phone1, addressMasked: maskAddress(phone1), label: 'Telefone Principal', priority: 1, valid: true, blocked: false },
+    {
+      id: uuid(2000 + i * 4 + 1),
+      channelType: 'VOICE',
+      address: phoneRaw,
+      addressMasked: phoneMasked,
+      label: 'Telefone Principal',
+      priority: 1,
+      valid: true,
+      blocked: false,
+    },
   ];
-  if (p.wa) {
-    destinations.push({ id: uuid(200 + i * 2 + 1), channelType: 'WHATSAPP', address: wa, addressMasked: maskAddress(wa), label: 'WhatsApp Verificado', priority: 1, valid: true, blocked: false });
+
+  if (age >= 60 && i % 2 === 0) {
+    const fixedNum = String(2000000 + ((i * 83) % 799999)).slice(0, 3) + String(i * 10).slice(0, 4).padStart(4, '0');
+    const fixedRaw = `55${hub.ddd}3${fixedNum}`;
+    const fixedMasked = `(${hub.ddd}) 3${fixedNum.slice(0, 3)}-${fixedNum.slice(3)}`;
+    destinations.push({
+      id: uuid(2000 + i * 4 + 2),
+      channelType: 'VOICE',
+      address: fixedRaw,
+      addressMasked: fixedMasked,
+      label: 'Telefone Fixo Residencial',
+      priority: 2,
+      valid: true,
+      blocked: false,
+    });
   }
-  if (p.email) {
-    destinations.push({ id: uuid(200 + i * 2 + 2), channelType: 'EMAIL', address: p.email, addressMasked: p.email.replace(/(.{2})(.*)(@.*)/, '$1***$3'), label: 'E-mail Titular', priority: 2, valid: true, blocked: false });
+
+  if (age < 60 || i % 3 !== 0) {
+    destinations.push({
+      id: uuid(2000 + i * 4 + 3),
+      channelType: 'WHATSAPP',
+      address: phoneRaw,
+      addressMasked: phoneMasked,
+      label: 'WhatsApp Verificado',
+      priority: 1,
+      valid: true,
+      blocked: false,
+    });
   }
-  const blocks: Block[] =
-    i === 11
-      ? [
-          {
-            id: uuid(301),
-            scope: 'CONTACT',
-            destinationId: null,
-            reason: 'Bloqueio Procon / Não Me Perturbe (DNC Nacional)',
-            origin: 'MANUAL',
-            createdAt: '2026-10-18T14:20:00Z',
-            revokedAt: null,
-          },
-        ]
-      : [];
+
+  if (i % 4 !== 0) {
+    const email = `${fn.toLowerCase()}.${ln1.toLowerCase()}${i}@exemplo.com.br`;
+    destinations.push({
+      id: uuid(2000 + i * 4 + 4),
+      channelType: 'EMAIL',
+      address: email,
+      addressMasked: email.replace(/(.{2})(.*)(@.*)/, '$1***$3'),
+      label: 'E-mail Titular',
+      priority: 3,
+      valid: true,
+      blocked: false,
+    });
+  }
+
+  const isDnc = i === 11 || i % 59 === 0;
+  const blocks: Block[] = isDnc
+    ? [
+        {
+          id: uuid(5000 + i),
+          scope: 'CONTACT',
+          destinationId: null,
+          reason: 'Bloqueio Procon / Não Me Perturbe (DNC Nacional)',
+          origin: 'MANUAL',
+          createdAt: '2026-10-18T14:20:00Z',
+          revokedAt: null,
+        },
+      ]
+    : [];
+
+  const debt = Number((180 + ((i * 233) % 7800)).toFixed(2));
+  const overdue = 15 + ((i * 13) % 165);
+  const score = 320 + ((i * 37) % 580);
+
   return {
     id,
     externalId,
     name,
     attributes: {
-      cidade: p.city,
-      uf: p.uf,
-      idade: p.age,
-      valor_divida: p.debt,
-      dias_atraso: p.overdue,
-      ddd: p.ddd,
-      score: 45 + ((i * 19) % 50),
+      cidade: hub.city,
+      uf: hub.uf,
+      idade: age,
+      valor_divida: debt,
+      dias_atraso: overdue,
+      ddd: hub.ddd,
+      score,
+      phone_intent: intent,
     },
-    historyTotal: i % 4 === 0 ? null : (i * 2) % 5,
-    historyReferenceDate: i % 4 === 0 ? null : '2026-10-20',
+    historyTotal: i % 5 === 0 ? null : (i * 2) % 6,
+    historyReferenceDate: i % 5 === 0 ? null : '2026-10-20',
     destinations,
     blocks,
   };
@@ -314,17 +402,17 @@ const MAILINGS: { detail: MailingDetail; records: MailingRecord[] }[] = [
   {
     detail: {
       id: MAILING_ID,
-      name: 'Carteira exemplo',
+      name: 'Mailing Piloto 1.000 Contatos (Inteligência de CPC)',
       createdAt: '2026-10-18T12:00:00Z',
       recordCount: CONTACTS.length,
-      columns: ['cidade', 'valor_divida', 'dias_atraso', 'score'],
+      columns: ['cidade', 'uf', 'idade', 'valor_divida', 'dias_atraso', 'score', 'phone_intent'],
       versions: [
         {
           id: MAILING_VER_ID,
           version: 1,
-          totalRows: CONTACTS.length + 1,
+          totalRows: CONTACTS.length + 5,
           validRows: CONTACTS.length,
-          rejectedRows: 1,
+          rejectedRows: 5,
           createdAt: '2026-10-18T12:00:00Z',
         },
       ],
@@ -347,13 +435,13 @@ const LIST_VER_ID = uuid(71);
 const LISTS: ListDetail[] = [
   {
     id: LIST_ID,
-    name: 'Atraso > 30 dias (SP/RJ)',
-    mailing: { id: MAILING_ID, name: 'Carteira exemplo' },
+    name: 'Atraso > 30 dias (Faixa Prioritária 680 Contatos)',
+    mailing: { id: MAILING_ID, name: 'Mailing Piloto 1.000 Contatos (Inteligência de CPC)' },
     latestVersion: {
       id: LIST_VER_ID,
       version: 1,
       membershipMode: 'SNAPSHOT',
-      memberCount: 16,
+      memberCount: 680,
       publishedAt: '2026-10-19T09:30:00Z',
     },
     versions: [
@@ -361,7 +449,7 @@ const LISTS: ListDetail[] = [
         id: LIST_VER_ID,
         version: 1,
         membershipMode: 'SNAPSHOT',
-        memberCount: 16,
+        memberCount: 680,
         publishedAt: '2026-10-19T09:30:00Z',
         filters: [{ field: 'dias_atraso', op: 'gt', value: 30 }],
         sort: [{ field: 'valor_divida', dir: 'desc' }],
@@ -376,22 +464,22 @@ const CAMPAIGN_2_ID = uuid(81);
 const CAMPAIGNS: CampaignDetail[] = [
   {
     id: CAMPAIGN_1_ID,
-    name: 'Cobrança Outubro — Faixa 30+ dias',
-    description: 'Acionamento multicanal WhatsApp seguido de Discador para carteira prioritária.',
+    name: 'Cobrança Outubro — Faixa 30+ dias (1.000 Contatos)',
+    description: 'Acionamento multicanal inteligente (WhatsApp + Discador) orientado por modelo preditivo de CPC.',
     status: 'RUNNING',
     statusLabel: CAMPAIGN_STATUS_LABEL.RUNNING,
     operationalState: 'PROCESSING',
-    operationalExplanation: 'Processando: reservas e envios em andamento dentro da janela operacional.',
-    audience: { type: 'LIST', name: 'Atraso > 30 dias (SP/RJ)' },
+    operationalExplanation: 'Processando: ondas automáticas e distribuição inteligente dentro da janela operacional.',
+    audience: { type: 'MAILING', name: 'Mailing Piloto 1.000 Contatos (Inteligência de CPC)' },
     journeyName: 'WhatsApp → Discador',
     strategyName: 'Demonstração 24x7',
     strategyVersion: 1,
     createdAt: '2026-10-20T10:00:00Z',
     startedAt: '2026-10-20T10:05:00Z',
     scheduledAt: null,
-    progress: { members: 16, finished: 5, active: 11 },
-    mailing: { id: MAILING_ID, name: 'Carteira exemplo' },
-    listVersion: { id: LIST_VER_ID, version: 1, membershipMode: 'SNAPSHOT' },
+    progress: { members: 1000, finished: 180, active: 820 },
+    mailing: { id: MAILING_ID, name: 'Mailing Piloto 1.000 Contatos (Inteligência de CPC)' },
+    listVersion: null,
     journey: {
       id: JOURNEYS[1].id,
       version: 1,
@@ -406,20 +494,20 @@ const CAMPAIGNS: CampaignDetail[] = [
   {
     id: CAMPAIGN_2_ID,
     name: 'Recuperação Preventiva — Carteira Geral',
-    description: 'Campanha em pausa para revisão de lote.',
+    description: 'Campanha em pausa para revisão de lote e calibração de horários.',
     status: 'PAUSED',
     statusLabel: CAMPAIGN_STATUS_LABEL.PAUSED,
     operationalState: 'IDLE',
     operationalExplanation: 'Campanha pausada: novas reservas suspensas; retornos pendentes continuam sendo recebidos.',
-    audience: { type: 'MAILING', name: 'Carteira exemplo' },
+    audience: { type: 'MAILING', name: 'Mailing Piloto 1.000 Contatos (Inteligência de CPC)' },
     journeyName: 'Discador',
     strategyName: 'Padrão cobrança',
     strategyVersion: 1,
     createdAt: '2026-10-19T14:00:00Z',
     startedAt: '2026-10-19T14:10:00Z',
     scheduledAt: null,
-    progress: { members: 23, finished: 8, active: 15 },
-    mailing: { id: MAILING_ID, name: 'Carteira exemplo' },
+    progress: { members: 450, finished: 110, active: 340 },
+    mailing: { id: MAILING_ID, name: 'Mailing Piloto 1.000 Contatos (Inteligência de CPC)' },
     listVersion: null,
     journey: {
       id: JOURNEYS[0].id,
@@ -1308,10 +1396,15 @@ export async function handleMockApi<T = unknown>(
   // Contacts
   if (pathname === '/contacts' && method === 'GET') {
     const q = (searchParams.get('q') ?? '').toLowerCase();
+    const cursor = searchParams.get('cursor');
+    const limit = Math.max(1, Math.min(100, parseInt(searchParams.get('limit') ?? '50', 10)));
     const filtered = CONTACTS.filter(
       (c) => !q || c.name.toLowerCase().includes(q) || c.externalId.toLowerCase().includes(q),
     );
-    const items: ContactRow[] = filtered.map((c, idx) => {
+    const offset = cursor ? parseInt(cursor, 10) : 0;
+    const pageContacts = filtered.slice(offset, offset + limit);
+    const nextCursor = offset + limit < filtered.length ? String(offset + limit) : null;
+    const items: ContactRow[] = pageContacts.map((c, idx) => {
       const byChan = new Map<ChannelType, number>();
       for (const d of c.destinations) byChan.set(d.channelType, (byChan.get(d.channelType) ?? 0) + 1);
       return {
@@ -1326,7 +1419,7 @@ export async function handleMockApi<T = unknown>(
         intelligence: buildContactIntelligenceRationale(c),
       };
     });
-    return { items, nextCursor: null, total: items.length } as T;
+    return { items, nextCursor, total: filtered.length } as T;
   }
   const contactMatch = pathname.match(/^\/contacts\/([^/]+)$/);
   if (contactMatch && method === 'GET') {
@@ -1832,8 +1925,17 @@ export async function handleMockApi<T = unknown>(
 
   if (pathname.match(/^\/intelligence\/runs\/([^/]+)\/plans$/) && method === 'GET') {
     const items = CONTACTS.slice(0, 12).map((c, idx) => {
-      const p = BRAZILIAN_PROFILES[idx % BRAZILIAN_PROFILES.length];
-      const isDnc = idx === 11;
+      const isDnc = c.blocks.some((b) => !b.revokedAt && b.scope === 'CONTACT');
+      const ddd = String(c.attributes.ddd ?? '11');
+      const uf = String(c.attributes.uf ?? 'SP');
+      const city = String(c.attributes.cidade ?? 'São Paulo');
+      const age = Number(c.attributes.idade ?? 35);
+      const intent = String(c.attributes.phone_intent ?? 'P2_HIBRIDO_DIGITAL_VOZ');
+      const bracket = age >= 60 ? 'AGE_60_PLUS' : age >= 45 ? 'AGE_45_59' : age >= 35 ? 'AGE_35_44' : age >= 25 ? 'AGE_25_34' : 'AGE_16_24';
+      const channel = intent === 'P1_ALTA_PROPENSAO_VOZ' ? 'VOICE' : 'WHATSAPP';
+      const window = age >= 60 ? '08:30 – 11:30' : age < 25 ? '12:00 – 13:30 (Wi-Fi)' : '17:30 – 19:30';
+      const p = { ddd, uf, city, age, bracket, intent, channel, window };
+
       const track = idx < 8 ? ('PRODUCTION' as const) : ('LABORATORY' as const);
       const prob = isDnc ? 0 : Number((0.28 + (idx % 4) * 0.08).toFixed(2));
       const costPerCpc = isDnc ? 0 : Number((0.35 + (idx % 3) * 0.08).toFixed(2));

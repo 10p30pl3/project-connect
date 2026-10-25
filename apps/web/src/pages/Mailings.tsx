@@ -21,11 +21,21 @@ export function MailingsSection() {
           <h2 className="text-sm font-semibold text-slate-800">Mailings (Cargas Originais)</h2>
           <p className="text-xs text-slate-500">Arquivos CSV e cargas importadas com versionamento e conferência de linhas.</p>
         </div>
-        {can('mailings.write') && (
-          <Link to="/mailings/importar" className={btnClass('primary', 'sm')}>
-            <Plus className="size-4" aria-hidden /> Importar mailing
-          </Link>
-        )}
+        <div className="flex items-center gap-2">
+          <a
+            href="/mailing_1000_contatos_cpc.csv"
+            download="mailing_1000_contatos_cpc.csv"
+            className={btnClass('secondary', 'sm')}
+            title="Baixar CSV piloto com 1.000 contatos para inteligência de CPC"
+          >
+            <Download className="size-4 text-brand-600" aria-hidden /> Baixar CSV Piloto (1.000 contatos)
+          </a>
+          {can('mailings.write') && (
+            <Link to="/mailings/importar" className={btnClass('primary', 'sm')}>
+              <Plus className="size-4" aria-hidden /> Importar mailing
+            </Link>
+          )}
+        </div>
       </div>
       {q.isLoading ? (
         <Loading />
