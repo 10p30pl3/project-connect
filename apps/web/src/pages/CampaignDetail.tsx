@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useState } from 'react';
-import { ArrowLeft, Download, Pause, Play, Square } from 'lucide-react';
+import { ArrowLeft, Archive, Download, Pause, Play, Square } from 'lucide-react';
 import {
   ATTEMPT_STATES,
   ATTEMPT_STATE_LABEL,
@@ -94,17 +94,18 @@ function CampaignActions({ c }: { c: CampaignDetail }) {
   const qc = useQueryClient();
   const toast = useToast();
   const [closeOpen, setCloseOpen] = useState(false);
-  const [confirm, setConfirm] = useState<null | 'start' | 'pause' | 'resume'>(null);
+  const [confirm, setConfirm] = useState<null | 'start' | 'pause' | 'resume' | 'archive'>(null);
   const [reason, setReason] = useState('');
   const [reasonErr, setReasonErr] = useState<string | null>(null);
   const act = useMutation({
     mutationFn: ({ action, body }: { action: string; body?: unknown }) => post(`/campaigns/${c.id}/${action}`, body),
     onSuccess: (_d, v) => {
       const msg: Record<string, string> = {
-        start: 'Campanha iniciada.',
-        pause: 'Campanha pausada. Retornos em andamento continuam sendo processados.',
-        resume: 'Campanha retomada.',
-        close: 'Campanha encerrada. Reservas não enviadas foram canceladas.',
+        start: 'Campanha iniciada (Start).',
+        pause: 'Campanha pausada (Pause). Retornos em andamento continuam sendo processados.',
+        resume: 'Campanha retomada (Start).',
+        close: 'Campanha encerrada (Stop). Reservas não enviadas foram canceladas.',
+        archive: 'Campanha arquivada.',
       };
       toast('success', msg[v.action] ?? 'Feito.');
       qc.invalidateQueries({ queryKey: ['campaign', c.id] });
@@ -117,30 +118,36 @@ function CampaignActions({ c }: { c: CampaignDetail }) {
   if (!can('campaigns.operate')) return null;
   const s = c.status;
   const texts = {
-    start: ['Iniciar campanha?', 'As reservas e envios começam na próxima janela permitida pelo calendário da estratégia.', 'Iniciar'],
-    pause: ['Pausar campanha?', 'Novas reservas e envios param. Retornos de tentativas já enviadas continuam sendo processados.', 'Pausar'],
-    resume: ['Retomar campanha?', 'Novas reservas voltam a ser feitas, sujeitas a elegibilidade e calendário.', 'Retomar'],
+    start: ['Iniciar campanha (Start)?', 'As reservas e envios começam na próxima janela permitida pelo calendário da estratégia.', 'Start'],
+    pause: ['Pausar campanha (Pause)?', 'Novas reservas e envios param. Retornos de tentativas já enviadas continuam sendo processados.', 'Pause'],
+    resume: ['Retomar campanha (Start)?', 'Novas reservas voltam a ser feitas, sujeitas a elegibilidade e calendário.', 'Start'],
+    archive: ['Arquivar campanha?', 'A campanha sairá da listagem principal e ficará disponível no filtro "Arquivada", preservando todo o histórico e indicadores.', 'Arquivar'],
   } as const;
   return (
     <>
       {(s === 'READY' || s === 'SCHEDULED') && (
         <Button variant="primary" icon={<Play className="size-4" aria-hidden />} onClick={() => setConfirm('start')}>
-          Iniciar agora
+          Start
         </Button>
       )}
       {s === 'RUNNING' && (
         <Button icon={<Pause className="size-4" aria-hidden />} onClick={() => setConfirm('pause')}>
-          Pausar
+          Pause
         </Button>
       )}
       {s === 'PAUSED' && (
         <Button variant="primary" icon={<Play className="size-4" aria-hidden />} onClick={() => setConfirm('resume')}>
-          Retomar
+          Start
         </Button>
       )}
       {['RUNNING', 'PAUSED', 'READY', 'SCHEDULED'].includes(s) && (
         <Button variant="danger" icon={<Square className="size-4" aria-hidden />} onClick={() => setCloseOpen(true)}>
-          Encerrar
+          Stop
+        </Button>
+      )}
+      {s !== 'ARCHIVED' && (
+        <Button variant="secondary" icon={<Archive className="size-4" aria-hidden />} onClick={() => setConfirm('archive')}>
+          Arquivar
         </Button>
       )}
       <Modal

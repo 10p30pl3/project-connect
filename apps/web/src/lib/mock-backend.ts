@@ -1001,7 +1001,7 @@ export async function handleMockApi<T = unknown>(
   // Campaigns
   if (pathname === '/campaigns' && method === 'GET') {
     const status = searchParams.get('status') ?? '';
-    const items = CAMPAIGNS.filter((c) => !status || c.status === status);
+    const items = CAMPAIGNS.filter((c) => (status ? c.status === status : c.status !== 'ARCHIVED'));
     return { items } as T;
   }
   if (pathname === '/campaigns' && method === 'POST') {
@@ -1046,10 +1046,11 @@ export async function handleMockApi<T = unknown>(
     DRAFT = null;
     return camp as T;
   }
-  const campActionMatch = pathname.match(/^\/campaigns\/([^/]+)\/(start|pause|resume|close)$/);
+  const campActionMatch = pathname.match(/^\/campaigns\/([^/]+)\/(start|pause|resume|close|archive)$/);
   if (campActionMatch && method === 'POST') {
     const c = CAMPAIGNS.find((x) => x.id === campActionMatch[1]) ?? CAMPAIGNS[0];
     const act = campActionMatch[2];
+    const beforeStatus = c.status;
     if (act === 'start' || act === 'resume') {
       c.status = 'RUNNING';
       c.statusLabel = CAMPAIGN_STATUS_LABEL.RUNNING;
@@ -1065,8 +1066,24 @@ export async function handleMockApi<T = unknown>(
       c.status = 'CLOSED';
       c.statusLabel = CAMPAIGN_STATUS_LABEL.CLOSED;
       c.operationalState = 'IDLE';
-      c.operationalExplanation = `Campanha encerrada (${body?.reason ?? 'sem motivo'}).`;
+      c.operationalExplanation = `Campanha encerrada (${body?.reason ?? 'parada pelo usuário'}).`;
+    } else if (act === 'archive') {
+      c.status = 'ARCHIVED';
+      c.statusLabel = CAMPAIGN_STATUS_LABEL.ARCHIVED;
+      c.operationalState = 'IDLE';
+      c.operationalExplanation = 'Campanha arquivada (histórico preservado).';
     }
+    AUDITS.unshift({
+      id: AUDITS.length + 1,
+      at: new Date().toISOString(),
+      user: { name: me.name },
+      action: `campaign.${act}`,
+      entity: 'campaign',
+      entityId: c.id,
+      reason: body?.reason ?? null,
+      before: { status: beforeStatus },
+      after: { status: c.status },
+    });
     return c as T;
   }
   const campMatch = pathname.match(/^\/campaigns\/([^/]+)$/);

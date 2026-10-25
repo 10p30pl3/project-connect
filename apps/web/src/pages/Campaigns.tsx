@@ -1,21 +1,49 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowRight, Database, ListFilter, Megaphone, Plus } from 'lucide-react';
+import { Archive, ArrowRight, Database, ListFilter, Megaphone, Pause, Play, Plus, Square } from 'lucide-react';
 import { CAMPAIGN_STATUS, CAMPAIGN_STATUS_LABEL, type CampaignStatus } from '@voll/shared';
-import { get, qs } from '../lib/api';
+import { errorMessage, get, post, qs } from '../lib/api';
 import type { CampaignSummary } from '../lib/types';
 import { fmtDateTime, fmtNumber } from '../lib/format';
 import { useAuth } from '../lib/auth';
-import { btnClass, CampaignStatusBadge, Card, Empty, ErrorState, Loading, PageHeader, TableWrap } from '../components/ui';
+import { Button, btnClass, CampaignStatusBadge, Card, Empty, ErrorState, Field, Input, Loading, Modal, PageHeader, TableWrap, useToast } from '../components/ui';
 
 export function CampaignsPage() {
   const { can } = useAuth();
+  const qc = useQueryClient();
+  const toast = useToast();
   const [sp, setSp] = useSearchParams();
   const status = (sp.get('status') ?? '') as CampaignStatus | '';
+  const [stopTarget, setStopTarget] = useState<CampaignSummary | null>(null);
+  const [stopReason, setStopReason] = useState('');
+  const [stopErr, setStopErr] = useState<string | null>(null);
+
   const q = useQuery({
     queryKey: ['campaigns', status],
     queryFn: () => get<{ items: CampaignSummary[] }>(`/campaigns${qs({ status })}`),
     refetchInterval: 5000,
+  });
+
+  const actionM = useMutation({
+    mutationFn: ({ id, action, body }: { id: string; action: 'start' | 'pause' | 'resume' | 'close' | 'archive'; body?: unknown }) =>
+      post(`/campaigns/${id}/${action}`, body),
+    onSuccess: (_d, vars) => {
+      const msg: Record<string, string> = {
+        start: 'Campanha iniciada (Start).',
+        resume: 'Campanha retomada (Start).',
+        pause: 'Campanha pausada (Pause).',
+        close: 'Campanha encerrada (Stop).',
+        archive: 'Campanha arquivada.',
+      };
+      toast('success', msg[vars.action] ?? 'Ação executada.');
+      qc.invalidateQueries({ queryKey: ['campaigns'] });
+      qc.invalidateQueries({ queryKey: ['overview'] });
+      setStopTarget(null);
+      setStopReason('');
+      setStopErr(null);
+    },
+    onError: (e) => toast('error', errorMessage(e)),
   });
 
   const shortcuts = [
@@ -23,6 +51,8 @@ export function CampaignsPage() {
     { to: '/mailings/importar', label: 'Importar mailing', desc: 'CSV ou conteúdo colado, com conferência por linha.', icon: Database, perm: 'mailings.write' as const },
     { to: '/listas/nova', label: 'Preparar lista', desc: 'Filtros, ordenação e modalidade sobre um mailing.', icon: ListFilter, perm: 'lists.write' as const },
   ];
+
+  const canOperate = can('campaigns.operate');
 
   return (
     <div className="space-y-4">
@@ -105,39 +135,150 @@ export function CampaignsPage() {
                   <th>Estratégia</th>
                   <th>Progresso</th>
                   <th>Criada</th>
+                  {canOperate && <th className="text-right">Controles</th>}
                 </tr>
               </thead>
               <tbody>
-                {q.data!.items.map((c) => (
-                  <tr key={c.id}>
-                    <td className="min-w-48">
-                      <Link to={`/campanhas/${c.id}`} className="font-medium text-brand-800 hover:underline">
-                        {c.name}
-                      </Link>
-                      <div className="text-xs text-slate-500">{c.operationalExplanation}</div>
-                    </td>
-                    <td>
-                      <CampaignStatusBadge status={c.status} />
-                    </td>
-                    <td>
-                      <span className="text-xs text-slate-500">{c.audience.type === 'LIST' ? 'Lista' : 'Mailing'}</span>
-                      <div>{c.audience.name}</div>
-                    </td>
-                    <td>{c.journeyName}</td>
-                    <td>
-                      {c.strategyName} <span className="text-slate-500">v{c.strategyVersion}</span>
-                    </td>
-                    <td className="min-w-36">
-                      <Progress {...c.progress} />
-                    </td>
-                    <td className="whitespace-nowrap text-slate-600">{fmtDateTime(c.createdAt)}</td>
-                  </tr>
-                ))}
+                {q.data!.items.map((c) => {
+                  const canStart = c.status === 'READY' || c.status === 'SCHEDULED' || c.status === 'PAUSED';
+                  const canPause = c.status === 'RUNNING';
+                  const canStop = ['RUNNING', 'PAUSED', 'READY', 'SCHEDULED'].includes(c.status);
+                  const canArchive = c.status !== 'ARCHIVED';
+                  const busy = actionM.isPending && actionM.variables?.id === c.id;
+
+                  return (
+                    <tr key={c.id}>
+                      <td className="min-w-48">
+                        <Link to={`/campanhas/${c.id}`} className="font-medium text-brand-800 hover:underline">
+                          {c.name}
+                        </Link>
+                        <div className="text-xs text-slate-500">{c.operationalExplanation}</div>
+                      </td>
+                      <td>
+                        <CampaignStatusBadge status={c.status} />
+                      </td>
+                      <td>
+                        <span className="text-xs text-slate-500">{c.audience.type === 'LIST' ? 'Lista' : 'Mailing'}</span>
+                        <div>{c.audience.name}</div>
+                      </td>
+                      <td>{c.journeyName}</td>
+                      <td>
+                        {c.strategyName} <span className="text-slate-500">v{c.strategyVersion}</span>
+                      </td>
+                      <td className="min-w-36">
+                        <Progress {...c.progress} />
+                      </td>
+                      <td className="whitespace-nowrap text-slate-600">{fmtDateTime(c.createdAt)}</td>
+                      {canOperate && (
+                        <td className="whitespace-nowrap text-right">
+                          <div className="inline-flex items-center justify-end gap-1">
+                            {/* Start / Resume */}
+                            <Button
+                              size="sm"
+                              variant={canStart ? 'primary' : 'secondary'}
+                              disabled={!canStart || busy}
+                              title={c.status === 'PAUSED' ? 'Retomar campanha (Start)' : 'Iniciar campanha (Start)'}
+                              icon={<Play className="size-3.5" aria-hidden />}
+                              onClick={() =>
+                                actionM.mutate({
+                                  id: c.id,
+                                  action: c.status === 'PAUSED' ? 'resume' : 'start',
+                                })
+                              }
+                            >
+                              Start
+                            </Button>
+
+                            {/* Pause */}
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              disabled={!canPause || busy}
+                              title="Pausar campanha (Pause)"
+                              icon={<Pause className="size-3.5" aria-hidden />}
+                              onClick={() => actionM.mutate({ id: c.id, action: 'pause' })}
+                            >
+                              Pause
+                            </Button>
+
+                            {/* Stop (Encerrar) */}
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              disabled={!canStop || busy}
+                              title="Parar / encerrar campanha (Stop)"
+                              className="text-red-700 hover:bg-red-50 hover:border-red-200"
+                              icon={<Square className="size-3.5" aria-hidden />}
+                              onClick={() => {
+                                setStopTarget(c);
+                                setStopReason('Encerramento operacional pelo painel');
+                                setStopErr(null);
+                              }}
+                            >
+                              Stop
+                            </Button>
+
+                            {/* Arquivar */}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={!canArchive || busy}
+                              title="Arquivar campanha"
+                              icon={<Archive className="size-3.5" aria-hidden />}
+                              onClick={() => actionM.mutate({ id: c.id, action: 'archive', body: { reason: 'Arquivada na listagem' } })}
+                            >
+                              Arquivar
+                            </Button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </TableWrap>
         </Card>
       )}
+
+      <Modal
+        open={!!stopTarget}
+        onOpenChange={(o) => !o && setStopTarget(null)}
+        title={`Parar (Stop) campanha "${stopTarget?.name ?? ''}"?`}
+        description="Impede novas reservas e cancela o que ainda não foi enviado. Tentativas já aceitas pelo canal continuam rastreadas."
+        footer={
+          <>
+            <Button onClick={() => setStopTarget(null)}>Cancelar</Button>
+            <Button
+              variant="danger"
+              loading={actionM.isPending}
+              onClick={() => {
+                if (!stopTarget) return;
+                if (stopReason.trim().length < 3) return setStopErr('Informe o motivo (mínimo 3 caracteres)');
+                actionM.mutate({ id: stopTarget.id, action: 'close', body: { reason: stopReason } });
+              }}
+            >
+              Confirmar Stop
+            </Button>
+          </>
+        }
+      >
+        <Field label="Motivo do encerramento" required error={stopErr ?? undefined}>
+          {(p) => (
+            <Input
+              id={p.id}
+              autoFocus
+              value={stopReason}
+              aria-describedby={p.describedBy}
+              aria-invalid={p.invalid}
+              onChange={(e) => {
+                setStopReason(e.target.value);
+                setStopErr(null);
+              }}
+            />
+          )}
+        </Field>
+      </Modal>
     </div>
   );
 }

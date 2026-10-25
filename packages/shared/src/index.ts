@@ -25,7 +25,7 @@ export const CHANNEL_LABEL: Record<ChannelType, string> = {
   EMAIL: 'E-mail',
 };
 
-export const CAMPAIGN_STATUS = ['READY', 'SCHEDULED', 'RUNNING', 'PAUSED', 'CLOSED', 'COMPLETED'] as const;
+export const CAMPAIGN_STATUS = ['READY', 'SCHEDULED', 'RUNNING', 'PAUSED', 'CLOSED', 'COMPLETED', 'ARCHIVED'] as const;
 export type CampaignStatus = (typeof CAMPAIGN_STATUS)[number];
 export const CAMPAIGN_STATUS_LABEL: Record<CampaignStatus, string> = {
   READY: 'Pronta',
@@ -34,6 +34,7 @@ export const CAMPAIGN_STATUS_LABEL: Record<CampaignStatus, string> = {
   PAUSED: 'Pausada',
   CLOSED: 'Encerrada',
   COMPLETED: 'Concluída',
+  ARCHIVED: 'Arquivada',
 };
 
 export const ATTEMPT_STATES = [

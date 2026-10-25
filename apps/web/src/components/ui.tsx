@@ -178,6 +178,7 @@ export function CampaignStatusBadge({ status }: { status: CampaignStatus }) {
     PAUSED: ['amber', <Pause className={ic} aria-hidden />],
     CLOSED: ['red', <Square className={ic} aria-hidden />],
     COMPLETED: ['brand', <CheckCircle2 className={ic} aria-hidden />],
+    ARCHIVED: ['gray', <Square className={ic} aria-hidden />],
   };
   const [tone, icon] = map[status] ?? ['gray', null];
   return (
