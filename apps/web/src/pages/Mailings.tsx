@@ -92,11 +92,20 @@ export function MailingsSection() {
 }
 
 export function MailingsPage() {
+  const { can } = useAuth();
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Mailings (Cargas Originais)"
+        title="Mailings"
         subtitle="Importação de arquivos CSV, conferência de linhas e versionamento de bases de clientes"
+        actions={
+          can('mailings.write') && (
+            <Link to="/mailings/importar" className={btnClass('primary')}>
+              <Plus className="size-4" aria-hidden />
+              Importar mailing
+            </Link>
+          )
+        }
       />
       <MailingsSection />
     </div>

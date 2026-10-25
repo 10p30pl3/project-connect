@@ -8,22 +8,23 @@ import { useAuth } from '../lib/auth';
 import { Alert, Button, Card, Empty, ErrorState, Field, Input, Loading, Modal, PageHeader, Select, useToast } from '../components/ui';
 import { JourneySteps } from '../components/Summaries';
 
-export function JourneysSection() {
+export function JourneysSection({
+  open: extOpen,
+  onOpenChange: extOnOpenChange,
+}: {
+  open?: boolean;
+  onOpenChange?: (o: boolean) => void;
+} = {}) {
   const { can } = useAuth();
   const q = useQuery({ queryKey: ['journeys'], queryFn: () => get<{ items: Journey[] }>('/journeys') });
-  const [open, setOpen] = useState(false);
+  const [localOpen, setLocalOpen] = useState(false);
+  const open = extOpen !== undefined ? extOpen : localOpen;
+  const setOpen = extOnOpenChange !== undefined ? extOnOpenChange : setLocalOpen;
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-800">Jornadas de Acionamento (Sequência de Canais)</h2>
-          <p className="text-xs text-slate-500">Ordem dos canais, conexões e prazos de feedback (sem política de retentativa local).</p>
-        </div>
-        {can('journeys.write') && (
-          <Button variant="primary" size="sm" icon={<Plus className="size-4" aria-hidden />} onClick={() => setOpen(true)}>
-            Nova jornada
-          </Button>
-        )}
+      <div>
+        <h2 className="text-sm font-semibold text-slate-800">Jornadas de Acionamento (Sequência de Canais)</h2>
+        <p className="text-xs text-slate-500">Ordem dos canais, conexões e prazos de feedback (sem política de retentativa local).</p>
       </div>
       {q.isLoading ? (
         <Loading />
@@ -46,13 +47,22 @@ export function JourneysSection() {
 }
 
 export function JourneysPage() {
+  const { can } = useAuth();
+  const [open, setOpen] = useState(false);
   return (
     <div className="space-y-4">
       <PageHeader
         title="Jornadas de Canal"
         subtitle="Sequência e ordem dos canais, conexões e prazos de feedback para acionamento multicanal"
+        actions={
+          can('journeys.write') && (
+            <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setOpen(true)}>
+              Nova jornada
+            </Button>
+          )
+        }
       />
-      <JourneysSection />
+      <JourneysSection open={open} onOpenChange={setOpen} />
     </div>
   );
 }

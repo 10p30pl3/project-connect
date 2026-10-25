@@ -69,20 +69,12 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
         label: 'Campanhas',
         icon: <Megaphone className={ico} aria-hidden />,
         matchPrefixes: ['/campanhas'],
-        subItems: [
-          { to: '/campanhas', label: 'Todas as campanhas', end: true },
-          { to: '/campanhas/nova', label: 'Nova campanha' },
-        ],
       },
       {
         to: '/inteligencia',
         label: 'Central de inteligência',
         icon: <BrainCircuit className={ico} aria-hidden />,
         matchPrefixes: ['/inteligencia'],
-        subItems: [
-          { to: '/inteligencia?tab=decisao', label: 'Ajustar inteligência (Decisão)' },
-          { to: '/inteligencia?tab=testes', label: 'Desafiar inteligência (Testes)' },
-        ],
       },
     ],
   },
@@ -100,20 +92,12 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
         label: 'Mailings',
         icon: <Database className={ico} aria-hidden />,
         matchPrefixes: ['/mailings'],
-        subItems: [
-          { to: '/mailings', label: 'Bases & Cargas', end: true },
-          { to: '/mailings/importar', label: 'Importar novo mailing' },
-        ],
       },
       {
         to: '/listas',
         label: 'Listas',
         icon: <ListFilter className={ico} aria-hidden />,
         matchPrefixes: ['/listas'],
-        subItems: [
-          { to: '/listas', label: 'Todas as listas', end: true },
-          { to: '/listas/nova', label: 'Criar nova lista' },
-        ],
       },
     ],
   },

@@ -73,11 +73,20 @@ export function ListsSection() {
 }
 
 export function ListsPage() {
+  const { can } = useAuth();
   return (
     <div className="space-y-4">
       <PageHeader
         title="Listas de Segmentação"
         subtitle="Views versionadas sobre um mailing: filtros avançados, ordenação multi-coluna e modalidade"
+        actions={
+          can('lists.write') && (
+            <Link to="/listas/nova" className={btnClass('primary')}>
+              <Plus className="size-4" aria-hidden />
+              Nova lista
+            </Link>
+          )
+        }
       />
       <ListsSection />
     </div>
