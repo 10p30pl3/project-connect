@@ -260,18 +260,6 @@ function UserMenu() {
 
 export function Layout() {
   const loc = useLocation();
-  const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
-
-  const isGroupOpen = (label: string, defaultOpen = true) => {
-    return openMap[label] !== undefined ? openMap[label] : defaultOpen;
-  };
-
-  const toggleGroup = (label: string, defaultOpen = true) => {
-    setOpenMap((prev) => ({
-      ...prev,
-      [label]: !isGroupOpen(label, defaultOpen),
-    }));
-  };
 
   return (
     <div className="flex min-h-full">
@@ -293,51 +281,26 @@ export function Layout() {
                   const isParentDirectActive = isRouteActive(it.to, loc.pathname, loc.search, it.end);
                   const isPrefixMatched = it.matchPrefixes?.some((p) => loc.pathname === p || loc.pathname.startsWith(p + '/')) ?? false;
                   const isParentActive = isParentDirectActive || isAnySubActive || isPrefixMatched;
-                  const isOpen = isGroupOpen(it.label, true);
 
                   return (
                     <li key={it.to} className="space-y-0.5">
-                      <div
+                      <Link
+                        to={it.to}
                         className={clsx(
-                          'flex items-center justify-between rounded-lg px-2 py-1.5 transition-colors',
+                          'flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-[13px] transition-colors',
                           isParentActive
                             ? 'bg-brand-50/80 font-semibold text-brand-900 ring-1 ring-inset ring-brand-200/60'
                             : 'font-medium text-slate-600 hover:bg-slate-100/80 hover:text-slate-900',
                         )}
                       >
-                        <Link
-                          to={it.to}
-                          className="flex min-w-0 flex-1 items-center gap-2.5 text-[13px]"
-                        >
-                          <span className={clsx(isParentActive ? 'text-brand-700' : 'text-slate-500')}>
-                            {it.icon}
-                          </span>
-                          <span className="truncate">{it.label}</span>
-                        </Link>
-                        {it.subItems && it.subItems.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              toggleGroup(it.label, true);
-                            }}
-                            className="ml-1 rounded p-1 text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-700"
-                            aria-label={`Alternar submenu de ${it.label}`}
-                          >
-                            <ChevronDown
-                              className={clsx(
-                                'size-3.5 transition-transform duration-200',
-                                isOpen ? 'rotate-180' : 'rotate-0',
-                              )}
-                              aria-hidden
-                            />
-                          </button>
-                        )}
-                      </div>
+                        <span className={clsx(isParentActive ? 'text-brand-700' : 'text-slate-500')}>
+                          {it.icon}
+                        </span>
+                        <span className="truncate">{it.label}</span>
+                      </Link>
 
-                      {/* Submenu links */}
-                      {isOpen && it.subItems && it.subItems.length > 0 && (
+                      {/* Submenu links: sempre abertos, sem botão de recolher */}
+                      {it.subItems && it.subItems.length > 0 && (
                         <ul className="ml-4 mt-0.5 space-y-0.5 border-l border-slate-200 pl-2.5 py-0.5">
                           {it.subItems.map((sub) => {
                             const isSubActive = isRouteActive(sub.to, loc.pathname, loc.search, sub.end);
@@ -381,7 +344,7 @@ export function Layout() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 border-b border-slate-200/90 bg-white/95 backdrop-blur">
-          <div className="mx-auto flex h-15 w-full max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 md:px-8">
+          <div className="flex h-15 w-full items-center justify-between gap-3 px-4 sm:px-6 md:px-8">
             <div className="flex items-center gap-2 md:hidden">
               <BrandLogo size="sm" />
             </div>
@@ -396,7 +359,7 @@ export function Layout() {
         <main
           id="conteudo"
           tabIndex={-1}
-          className="mx-auto w-full max-w-7xl flex-1 px-4 pb-24 pt-6 focus:outline-none sm:px-6 md:px-8 md:pb-10"
+          className="w-full flex-1 px-4 pb-24 pt-6 focus:outline-none sm:px-6 md:px-8 md:pb-10"
           key={loc.pathname}
         >
           <Outlet />
