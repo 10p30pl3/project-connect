@@ -131,6 +131,8 @@ export async function finalizeWithTabulation(c: Client, a: any, tab: Tab, meta: 
   if (tab.invalidates_destination) {
     await c.query(`UPDATE contact_destinations SET valid=false WHERE id=$1`, [a.destination_id]);
   }
+  // Retroalimentação imediata da Base Cumulativa de Inteligência (Golden Record)
+  await updateCumulativeIntelligenceProfile(c, a, tab, meta);
   if (tab.is_opt_out) {
     await applyOptOut(c, a.workspace_id, a.contact_id, 'OPT_OUT', `Tabulação ${tab.name}`, null);
     return;
@@ -222,6 +224,93 @@ export async function applyOptOut(c: Client, workspaceId: string, contactId: str
       `UPDATE enrollments SET state='CANCELLED', terminal_reason='OPT_OUT', updated_at=now()
         WHERE contact_id=$1 AND state='ACTIVE'`,
       [contactId],
+    );
+  }
+}
+
+/**
+ * Atualiza o Perfil Cumulativo de Inteligência de Contato (Golden Record).
+ * Executado a cada tabulação de tentativa para acumular histórico e feedback comportamental.
+ */
+export async function updateCumulativeIntelligenceProfile(
+  c: Client,
+  attempt: any,
+  tab: Tab,
+  meta: { occurredAt?: string | null },
+) {
+  const eventTime = meta.occurredAt ? new Date(meta.occurredAt) : new Date();
+  const hourUtc = eventTime.getUTCHours();
+  const dayOfWeek = eventTime.getUTCDay();
+  // Janela local BRT (UTC-3)
+  const localHour = (hourUtc - 3 + 24) % 24;
+  const timeWindow = `${String(localHour).padStart(2, '0')}:00–${String(Math.min(21, localHour + 1)).padStart(2, '0')}:30`;
+
+  // Busca destino acionado para quarentena caso inválido/terceiro
+  const dest = await one<{ address: string }>(c, `SELECT address FROM contact_destinations WHERE id=$1`, [attempt.destination_id]);
+  const destAddress = dest?.address;
+
+  // Garante existência prévia do perfil
+  await c.query(
+    `INSERT INTO contact_intelligence_profiles (workspace_id, contact_id, locator_score)
+     VALUES ($1, $2, 75)
+     ON CONFLICT (workspace_id, contact_id) DO NOTHING`,
+    [attempt.workspace_id, attempt.contact_id],
+  );
+
+  if (tab.is_cpc) {
+    // CPC Confirmado: eleva Locator Score, define Preferred Channel e Best Time Window (BTTC)
+    await c.query(
+      `UPDATE contact_intelligence_profiles
+          SET total_attempts_lifetime = total_attempts_lifetime + 1,
+              total_confirmed_cpcs = total_confirmed_cpcs + 1,
+              last_cpc_at = $1,
+              last_cpc_tabulation = $2,
+              best_time_window = $3,
+              best_hour_utc = $4,
+              best_day_of_week = $5,
+              preferred_channel = $6,
+              locator_score = LEAST(99, locator_score + 10),
+              phone_intent_tier = CASE
+                WHEN $6 = 'VOICE' THEN 'P1_ALTA_PROPENSAO_VOZ'
+                ELSE 'P3_DIGITAL_FIRST'
+              END,
+              tags = array_append(array_remove(tags, 'HISTORIC_CPC_CONFIRMED'), 'HISTORIC_CPC_CONFIRMED'),
+              updated_at = now()
+        WHERE workspace_id = $7 AND contact_id = $8`,
+      [
+        eventTime,
+        tab.code,
+        timeWindow,
+        hourUtc,
+        dayOfWeek,
+        attempt.channel_type,
+        attempt.workspace_id,
+        attempt.contact_id,
+      ],
+    );
+  } else if (tab.invalidates_destination || tab.code === 'WRONG_PERSON') {
+    // Número inválido ou pessoa errada: penaliza Locator Score e inclui em quarentena
+    await c.query(
+      `UPDATE contact_intelligence_profiles
+          SET total_attempts_lifetime = total_attempts_lifetime + 1,
+              locator_score = GREATEST(15, locator_score - 20),
+              quarantined_destinations = CASE
+                WHEN $1::text IS NOT NULL THEN array_append(array_remove(quarantined_destinations, $1::text), $1::text)
+                ELSE quarantined_destinations
+              END,
+              tags = array_append(array_remove(tags, 'CONTAINS_WRONG_PERSON_HISTORY'), 'CONTAINS_WRONG_PERSON_HISTORY'),
+              updated_at = now()
+        WHERE workspace_id = $2 AND contact_id = $3`,
+      [destAddress ?? null, attempt.workspace_id, attempt.contact_id],
+    );
+  } else {
+    // Tentativa normal sem CPC (ex: Não atende, ocupado)
+    await c.query(
+      `UPDATE contact_intelligence_profiles
+          SET total_attempts_lifetime = total_attempts_lifetime + 1,
+              updated_at = now()
+        WHERE workspace_id = $1 AND contact_id = $2`,
+      [attempt.workspace_id, attempt.contact_id],
     );
   }
 }

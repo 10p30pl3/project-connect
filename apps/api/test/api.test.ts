@@ -363,4 +363,82 @@ describe('esteira de inteligência de contato & otimização de CPC (Produção 
     expect(csvExp.statusCode).toBe(200);
     expect(csvExp.body).toContain('external_id;nome;track;status_decisao');
   });
+
+  it('acumula informação histórica e retroalimenta o perfil cumulativo (Golden Record)', async () => {
+    // 1. Carga do 1º mailing com Contato A
+    const csv1 = [
+      'id;nome;telefone1;uf;cidade',
+      'CLI_GOLDEN_1;Roberto Carlos Almeida;(11) 98765-4321;SP;São Paulo',
+    ].join('\n');
+    const imp1 = await importCsv(a, 'Base Inicial', csv1);
+    const m1Id = imp1.result.body.mailingId as string;
+
+    // Busca contato criado
+    const contactsRes = await a.get('/contacts?q=CLI_GOLDEN_1');
+    expect(contactsRes.status).toBe(200);
+    expect(contactsRes.body.items.length).toBe(1);
+    const contactId = contactsRes.body.items[0].id as string;
+
+    // Simula tentativa com CPC confirmado às 10:30 via WhatsApp
+    const cat = await catalog();
+    const camp = await a.post('/campaigns', {
+      name: 'Campanha Feedback',
+      startMode: 'NOW',
+      mailingId: m1Id,
+      journeyVersionId: cat.journey('WhatsApp → Discador'),
+      strategyVersionId: cat.strategy('Demonstração 24x7'),
+    });
+    const deliver = injectDeliver(app);
+    await tick({ deliver });
+
+    const attemptsRes = await a.get(`/operation/attempts?campaignId=${camp.body.id}`);
+    expect(attemptsRes.body.items.length).toBeGreaterThan(0);
+    const attemptId = attemptsRes.body.items[0].id as string;
+
+    // Conector envia resultado com CPC confirmado
+    const conn = cat.connection('WHATSAPP');
+    await postWebhook(app, conn, {
+      eventId: 'evt-cpc-golden-1',
+      providerAttemptId: attemptsRes.body.items[0].providerAttemptId ?? attemptId,
+      type: 'RESULT',
+      occurredAt: '2026-10-25T13:30:00Z', // 10:30 BRT
+      tabulationCode: 'CPC_AGREEMENT',
+    });
+
+    // Verifica que o Golden Profile foi atualizado com BTTC e Preferred Channel
+    const contactDetail = await a.get(`/contacts/${contactId}`);
+    expect(contactDetail.status).toBe(200);
+    expect(contactDetail.body.goldenProfile).toBeTruthy();
+    expect(contactDetail.body.goldenProfile.totalConfirmedCpcs).toBeGreaterThan(0);
+    expect(contactDetail.body.goldenProfile.preferredChannel).toBe('WHATSAPP');
+    expect(contactDetail.body.goldenProfile.bestTimeWindow).toContain('10:00');
+
+    // 2. Carga do 2º mailing com o mesmo cliente trazendo novo telefone e novo e-mail
+    const csv2 = [
+      'id;nome;telefone1;telefone2;email;idade',
+      'CLI_GOLDEN_1;Roberto Carlos Almeida;(11) 98765-4321;(11) 3344-5566;roberto@empresa.com;52',
+    ].join('\n');
+    const imp2 = await importCsv(a, 'Base Recorrente', csv2);
+    const m2Id = imp2.result.body.mailingId as string;
+
+    // Verifica que o contato fundiu os destinos
+    const contactAfterMerge = await a.get(`/contacts/${contactId}`);
+    expect(contactAfterMerge.body.destinations.length).toBeGreaterThanOrEqual(2);
+
+    // 3. Executa a esteira no 2º mailing: deve prioritariamente usar o perfil acumulado (WhatsApp e janela observada)
+    const run2 = await a.post('/intelligence/runs', {
+      mailingId: m2Id,
+      mode: 'PRODUCTION',
+      purposeCode: 'COBRANCA',
+      purposePrompt: 'Cobrança consultiva com base no histórico cumulativo.',
+    });
+    expect(run2.status).toBe(201);
+
+    const plans2 = await a.get(`/intelligence/runs/${run2.body.id}/plans`);
+    expect(plans2.status).toBe(200);
+    const planCustomer = plans2.body.items.find((p: any) => p.externalId === 'CLI_GOLDEN_1');
+    expect(planCustomer).toBeTruthy();
+    // Priorizou histórico BTTC observado
+    expect(planCustomer.blocks.bloco4_janela_horaria.janelaPrimaria).toContain('10:00');
+  });
 });

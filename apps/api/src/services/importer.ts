@@ -286,6 +286,14 @@ export async function commitImport(
         [ws.id, contact.id, d.channelType, d.address, d.label, d.priority],
       );
     }
+    // Garante que o contato tenha Perfil Cumulativo de Inteligência (Golden Record)
+    await c.query(
+      `INSERT INTO contact_intelligence_profiles (workspace_id, contact_id, locator_score)
+       VALUES ($1, $2, 75)
+       ON CONFLICT (workspace_id, contact_id) DO UPDATE SET
+         updated_at = now()`,
+      [ws.id, contact.id],
+    );
     await c.query(
       `INSERT INTO mailing_records (mailing_id, mailing_version_id, contact_id, row_number, business_key, raw_fields, typed_fields)
        VALUES ($1,$2,$3,$4,$5,$6,$7)`,

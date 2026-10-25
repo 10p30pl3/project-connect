@@ -92,6 +92,14 @@ export async function contactRoutes(app: FastifyInstance) {
       `SELECT ${ATTEMPT_SELECT} FROM ${ATTEMPT_FROM} WHERE a.contact_id=$1 ORDER BY a.created_at DESC LIMIT 20`,
       [c.id],
     );
+    const goldenProfile = await one(
+      getPool(),
+      `SELECT best_time_window, best_hour_utc, best_day_of_week, preferred_channel, locator_score,
+              phone_intent_tier, total_attempts_lifetime, total_confirmed_cpcs, last_cpc_at,
+              last_cpc_tabulation, quarantined_destinations, tags, updated_at
+         FROM contact_intelligence_profiles WHERE contact_id=$1`,
+      [c.id],
+    );
     return {
       contact: {
         id: c.id,
@@ -101,6 +109,21 @@ export async function contactRoutes(app: FastifyInstance) {
         historyTotal: c.history_total,
         historyReferenceDate: c.history_reference_date,
       },
+      goldenProfile: goldenProfile
+        ? {
+            bestTimeWindow: goldenProfile.best_time_window,
+            preferredChannel: goldenProfile.preferred_channel,
+            locatorScore: goldenProfile.locator_score,
+            phoneIntentTier: goldenProfile.phone_intent_tier,
+            totalAttemptsLifetime: goldenProfile.total_attempts_lifetime,
+            totalConfirmedCpcs: goldenProfile.total_confirmed_cpcs,
+            lastCpcAt: goldenProfile.last_cpc_at,
+            lastCpcTabulation: goldenProfile.last_cpc_tabulation,
+            quarantinedDestinations: goldenProfile.quarantined_destinations,
+            tags: goldenProfile.tags,
+            updatedAt: goldenProfile.updated_at,
+          }
+        : null,
       destinations: dests.map((d) => ({
         id: d.id,
         channelType: d.channel_type,

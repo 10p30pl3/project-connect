@@ -287,6 +287,23 @@ export async function runIntelligencePipeline(
     histByContact.set(h.contact_id, list);
   }
 
+  // Busca Perfil Cumulativo de Inteligência (Golden Record) dos contatos
+  const profilesRes = contactIds.length
+    ? await c.query(
+        `SELECT contact_id, best_time_window, best_hour_utc, best_day_of_week, preferred_channel,
+                locator_score, phone_intent_tier, total_attempts_lifetime, total_confirmed_cpcs,
+                last_cpc_at, last_cpc_tabulation, quarantined_destinations, tags
+           FROM contact_intelligence_profiles
+          WHERE workspace_id = $1 AND contact_id = ANY($2::uuid[])`,
+        [workspaceId, contactIds],
+      )
+    : { rows: [] };
+
+  const profileByContact = new Map<string, any>();
+  for (const p of profilesRes.rows) {
+    profileByContact.set(p.contact_id, p);
+  }
+
   // Avaliação da Esteira para 100% dos contatos
   type EvaluatedContact = {
     row: any;
@@ -299,7 +316,12 @@ export async function runIntelligencePipeline(
 
   for (const row of recordsRes.rows) {
     const attrs = { ...(row.raw_fields ?? {}), ...(row.typed_fields ?? {}), ...(row.attributes ?? {}) };
-    const dests = (destsByContact.get(row.contact_id) ?? []).filter((d) => d.valid && !d.dest_blocked);
+    // Destinos do contato expurgando números que já estejam em quarentena (Golden Record)
+    const goldenProfile = profileByContact.get(row.contact_id);
+    const quarantinedAddrs = new Set<string>(goldenProfile?.quarantined_destinations ?? []);
+    const dests = (destsByContact.get(row.contact_id) ?? []).filter(
+      (d) => d.valid && !d.dest_blocked && !quarantinedAddrs.has(d.address),
+    );
     const history = histByContact.get(row.contact_id) ?? [];
 
     const phones = dests.filter((d) => d.channel_type !== 'EMAIL').map((d) => d.address as string);
@@ -437,7 +459,15 @@ export async function runIntelligencePipeline(
     let phoneIntentTier: PhoneIntentTier = 'P2_VOZ_COM_WARMUP';
     let archetype = 'MULTICANAL_CONTEXTUAL';
 
-    if (ageInfo.bracket === '60_PLUS') {
+    if (goldenProfile?.preferred_channel === 'WHATSAPP' || goldenProfile?.preferred_channel === 'SMS') {
+      phoneIntentTier = 'P3_DIGITAL_ASSINCRONO';
+      archetype = 'DIGITAL_HISTORICO_CONFIRMADO';
+      appliedHyps.push('H-A2', 'H-C1');
+    } else if (goldenProfile?.preferred_channel === 'VOICE') {
+      phoneIntentTier = 'P1_VOZ_DIRETA';
+      archetype = 'VOZ_HISTORICO_CONFIRMADO';
+      appliedHyps.push('H-A4', 'H-C6');
+    } else if (ageInfo.bracket === '60_PLUS') {
       phoneIntentTier = 'P1_VOZ_DIRETA';
       archetype = 'SENIOR_VOZ_LOCAL_E_HUMANO (38% Offline / 81% Mobile-Only Cetic)';
       appliedHyps.push('H-A1', 'H-A4', 'H-C6');
@@ -463,7 +493,12 @@ export async function runIntelligencePipeline(
     const declaredWindow = String(attrs.janela_preferida ?? attrs.horario_preferido ?? '').trim();
     const prevSuccessAttempt = history.find((h) => h.is_cpc && h.sent_at);
 
-    if (declaredWindow) {
+    // Prioridade Máxima: Histórico Real Cumulativo (Golden Record) ou Tentativa de Sucesso Prévia
+    if (goldenProfile?.best_time_window) {
+      localTimeWindow = goldenProfile.best_time_window;
+      scheduleBasis = 'HISTORICO_BTTC_OBSERVADO';
+      appliedHyps.push('H-T3', 'H-A5');
+    } else if (declaredWindow) {
       localTimeWindow = declaredWindow;
       scheduleBasis = 'PREFERENCIA_DECLARADA';
       appliedHyps.push('H-T6', 'H-A5');
