@@ -244,12 +244,19 @@ type StudyCatalogResponse = {
 export function IntelligencePage() {
   const qc = useQueryClient();
   const toast = useToast();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const mailingFromUrl = searchParams.get('mailingId') ?? searchParams.get('mailing') ?? '';
+  const tabFromUrl = searchParams.get('aba') || searchParams.get('tab');
 
   // Seletor de Jornada Inicial: Inteligência Autônoma (Padrão) vs. Modo Manual Clássico (Opcional)
   const [journeyChoice, setJourneyChoice] = useState<'INTELLIGENCE' | 'MANUAL'>('INTELLIGENCE');
-  const [activeTab, setActiveTab] = useState('operacao');
+  const [activeTab, setActiveTab] = useState(tabFromUrl || 'operacao');
+
+  useEffect(() => {
+    if (tabFromUrl && ['operacao', 'hipoteses', 'benchmark', 'brasil'].includes(tabFromUrl)) {
+      setActiveTab(tabFromUrl);
+    }
+  }, [tabFromUrl]);
 
   // Parâmetros do Lançador da Esteira
   const [selectedMailingId, setSelectedMailingId] = useState(mailingFromUrl);
@@ -536,7 +543,12 @@ export function IntelligencePage() {
       ) : (
         <Tabs
           value={activeTab}
-          onValueChange={setActiveTab}
+          onValueChange={(val) => {
+            setActiveTab(val);
+            const n = new URLSearchParams(searchParams);
+            n.set('aba', val);
+            setSearchParams(n, { replace: true });
+          }}
           tabs={[
             {
               value: 'operacao',

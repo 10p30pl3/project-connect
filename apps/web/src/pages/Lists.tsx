@@ -73,7 +73,15 @@ export function ListsSection() {
 }
 
 export function ListsPage() {
-  return <ListsSection />;
+  return (
+    <div className="space-y-4">
+      <PageHeader
+        title="Listas de Segmentação"
+        subtitle="Views versionadas sobre um mailing: filtros avançados, ordenação multi-coluna e modalidade"
+      />
+      <ListsSection />
+    </div>
+  );
 }
 
 export function NewListPage() {

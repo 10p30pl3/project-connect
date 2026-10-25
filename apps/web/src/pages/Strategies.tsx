@@ -73,7 +73,15 @@ export function StrategiesSection() {
 }
 
 export function StrategiesPage() {
-  return <StrategiesSection />;
+  return (
+    <div className="space-y-4">
+      <PageHeader
+        title="Templates de Estratégia"
+        subtitle="Calendário operacional, limites de esforço diário/total, cadência de retentativas e regras por tabulação"
+      />
+      <StrategiesSection />
+    </div>
+  );
 }
 
 export function StrategyDetailPage() {

@@ -92,7 +92,15 @@ export function MailingsSection() {
 }
 
 export function MailingsPage() {
-  return <MailingsSection />;
+  return (
+    <div className="space-y-4">
+      <PageHeader
+        title="Mailings (Cargas Originais)"
+        subtitle="Importação de arquivos CSV, conferência de linhas e versionamento de bases de clientes"
+      />
+      <MailingsSection />
+    </div>
+  );
 }
 
 export function MailingImportPage() {

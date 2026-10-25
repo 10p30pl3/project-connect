@@ -46,7 +46,15 @@ export function JourneysSection() {
 }
 
 export function JourneysPage() {
-  return <JourneysSection />;
+  return (
+    <div className="space-y-4">
+      <PageHeader
+        title="Jornadas de Canal"
+        subtitle="Sequência e ordem dos canais, conexões e prazos de feedback para acionamento multicanal"
+      />
+      <JourneysSection />
+    </div>
+  );
 }
 
 function NewJourneyDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {

@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useQueryClient } from '@tanstack/react-query';
 import { ROLES } from '@voll/shared';
@@ -25,21 +25,69 @@ import { ROLE_LABEL } from '@voll/shared';
 import { useAuth } from '../lib/auth';
 import { AttemptDrawer } from './AttemptDrawer';
 import { BrandLogo } from './ui';
-import type { ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 
-export type NavItem = { to: string; label: string; icon: ReactNode; end?: boolean; matchPrefixes?: string[] };
+export type SubNavItem = { to: string; label: string; end?: boolean };
+export type NavItem = {
+  to: string;
+  label: string;
+  icon: ReactNode;
+  end?: boolean;
+  matchPrefixes?: string[];
+  subItems?: SubNavItem[];
+};
+
+export function isRouteActive(to: string, currentPath: string, currentSearch: string, end?: boolean) {
+  if (to.includes('?')) {
+    const [path, query] = to.split('?');
+    if (currentPath !== path) return false;
+    const toParams = new URLSearchParams(query);
+    const curParams = new URLSearchParams(currentSearch);
+    for (const [k, v] of toParams.entries()) {
+      if (curParams.get(k) !== v) return false;
+    }
+    return true;
+  }
+  if (end) return currentPath === to;
+  return currentPath === to || (to !== '/' && currentPath.startsWith(to + '/'));
+}
+
 const ico = 'size-4 shrink-0';
 export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: 'Operação',
     items: [
-      { to: '/', label: 'Painel operacional', icon: <Home className={ico} aria-hidden />, end: true, matchPrefixes: ['/tentativas'] },
-      { to: '/campanhas', label: 'Campanhas', icon: <Megaphone className={ico} aria-hidden /> },
+      {
+        to: '/',
+        label: 'Painel operacional',
+        icon: <Home className={ico} aria-hidden />,
+        end: true,
+        matchPrefixes: ['/tentativas'],
+        subItems: [
+          { to: '/', label: 'Visão geral', end: true },
+          { to: '/tentativas', label: 'Tentativas em tempo real' },
+        ],
+      },
+      {
+        to: '/campanhas',
+        label: 'Campanhas',
+        icon: <Megaphone className={ico} aria-hidden />,
+        matchPrefixes: ['/campanhas'],
+        subItems: [
+          { to: '/campanhas', label: 'Todas as campanhas', end: true },
+          { to: '/campanhas/nova', label: 'Nova campanha' },
+        ],
+      },
       {
         to: '/mailings',
         label: 'Bases & Contatos',
         icon: <Database className={ico} aria-hidden />,
         matchPrefixes: ['/mailings', '/listas', '/contatos'],
+        subItems: [
+          { to: '/mailings', label: 'Mailings (Cargas)' },
+          { to: '/listas', label: 'Listas de segmentação' },
+          { to: '/contatos', label: 'Contatos & DNC' },
+        ],
       },
     ],
   },
@@ -51,6 +99,12 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
         label: 'Laboratório & Testes Empíricos',
         icon: <BrainCircuit className={ico} aria-hidden />,
         matchPrefixes: ['/inteligencia'],
+        subItems: [
+          { to: '/inteligencia?aba=operacao', label: 'Esteira dual & 8 blocos' },
+          { to: '/inteligencia?aba=hipoteses', label: '29 Hipóteses H-A..H-L' },
+          { to: '/inteligencia?aba=benchmark', label: 'Benchmark de canais' },
+          { to: '/inteligencia?aba=brasil', label: 'Estudo TIC Domicílios' },
+        ],
       },
     ],
   },
@@ -59,18 +113,44 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     items: [
       {
         to: '/estrategias',
-        label: 'Réguas & Estratégias',
+        label: 'Estratégias',
         icon: <SlidersHorizontal className={ico} aria-hidden />,
         matchPrefixes: ['/estrategias', '/jornadas', '/tabulacoes'],
+        subItems: [
+          { to: '/estrategias', label: 'Templates' },
+          { to: '/jornadas', label: 'Jornadas' },
+          { to: '/tabulacoes', label: 'Tabulações' },
+        ],
       },
-      { to: '/canais', label: 'Canais & Conectores', icon: <Cable className={ico} aria-hidden /> },
+      {
+        to: '/canais',
+        label: 'Canais & Conectores',
+        icon: <Cable className={ico} aria-hidden />,
+        matchPrefixes: ['/canais'],
+        subItems: [
+          { to: '/canais', label: 'Conexões & Provedores' },
+        ],
+      },
       {
         to: '/otimizacao',
         label: 'Central de Decisão & Custos',
         icon: <Compass className={ico} aria-hidden />,
         matchPrefixes: ['/otimizacao', '/experimentos', '/custos'],
+        subItems: [
+          { to: '/otimizacao', label: 'Otimização consultiva' },
+          { to: '/experimentos', label: 'Experimentos A/B' },
+          { to: '/custos', label: 'Custos & conciliação' },
+        ],
       },
-      { to: '/controle', label: 'Governança & Controle Central', icon: <ShieldAlert className={ico} aria-hidden /> },
+      {
+        to: '/controle',
+        label: 'Governança & Controle Central',
+        icon: <ShieldAlert className={ico} aria-hidden />,
+        matchPrefixes: ['/controle'],
+        subItems: [
+          { to: '/controle', label: 'Limites institucionais & suspensão' },
+        ],
+      },
     ],
   },
 ];
@@ -170,6 +250,19 @@ function UserMenu() {
 
 export function Layout() {
   const loc = useLocation();
+  const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
+
+  const isGroupOpen = (label: string, defaultOpen: boolean) => {
+    return openMap[label] !== undefined ? openMap[label] : defaultOpen;
+  };
+
+  const toggleGroup = (label: string, defaultOpen: boolean) => {
+    setOpenMap((prev) => ({
+      ...prev,
+      [label]: !isGroupOpen(label, defaultOpen),
+    }));
+  };
+
   return (
     <div className="flex min-h-full">
       <a href="#conteudo" className="sr-only z-50 rounded bg-white px-3 py-2 focus:not-sr-only focus:fixed focus:left-2 focus:top-2">
@@ -184,26 +277,85 @@ export function Layout() {
           {NAV_GROUPS.map((g) => (
             <div key={g.title} className="mb-4">
               <div className="px-2.5 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400">{g.title}</div>
-              <ul className="space-y-0.5">
+              <ul className="space-y-1">
                 {g.items.map((it) => {
-                  const matchedByPrefix = it.matchPrefixes?.some((p) => loc.pathname.startsWith(p)) ?? false;
+                  const isAnySubActive = it.subItems?.some((sub) => isRouteActive(sub.to, loc.pathname, loc.search, sub.end)) ?? false;
+                  const isParentDirectActive = isRouteActive(it.to, loc.pathname, loc.search, it.end);
+                  const isPrefixMatched = it.matchPrefixes?.some((p) => loc.pathname === p || loc.pathname.startsWith(p + '/')) ?? false;
+                  const isParentActive = isParentDirectActive || isAnySubActive || isPrefixMatched;
+                  const isOpen = isGroupOpen(it.label, isParentActive);
+
                   return (
-                    <li key={it.to}>
-                      <NavLink
-                        to={it.to}
-                        end={it.end}
-                        className={({ isActive }) =>
-                          clsx(
-                            'flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] transition-colors',
-                            isActive || matchedByPrefix
-                              ? 'bg-brand-50 font-semibold text-brand-800 shadow-2xs ring-1 ring-inset ring-brand-200/70'
-                              : 'font-medium text-slate-600 hover:bg-slate-100/80 hover:text-slate-900',
-                          )
-                        }
+                    <li key={it.to} className="space-y-0.5">
+                      <div
+                        className={clsx(
+                          'flex items-center justify-between rounded-lg px-2 py-1.5 transition-colors',
+                          isParentActive
+                            ? 'bg-brand-50/80 font-semibold text-brand-900 ring-1 ring-inset ring-brand-200/60'
+                            : 'font-medium text-slate-600 hover:bg-slate-100/80 hover:text-slate-900',
+                        )}
                       >
-                        {it.icon}
-                        {it.label}
-                      </NavLink>
+                        <Link
+                          to={it.to}
+                          className="flex min-w-0 flex-1 items-center gap-2.5 text-[13px]"
+                        >
+                          <span className={clsx(isParentActive ? 'text-brand-700' : 'text-slate-500')}>
+                            {it.icon}
+                          </span>
+                          <span className="truncate">{it.label}</span>
+                        </Link>
+                        {it.subItems && it.subItems.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              toggleGroup(it.label, isParentActive);
+                            }}
+                            className="ml-1 rounded p-1 text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-slate-700"
+                            aria-label={`Alternar submenu de ${it.label}`}
+                          >
+                            <ChevronDown
+                              className={clsx(
+                                'size-3.5 transition-transform duration-200',
+                                isOpen ? 'rotate-180' : 'rotate-0',
+                              )}
+                              aria-hidden
+                            />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Submenu links */}
+                      {isOpen && it.subItems && it.subItems.length > 0 && (
+                        <ul className="ml-4 mt-0.5 space-y-0.5 border-l border-slate-200 pl-2.5 py-0.5">
+                          {it.subItems.map((sub) => {
+                            const isSubActive = isRouteActive(sub.to, loc.pathname, loc.search, sub.end);
+                            return (
+                              <li key={sub.to}>
+                                <Link
+                                  to={sub.to}
+                                  className={clsx(
+                                    'flex items-center gap-2 rounded-md px-2 py-1 text-xs transition-colors',
+                                    isSubActive
+                                      ? 'bg-brand-100/80 font-semibold text-brand-900 shadow-2xs'
+                                      : 'font-medium text-slate-500 hover:bg-slate-100/80 hover:text-slate-900',
+                                  )}
+                                >
+                                  <span
+                                    className={clsx(
+                                      'size-1.5 shrink-0 rounded-full transition-colors',
+                                      isSubActive ? 'bg-brand-700' : 'bg-slate-300',
+                                    )}
+                                    aria-hidden
+                                  />
+                                  <span className="truncate">{sub.label}</span>
+                                </Link>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
                     </li>
                   );
                 })}

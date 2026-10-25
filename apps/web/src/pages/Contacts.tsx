@@ -123,5 +123,13 @@ export function ContactsSection() {
 }
 
 export function ContactsPage() {
-  return <ContactsSection />;
+  return (
+    <div className="space-y-4">
+      <PageHeader
+        title="Contatos & DNC"
+        subtitle="Identidade persistente do cliente em todas as cargas e campanhas, com histórico acumulado e bloqueios"
+      />
+      <ContactsSection />
+    </div>
+  );
 }

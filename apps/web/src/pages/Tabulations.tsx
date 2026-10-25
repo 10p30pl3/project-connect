@@ -61,5 +61,13 @@ export function TabulationsSection() {
 }
 
 export function TabulationsPage() {
-  return <TabulationsSection />;
+  return (
+    <div className="space-y-4">
+      <PageHeader
+        title="Dicionário de Tabulações"
+        subtitle="Resultados normalizados de máquina ou humano e parametrização de CPC, conversão e DNC"
+      />
+      <TabulationsSection />
+    </div>
+  );
 }
