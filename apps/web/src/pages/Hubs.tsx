@@ -99,8 +99,8 @@ export function DecisionHubPage() {
             </div>
           </div>
         </div>
-        <Link to="/inteligencia" className={btnClass('primary', 'sm')}>
-          Abrir Esteira de CPC & Lab →
+        <Link to="/contatos" className={btnClass('primary', 'sm')}>
+          Consultar Racional dos Contatos →
         </Link>
       </div>
       <Tabs

@@ -12,6 +12,9 @@ import type {
   StrategyConfig,
   ListFilter,
 } from '@voll/shared';
+import type { ContactIntelligenceRationale } from './intelligence-rationale';
+
+export type { ContactIntelligenceRationale };
 
 export type Me = {
   id: string;
@@ -253,6 +256,7 @@ export type ContactRow = {
   attempts: { total: number | null; new: number };
   lastTabulation: { code: string; name: string; at: string } | null;
   campaigns: number;
+  intelligence?: ContactIntelligenceRationale;
 };
 export type Destination = {
   id: string;
@@ -287,6 +291,7 @@ export type ContactDetail = {
   counters: { historyTotal: number | null; newTotal: number; today: number; byChannel: { channelType: ChannelType; count: number }[] };
   enrollments: { campaign: { id: string; name: string }; state: EnrollmentState; stage: number }[];
   attempts: AttemptRow[];
+  intelligence?: ContactIntelligenceRationale;
 };
 
 export type Control = { dailyLimit: number | null; totalLimit: number | null; globalSuspension: boolean };

@@ -72,8 +72,8 @@ export function MailingsSection() {
                     <td className="text-xs text-slate-600">{fmtDateTime(m.createdAt)}</td>
                     <td className="text-right">
                       <div className="inline-flex items-center gap-3">
-                        <Link to={`/inteligencia?mailing=${m.id}`} className="text-xs font-semibold text-brand-700 hover:underline">
-                          Esteira de CPC →
+                        <Link to={`/campanhas/nova?mailing=${m.id}`} className="text-xs font-semibold text-brand-700 hover:underline">
+                          Nova campanha →
                         </Link>
                         <Link to={`/listas/nova?mailing=${m.id}`} className="text-xs font-medium text-slate-600 hover:underline">
                           Criar lista →
@@ -158,8 +158,8 @@ export function MailingDetailPage() {
         subtitle={`${fmtNumber(m.recordCount)} registros · criado em ${fmtDateTime(m.createdAt)}`}
         actions={
           <div className="flex items-center gap-2">
-            <Link to={`/inteligencia?mailing=${m.id}`} className={btnClass('primary')}>
-              Processar na Esteira de CPC
+            <Link to={`/campanhas/nova?mailing=${m.id}`} className={btnClass('primary')}>
+              Criar campanha com esta base
             </Link>
             <Link to={`/listas/nova?mailing=${m.id}`} className={btnClass('secondary')}>
               Preparar lista

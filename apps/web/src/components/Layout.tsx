@@ -92,23 +92,6 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     ],
   },
   {
-    title: 'Inteligência & Otimização',
-    items: [
-      {
-        to: '/inteligencia',
-        label: 'Laboratório & Testes Empíricos',
-        icon: <BrainCircuit className={ico} aria-hidden />,
-        matchPrefixes: ['/inteligencia'],
-        subItems: [
-          { to: '/inteligencia?aba=operacao', label: 'Esteira dual & 8 blocos' },
-          { to: '/inteligencia?aba=hipoteses', label: '29 Hipóteses H-A..H-L' },
-          { to: '/inteligencia?aba=benchmark', label: 'Benchmark de canais' },
-          { to: '/inteligencia?aba=brasil', label: 'Estudo TIC Domicílios' },
-        ],
-      },
-    ],
-  },
-  {
     title: 'Configurações & Parâmetros',
     items: [
       {

@@ -21,6 +21,7 @@ import {
   type StrategyConfig,
 } from '@voll/shared';
 import { ApiError } from './api';
+import { buildContactIntelligenceRationale } from './intelligence-rationale';
 import type {
   AttemptDetail,
   AuditRow,
@@ -1322,6 +1323,7 @@ export async function handleMockApi<T = unknown>(
         attempts: { total: c.historyTotal, new: idx < 6 ? 1 : 0 },
         lastTabulation: idx === 1 ? { code: 'CONVERSION', name: 'Acordo fechado', at: '2026-10-20T10:15:00Z' } : null,
         campaigns: 1,
+        intelligence: buildContactIntelligenceRationale(c),
       };
     });
     return { items, nextCursor: null, total: items.length } as T;
@@ -1351,6 +1353,7 @@ export async function handleMockApi<T = unknown>(
       },
       enrollments: [{ campaign: { id: CAMPAIGNS[0].id, name: CAMPAIGNS[0].name }, state: 'ACTIVE', stage: 0 }],
       attempts: contactAttempts,
+      intelligence: buildContactIntelligenceRationale(c),
     };
     return detail as T;
   }

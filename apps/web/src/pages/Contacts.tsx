@@ -1,11 +1,13 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
-import { Ban } from 'lucide-react';
+import { Ban, Sparkles } from 'lucide-react';
 import { CHANNEL_LABEL } from '@voll/shared';
+import clsx from 'clsx';
 import { get, qs } from '../lib/api';
 import type { ContactRow, Paginated } from '../lib/types';
-import { fmtDateTime, fmtNumber } from '../lib/format';
+import { fmtDateTime, fmtMoney, fmtNumber } from '../lib/format';
+import { buildContactIntelligenceRationale } from '../lib/intelligence-rationale';
 import { useCursorPager, useDebounced } from '../lib/hooks';
 import { Badge, Card, ErrorState, Field, Input, Loading, PageHeader, Pager, TableWrap } from '../components/ui';
 
@@ -57,6 +59,7 @@ export function ContactsSection() {
                   <tr>
                     <th>ID</th>
                     <th>Nome</th>
+                    <th>Racional da Inteligência (TIC Domicílios)</th>
                     <th>Bloqueio</th>
                     <th>Destinos</th>
                     <th>Tentativas (importado / novas)</th>
@@ -67,19 +70,44 @@ export function ContactsSection() {
                 <tbody>
                   {data.data!.items.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="py-6 text-center text-slate-500">
+                      <td colSpan={8} className="py-6 text-center text-slate-500">
                         Nenhum contato encontrado.
                       </td>
                     </tr>
                   )}
-                  {data.data!.items.map((c) => (
-                    <tr key={c.id}>
-                      <td className="font-mono text-xs">{c.externalId}</td>
-                      <td>
-                        <Link to={`/contatos/${c.id}`} className="font-medium text-brand-800 hover:underline">
-                          {c.name ?? '(sem nome)'}
-                        </Link>
-                      </td>
+                  {data.data!.items.map((c) => {
+                    const r = c.intelligence ?? buildContactIntelligenceRationale(c);
+                    return (
+                      <tr key={c.id}>
+                        <td className="font-mono text-xs">{c.externalId}</td>
+                        <td>
+                          <Link to={`/contatos/${c.id}`} className="font-medium text-brand-800 hover:underline">
+                            {c.name ?? '(sem nome)'}
+                          </Link>
+                        </td>
+                        <td>
+                          <Link to={`/contatos/${c.id}`} className="group block max-w-xs space-y-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={clsx(
+                                  'inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold',
+                                  r.channelStrategy.primaryChannel === 'WHATSAPP'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : 'bg-brand-100 text-brand-800',
+                                )}
+                              >
+                                <Sparkles className="size-2.5" aria-hidden />
+                                {r.channelStrategy.primaryChannelLabel}
+                              </span>
+                              <span className="text-[11px] font-medium text-slate-600">
+                                {r.timing.suggestedWindow}
+                              </span>
+                            </div>
+                            <div className="truncate text-[11px] text-slate-500 group-hover:text-brand-800">
+                              {r.summary.slice(0, 75)}…
+                            </div>
+                          </Link>
+                        </td>
                       <td>
                         {c.blocked ? (
                           <Badge tone="red" icon={<Ban className="size-3.5" aria-hidden />}>
@@ -110,7 +138,8 @@ export function ContactsSection() {
                       </td>
                       <td className="tabular">{fmtNumber(c.campaigns)}</td>
                     </tr>
-                  ))}
+                  );
+                })}
                 </tbody>
               </table>
             </TableWrap>

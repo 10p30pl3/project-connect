@@ -4,11 +4,12 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { z } from 'zod';
-import { ArrowLeft, Ban, Eye, EyeOff, Plus } from 'lucide-react';
+import { ArrowLeft, Ban, BrainCircuit, CheckCircle2, Clock, Eye, EyeOff, Globe2, MessageSquare, Phone, Plus, ShieldCheck, Sparkles, TrendingDown } from 'lucide-react';
 import { BlockCreateSchema, CHANNEL_LABEL, CHANNEL_TYPES, DestinationCreateSchema, ENROLLMENT_STATE_LABEL } from '@voll/shared';
 import { applyFieldErrors, errorMessage, get, patch, post } from '../lib/api';
 import type { ContactDetail, Destination } from '../lib/types';
-import { fmtDateTime, fmtNumber } from '../lib/format';
+import { fmtDateTime, fmtMoney, fmtNumber } from '../lib/format';
+import { buildContactIntelligenceRationale, type ContactIntelligenceRationale } from '../lib/intelligence-rationale';
 import { useAuth } from '../lib/auth';
 import {
   Alert,
@@ -40,6 +41,7 @@ export function ContactDetailPage() {
   if (q.error) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
   const d = q.data!;
   const contactBlock = d.blocks.find((b) => b.scope === 'CONTACT' && !b.revokedAt);
+  const rationale = d.intelligence ?? buildContactIntelligenceRationale({ ...d.contact, destinations: d.destinations, historyTotal: d.counters.historyTotal });
 
   return (
     <div>
@@ -77,6 +79,123 @@ export function ContactDetailPage() {
       )}
 
       <div className="grid gap-4 lg:grid-cols-3">
+        {/* Racional da Inteligência de Contato (Estudo TIC Domicílios & CPC) */}
+        <Card
+          className="lg:col-span-3 border-brand-200/90 bg-gradient-to-br from-brand-50/40 via-white to-slate-50 shadow-xs"
+          title={
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="inline-flex items-center gap-2 text-base font-semibold text-brand-950">
+                <Sparkles className="size-4 text-brand-700" aria-hidden />
+                <span>Racional da Inteligência de Contato (Estudo TIC Domicílios & CPC)</span>
+              </span>
+              <div className="flex items-center gap-2">
+                <Badge tone="brand">Golden Record Ativo</Badge>
+                <Badge tone="green">Canal Recomendado: {rationale.channelStrategy.primaryChannelLabel}</Badge>
+              </div>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            {/* Resumo Executivo do Estudo */}
+            <div className="rounded-xl border border-brand-200 bg-brand-50/80 p-4 text-slate-800 shadow-2xs">
+              <div className="flex items-start gap-3">
+                <BrainCircuit className="size-5 shrink-0 text-brand-700 mt-0.5" aria-hidden />
+                <div className="space-y-1">
+                  <div className="text-xs font-bold uppercase tracking-wider text-brand-900">
+                    Resumo do Estudo · Racional da Inteligência
+                  </div>
+                  <p className="text-sm leading-relaxed text-slate-800">
+                    {rationale.summary}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Grid dos 4 Pilares do Estudo */}
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-1.5">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+                  <Globe2 className="size-3.5 text-brand-700" aria-hidden />
+                  <span>Demografia & Conectividade</span>
+                </div>
+                <div className="text-sm font-bold text-slate-900">{rationale.demographics.ageBracket}</div>
+                <div className="text-xs text-slate-500">
+                  DDD {rationale.demographics.ddd} · {rationale.demographics.city} ({rationale.demographics.region})
+                </div>
+                <div className="text-[11px] text-slate-600 bg-slate-50 rounded p-1.5">
+                  <strong>Perfil:</strong> {rationale.demographics.connectivityProfile}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-1.5">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+                  {rationale.channelStrategy.primaryChannel === 'WHATSAPP' ? (
+                    <MessageSquare className="size-3.5 text-emerald-600" aria-hidden />
+                  ) : (
+                    <Phone className="size-3.5 text-brand-700" aria-hidden />
+                  )}
+                  <span>Estratégia de Canal</span>
+                </div>
+                <div className="text-sm font-bold text-emerald-700">{rationale.channelStrategy.primaryChannelLabel}</div>
+                <div className="text-xs text-slate-500">
+                  Fallback: <strong>{rationale.channelStrategy.fallbackChannelLabel ?? 'Nenhum'}</strong>
+                </div>
+                <div className="text-[11px] text-slate-600 bg-slate-50 rounded p-1.5">
+                  <strong>Arquétipo:</strong> {rationale.channelStrategy.archetype}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-1.5">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+                  <Clock className="size-3.5 text-amber-600" aria-hidden />
+                  <span>Janela Operacional Ótima</span>
+                </div>
+                <div className="text-sm font-bold text-slate-900">{rationale.timing.suggestedWindow}</div>
+                <div className="text-xs text-slate-500">Fuso: {rationale.timing.timezone}</div>
+                <div className="text-[11px] text-slate-600 bg-slate-50 rounded p-1.5">
+                  <strong>Base:</strong> {rationale.timing.timingBasis}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-1.5">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+                  <TrendingDown className="size-3.5 text-emerald-600" aria-hidden />
+                  <span>Economia & Eficiência CPC</span>
+                </div>
+                <div className="text-sm font-bold text-emerald-700">
+                  {fmtMoney(rationale.economics.expectedCostCpcBrl)} <span className="text-xs font-normal text-slate-500">/ CPC</span>
+                </div>
+                <div className="text-xs text-slate-500">
+                  vs. {fmtMoney(rationale.economics.bruteForceCpcBrl)} bruto ({rationale.economics.projectedSavingsPct}% economia)
+                </div>
+                <div className="text-[11px] text-emerald-700 bg-emerald-50 rounded p-1.5 font-medium">
+                  Economia de {fmtMoney(rationale.economics.projectedSavingsBrl)} por CPC
+                </div>
+              </div>
+            </div>
+
+            {/* Hipóteses Científicas Comprovadas */}
+            <div className="rounded-lg border border-slate-200 bg-white p-3.5">
+              <div className="text-xs font-semibold text-slate-700 mb-2">
+                Hipóteses do Estudo Aplicadas a este Contato:
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {rationale.appliedHypotheses.map((h) => (
+                  <div key={h.code} className="rounded-md border border-slate-100 bg-slate-50/70 p-2 text-xs space-y-1">
+                    <div className="flex items-center gap-1 font-semibold text-brand-900">
+                      <span className="font-mono text-[11px] rounded bg-brand-100 text-brand-800 px-1 py-0.5">
+                        {h.code}
+                      </span>
+                      <span className="truncate">{h.title}</span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-tight">{h.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Card>
+
         <Card
           className="lg:col-span-2"
           title="Destinos"

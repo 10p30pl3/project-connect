@@ -11,7 +11,8 @@ import { fmtDateTimeSec, fmtMoney } from '../lib/format';
 import { useAuth } from '../lib/auth';
 import { Alert, AttemptStateBadge, Badge, Button, ErrorState, Field, KeyValue, Loading, Modal, Select, Input, useToast } from './ui';
 import { Link } from 'react-router-dom';
-import { Copy, Repeat, Wrench } from 'lucide-react';
+import { Copy, Repeat, Sparkles, Wrench } from 'lucide-react';
+import { buildContactIntelligenceRationale } from '../lib/intelligence-rationale';
 
 /** Abre o detalhe de uma tentativa em qualquer tela via ?tentativa=<id> (§26.7). */
 export function useOpenAttempt() {
@@ -90,6 +91,33 @@ function AttemptBody({ id }: { id: string }) {
         <Explain title="Por que está assim" text={d.explanation.why} />
         <Explain title="Próxima ação" text={d.explanation.nextAction} strong />
       </div>
+
+      {/* Racional da Inteligência do Contato (Estudo TIC Domicílios) */}
+      {(() => {
+        const r = buildContactIntelligenceRationale(a.contact);
+        return (
+          <div className="rounded-xl border border-brand-200/90 bg-gradient-to-br from-brand-50/60 to-white p-3.5 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-brand-900">
+                <Sparkles className="size-3.5 text-brand-700" aria-hidden />
+                Racional da Inteligência (Estudo TIC Domicílios)
+              </span>
+              <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-100 rounded px-1.5 py-0.5">
+                Economia {r.economics.projectedSavingsPct}% CPC
+              </span>
+            </div>
+            <p className="text-xs text-slate-700 leading-relaxed">
+              {r.summary}
+            </p>
+            <div className="flex items-center justify-between pt-1 border-t border-brand-100 text-[11px]">
+              <span className="text-slate-500">Janela Ótima: <strong className="text-slate-800">{r.timing.suggestedWindow}</strong></span>
+              <Link to={`/contatos/${a.contact.id}`} className="font-semibold text-brand-800 hover:underline">
+                Ver estudo completo do cliente →
+              </Link>
+            </div>
+          </div>
+        );
+      })()}
 
       {a.state === 'RECONCILIATION' && (
         <Alert tone="warn" title="Novo envio bloqueado">

@@ -1006,66 +1006,31 @@ function UnifiedCampaignCreator({
         </div>
       </Card>
 
-      {/* Card 3: Modo de Execução & Testes */}
+      {/* Card 3: Alocação Inteligente de CPC */}
       <Card
         title={
           <span className="flex items-center gap-2">
-            <BrainCircuit className="size-4 text-brand-700" aria-hidden />
-            <span>3. Modo de Execução & Testes</span>
+            <Rocket className="size-4 text-brand-700" aria-hidden />
+            <span>3. Alocação Inteligente & Menor Custo por CPC</span>
           </span>
         }
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => setOperatingMode('PRODUCTION')}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') setOperatingMode('PRODUCTION');
-            }}
-            className={clsx(
-              'cursor-pointer rounded-xl border p-4 text-left transition',
-              operatingMode === 'PRODUCTION'
-                ? 'border-brand-500 bg-brand-50/70 ring-2 ring-brand-500/20'
-                : 'border-slate-200 bg-white hover:border-slate-300',
-            )}
-          >
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-2 font-semibold text-sm text-slate-900">
-                <Rocket className="size-4 text-brand-700" aria-hidden />
-                Modo Produção Direta
-              </span>
-              <Badge tone="green">Recomendado</Badge>
+        <div className="rounded-xl border border-brand-200/90 bg-gradient-to-r from-brand-50/70 via-white to-slate-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-sm text-slate-900">Motor de Otimização Autônomo Ativo</span>
+                <Badge tone="green">Produção Otimizada</Badge>
+                <Badge tone="brand">Golden Record Conectado</Badge>
+              </div>
+              <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
+                A esteira de inteligência analisa o perfil de cada contato no backend (TIC Domicílios 2025 + histórico unificado), determinando canal ótimo, janela horária Wi-Fi e DDD local com economia projetada superior a 40%.
+              </p>
             </div>
-            <p className="mt-1.5 text-xs text-slate-600 leading-relaxed">
-              Disparo em escala focado em conversão de CPC nos melhores canais (WhatsApp, Voz Inteligente, RCS) com base na matriz Phone-Intent P1..P4.
-            </p>
-          </div>
-
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => setOperatingMode('LABORATORY')}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') setOperatingMode('LABORATORY');
-            }}
-            className={clsx(
-              'cursor-pointer rounded-xl border p-4 text-left transition',
-              operatingMode === 'LABORATORY'
-                ? 'border-amber-500 bg-amber-50/70 ring-2 ring-amber-500/20'
-                : 'border-slate-200 bg-white hover:border-slate-300',
-            )}
-          >
-            <div className="flex items-center justify-between">
-              <span className="flex items-center gap-2 font-semibold text-sm text-slate-900">
-                <FlaskConical className="size-4 text-amber-600" aria-hidden />
-                Laboratório & Testes Empíricos
-              </span>
-              <Badge tone="amber">Amostra A/B ({labSamplePct}%)</Badge>
+            <div className="text-right">
+              <div className="text-xs text-slate-500 font-medium">Meta Máxima Aceitável</div>
+              <div className="text-sm font-bold text-slate-900">{fmtMoney(maxAcceptableCpcBrl)} / CPC</div>
             </div>
-            <p className="mt-1.5 text-xs text-slate-600 leading-relaxed">
-              Separa uma onda amostral controlada para testar as 29 hipóteses empíricas H-A..H-L antes de liberar a carteira para escala total.
-            </p>
           </div>
         </div>
       </Card>
@@ -1765,43 +1730,12 @@ function ActivationStep({
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <label className="text-xs font-medium text-slate-700">Modo de Operação</label>
-                  <div className="mt-1.5 grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setOperatingMode('PRODUCTION')}
-                      className={clsx(
-                        'flex flex-col items-start rounded-lg border p-2.5 text-left text-xs transition-colors',
-                        operatingMode === 'PRODUCTION'
-                          ? 'border-brand-600 bg-brand-50/70 font-semibold text-brand-900'
-                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
-                      )}
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <Rocket className="size-3.5 text-brand-700" aria-hidden />
-                        Modo Produção
-                      </span>
-                      <span className="mt-1 font-normal text-slate-500 text-[11px]">
-                        Disparo em escala focado em CPC
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setOperatingMode('LABORATORY')}
-                      className={clsx(
-                        'flex flex-col items-start rounded-lg border p-2.5 text-left text-xs transition-colors',
-                        operatingMode === 'LABORATORY'
-                          ? 'border-amber-600 bg-amber-50/70 font-semibold text-amber-900'
-                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
-                      )}
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <FlaskConical className="size-3.5 text-amber-600" aria-hidden />
-                        Modo Laboratório
-                      </span>
-                      <span className="mt-1 font-normal text-slate-500 text-[11px]">
-                        Ondas amostrais e teste de hipóteses
-                      </span>
-                    </button>
+                  <div className="mt-1.5 flex items-center justify-between rounded-lg border border-brand-200 bg-brand-50/70 p-2.5 text-xs">
+                    <span className="flex items-center gap-1.5 font-semibold text-brand-900">
+                      <Rocket className="size-3.5 text-brand-700" aria-hidden />
+                      Modo Produção Otimizada (Backend AI)
+                    </span>
+                    <Badge tone="green">Ativo</Badge>
                   </div>
                 </div>
 
@@ -1856,24 +1790,6 @@ function ActivationStep({
                     />
                   )}
                 </Field>
-
-                {operatingMode === 'LABORATORY' && (
-                  <Field
-                    label="Amostra do Laboratório (%)"
-                    hint="Percentual da carteira reservado para teste controlado de hipóteses"
-                  >
-                    {(p) => (
-                      <Input
-                        id={p.id}
-                        type="number"
-                        min="1"
-                        max="50"
-                        value={labSamplePct}
-                        onChange={(e) => setLabSamplePct(Number(e.target.value))}
-                      />
-                    )}
-                  </Field>
-                )}
               </div>
 
               <div className="flex items-center justify-between border-t border-slate-100 pt-3">
@@ -1932,9 +1848,7 @@ function ActivationStep({
               </div>
             }
             actions={
-              <Link to="/inteligencia" className="text-xs font-medium text-brand-700 hover:underline">
-                Inspecionar esteira completa →
-              </Link>
+              <Badge tone="brand">TIC Domicílios 2025</Badge>
             }
           >
             <TableWrap label="8 Blocos Padronizados">
@@ -2330,9 +2244,7 @@ function CampaignStep({
                 <div className="mb-3 rounded-lg border border-brand-200 bg-brand-50/60 p-3.5">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge tone="brand">Inteligência Voll Connect</Badge>
-                    <Badge tone={extra.operatingMode === 'LABORATORY' ? 'amber' : 'green'}>
-                      {extra.operatingMode === 'LABORATORY' ? 'Modo Laboratório' : 'Modo Produção'}
-                    </Badge>
+                    <Badge tone="green">Produção Otimizada</Badge>
                     <span className="text-xs font-semibold text-slate-800">
                       {OPERATION_PURPOSE_LABEL[extra.purposeCode ?? 'COBRANCA']}
                     </span>
