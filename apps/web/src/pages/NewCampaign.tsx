@@ -24,6 +24,7 @@ import {
   Sparkles,
   TrendingDown,
   UploadCloud,
+  Users,
 } from 'lucide-react';
 import {
   CETIC_AGE_BRACKET_LABEL,
@@ -688,8 +689,8 @@ function UnifiedCampaignCreator({
   const toast = useToast();
   const idemRef = useRef<string | null>(null);
 
-  // Wizard Step: 1 = Base, 2 = Objetivo, 3 = Revisão
-  const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
+  // Wizard Step: 1 = Mailing, 2 = Público, 3 = Acionamento, 4 = Campanha
+  const [wizardStep, setWizardStep] = useState<1 | 2 | 3 | 4>(1);
 
   // 1. Base selection state
   const [sourceType, setSourceType] = useState<'EXISTING' | 'IMPORT'>('EXISTING');
@@ -751,7 +752,7 @@ function UnifiedCampaignCreator({
     }
     if (!campaignName.trim()) {
       setFormError('Informe o nome da campanha.');
-      setWizardStep(2);
+      setWizardStep(4);
       return;
     }
     if (!bestJourney?.latestVersion?.id || !bestStrategy?.latestVersion?.id) {
@@ -787,102 +788,84 @@ function UnifiedCampaignCreator({
     }
   };
 
+  const WIZARD_STEPS = [
+    { num: 1, label: 'Mailing' },
+    { num: 2, label: 'Público' },
+    { num: 3, label: 'Acionamento' },
+    { num: 4, label: 'Campanha' },
+  ] as const;
+
   return (
     <div className="space-y-6">
       {/* Wizard Header & Stepper */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200/80 pb-4">
+      <div className="space-y-4 border-b border-slate-200/80 pb-5">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900">Nova Campanha</h1>
-          <p className="text-xs text-slate-500">
-            {wizardStep === 1 && 'Etapa 1 de 3 · Seleção da base de contatos'}
-            {wizardStep === 2 && 'Etapa 2 de 3 · Definição do objetivo em linguagem natural'}
-            {wizardStep === 3 && 'Etapa 3 de 3 · Revisão de CPC e disparo da campanha'}
+          <h1 className="text-xl font-bold tracking-tight text-slate-900">Nova campanha</h1>
+          <p className="text-sm text-slate-500">
+            Prepare o público e o acionamento. Crie a campanha ao concluir.
           </p>
         </div>
 
-        <nav aria-label="Progresso do assistente" className="flex items-center gap-1.5 sm:gap-2">
-          <button
-            type="button"
-            onClick={() => setWizardStep(1)}
-            className={clsx(
-              'flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition',
-              wizardStep === 1
-                ? 'bg-brand-700 text-white font-semibold shadow-2xs'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200',
-            )}
-          >
-            <span
-              className={clsx(
-                'grid size-4.5 place-items-center rounded-full text-[10px] font-bold',
-                wizardStep === 1 ? 'bg-white text-brand-700' : 'bg-slate-300 text-slate-700',
-              )}
-            >
-              1
-            </span>
-            <span>Base</span>
-          </button>
+        {/* 4-Step Stepper Bar (matching reference screenshot) */}
+        <nav aria-label="Etapas da campanha" className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 pt-1">
+          {WIZARD_STEPS.map((s) => {
+            const isActive = wizardStep === s.num;
+            const isDone = wizardStep > s.num;
+            const isClickable =
+              s.num === 1 ||
+              (s.num === 2 && Boolean(selectedMailingId || activeMailing?.id)) ||
+              (s.num === 3 && Boolean(selectedMailingId || activeMailing?.id)) ||
+              (s.num === 4 && Boolean(selectedMailingId || activeMailing?.id));
 
-          <span className="text-slate-300 text-xs font-bold" aria-hidden>
-            →
-          </span>
-
-          <button
-            type="button"
-            onClick={() => {
-              if (selectedMailingId || activeMailing?.id) setWizardStep(2);
-            }}
-            disabled={!selectedMailingId && !activeMailing?.id}
-            className={clsx(
-              'flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition',
-              wizardStep === 2
-                ? 'bg-brand-700 text-white font-semibold shadow-2xs'
-                : wizardStep > 2
-                ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                : 'bg-slate-100/60 text-slate-400 cursor-not-allowed',
-            )}
-          >
-            <span
-              className={clsx(
-                'grid size-4.5 place-items-center rounded-full text-[10px] font-bold',
-                wizardStep === 2 ? 'bg-white text-brand-700' : 'bg-slate-300 text-slate-700',
-              )}
-            >
-              2
-            </span>
-            <span>Objetivo</span>
-          </button>
-
-          <span className="text-slate-300 text-xs font-bold" aria-hidden>
-            →
-          </span>
-
-          <button
-            type="button"
-            onClick={() => {
-              if ((selectedMailingId || activeMailing?.id) && campaignName.trim()) setWizardStep(3);
-            }}
-            disabled={!campaignName.trim() || (!selectedMailingId && !activeMailing?.id)}
-            className={clsx(
-              'flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition',
-              wizardStep === 3
-                ? 'bg-brand-700 text-white font-semibold shadow-2xs'
-                : 'bg-slate-100/60 text-slate-400 cursor-not-allowed',
-            )}
-          >
-            <span
-              className={clsx(
-                'grid size-4.5 place-items-center rounded-full text-[10px] font-bold',
-                wizardStep === 3 ? 'bg-white text-brand-700' : 'bg-slate-300 text-slate-700',
-              )}
-            >
-              3
-            </span>
-            <span>Revisão</span>
-          </button>
+            return (
+              <button
+                key={s.num}
+                type="button"
+                disabled={!isClickable}
+                onClick={() => isClickable && setWizardStep(s.num)}
+                aria-current={isActive ? 'step' : undefined}
+                className={clsx(
+                  'group flex flex-col gap-2 pb-3.5 border-b-[3px] text-left transition-all duration-150',
+                  isActive
+                    ? 'border-brand-700'
+                    : isDone
+                    ? 'border-brand-300 hover:border-brand-400 cursor-pointer'
+                    : 'border-slate-200 cursor-default',
+                )}
+              >
+                <div className="flex items-center gap-2.5">
+                  <span
+                    className={clsx(
+                      'grid size-7 sm:size-8 shrink-0 place-items-center rounded-full text-xs sm:text-sm font-bold transition-all',
+                      isActive
+                        ? 'bg-brand-700 text-white shadow-xs'
+                        : isDone
+                        ? 'bg-brand-100 text-brand-800'
+                        : 'bg-slate-100 text-slate-400 font-medium',
+                    )}
+                  >
+                    {isDone ? <Check className="size-4 stroke-[2.5]" /> : s.num}
+                  </span>
+                  <span
+                    className={clsx(
+                      'text-sm sm:text-base tracking-tight transition-colors',
+                      isActive
+                        ? 'text-brand-900 font-bold'
+                        : isDone
+                        ? 'text-slate-700 font-semibold group-hover:text-brand-800'
+                        : 'text-slate-400 font-medium',
+                    )}
+                  >
+                    {s.label}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
         </nav>
       </div>
 
-      {/* ETAPA 1: BASE DE CONTATOS */}
+      {/* ETAPA 1: MAILING */}
       {wizardStep === 1 && (
         <div className="space-y-4">
           <Card
@@ -890,11 +873,11 @@ function UnifiedCampaignCreator({
               <div className="flex items-center justify-between w-full">
                 <span className="flex items-center gap-2">
                   <Database className="size-4 text-brand-700" aria-hidden />
-                  <span>1. Base de Contatos</span>
+                  <span>1. Seleção do Mailing</span>
                 </span>
                 {activeMailing && (
                   <Badge tone="green">
-                    ✓ {fmtNumber(targetCount)} contatos qualificados
+                    ✓ {fmtNumber(activeMailing.recordCount)} contatos importados
                   </Badge>
                 )}
               </div>
@@ -906,7 +889,7 @@ function UnifiedCampaignCreator({
                   type="button"
                   onClick={() => setSourceType('EXISTING')}
                   className={clsx(
-                    'flex items-center gap-3 rounded-xl border p-3.5 text-left transition',
+                    'flex items-center gap-3 rounded-xl border p-4 text-left transition',
                     sourceType === 'EXISTING'
                       ? 'border-brand-500 bg-brand-50/70 font-semibold text-brand-900 ring-2 ring-brand-500/20'
                       : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
@@ -914,8 +897,8 @@ function UnifiedCampaignCreator({
                 >
                   <FileSpreadsheet className="size-5 text-brand-700 shrink-0" aria-hidden />
                   <div>
-                    <div className="text-sm font-semibold">Usar base ou lista pronta</div>
-                    <div className="text-xs font-normal text-slate-500">Mailing existente ou lista segmentada</div>
+                    <div className="text-sm font-semibold">Usar mailing existente</div>
+                    <div className="text-xs font-normal text-slate-500">Selecione uma base já carregada no workspace</div>
                   </div>
                 </button>
 
@@ -923,7 +906,7 @@ function UnifiedCampaignCreator({
                   type="button"
                   onClick={() => setSourceType('IMPORT')}
                   className={clsx(
-                    'flex items-center gap-3 rounded-xl border p-3.5 text-left transition',
+                    'flex items-center gap-3 rounded-xl border p-4 text-left transition',
                     sourceType === 'IMPORT'
                       ? 'border-brand-500 bg-brand-50/70 font-semibold text-brand-900 ring-2 ring-brand-500/20'
                       : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
@@ -932,65 +915,35 @@ function UnifiedCampaignCreator({
                   <UploadCloud className="size-5 text-brand-700 shrink-0" aria-hidden />
                   <div>
                     <div className="text-sm font-semibold">Carregar novo mailing (CSV)</div>
-                    <div className="text-xs font-normal text-slate-500">Upload de planilha com conferência</div>
+                    <div className="text-xs font-normal text-slate-500">Upload de planilha com conferência de colunas</div>
                   </div>
                 </button>
               </div>
 
               {sourceType === 'EXISTING' ? (
                 <div className="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <label htmlFor="select-base" className="text-xs font-medium text-slate-700">
-                      Selecione a base de contatos
-                    </label>
-                    {lists && lists.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setUseList(!useList)}
-                        className="text-xs text-brand-700 hover:underline font-medium"
-                      >
-                        {useList ? 'Trocar para mailing completo' : 'Usar lista segmentada específica'}
-                      </button>
-                    )}
-                  </div>
+                  <label htmlFor="select-base" className="text-xs font-medium text-slate-700 block">
+                    Selecione o mailing para a campanha
+                  </label>
 
-                  {!useList ? (
-                    <Select
-                      id="select-base"
-                      value={selectedMailingId}
-                      onChange={(e) => setSelectedMailingId(e.target.value)}
-                    >
-                      <option value="">Selecione um mailing...</option>
-                      {mailings?.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.name} — {fmtNumber(m.recordCount)} registros ({fmtDateTime(m.createdAt)})
-                        </option>
-                      ))}
-                    </Select>
-                  ) : (
-                    <Select
-                      id="select-base"
-                      value={selectedListId}
-                      onChange={(e) => {
-                        setSelectedListId(e.target.value);
-                        const l = lists?.find((x) => x.id === e.target.value);
-                        if (l) setSelectedMailingId(l.mailing.id);
-                      }}
-                    >
-                      <option value="">Selecione uma lista...</option>
-                      {lists?.map((l) => (
-                        <option key={l.id} value={l.id}>
-                          {l.name} — {fmtNumber(l.latestVersion?.memberCount ?? 0)} membros (v{l.latestVersion?.version})
-                        </option>
-                      ))}
-                    </Select>
-                  )}
+                  <Select
+                    id="select-base"
+                    value={selectedMailingId}
+                    onChange={(e) => setSelectedMailingId(e.target.value)}
+                  >
+                    <option value="">Selecione um mailing...</option>
+                    {mailings?.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name} — {fmtNumber(m.recordCount)} registros ({fmtDateTime(m.createdAt)})
+                      </option>
+                    ))}
+                  </Select>
 
                   {activeMailing && (
-                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                    <div className="flex items-center gap-2 text-xs text-slate-600 pt-1">
                       <Check className="size-3.5 text-emerald-600" />
                       <span>
-                        Base selecionada: <strong>{activeMailing.name}</strong> · {fmtNumber(targetCount)} contatos qualificados
+                        Mailing selecionado: <strong>{activeMailing.name}</strong> · {fmtNumber(activeMailing.recordCount)} contatos disponíveis
                       </span>
                     </div>
                   )}
@@ -1027,30 +980,165 @@ function UnifiedCampaignCreator({
               onClick={() => setWizardStep(2)}
               icon={<ArrowRight className="size-4" aria-hidden />}
             >
-              Avançar para o Objetivo →
+              Avançar para Público →
             </Button>
           </div>
         </div>
       )}
 
-      {/* ETAPA 2: OBJETIVO EM LINGUAGEM NATURAL */}
+      {/* ETAPA 2: PÚBLICO */}
       {wizardStep === 2 && (
         <div className="space-y-4">
           <Card
             title={
               <div className="flex items-center justify-between w-full">
                 <span className="flex items-center gap-2">
-                  <Sparkles className="size-4 text-brand-700" aria-hidden />
-                  <span>2. Objetivo da Campanha</span>
+                  <Users className="size-4 text-brand-700" aria-hidden />
+                  <span>2. Definição do Público</span>
                 </span>
-                <span className="text-xs font-normal text-slate-500">Linguagem natural</span>
+                <Badge tone="green">
+                  ✓ {fmtNumber(targetCount)} contatos qualificados
+                </Badge>
+              </div>
+            }
+          >
+            <div className="space-y-4">
+              <div className="text-xs text-slate-600">
+                Mailing de origem: <strong className="text-slate-900">{activeMailing?.name}</strong> ({fmtNumber(activeMailing?.recordCount ?? 0)} registros totais)
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setUseList(false)}
+                  className={clsx(
+                    'flex items-start gap-3 rounded-xl border p-4 text-left transition',
+                    !useList
+                      ? 'border-brand-500 bg-brand-50/70 font-semibold text-brand-900 ring-2 ring-brand-500/20'
+                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+                  )}
+                >
+                  <Users className="size-5 text-brand-700 shrink-0 mt-0.5" aria-hidden />
+                  <div>
+                    <div className="text-sm font-semibold">Toda a base do mailing</div>
+                    <div className="text-xs font-normal text-slate-500 mt-0.5">
+                      Disparar para todos os {fmtNumber(activeMailing?.recordCount ?? 0)} contatos do mailing
+                    </div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setUseList(true)}
+                  className={clsx(
+                    'flex items-start gap-3 rounded-xl border p-4 text-left transition',
+                    useList
+                      ? 'border-brand-500 bg-brand-50/70 font-semibold text-brand-900 ring-2 ring-brand-500/20'
+                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+                  )}
+                >
+                  <SlidersHorizontal className="size-5 text-brand-700 shrink-0 mt-0.5" aria-hidden />
+                  <div>
+                    <div className="text-sm font-semibold">Lista segmentada</div>
+                    <div className="text-xs font-normal text-slate-500 mt-0.5">
+                      Filtrar contatos por regras e segmentações específicas
+                    </div>
+                  </div>
+                </button>
+              </div>
+
+              {useList && (
+                <div className="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 space-y-3">
+                  <label htmlFor="select-list" className="text-xs font-medium text-slate-700 block">
+                    Selecione a lista segmentada
+                  </label>
+
+                  {lists && lists.length > 0 ? (
+                    <Select
+                      id="select-list"
+                      value={selectedListId}
+                      onChange={(e) => {
+                        setSelectedListId(e.target.value);
+                        const l = lists.find((x) => x.id === e.target.value);
+                        if (l) setSelectedMailingId(l.mailing.id);
+                      }}
+                    >
+                      <option value="">Selecione uma lista...</option>
+                      {lists.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.name} — {fmtNumber(l.latestVersion?.memberCount ?? 0)} membros (v{l.latestVersion?.version})
+                        </option>
+                      ))}
+                    </Select>
+                  ) : (
+                    <div className="text-xs text-slate-500">
+                      Nenhuma lista segmentada cadastrada.{' '}
+                      <Link to="/listas" className="text-brand-700 underline font-medium">
+                        Criar lista em Dados &gt; Listas
+                      </Link>
+                    </div>
+                  )}
+
+                  {activeList && (
+                    <div className="flex items-center gap-2 text-xs text-slate-600 pt-1">
+                      <Check className="size-3.5 text-emerald-600" />
+                      <span>
+                        Lista selecionada: <strong>{activeList.name}</strong> · {fmtNumber(activeList.latestVersion?.memberCount ?? 0)} membros
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/40 p-3.5 flex items-center justify-between text-xs text-emerald-950">
+                <div className="flex items-center gap-2">
+                  <Check className="size-4 text-emerald-600 shrink-0" />
+                  <span>
+                    Público configurado: <strong>{fmtNumber(targetCount)} contatos qualificados</strong> prontos para acionamento.
+                  </span>
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          <div className="flex items-center justify-between gap-3 pt-2">
+            <Button
+              variant="secondary"
+              onClick={() => setWizardStep(1)}
+              icon={<ArrowLeft className="size-4" aria-hidden />}
+            >
+              ← Voltar para Mailing
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => setWizardStep(3)}
+              icon={<ArrowRight className="size-4" aria-hidden />}
+            >
+              Avançar para Acionamento →
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ETAPA 3: ACIONAMENTO */}
+      {wizardStep === 3 && (
+        <div className="space-y-4">
+          <Card
+            title={
+              <div className="flex items-center justify-between w-full">
+                <span className="flex items-center gap-2">
+                  <Sparkles className="size-4 text-brand-700" aria-hidden />
+                  <span>3. Acionamento & Inteligência de CPC</span>
+                </span>
+                <span className="text-xs font-normal text-slate-500">Otimização automática</span>
               </div>
             }
           >
             <div className="space-y-4">
               <div className="space-y-2">
                 <label htmlFor="campaign-prompt" className="text-xs font-medium text-slate-700">
-                  Descreva o objetivo da campanha
+                  Descreva o objetivo do acionamento
                 </label>
                 <Textarea
                   id="campaign-prompt"
@@ -1080,17 +1168,6 @@ function UnifiedCampaignCreator({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                <Field label="Nome da Campanha" required>
-                  {(p) => (
-                    <Input
-                      id={p.id}
-                      value={campaignName}
-                      onChange={(e) => setCampaignName(e.target.value)}
-                      placeholder="Nome identificador da campanha"
-                    />
-                  )}
-                </Field>
-
                 <Field label="Teto de Custo por CPC (R$)">
                   {(p) => (
                     <Input
@@ -1103,66 +1180,19 @@ function UnifiedCampaignCreator({
                     />
                   )}
                 </Field>
-              </div>
-            </div>
-          </Card>
 
-          <div className="flex items-center justify-between gap-3 pt-2">
-            <Button
-              variant="secondary"
-              onClick={() => setWizardStep(1)}
-              icon={<ArrowLeft className="size-4" aria-hidden />}
-            >
-              ← Voltar para Base
-            </Button>
-            <Button
-              variant="primary"
-              size="md"
-              disabled={!campaignName.trim()}
-              onClick={() => setWizardStep(3)}
-              icon={<ArrowRight className="size-4" aria-hidden />}
-            >
-              Avançar para Revisão & Disparo →
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* ETAPA 3: REVISÃO & DISPARO */}
-      {wizardStep === 3 && (
-        <div className="space-y-4">
-          <Card
-            title={
-              <div className="flex items-center justify-between w-full">
-                <span className="flex items-center gap-2">
-                  <ShieldCheck className="size-4 text-brand-700" aria-hidden />
-                  <span>3. Revisão & CPC Otimizado</span>
-                </span>
-                <Badge tone="green">Pronta para Disparo</Badge>
-              </div>
-            }
-          >
-            <div className="space-y-4">
-              {/* Resumo compacto dos parâmetros */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 rounded-xl border border-slate-200/90 bg-slate-50/60 p-3.5 text-xs text-slate-700">
-                <div>
-                  <span className="text-slate-500 block text-[11px]">Base Selecionada:</span>
-                  <span className="font-semibold text-slate-900 truncate block">
-                    {activeMailing?.name ?? 'Mailing'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block text-[11px]">Nome da Campanha:</span>
-                  <span className="font-semibold text-slate-900 truncate block">{campaignName}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block text-[11px]">Teto Máximo Aceitável:</span>
-                  <span className="font-semibold text-slate-900">{fmtMoney(maxAcceptableCpcBrl)} / CPC</span>
+                <div className="flex flex-col justify-end">
+                  <div className="text-xs text-slate-500 pb-1">Canal de Contato Prioritário</div>
+                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                    <Badge tone="green">WhatsApp Oficial</Badge>
+                    <span className="text-xs text-slate-400">+</span>
+                    <Badge tone="brand">Discador Otimizado</Badge>
+                  </div>
                 </div>
               </div>
 
               {/* Indicadores de CPC */}
-              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 pt-2 border-t border-slate-200/80">
                 <Stat
                   label="Contatos Qualificados"
                   value={fmtNumber(targetCount)}
@@ -1270,16 +1300,112 @@ function UnifiedCampaignCreator({
             </div>
           </Card>
 
+          <div className="flex items-center justify-between gap-3 pt-2">
+            <Button
+              variant="secondary"
+              onClick={() => setWizardStep(2)}
+              icon={<ArrowLeft className="size-4" aria-hidden />}
+            >
+              ← Voltar para Público
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => setWizardStep(4)}
+              icon={<ArrowRight className="size-4" aria-hidden />}
+            >
+              Avançar para Campanha →
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ETAPA 4: CAMPANHA */}
+      {wizardStep === 4 && (
+        <div className="space-y-4">
+          <Card
+            title={
+              <div className="flex items-center justify-between w-full">
+                <span className="flex items-center gap-2">
+                  <ShieldCheck className="size-4 text-brand-700" aria-hidden />
+                  <span>4. Finalização e Disparo da Campanha</span>
+                </span>
+                <Badge tone="green">Pronta para Disparo</Badge>
+              </div>
+            }
+          >
+            <div className="space-y-4">
+              <Field label="Nome da Campanha" required>
+                {(p) => (
+                  <Input
+                    id={p.id}
+                    value={campaignName}
+                    onChange={(e) => setCampaignName(e.target.value)}
+                    placeholder="Nome identificador da campanha"
+                  />
+                )}
+              </Field>
+
+              {/* Resumo consolidado dos 4 passos */}
+              <div className="rounded-xl border border-slate-200/90 bg-slate-50/60 p-4 space-y-3">
+                <div className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                  Resumo dos parâmetros configurados
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                  <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1">
+                    <span className="text-slate-500 block text-[11px] font-medium">1. Mailing</span>
+                    <span className="font-semibold text-slate-900 block truncate">
+                      {activeMailing?.name ?? 'Mailing'}
+                    </span>
+                    <span className="text-slate-500 text-[11px] block">
+                      {fmtNumber(activeMailing?.recordCount ?? 0)} contatos
+                    </span>
+                  </div>
+
+                  <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1">
+                    <span className="text-slate-500 block text-[11px] font-medium">2. Público</span>
+                    <span className="font-semibold text-slate-900 block truncate">
+                      {useList ? activeList?.name ?? 'Lista segmentada' : 'Toda a base'}
+                    </span>
+                    <span className="text-emerald-700 font-semibold text-[11px] block">
+                      {fmtNumber(targetCount)} qualificados
+                    </span>
+                  </div>
+
+                  <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1">
+                    <span className="text-slate-500 block text-[11px] font-medium">3. Acionamento</span>
+                    <span className="font-semibold text-slate-900 block truncate">
+                      {OPERATION_PURPOSE_LABEL[purposeCode] || 'Cobrança'}
+                    </span>
+                    <span className="text-slate-500 text-[11px] block">
+                      Teto: {fmtMoney(maxAcceptableCpcBrl)} / CPC
+                    </span>
+                  </div>
+
+                  <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1">
+                    <span className="text-slate-500 block text-[11px] font-medium">4. Eficiência</span>
+                    <span className="font-semibold text-emerald-700 block">
+                      R$ 3,18 / CPC
+                    </span>
+                    <span className="text-emerald-700 text-[11px] block">
+                      43,2% de economia prevista
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Card>
+
           {formError && <Alert tone="error">{formError}</Alert>}
 
           {/* Barra de Ação Final */}
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
             <Button
               variant="secondary"
-              onClick={() => setWizardStep(2)}
+              onClick={() => setWizardStep(3)}
               icon={<ArrowLeft className="size-4" aria-hidden />}
             >
-              ← Voltar para Objetivo
+              ← Voltar para Acionamento
             </Button>
 
             <div className="flex flex-wrap items-center gap-2.5">
