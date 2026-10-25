@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpDown, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, GripVertical, Plus, Trash2, X } from 'lucide-react';
 import { FILTER_OPS, REASON_LABEL, type ListFilter } from '@voll/shared';
 import { ApiError, errorMessage, post } from '../lib/api';
 import type { ListPreview, ListPublishResult } from '../lib/types';
@@ -51,6 +51,8 @@ export function ListEditor({
   const [applied, setApplied] = useState<{ filters: ListFilter[]; sort: Sort[] }>({ filters: initial?.filters ?? [], sort: initial?.sort ?? [] });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showManual, setShowManual] = useState(true);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [overIdx, setOverIdx] = useState<number | null>(null);
   const nameRef = useRef<HTMLInputElement>(null);
 
   const baseFields = useQuery({
@@ -130,6 +132,21 @@ export function ListEditor({
     const idx = applied.sort.findIndex((s) => s.field === fieldKey);
     if (idx === -1) return null;
     return { priority: idx + 1, dir: applied.sort[idx].dir, total: applied.sort.length };
+  }
+
+  function moveSortItem(from: number, to: number) {
+    if (from === to || from < 0 || to < 0 || from >= applied.sort.length || to >= applied.sort.length) return;
+    const nextSort = [...applied.sort];
+    const [moved] = nextSort.splice(from, 1);
+    nextSort.splice(to, 0, moved);
+    setSort(nextSort);
+    setApplied((prev) => ({ ...prev, sort: nextSort }));
+  }
+
+  function removeSortItem(idx: number) {
+    const nextSort = applied.sort.filter((_, i) => i !== idx);
+    setSort(nextSort);
+    setApplied((prev) => ({ ...prev, sort: nextSort }));
   }
 
   return (
@@ -289,18 +306,98 @@ export function ListEditor({
                   )}
                 </div>
               </div>
-              <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-col gap-2">
                 <span className="text-xs text-slate-500">
-                  Clique no título da coluna para ordenar (crescente / decrescente / remover). Até 3 níveis simultâneos.
+                  Clique no título da coluna para ordenar (crescente / decrescente / remover). Até 3 níveis simultâneos — arraste os cartões para reordenar a prioridade.
                 </span>
                 {applied.sort.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
-                    <span className="font-medium">Ordenação ativa:</span>
-                    {applied.sort.map((s, idx) => (
-                      <Badge key={s.field} tone="brand">
-                        {idx + 1}º {s.field} ({s.dir === 'asc' ? '↑ crescente' : '↓ decrescente'})
-                      </Badge>
-                    ))}
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                    <span className="font-medium text-slate-700">Ordenação ativa:</span>
+                    {applied.sort.map((s, idx) => {
+                      const isDragging = dragIdx === idx;
+                      const isOver = overIdx === idx && dragIdx !== null && dragIdx !== idx;
+                      return (
+                        <div
+                          key={s.field}
+                          draggable
+                          onDragStart={(e) => {
+                            setDragIdx(idx);
+                            e.dataTransfer.effectAllowed = 'move';
+                            e.dataTransfer.setData('text/plain', String(idx));
+                          }}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            e.dataTransfer.dropEffect = 'move';
+                            if (overIdx !== idx) setOverIdx(idx);
+                          }}
+                          onDragLeave={() => {
+                            if (overIdx === idx) setOverIdx(null);
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            const from = dragIdx ?? Number(e.dataTransfer.getData('text/plain'));
+                            moveSortItem(from, idx);
+                            setDragIdx(null);
+                            setOverIdx(null);
+                          }}
+                          onDragEnd={() => {
+                            setDragIdx(null);
+                            setOverIdx(null);
+                          }}
+                          title="Clique e arraste para alterar a prioridade da ordenação"
+                          className={`inline-flex cursor-grab active:cursor-grabbing items-center gap-1 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-800 ring-1 ring-inset transition-all select-none ${
+                            isDragging
+                              ? 'opacity-50 ring-brand-400 scale-95'
+                              : isOver
+                                ? 'ring-2 ring-brand-600 bg-brand-100/80 shadow-xs'
+                                : 'ring-brand-200 hover:bg-brand-100/50'
+                          }`}
+                        >
+                          <GripVertical className="size-3.5 text-brand-600/80 shrink-0" aria-hidden />
+                          {applied.sort.length > 1 && idx > 0 && (
+                            <button
+                              type="button"
+                              aria-label={`Mover ${s.field} para trás`}
+                              title="Mover para a esquerda (maior prioridade)"
+                              onClick={() => moveSortItem(idx, idx - 1)}
+                              className="rounded p-0.5 text-brand-700 hover:bg-brand-200/60"
+                            >
+                              <ChevronLeft className="size-3" aria-hidden />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => toggleColumnSort(s.field)}
+                            title="Clique para alternar crescente / decrescente"
+                            className="inline-flex items-center gap-1 hover:underline"
+                          >
+                            <span className="font-bold">{idx + 1}º</span>
+                            <span>{s.field}</span>
+                            <span className="text-brand-700">({s.dir === 'asc' ? '↑ crescente' : '↓ decrescente'})</span>
+                          </button>
+                          {applied.sort.length > 1 && idx < applied.sort.length - 1 && (
+                            <button
+                              type="button"
+                              aria-label={`Mover ${s.field} para frente`}
+                              title="Mover para a direita (menor prioridade)"
+                              onClick={() => moveSortItem(idx, idx + 1)}
+                              className="rounded p-0.5 text-brand-700 hover:bg-brand-200/60"
+                            >
+                              <ChevronRight className="size-3" aria-hidden />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            aria-label={`Remover ordenação ${s.field}`}
+                            title="Remover esta ordenação"
+                            onClick={() => removeSortItem(idx)}
+                            className="ml-0.5 rounded-full p-0.5 text-brand-700/70 hover:bg-brand-200/70 hover:text-brand-900"
+                          >
+                            <X className="size-3" aria-hidden />
+                          </button>
+                        </div>
+                      );
+                    })}
                     <button
                       type="button"
                       className="ml-1 text-xs text-brand-700 underline hover:text-brand-900"
