@@ -695,6 +695,7 @@ function UnifiedCampaignCreator({
   // 1. Base selection state
   const [sourceType, setSourceType] = useState<'EXISTING' | 'IMPORT'>('EXISTING');
   const [useList, setUseList] = useState<boolean>(draft.audienceMode === 'LIST');
+  const [listSelectionMode, setListSelectionMode] = useState<'SELECT' | 'CREATE'>('SELECT');
   const [selectedMailingId, setSelectedMailingId] = useState<string>(
     draft.mailingId || mailings?.[0]?.id || '',
   );
@@ -719,6 +720,7 @@ function UnifiedCampaignCreator({
   const [maxAcceptableCpcBrl, setMaxAcceptableCpcBrl] = useState<number>(
     extra.maxAcceptableCpcBrl || 4.5,
   );
+  const [skipAiOptimization, setSkipAiOptimization] = useState<boolean>(false);
 
   // UI details toggle
   const [showBlocksDetail, setShowBlocksDetail] = useState(false);
@@ -765,9 +767,13 @@ function UnifiedCampaignCreator({
     idemRef.current ??= newIdempotencyKey();
 
     try {
+      const desc = skipAiOptimization
+        ? (promptText.trim() ? `${promptText.trim()} [Disparo direto sem otimização IA]` : 'Disparo direto sem otimização IA')
+        : (promptText.trim() || undefined);
+
       const payload = {
         name: campaignName.trim(),
-        description: promptText.trim() || undefined,
+        description: desc,
         mailingId: mailingIdToUse,
         listVersionId: useList && activeList?.latestVersion ? activeList.latestVersion.id : null,
         journeyVersionId: bestJourney.latestVersion.id,
@@ -978,9 +984,9 @@ function UnifiedCampaignCreator({
               size="md"
               disabled={!selectedMailingId && !activeMailing?.id}
               onClick={() => setWizardStep(2)}
-              icon={<ArrowRight className="size-4" aria-hidden />}
             >
-              Avançar para Público →
+              <span>Avançar para Público</span>
+              <ArrowRight className="size-4" aria-hidden />
             </Button>
           </div>
         </div>
@@ -1048,43 +1054,131 @@ function UnifiedCampaignCreator({
               </div>
 
               {useList && (
-                <div className="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 space-y-3">
-                  <label htmlFor="select-list" className="text-xs font-medium text-slate-700 block">
-                    Selecione a lista segmentada
-                  </label>
-
-                  {lists && lists.length > 0 ? (
-                    <Select
-                      id="select-list"
-                      value={selectedListId}
-                      onChange={(e) => {
-                        setSelectedListId(e.target.value);
-                        const l = lists.find((x) => x.id === e.target.value);
-                        if (l) setSelectedMailingId(l.mailing.id);
-                      }}
-                    >
-                      <option value="">Selecione uma lista...</option>
-                      {lists.map((l) => (
-                        <option key={l.id} value={l.id}>
-                          {l.name} — {fmtNumber(l.latestVersion?.memberCount ?? 0)} membros (v{l.latestVersion?.version})
-                        </option>
-                      ))}
-                    </Select>
-                  ) : (
-                    <div className="text-xs text-slate-500">
-                      Nenhuma lista segmentada cadastrada.{' '}
-                      <Link to="/listas" className="text-brand-700 underline font-medium">
-                        Criar lista em Dados &gt; Listas
-                      </Link>
-                    </div>
-                  )}
-
-                  {activeList && (
-                    <div className="flex items-center gap-2 text-xs text-slate-600 pt-1">
-                      <Check className="size-3.5 text-emerald-600" />
-                      <span>
-                        Lista selecionada: <strong>{activeList.name}</strong> · {fmtNumber(activeList.latestVersion?.memberCount ?? 0)} membros
+                <div className="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-3">
+                    <div>
+                      <span className="text-xs font-semibold text-slate-800 uppercase tracking-wider">
+                        Configuração do Público (Lista)
                       </span>
+                      <p className="text-xs text-slate-500">
+                        Selecione um público existente ou crie uma nova lista com filtros sobre o mailing.
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-0.5 text-xs font-medium">
+                      <button
+                        type="button"
+                        onClick={() => setListSelectionMode('SELECT')}
+                        className={clsx(
+                          'rounded-md px-3 py-1.5 transition',
+                          listSelectionMode === 'SELECT'
+                            ? 'bg-brand-50 text-brand-800 font-semibold shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900',
+                        )}
+                      >
+                        Selecionar existente
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setListSelectionMode('CREATE')}
+                        className={clsx(
+                          'inline-flex items-center gap-1 rounded-md px-3 py-1.5 transition',
+                          listSelectionMode === 'CREATE'
+                            ? 'bg-brand-50 text-brand-800 font-semibold shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900',
+                        )}
+                      >
+                        <Plus className="size-3.5" /> Criar nova lista
+                      </button>
+                    </div>
+                  </div>
+
+                  {listSelectionMode === 'SELECT' ? (
+                    <div className="space-y-3">
+                      <label htmlFor="select-list" className="text-xs font-medium text-slate-700 block">
+                        Selecione a lista segmentada
+                      </label>
+
+                      {lists && lists.length > 0 ? (
+                        <div className="space-y-2">
+                          <Select
+                            id="select-list"
+                            value={selectedListId}
+                            onChange={(e) => {
+                              setSelectedListId(e.target.value);
+                              const l = lists.find((x) => x.id === e.target.value);
+                              if (l) setSelectedMailingId(l.mailing.id);
+                            }}
+                          >
+                            <option value="">Selecione uma lista...</option>
+                            {lists.map((l) => (
+                              <option key={l.id} value={l.id}>
+                                {l.name} — {fmtNumber(l.latestVersion?.memberCount ?? 0)} membros (v{l.latestVersion?.version})
+                              </option>
+                            ))}
+                          </Select>
+
+                          {activeList && (
+                            <div className="flex items-center justify-between rounded-lg bg-white p-2.5 border border-slate-200 text-xs text-slate-700">
+                              <div className="flex items-center gap-2">
+                                <Check className="size-3.5 text-emerald-600" />
+                                <span>
+                                  Público selecionado: <strong>{activeList.name}</strong> · {fmtNumber(activeList.latestVersion?.memberCount ?? 0)} membros
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setListSelectionMode('CREATE')}
+                                className="text-brand-700 hover:underline font-semibold flex items-center gap-1"
+                              >
+                                <Plus className="size-3.5" /> Criar nova lista
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="rounded-lg border border-dashed border-slate-300 p-4 text-center">
+                          <p className="text-xs text-slate-500 mb-2">Nenhuma lista segmentada cadastrada no workspace.</p>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => setListSelectionMode('CREATE')}
+                            icon={<Plus className="size-3.5" />}
+                          >
+                            Criar nova lista agora
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-3 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                        <div>
+                          <span className="text-xs font-semibold text-slate-800">
+                            Criar Nova Lista Segmentada
+                          </span>
+                          <span className="text-xs text-slate-500 block">
+                            Filtros aplicados sobre "{activeMailing?.name}"
+                          </span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setListSelectionMode('SELECT')}
+                        >
+                          Cancelar e voltar
+                        </Button>
+                      </div>
+                      <ListEditor
+                        mailingId={selectedMailingId || activeMailing?.id || ''}
+                        initial={{ name: `${activeMailing?.name ?? 'Mailing'} · Lista ${new Date().toLocaleDateString('pt-BR')}` }}
+                        onPublished={(r, s) => {
+                          qc.invalidateQueries({ queryKey: ['lists'] });
+                          setSelectedListId(r.listId);
+                          setListSelectionMode('SELECT');
+                          toast('success', `Lista "${s.name}" criada com sucesso (${fmtNumber(r.memberCount)} membros).`);
+                        }}
+                      />
                     </div>
                   )}
                 </div>
@@ -1107,15 +1201,15 @@ function UnifiedCampaignCreator({
               onClick={() => setWizardStep(1)}
               icon={<ArrowLeft className="size-4" aria-hidden />}
             >
-              ← Voltar para Mailing
+              Voltar para Mailing
             </Button>
             <Button
               variant="primary"
               size="md"
               onClick={() => setWizardStep(3)}
-              icon={<ArrowRight className="size-4" aria-hidden />}
             >
-              Avançar para Acionamento →
+              <span>Avançar para Acionamento</span>
+              <ArrowRight className="size-4" aria-hidden />
             </Button>
           </div>
         </div>
@@ -1131,11 +1225,33 @@ function UnifiedCampaignCreator({
                   <Sparkles className="size-4 text-brand-700" aria-hidden />
                   <span>3. Acionamento & Inteligência de CPC</span>
                 </span>
-                <span className="text-xs font-normal text-slate-500">Otimização automática</span>
+                {skipAiOptimization ? (
+                  <Badge tone="amber">Sem Otimização IA</Badge>
+                ) : (
+                  <Badge tone="green">Otimização Automática Ativa</Badge>
+                )}
               </div>
             }
           >
             <div className="space-y-4">
+              {skipAiOptimization && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3.5 text-xs text-amber-900 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <SlidersHorizontal className="size-4 text-amber-700 shrink-0" />
+                    <span>
+                      <strong>Otimização IA ignorada:</strong> o acionamento seguirá a ordem sequencial direta da base e os parâmetros padrão da estratégia.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSkipAiOptimization(false)}
+                    className="font-semibold text-brand-700 underline hover:text-brand-900 ml-2 shrink-0"
+                  >
+                    Reativar Otimização IA
+                  </button>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <label htmlFor="campaign-prompt" className="text-xs font-medium text-slate-700">
                   Descreva o objetivo do acionamento
@@ -1306,16 +1422,31 @@ function UnifiedCampaignCreator({
               onClick={() => setWizardStep(2)}
               icon={<ArrowLeft className="size-4" aria-hidden />}
             >
-              ← Voltar para Público
+              Voltar para Público
             </Button>
-            <Button
-              variant="primary"
-              size="md"
-              onClick={() => setWizardStep(4)}
-              icon={<ArrowRight className="size-4" aria-hidden />}
-            >
-              Avançar para Campanha →
-            </Button>
+            <div className="flex items-center gap-2.5">
+              <Button
+                variant="secondary"
+                size="md"
+                onClick={() => {
+                  setSkipAiOptimization(true);
+                  setWizardStep(4);
+                }}
+              >
+                Pular (sem otimização IA)
+              </Button>
+              <Button
+                variant="primary"
+                size="md"
+                onClick={() => {
+                  setSkipAiOptimization(false);
+                  setWizardStep(4);
+                }}
+              >
+                <span>Avançar para Campanha</span>
+                <ArrowRight className="size-4" aria-hidden />
+              </Button>
+            </div>
           </div>
         </div>
       )}
@@ -1375,21 +1506,34 @@ function UnifiedCampaignCreator({
                   <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1">
                     <span className="text-slate-500 block text-[11px] font-medium">3. Acionamento</span>
                     <span className="font-semibold text-slate-900 block truncate">
-                      {OPERATION_PURPOSE_LABEL[purposeCode] || 'Cobrança'}
+                      {skipAiOptimization ? 'Disparo Direto' : OPERATION_PURPOSE_LABEL[purposeCode] || 'Cobrança'}
                     </span>
                     <span className="text-slate-500 text-[11px] block">
-                      Teto: {fmtMoney(maxAcceptableCpcBrl)} / CPC
+                      {skipAiOptimization ? 'Sem otimização IA' : `Teto: ${fmtMoney(maxAcceptableCpcBrl)} / CPC`}
                     </span>
                   </div>
 
                   <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1">
                     <span className="text-slate-500 block text-[11px] font-medium">4. Eficiência</span>
-                    <span className="font-semibold text-emerald-700 block">
-                      R$ 3,18 / CPC
-                    </span>
-                    <span className="text-emerald-700 text-[11px] block">
-                      43,2% de economia prevista
-                    </span>
+                    {skipAiOptimization ? (
+                      <>
+                        <span className="font-semibold text-slate-700 block">
+                          Ordem Direta
+                        </span>
+                        <span className="text-slate-500 text-[11px] block">
+                          Sem filtro preditivo
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-semibold text-emerald-700 block">
+                          R$ 3,18 / CPC
+                        </span>
+                        <span className="text-emerald-700 text-[11px] block">
+                          43,2% de economia prevista
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1405,7 +1549,7 @@ function UnifiedCampaignCreator({
               onClick={() => setWizardStep(3)}
               icon={<ArrowLeft className="size-4" aria-hidden />}
             >
-              ← Voltar para Acionamento
+              Voltar para Acionamento
             </Button>
 
             <div className="flex flex-wrap items-center gap-2.5">
@@ -1424,7 +1568,7 @@ function UnifiedCampaignCreator({
                 disabled={isCreating}
                 icon={<Rocket className="size-4" aria-hidden />}
               >
-                Criar e iniciar campanha →
+                Criar e iniciar campanha
               </Button>
             </div>
           </div>
