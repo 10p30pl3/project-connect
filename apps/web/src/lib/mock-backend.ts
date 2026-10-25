@@ -240,31 +240,46 @@ type FullContact = {
   blocks: Block[];
 };
 
-const FIRST = ['Ana', 'Bruno', 'Carla', 'Diego', 'Elisa', 'Fábio', 'Gabriela', 'Heitor', 'Isabela', 'João', 'Larissa', 'Marcos', 'Natália', 'Otávio', 'Paula', 'Rafael', 'Sofia', 'Tiago', 'Vera', 'Wagner'];
-const LAST = ['Almeida', 'Barbosa', 'Cardoso', 'Duarte', 'Esteves', 'Ferraz', 'Gomes', 'Henriques', 'Lima', 'Moraes'];
-const CITIES = ['SP', 'RJ', 'MG', 'PR', 'RS'];
+const BRAZILIAN_PROFILES = [
+  { name: 'Maria Aparecida Santos', age: 67, ddd: '11', uf: 'SP', city: 'São Paulo', debt: 1450.00, overdue: 45, phone: '551132224455', wa: '5511988881001', email: 'maria.santos@uol.com.br', bracket: 'AGE_60_PLUS' as const, intent: 'P1_ALTA_PROPENSAO_VOZ' as const, channel: 'VOICE' as const, window: '09:00 – 11:30' },
+  { name: 'Lucas Gabriel Silva', age: 22, ddd: '71', uf: 'BA', city: 'Salvador', debt: 320.00, overdue: 18, phone: '5571991112233', wa: '5571991112233', email: 'lucas.g@gmail.com', bracket: 'AGE_16_24' as const, intent: 'P3_DIGITAL_FIRST' as const, channel: 'WHATSAPP' as const, window: '12:00 – 13:30 (Wi-Fi)' },
+  { name: 'Carlos Eduardo Souza', age: 41, ddd: '21', uf: 'RJ', city: 'Rio de Janeiro', debt: 2890.00, overdue: 90, phone: '5521987654321', wa: '5521987654321', email: 'carlos.edu@globo.com', bracket: 'AGE_35_44' as const, intent: 'P2_HIBRIDO_DIGITAL_VOZ' as const, channel: 'WHATSAPP' as const, window: '17:30 – 19:30' },
+  { name: 'Fernanda Cristina Oliveira', age: 33, ddd: '92', uf: 'AM', city: 'Manaus', debt: 610.00, overdue: 30, phone: '5592981113344', wa: '5592981113344', email: 'fernanda.am@hotmail.com', bracket: 'AGE_25_34' as const, intent: 'P2_HIBRIDO_DIGITAL_VOZ' as const, channel: 'WHATSAPP' as const, window: '19:00 – 20:45 (Wi-Fi)' },
+  { name: 'Seu José Raimundo Pereira', age: 72, ddd: '85', uf: 'CE', city: 'Fortaleza', debt: 980.00, overdue: 60, phone: '558534567890', wa: '5585988776655', email: 'jose.pereira@gmail.com', bracket: 'AGE_60_PLUS' as const, intent: 'P1_ALTA_PROPENSAO_VOZ' as const, channel: 'VOICE' as const, window: '08:30 – 11:15' },
+  { name: 'Patrícia da Costa Lima', age: 29, ddd: '41', uf: 'PR', city: 'Curitiba', debt: 540.00, overdue: 15, phone: '5541999887766', wa: '5541999887766', email: 'patricia.costa@adv.com.br', bracket: 'AGE_25_34' as const, intent: 'P3_DIGITAL_FIRST' as const, channel: 'WHATSAPP' as const, window: '11:45 – 13:15' },
+  { name: 'Antônio Marcos Ferreira', age: 58, ddd: '31', uf: 'MG', city: 'Belo Horizonte', debt: 3400.00, overdue: 120, phone: '5531984445566', wa: '5531984445566', email: 'marcos.ferreira@terra.com.br', bracket: 'AGE_45_59' as const, intent: 'P2_HIBRIDO_DIGITAL_VOZ' as const, channel: 'VOICE' as const, window: '10:00 – 12:00' },
+  { name: 'Beatriz Helena Rocha', age: 24, ddd: '51', uf: 'RS', city: 'Porto Alegre', debt: 410.00, overdue: 22, phone: '5551992223344', wa: '5551992223344', email: 'bia.rocha@icloud.com', bracket: 'AGE_16_24' as const, intent: 'P3_DIGITAL_FIRST' as const, channel: 'WHATSAPP' as const, window: '18:00 – 19:30' },
+  { name: 'Rodrigo Henrique Castro', age: 38, ddd: '61', uf: 'DF', city: 'Brasília', debt: 1780.00, overdue: 40, phone: '5561993334455', wa: '5561993334455', email: 'rodrigo.castro@bb.com.br', bracket: 'AGE_35_44' as const, intent: 'P2_HIBRIDO_DIGITAL_VOZ' as const, channel: 'WHATSAPP' as const, window: '12:00 – 14:00' },
+  { name: 'Silvia Regina Andrade', age: 63, ddd: '19', uf: 'SP', city: 'Campinas', debt: 2150.00, overdue: 75, phone: '551932334455', wa: '5519987778899', email: 'silvia.andrade@gmail.com', bracket: 'AGE_60_PLUS' as const, intent: 'P1_ALTA_PROPENSAO_VOZ' as const, channel: 'VOICE' as const, window: '09:00 – 11:30' },
+  { name: 'Felipe Augusto Nogueira', age: 31, ddd: '62', uf: 'GO', city: 'Goiânia', debt: 890.00, overdue: 35, phone: '5562985556677', wa: '5562985556677', email: 'felipe.agro@gmail.com', bracket: 'AGE_25_34' as const, intent: 'P2_HIBRIDO_DIGITAL_VOZ' as const, channel: 'WHATSAPP' as const, window: '17:00 – 18:45' },
+  { name: 'Dona Helena Vasconcelos', age: 79, ddd: '81', uf: 'PE', city: 'Recife', debt: 1200.00, overdue: 80, phone: '558134221100', wa: '', email: '', bracket: 'AGE_60_PLUS' as const, intent: 'P1_ALTA_PROPENSAO_VOZ' as const, channel: 'VOICE' as const, window: '08:30 – 11:00' },
+];
 
 const CONTACTS: FullContact[] = Array.from({ length: 24 }, (_, idx) => {
   const i = idx + 1;
   const id = uuid(100 + i);
-  const externalId = String(i).padStart(6, '0');
-  const name = `${FIRST[i % FIRST.length]} ${LAST[(i * 3) % LAST.length]}`;
-  const phone1 = `551190000${String(i * 10 + 1).padStart(4, '0')}`;
-  const wa = `551190000${String(i * 10 + 5).padStart(4, '0')}`;
+  const p = BRAZILIAN_PROFILES[idx % BRAZILIAN_PROFILES.length];
+  const externalId = `${p.ddd}${String(i * 12345).padStart(6, '0')}`;
+  const name = `${p.name} ${idx >= BRAZILIAN_PROFILES.length ? '(Filial)' : ''}`.trim();
+  const phone1 = p.phone;
+  const wa = p.wa || p.phone;
   const destinations: Destination[] = [
-    { id: uuid(200 + i * 2), channelType: 'VOICE', address: phone1, addressMasked: maskAddress(phone1), label: 'Principal', priority: 1, valid: true, blocked: false },
+    { id: uuid(200 + i * 2), channelType: 'VOICE', address: phone1, addressMasked: maskAddress(phone1), label: 'Telefone Principal', priority: 1, valid: true, blocked: false },
   ];
-  if (i % 2 === 0) {
-    destinations.push({ id: uuid(200 + i * 2 + 1), channelType: 'WHATSAPP', address: wa, addressMasked: maskAddress(wa), label: 'WhatsApp', priority: 1, valid: true, blocked: false });
+  if (p.wa) {
+    destinations.push({ id: uuid(200 + i * 2 + 1), channelType: 'WHATSAPP', address: wa, addressMasked: maskAddress(wa), label: 'WhatsApp Verificado', priority: 1, valid: true, blocked: false });
+  }
+  if (p.email) {
+    destinations.push({ id: uuid(200 + i * 2 + 2), channelType: 'EMAIL', address: p.email, addressMasked: p.email.replace(/(.{2})(.*)(@.*)/, '$1***$3'), label: 'E-mail Titular', priority: 2, valid: true, blocked: false });
   }
   const blocks: Block[] =
-    i === 1
+    i === 11
       ? [
           {
             id: uuid(301),
             scope: 'CONTACT',
             destinationId: null,
-            reason: 'Solicitação registrada no SAC (exemplo)',
+            reason: 'Bloqueio Procon / Não Me Perturbe (DNC Nacional)',
             origin: 'MANUAL',
             createdAt: '2026-10-18T14:20:00Z',
             revokedAt: null,
@@ -276,13 +291,16 @@ const CONTACTS: FullContact[] = Array.from({ length: 24 }, (_, idx) => {
     externalId,
     name,
     attributes: {
-      cidade: CITIES[i % CITIES.length],
-      valor_divida: Number((250 + ((i * 137) % 4800)).toFixed(2)),
-      dias_atraso: 5 + ((i * 17) % 180),
-      score: (i * 29) % 101,
+      cidade: p.city,
+      uf: p.uf,
+      idade: p.age,
+      valor_divida: p.debt,
+      dias_atraso: p.overdue,
+      ddd: p.ddd,
+      score: 45 + ((i * 19) % 50),
     },
-    historyTotal: i % 5 === 0 ? null : (i * 3) % 4,
-    historyReferenceDate: i % 5 === 0 ? null : '2026-10-15',
+    historyTotal: i % 4 === 0 ? null : (i * 2) % 5,
+    historyReferenceDate: i % 4 === 0 ? null : '2026-10-20',
     destinations,
     blocks,
   };
@@ -1810,109 +1828,119 @@ export async function handleMockApi<T = unknown>(
   }
 
   if (pathname.match(/^\/intelligence\/runs\/([^/]+)\/plans$/) && method === 'GET') {
-    const items = CONTACTS.slice(0, 12).map((c, idx) => ({
-      id: uuid(890 + idx),
-      runId: uuid(880),
-      contactId: c.id,
-      externalId: c.externalId,
-      contactName: c.name,
-      track: idx < 8 ? 'PRODUCTION' : 'LABORATORY',
-      decisionStatus: idx === 11 ? 'SUPRIMIDO_DNC_LGPD' : idx < 5 ? 'INCLUIDO_PRIORITARIO' : 'INCLUIDO_PADRAO',
-      priorityRank: idx === 11 ? 9999 : idx + 1,
-      ddd: idx % 2 === 0 ? '11' : '71',
-      uf: idx % 2 === 0 ? 'SP' : 'BA',
-      macroRegion: idx % 2 === 0 ? 'SUDESTE' : 'NORDESTE',
-      ibgeCityTier: 'CAPITAL_METROPOLIS',
-      ceticAgeBracket: idx % 3 === 0 ? 'AGE_60_PLUS' : 'AGE_35_44',
-      inferredAge: idx % 3 === 0 ? 66 : 39,
-      locatorScore: 84,
-      phoneIntentTier: idx % 3 === 0 ? 'P1_ALTA_PROPENSAO_VOZ' : 'P2_HIBRIDO_DIGITAL_VOZ',
-      primaryChannel: idx % 3 === 0 ? 'VOICE' : 'WHATSAPP',
-      fallbackChannel: idx % 3 === 0 ? 'WHATSAPP' : 'VOICE',
-      bestShift: 'MANHA_09_12',
-      bestTimeWindow: '09:00 – 11:30',
-      maxAttempts: 3,
-      estimatedCpcProb: 0.34,
-      expectedCostPerCpcBrl: 0.42,
-      ConfidenceLevel: 'ALTO',
-      dispatchedToActuator: idx < 8,
-      blocks: {
-        bloco1_status_decisao: {
-          status: idx === 11 ? 'SUPRIMIDO_DNC_LGPD' : 'INCLUIDO_PRIORITARIO',
-          statusLabel: idx === 11 ? 'Suprimido (DNC / LGPD)' : 'Incluído · Prioridade Alta',
-          rankingPrioridade: idx + 1,
-          trilhaOperacional: idx < 8 ? 'PRODUCTION' : 'LABORATORY',
-          despachadoParaAcionador: idx < 8,
-          motivoDecisao: 'Score ECPC favorável para o propósito selecionado.',
+    const items = CONTACTS.slice(0, 12).map((c, idx) => {
+      const p = BRAZILIAN_PROFILES[idx % BRAZILIAN_PROFILES.length];
+      const isDnc = idx === 11;
+      const track = idx < 8 ? ('PRODUCTION' as const) : ('LABORATORY' as const);
+      const prob = isDnc ? 0 : Number((0.28 + (idx % 4) * 0.08).toFixed(2));
+      const costPerCpc = isDnc ? 0 : Number((0.35 + (idx % 3) * 0.08).toFixed(2));
+      const bruteCost = isDnc ? 0 : Number((1.10 + (idx % 3) * 0.25).toFixed(2));
+      const savingsPct = isDnc ? 0 : Number(((1 - costPerCpc / bruteCost) * 100).toFixed(1));
+
+      return {
+        id: uuid(890 + idx),
+        runId: uuid(880),
+        contactId: c.id,
+        externalId: c.externalId,
+        contactName: c.name,
+        track,
+        decisionStatus: isDnc ? 'SUPRIMIDO_DNC_LGPD' : idx < 4 ? 'INCLUIDO_PRIORITARIO' : 'INCLUIDO_PADRAO',
+        priorityRank: isDnc ? 9999 : idx + 1,
+        ddd: p.ddd,
+        uf: p.uf,
+        macroRegion: p.ddd === '11' || p.ddd === '21' || p.ddd === '31' || p.ddd === '19' ? 'SUDESTE' : p.ddd === '71' || p.ddd === '85' || p.ddd === '81' ? 'NORDESTE' : p.ddd === '41' || p.ddd === '51' ? 'SUL' : p.ddd === '92' ? 'NORTE' : 'CENTRO_OESTE',
+        ibgeCityTier: 'CAPITAL_METROPOLIS',
+        ceticAgeBracket: p.bracket,
+        inferredAge: p.age,
+        locatorScore: isDnc ? 30 : 80 + (idx % 18),
+        phoneIntentTier: p.intent,
+        primaryChannel: isDnc ? null : p.channel,
+        fallbackChannel: isDnc ? null : p.channel === 'VOICE' ? 'WHATSAPP' : 'VOICE',
+        bestShift: p.window.includes('09:') || p.window.includes('08:') ? 'MANHA_09_12' : p.window.includes('12:') ? 'ALMOCO_12_14' : 'FIM_TARDE_17_20',
+        bestTimeWindow: p.window,
+        maxAttempts: 3,
+        estimatedCpcProb: prob,
+        expectedCostPerCpcBrl: costPerCpc,
+        ConfidenceLevel: 'ALTO',
+        dispatchedToActuator: track === 'PRODUCTION' && !isDnc,
+        blocks: {
+          bloco1_status_decisao: {
+            status: isDnc ? 'SUPRIMIDO_DNC_LGPD' : idx < 4 ? 'INCLUIDO_PRIORITARIO' : 'INCLUIDO_PADRAO',
+            statusLabel: isDnc ? 'Suprimido (DNC Procon / Não Me Perturbe)' : idx < 4 ? 'Incluído · Prioridade Ouro' : 'Incluído · Prioridade Padrão',
+            rankingPrioridade: isDnc ? 9999 : idx + 1,
+            trilhaOperacional: track,
+            despachadoParaAcionador: track === 'PRODUCTION' && !isDnc,
+            motivoDecisao: isDnc ? 'Bloqueio legal obrigatório no Procon Nacional' : 'Menor custo esperado por CPC confirmado na esteira.',
+          },
+          bloco2_perfil_inferido: {
+            ddd: p.ddd,
+            uf: p.uf,
+            macroRegiao: p.ddd === '11' ? 'SUDESTE' : 'NORDESTE',
+            macroRegiaoLabel: p.ddd === '11' ? 'Sudeste' : 'Nordeste',
+            porteMunicipioIbge: 'CAPITAL_METROPOLIS',
+            porteMunicipioLabel: `${p.city} (${p.uf})`,
+            idadeInferida: p.age,
+            faixaEtariaCetic: p.bracket,
+            faixaEtariaLabel: p.bracket === 'AGE_60_PLUS' ? '60+ anos (Sênior)' : p.bracket === 'AGE_16_24' ? '16 a 24 anos (Geração Z)' : `${p.age} anos`,
+            probabilidadeConectividadePct: p.bracket === 'AGE_60_PLUS' ? 62 : 95,
+            probabilidadeRestricaoPacoteDadosPct: p.uf === 'AM' || p.uf === 'BA' ? 48 : 28,
+            locatorScore: isDnc ? 30 : 88,
+            phoneIntentTier: p.intent,
+            phoneIntentLabel: p.intent === 'P1_ALTA_PROPENSAO_VOZ' ? 'P1 · Alta Propensão a Voz' : p.intent === 'P3_DIGITAL_FIRST' ? 'P3 · Digital-First (WhatsApp)' : 'P2 · Híbrido Multicanal',
+          },
+          bloco3_recomendacao_canal: {
+            canalPrimario: isDnc ? null : p.channel,
+            canalPrimarioLabel: isDnc ? 'Suprimido' : p.channel === 'VOICE' ? 'Discador (Voz Local)' : 'WhatsApp Comercial',
+            destinoPrimarioMascarado: c.destinations[0]?.addressMasked ?? '1198****01',
+            canalSecundarioFallback: isDnc ? null : p.channel === 'VOICE' ? 'WHATSAPP' : 'VOICE',
+            canalSecundarioLabel: isDnc ? 'Nenhum' : p.channel === 'VOICE' ? 'WhatsApp' : 'Voz',
+            destinoSecundarioMascarado: c.destinations[1]?.addressMasked ?? null,
+            exigeBinaLocalMatchDdd: true,
+            exigeBrandedCall: p.channel === 'VOICE',
+          },
+          bloco4_janela_horaria: {
+            melhorTurno: p.window.includes('09:') ? 'MANHA_09_12' : 'FIM_TARDE_17_20',
+            janelaPrimaria: p.window,
+            janelaSecundaria: '14:30 – 17:00',
+            fusoHorarioUtcOffset: p.uf === 'AM' ? -4 : -3,
+            regraReciclagemTurno: 'Aspect ALM Shift Matrix: proibido repetir chamada no mesmo turno.',
+          },
+          bloco5_sequencia_cadencia: {
+            maximoTentativas: 3,
+            intervaloMinimoHoras: 6,
+            regraParadaImediata: 'Parada imediata após CPC confirmado por tabulação.',
+            passos: [
+              { tentativa: 1, diaOffset: 1, turno: 'MANHA_09_12', janela: p.window, canal: p.channel, acao: p.channel === 'WHATSAPP' ? 'Abertura amigável com opção de chave PIX' : 'Discagem com DDD local e identificação de titularidade', condicaoTransicao: 'Aguardar 6h' },
+              { tentativa: 2, diaOffset: 2, turno: 'TARDE_14_17', janela: '14:30 – 16:30', canal: p.channel === 'VOICE' ? 'WHATSAPP' : 'VOICE', acao: 'Transbordo para canal complementar', condicaoTransicao: 'Reciclar turno' },
+            ],
+          },
+          bloco6_abordagem_linguagem: {
+            propositoOperacao: 'COBRANCA',
+            tomDeVoz: p.age >= 60 ? 'Respeitoso, claro e pausado' : 'Direto, empático e prático',
+            comprimentoMensagem: 'Curto (até 220 caracteres com botão de ação rápida)',
+            roteiroAberturaSugerido: `Olá ${c.name}, identificamos uma proposta para regularização com 40% de desconto à vista.`,
+            gatilhoPsicologico: 'Alívio imediato e retirada de negativação em até 24h',
+          },
+          bloco7_economia_cpc: {
+            probabilidadeCpcConfirmado: prob,
+            custoUnitarioCanalPrimarioBrl: p.channel === 'VOICE' ? 0.12 : 0.24,
+            custoEsperadoPorCpcConfirmadoBrl: costPerCpc,
+            custoBruteForceBaselineBrl: bruteCost,
+            economiaEstimadaPct: savingsPct,
+            tetoMaximoAceitavelBrl: 1.8,
+          },
+          bloco8_explicabilidade_governanca: {
+            hipotesesAtivadas: p.bracket === 'AGE_60_PLUS' ? ['H-A4 (Sênior 60+)', 'H-G1', 'H-T1'] : ['H-A1 (Geração Z/Jovem)', 'H-C3 (Zero-Rating)', 'H-T5'],
+            evidenciasPublicasCitadas: ['TIC Domicílios 2025 (CETIC.br)', 'Alvaria ALM Shift Matrix'],
+            nivelConfianca: 'ALTO',
+            auditoriaLgpdArt20: 'Decisão 100% auditável com revisão humana disponível em um clique.',
+            revisaoHumanaAplicada: false,
+            notaRevisaoHumana: null,
+          },
         },
-        bloco2_perfil_inferido: {
-          ddd: idx % 2 === 0 ? '11' : '71',
-          uf: idx % 2 === 0 ? 'SP' : 'BA',
-          macroRegiao: idx % 2 === 0 ? 'SUDESTE' : 'NORDESTE',
-          macroRegiaoLabel: idx % 2 === 0 ? 'Sudeste' : 'Nordeste',
-          porteMunicipioIbge: 'CAPITAL_METROPOLIS',
-          porteMunicipioLabel: 'Capital / Região Metropolitana',
-          idadeInferida: idx % 3 === 0 ? 66 : 39,
-          faixaEtariaCetic: idx % 3 === 0 ? 'AGE_60_PLUS' : 'AGE_35_44',
-          faixaEtariaLabel: idx % 3 === 0 ? '60 anos ou mais' : '35 a 44 anos',
-          probabilidadeConectividadePct: idx % 3 === 0 ? 62 : 93,
-          probabilidadeRestricaoPacoteDadosPct: idx % 2 === 0 ? 29 : 48,
-          locatorScore: 84,
-          phoneIntentTier: idx % 3 === 0 ? 'P1_ALTA_PROPENSAO_VOZ' : 'P2_HIBRIDO_DIGITAL_VOZ',
-          phoneIntentLabel: idx % 3 === 0 ? 'P1 · Alta Propensão a Voz' : 'P2 · Híbrido Digital + Voz',
-        },
-        bloco3_recomendacao_canal: {
-          canalPrimario: idx % 3 === 0 ? 'VOICE' : 'WHATSAPP',
-          canalPrimarioLabel: idx % 3 === 0 ? 'Discador (Voz)' : 'WhatsApp',
-          destinoPrimarioMascarado: c.destinations[0]?.addressMasked ?? '1198****01',
-          canalSecundarioFallback: idx % 3 === 0 ? 'WHATSAPP' : 'VOICE',
-          canalSecundarioLabel: idx % 3 === 0 ? 'WhatsApp' : 'Discador (Voz)',
-          destinoSecundarioMascarado: c.destinations[1]?.addressMasked ?? null,
-          exigeBinaLocalMatchDdd: true,
-          exigeBrandedCall: idx % 2 === 0,
-        },
-        bloco4_janela_horaria: {
-          melhorTurno: 'MANHA_09_12',
-          janelaPrimaria: '09:00 – 11:30',
-          janelaSecundaria: '14:30 – 17:00',
-          fusoHorarioUtcOffset: -3,
-          regraReciclagemTurno: 'Aspect ALM Shift Matrix: proibido repetir tentativa no mesmo turno após Não Atende.',
-        },
-        bloco5_sequencia_cadencia: {
-          maximoTentativas: 3,
-          intervaloMinimoHoras: 6,
-          regraParadaImediata: 'Parar imediatamente após CPC confirmado por tabulação.',
-          passos: [
-            { tentativa: 1, diaOffset: 1, turno: 'MANHA_09_12', janela: '09:00 – 11:30', canal: 'WHATSAPP', acao: 'Abertura contextual', condicaoTransicao: 'Aguardar 6h' },
-            { tentativa: 2, diaOffset: 1, turno: 'TARDE_14_17', janela: '14:30 – 17:00', canal: 'VOICE', acao: 'Voz com DDD local', condicaoTransicao: 'Reciclar turno' },
-          ],
-        },
-        bloco6_abordagem_linguagem: {
-          propositoOperacao: 'COBRANCA',
-          tomDeVoz: 'Consultivo, empático e direto',
-          comprimentoMensagem: 'Curto (até 240 caracteres, zero-rating friendly)',
-          roteiroAberturaSugerido: `Olá ${c.name}, temos uma condição especial para regularização com desconto à vista.`,
-          gatilhoPsicologico: 'Alívio imediato de restrição e transparência de valores',
-        },
-        bloco7_economia_cpc: {
-          probabilidadeCpcConfirmado: 0.34,
-          custoUnitarioCanalPrimarioBrl: 0.11,
-          custoEsperadoPorCpcConfirmadoBrl: 0.42,
-          custoBruteForceBaselineBrl: 1.08,
-          economiaEstimadaPct: 61.1,
-          tetoMaximoAceitavelBrl: 1.8,
-        },
-        bloco8_explicabilidade_governanca: {
-          hipotesesAtivadas: ['H-A4', 'H-G1', 'H-T1', 'H-L1'],
-          evidenciasPublicasCitadas: ['TIC Domicílios 2025 (CETIC.br)', 'Aspect ALM Shift Matrix'],
-          nivelConfianca: 'ALTO',
-          auditoriaLgpdArt20: 'Decisão automatizada auditável com opção de revisão humana imediata.',
-          revisaoHumanaAplicada: false,
-          notaRevisaoHumana: null,
-        },
-      },
-      humanOverride: null,
-    }));
+        humanOverride: null,
+      };
+    });
     return { items } as T;
   }
 

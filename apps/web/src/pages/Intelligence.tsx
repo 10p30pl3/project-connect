@@ -253,6 +253,7 @@ export function IntelligencePage() {
 
   // Parâmetros do Lançador da Esteira
   const [selectedMailingId, setSelectedMailingId] = useState(mailingFromUrl);
+  const [configOpen, setConfigOpen] = useState(false);
   const [mode, setMode] = useState<OperatingMode>('PARALLEL_BOTH');
   const [purposeCode, setPurposeCode] = useState<OperationPurpose>('COBRANCA');
   const [purposePrompt, setPurposePrompt] = useState(
@@ -547,18 +548,28 @@ export function IntelligencePage() {
               ),
               content: (
                 <div className="space-y-5">
-                  {/* Lançador da Esteira de Inteligência */}
+                  {/* Lançador da Esteira de Inteligência (Compacto & Objetivo) */}
                   <Card
                     title={
-                      <span className="inline-flex items-center gap-2">
-                        <Sparkles className="size-4 text-brand-700" aria-hidden />
-                        <span>Configurar e Disparar Esteira de Inteligência de Contato</span>
-                      </span>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="inline-flex items-center gap-2">
+                          <Sparkles className="size-4 text-brand-700" aria-hidden />
+                          <span>Disparo da Esteira de Inteligência</span>
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setConfigOpen(!configOpen)}
+                        >
+                          <SlidersHorizontal className="mr-1 inline size-3.5" />
+                          {configOpen ? 'Ocultar Parâmetros Avançados' : 'Ajustar Prompt & Parâmetros'}
+                        </Button>
+                      </div>
                     }
                   >
-                    <div className="grid gap-4 lg:grid-cols-12">
-                      <div className="space-y-3 lg:col-span-4">
-                        <Field label="1. Lista de Mailing (Input)" hint="Selecione a carga bruta que passará pela esteira">
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap items-end gap-3">
+                        <Field label="Mailing (Base de Clientes)" className="flex-1 min-w-64">
                           {(p) => (
                             <Select
                               id={p.id}
@@ -574,7 +585,7 @@ export function IntelligencePage() {
                           )}
                         </Field>
 
-                        <Field label="2. Finalidade da Operação" hint="Altera as hipóteses e a régua sem mudar o conceito de CPC">
+                        <Field label="Objetivo da Operação" className="w-56">
                           {(p) => (
                             <Select
                               id={p.id}
@@ -589,96 +600,75 @@ export function IntelligencePage() {
                             </Select>
                           )}
                         </Field>
-                      </div>
-
-                      <div className="space-y-3 lg:col-span-5">
-                        <Field
-                          label="3. Prompt Inicial de Contexto & Finalidade"
-                          hint="Descreva o contexto para calibrar canais, tom de abordagem, janelas e guardrails"
-                        >
-                          {(p) => (
-                            <Textarea
-                              id={p.id}
-                              rows={3}
-                              value={purposePrompt}
-                              onChange={(e) => setPurposePrompt(e.target.value)}
-                            />
-                          )}
-                        </Field>
-
-                        <div className="grid grid-cols-3 gap-2.5">
-                          <Field label="Modo de Operação" className="col-span-3 sm:col-span-3">
-                            {(p) => (
-                              <Select
-                                id={p.id}
-                                value={mode}
-                                onChange={(e) => setMode(e.target.value as OperatingMode)}
-                              >
-                                {OPERATING_MODES.map((m) => (
-                                  <option key={m} value={m}>
-                                    {OPERATING_MODE_LABEL[m]}
-                                  </option>
-                                ))}
-                              </Select>
-                            )}
-                          </Field>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col justify-between rounded-lg border border-slate-200 bg-slate-50/70 p-3.5 lg:col-span-3">
-                        <div className="grid grid-cols-2 gap-2.5">
-                          <Field label="Amostra Lab (%)" hint="Estratificada">
-                            {(p) => (
-                              <Input
-                                id={p.id}
-                                type="number"
-                                min={10}
-                                max={50}
-                                disabled={mode === 'PRODUCTION'}
-                                value={labSamplePct}
-                                onChange={(e) => setLabSamplePct(Number(e.target.value))}
-                              />
-                            )}
-                          </Field>
-                          <Field label="Dias / Ondas Lab" hint="Ciclos reais">
-                            {(p) => (
-                              <Input
-                                id={p.id}
-                                type="number"
-                                min={2}
-                                max={7}
-                                disabled={mode === 'PRODUCTION'}
-                                value={plannedDaysWaves}
-                                onChange={(e) => setPlannedDaysWaves(Number(e.target.value))}
-                              />
-                            )}
-                          </Field>
-                          <Field label="Teto R$ / CPC" className="col-span-2">
-                            {(p) => (
-                              <Input
-                                id={p.id}
-                                type="number"
-                                step="0.10"
-                                min={0.2}
-                                max={20}
-                                value={maxAcceptableCpcBrl}
-                                onChange={(e) => setMaxAcceptableCpcBrl(Number(e.target.value))}
-                              />
-                            )}
-                          </Field>
-                        </div>
 
                         <Button
                           variant="primary"
-                          className="mt-3 w-full justify-center"
+                          className="h-9 px-5"
                           loading={startRunMut.isPending}
                           disabled={!selectedMailingId}
                           onClick={() => startRunMut.mutate()}
                         >
                           <Play className="size-4" aria-hidden />
-                          Processar Esteira de Inteligência
+                          Processar Esteira Agora
                         </Button>
                       </div>
+
+                      {configOpen && (
+                        <div className="mt-3 grid gap-3 rounded-lg border border-slate-200 bg-slate-50/80 p-3.5 lg:grid-cols-12">
+                          <div className="lg:col-span-6">
+                            <Field label="Instrução / Prompt de Negócio">
+                              {(p) => (
+                                <Textarea
+                                  id={p.id}
+                                  rows={2}
+                                  value={purposePrompt}
+                                  onChange={(e) => setPurposePrompt(e.target.value)}
+                                />
+                              )}
+                            </Field>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2.5 lg:col-span-6">
+                            <Field label="Modo Operacional">
+                              {(p) => (
+                                <Select
+                                  id={p.id}
+                                  value={mode}
+                                  onChange={(e) => setMode(e.target.value as OperatingMode)}
+                                >
+                                  {OPERATING_MODES.map((m) => (
+                                    <option key={m} value={m}>
+                                      {OPERATING_MODE_LABEL[m]}
+                                    </option>
+                                  ))}
+                                </Select>
+                              )}
+                            </Field>
+                            <Field label="Amostra Lab (%)">
+                              {(p) => (
+                                <Input
+                                  id={p.id}
+                                  type="number"
+                                  min={10}
+                                  max={50}
+                                  value={labSamplePct}
+                                  onChange={(e) => setLabSamplePct(Number(e.target.value))}
+                                />
+                              )}
+                            </Field>
+                            <Field label="Teto R$/CPC">
+                              {(p) => (
+                                <Input
+                                  id={p.id}
+                                  type="number"
+                                  step="0.10"
+                                  value={maxAcceptableCpcBrl}
+                                  onChange={(e) => setMaxAcceptableCpcBrl(Number(e.target.value))}
+                                />
+                              )}
+                            </Field>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </Card>
 
@@ -1047,24 +1037,21 @@ export function IntelligencePage() {
                             <table className="data">
                               <thead>
                                 <tr>
-                                  <th>Rank</th>
-                                  <th>Contato</th>
-                                  <th>1. Modo & Decisão</th>
-                                  <th>7. Perfil Brasil & Locator</th>
-                                  <th>2. Propensão CPC</th>
-                                  <th>3. Canal & Fallback</th>
-                                  <th>4. Janela & Fuso</th>
-                                  <th>5. Sequência (Passos)</th>
-                                  <th>6. Custo / CPC (ECPC)</th>
-                                  <th className="text-right">8. Governança</th>
+                                  <th className="w-12">#</th>
+                                  <th>Cliente & Identificação</th>
+                                  <th>Status na Esteira</th>
+                                  <th>Perfil & Região</th>
+                                  <th>Canal Recomendado</th>
+                                  <th>Melhor Janela</th>
+                                  <th className="text-right">Custo / CPC</th>
+                                  <th className="text-right">Ação</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {(plansQ.data?.items ?? []).map((p) => {
-                                  const seq = p.blocks?.attempts?.candidateSequence ?? [];
                                   return (
                                     <tr key={p.id}>
-                                      <td className="tabular font-semibold text-slate-600">
+                                      <td className="tabular font-semibold text-slate-500">
                                         {p.decisionStatus === 'EXCLUIDO_SUPRESSAO' ? '—' : `#${p.priorityRank}`}
                                       </td>
                                       <td>
@@ -1075,25 +1062,23 @@ export function IntelligencePage() {
                                             setOverrideStatus(p.decisionStatus);
                                             setOverrideChannel(p.primaryChannel ?? 'WHATSAPP');
                                           }}
-                                          className="text-left font-medium text-brand-800 hover:underline"
+                                          className="text-left font-medium text-slate-900 hover:text-brand-700 hover:underline"
                                         >
                                           {p.contactName ?? '(Sem nome)'}
                                         </button>
                                         <div className="font-mono text-[11px] text-slate-500">{p.externalId}</div>
                                       </td>
                                       <td>
-                                        <div className="flex flex-wrap items-center gap-1">
-                                          {p.operatingTrack === 'LABORATORY' ? (
-                                            <Badge tone="brand">Lab · Onda {p.labWaveNumber}</Badge>
-                                          ) : (
-                                            <Badge tone="green">Produção</Badge>
-                                          )}
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                          <Badge tone={p.operatingTrack === 'LABORATORY' ? 'brand' : 'green'}>
+                                            {p.operatingTrack === 'LABORATORY' ? `Lab (Onda ${p.labWaveNumber ?? 1})` : 'Produção'}
+                                          </Badge>
                                           {p.decisionStatus === 'EXCLUIDO_SUPRESSAO' ? (
-                                            <Badge tone="red">Excluído</Badge>
+                                            <Badge tone="red">DNC / Bloqueado</Badge>
                                           ) : p.decisionStatus === 'INCLUIDO_PRIORITARIO' ? (
-                                            <Badge tone="green">Ouro ({p.priorityScore})</Badge>
+                                            <Badge tone="green">Alta Prioridade</Badge>
                                           ) : (
-                                            <Badge tone="blue">Padrão ({p.priorityScore})</Badge>
+                                            <Badge tone="blue">Padrão</Badge>
                                           )}
                                         </div>
                                       </td>
@@ -1102,36 +1087,24 @@ export function IntelligencePage() {
                                           DDD {p.ddd ?? '—'}/{p.uf ?? '—'} · {(p.ageBracket ?? '').replace('_', '–') || 'Geral'}
                                         </div>
                                         <div className="text-[11px] text-slate-500">
-                                          Locator: <strong>{p.locatorScore ?? 0}/100</strong> · Sem dados:{' '}
-                                          {p.blocks?.evidence?.dataCapExhaustionPct ?? 39}%
+                                          Locator: <strong>{p.locatorScore ?? 0}%</strong> · P(CPC):{' '}
+                                          <strong className="text-emerald-700">{((p.estimatedCpcProb ?? 0) * 100).toFixed(0)}%</strong>
                                         </div>
                                       </td>
-                                      <td className="text-xs">
-                                        {p.decisionStatus === 'EXCLUIDO_SUPRESSAO' ? (
-                                          <span className="text-slate-400">Suprimido</span>
-                                        ) : (
-                                          <>
-                                            <div className="tabular font-bold text-emerald-700">
-                                              {((p.estimatedCpcProb ?? 0) * 100).toFixed(1)}% CPC
-                                            </div>
-                                            <div className="text-[11px] text-slate-500">
-                                              {(p.phoneIntentTier ?? 'P2').split('_')[0]} · Conf. {p.blocks?.cpc?.confidenceLevel ?? 'MÉDIA'}
-                                            </div>
-                                          </>
-                                        )}
-                                      </td>
-                                      <td className="text-xs">
+                                      <td>
                                         {p.primaryChannel ? (
-                                          <>
-                                            <Badge tone="blue">{CHANNEL_LABEL[p.primaryChannel]}</Badge>
+                                          <div className="space-y-0.5">
+                                            <Badge tone={p.primaryChannel === 'VOICE' ? 'amber' : 'green'}>
+                                              {CHANNEL_LABEL[p.primaryChannel]}
+                                            </Badge>
                                             {p.blocks?.channel?.fallbackChannel && (
-                                              <span className="ml-1 text-[11px] text-slate-500">
-                                                → {CHANNEL_LABEL[p.blocks.channel.fallbackChannel as ChannelType]}
-                                              </span>
+                                              <div className="text-[11px] text-slate-500">
+                                                Fallback: {CHANNEL_LABEL[p.blocks.channel.fallbackChannel as ChannelType]}
+                                              </div>
                                             )}
-                                          </>
+                                          </div>
                                         ) : (
-                                          <span className="text-slate-400">Nenhum</span>
+                                          <span className="text-xs text-slate-400">Nenhum (Suprimido)</span>
                                         )}
                                       </td>
                                       <td className="text-xs">
@@ -1140,33 +1113,18 @@ export function IntelligencePage() {
                                           {(p.timezoneIana ?? '').replace('America/', '') || 'BRT'}
                                         </div>
                                       </td>
-                                      <td className="text-xs">
-                                        {seq.length === 0 ? (
-                                          <span className="text-slate-400">0 tentativas</span>
-                                        ) : (
-                                          <div className="space-y-0.5">
-                                            <div className="font-medium text-slate-800">
-                                              {seq.map((s: any) => s.channel).join(' → ')}
-                                            </div>
-                                            <div className="text-[11px] text-slate-500">
-                                              {seq.length} passos ·{' '}
-                                              {p.blocks?.attempts?.microJourneyWarmup ? 'Com Warm-up' : 'Direto'}
-                                            </div>
-                                          </div>
-                                        )}
-                                      </td>
-                                      <td className="tabular text-xs">
+                                      <td className="text-right text-xs">
                                         {p.decisionStatus === 'EXCLUIDO_SUPRESSAO' ? (
-                                          <span className="text-slate-400">R$ 0,00</span>
+                                          <span className="text-slate-400">—</span>
                                         ) : (
-                                          <>
+                                          <div className="tabular">
                                             <div className="font-bold text-emerald-800">
-                                              {fmtMoney(p.expectedCostPerCpcBrl)} / CPC
+                                              {fmtMoney(p.expectedCostPerCpcBrl)}
                                             </div>
                                             <div className="text-[11px] text-slate-400 line-through">
-                                              Bruta: {fmtMoney(p.bruteForceCpcBrl)}
+                                              {fmtMoney(p.bruteForceCpcBrl)}
                                             </div>
-                                          </>
+                                          </div>
                                         )}
                                       </td>
                                       <td className="text-right">
@@ -1179,7 +1137,7 @@ export function IntelligencePage() {
                                             setOverrideChannel(p.primaryChannel ?? 'WHATSAPP');
                                           }}
                                         >
-                                          Ver 8 Blocos →
+                                          Detalhes →
                                         </Button>
                                       </td>
                                     </tr>
