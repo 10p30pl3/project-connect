@@ -42,7 +42,7 @@ const STEPS: { key: Step; label: string }[] = [
   { key: 'MAILING', label: 'Mailing' },
   { key: 'AUDIENCE', label: 'Público' },
   { key: 'ACTIVATION', label: 'Acionamento' },
-  { key: 'CAMPAIGN', label: 'Campanha' },
+  { key: 'CAMPAIGN', label: 'Revisar e finalizar' },
 ];
 
 type MailingSource = 'IMPORT' | 'MAILING' | 'LIST';
@@ -870,7 +870,7 @@ function ActivationStep({
 
       <Footer onBack={onBack}>
         <Button variant="primary" onClick={next}>
-          Continuar para campanha
+          Continuar para revisar e finalizar
         </Button>
       </Footer>
     </div>
