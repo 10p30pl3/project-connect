@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Activity, BrainCircuit, Clock, FlaskConical, PlayCircle, Rocket, SlidersHorizontal, Sparkles } from 'lucide-react';
+import { Activity, Clock, PlayCircle, Sparkles } from 'lucide-react';
 import { CHANNEL_LABEL } from '@voll/shared';
 import { get } from '../lib/api';
 import type { AttemptRow, CampaignSummary, Eligibility, Overview, OverviewQueueItem, Paginated } from '../lib/types';
@@ -65,60 +65,6 @@ export function OverviewPage() {
         title={`Olá, ${me?.name.split(' ')[0] ?? ''}`}
         subtitle="Painel operacional do workspace — acompanhe campanhas, registros em trabalho e a fila de próximos acionamentos"
       />
-      {/* Seletor de Jornada Inicial: Esteira de Inteligência (Produção + Laboratório) vs. Modo Manual */}
-      <div className="grid gap-3 md:grid-cols-2" data-testid="overview-journey-selector">
-        <div className="flex flex-col justify-between rounded-xl border border-brand-200 bg-gradient-to-br from-brand-50/90 via-white to-emerald-50/40 p-4 shadow-2xs">
-          <div>
-            <div className="flex items-center gap-2">
-              <BrainCircuit className="size-4 text-brand-700" aria-hidden />
-              <span className="text-xs font-bold uppercase tracking-wider text-brand-800">Jornada 1 · Recomendada</span>
-              <Badge tone="brand">Produção + Laboratório</Badge>
-            </div>
-            <h2 className="mt-1 text-sm font-semibold text-slate-900">
-              Esteira de Inteligência & Otimização de Custo por CPC Confirmado
-            </h2>
-            <p className="mt-1 text-xs text-slate-600">
-              Classifique o mailing em 8 blocos padronizados (DDD, IBGE, Faixa Etária TIC 2025, Phone-Intent P1..P4). Opere em paralelo no{' '}
-              <strong>Modo Produção</strong> (disparo imediato aos acionadores) e no <strong>Modo Laboratório</strong> (ondas amostrais com ajuste automático).
-            </p>
-          </div>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Link to="/inteligencia" className={btnClass('primary', 'sm')}>
-              <Rocket className="size-3.5" aria-hidden /> Iniciar Esteira de CPC & Lab →
-            </Link>
-            <span className="inline-flex items-center gap-1 text-[11px] text-slate-500">
-              <FlaskConical className="size-3.5 text-amber-600" aria-hidden /> 29 hipóteses H-A..H-L ativas
-            </span>
-          </div>
-        </div>
-
-        <div className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
-          <div>
-            <div className="flex items-center gap-2">
-              <SlidersHorizontal className="size-4 text-slate-600" aria-hidden />
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Jornada 2 · Opcional</span>
-              <Badge tone="gray">Controle Manual</Badge>
-            </div>
-            <h2 className="mt-1 text-sm font-semibold text-slate-900">
-              Jornada Clássica de Operação Manual
-            </h2>
-            <p className="mt-1 text-xs text-slate-600">
-              Construa filtros SQL manuais em listas, defina jornadas fixas de canal, configure réguas horárias manualmente e crie campanhas pelo assistente tradicional de 4 passos.
-            </p>
-          </div>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Link to="/campanhas/nova" className={btnClass('secondary', 'sm')}>
-              Criar campanha manual →
-            </Link>
-            <Link to="/listas/nova" className={btnClass('ghost', 'sm')}>
-              Filtro manual de lista
-            </Link>
-            <Link to="/estrategias" className={btnClass('ghost', 'sm')}>
-              Réguas & Jornadas
-            </Link>
-          </div>
-        </div>
-      </div>
       {q.data?.globalSuspension && (
         <Alert tone="warn" title="Suspensão global ativa">
           Nenhuma nova reserva ou envio acontece até a liberação no Controle central. Retornos em andamento continuam sendo processados.

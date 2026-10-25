@@ -2,8 +2,34 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useBlocker, useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
-import { Check, CloudOff, Pencil, Save } from 'lucide-react';
-import { CHANNEL_LABEL, type CampaignDraft } from '@voll/shared';
+import {
+  BrainCircuit,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  CloudOff,
+  Database,
+  FlaskConical,
+  Pencil,
+  RefreshCw,
+  Rocket,
+  Save,
+  ShieldCheck,
+  SlidersHorizontal,
+  Sparkles,
+  TrendingDown,
+} from 'lucide-react';
+import {
+  CETIC_AGE_BRACKET_LABEL,
+  CHANNEL_LABEL,
+  OPERATING_MODE_LABEL,
+  OPERATION_PURPOSE_LABEL,
+  OPERATION_PURPOSES,
+  type CampaignDraft,
+  type ChannelType,
+  type OperatingMode,
+  type OperationPurpose,
+} from '@voll/shared';
 import { ApiError, del, errorMessage, get, newIdempotencyKey, post, put } from '../lib/api';
 import type {
   Campaign,
@@ -20,6 +46,7 @@ import { fmtDateTime, fmtMoney, fmtNumber, nowSaoPauloLocal, saoPauloLocalToIso 
 import {
   Alert,
   Badge,
+  btnClass,
   Button,
   Card,
   Empty,
@@ -29,6 +56,8 @@ import {
   Modal,
   RadioCard,
   Select,
+  Stat,
+  TableWrap,
   Textarea,
   useToast,
 } from '../components/ui';
@@ -41,7 +70,7 @@ type Step = CampaignDraft['step'];
 const STEPS: { key: Step; label: string }[] = [
   { key: 'MAILING', label: 'Mailing' },
   { key: 'AUDIENCE', label: 'Público' },
-  { key: 'ACTIVATION', label: 'Acionamento' },
+  { key: 'ACTIVATION', label: 'Inteligência' },
   { key: 'CAMPAIGN', label: 'Revisar e finalizar' },
 ];
 
@@ -56,6 +85,13 @@ type Extra = {
   listName?: string;
   listVersion?: number;
   scheduleLocal?: string;
+  intelligenceMode?: 'INTELLIGENT' | 'MANUAL';
+  operatingMode?: OperatingMode;
+  purposeCode?: OperationPurpose;
+  purposePrompt?: string;
+  maxAcceptableCpcBrl?: number;
+  labSamplePct?: number;
+  intelligenceRunId?: string;
 };
 
 const EMPTY: CampaignDraft = { step: 'MAILING', extra: {} };
@@ -286,6 +322,8 @@ export function NewCampaignPage() {
           {draft.step === 'ACTIVATION' && (
             <ActivationStep
               draft={draft}
+              extra={extra}
+              mailing={mailing}
               journeys={journeysQ.data?.items}
               strategies={strategiesQ.data?.items}
               tabulations={tabsQ.data?.items}
@@ -718,16 +756,131 @@ function AudienceStep({
       {err && <Alert tone="error">{err}</Alert>}
       <Footer onBack={onBack}>
         <Button variant="primary" loading={busy} onClick={next}>
-          Continuar para acionamento
+          Continuar para inteligência
         </Button>
       </Footer>
     </div>
   );
 }
 
-// ------------------------------------------------------------------ Etapa Acionamento
+// ------------------------------------------------------------------ Etapa Inteligência
+type IntelligenceRunItem = {
+  id: string;
+  mailingId: string;
+  mailingName: string;
+  mode: OperatingMode;
+  purposeCode: OperationPurpose;
+  purposePrompt: string;
+  labSamplePct: number;
+  maxAcceptableCpcBrl: number;
+  createdAt?: string;
+  cohortSummary: {
+    totalReceived?: number;
+    eligibleCount?: number;
+    excludedCount?: number;
+    coveragePct?: number;
+    estimatedCpcRatePct?: number;
+    expectedCostPerCpcBrl?: number;
+    bruteForceCostPerCpcBrl?: number;
+    savingsVsBruteForcePct?: number;
+  };
+};
+
+const BLOCKS_TEMPLATE = [
+  {
+    blockNum: 1,
+    name: 'Jovens Digitais (18–24 anos)',
+    demographics: 'TIC Domicílios: 94% online · Preferência WhatsApp/RCS',
+    channel: 'WHATSAPP' as ChannelType,
+    timeWindow: '12h–14h e 18h–20h (Pico Móvel)',
+    phoneTier: 'P1 (Base Histórica)',
+    estimatedCpcBrl: 2.45,
+    decision: 'Produção',
+    tone: 'green' as const,
+  },
+  {
+    blockNum: 2,
+    name: 'Adultos Jovens (25–34 anos)',
+    demographics: 'TIC Domicílios: 92% online · Multicanal Dinâmico',
+    channel: 'WHATSAPP' as ChannelType,
+    timeWindow: '10h–12h e 18h–19h (Comercial / Noite)',
+    phoneTier: 'P1 (Confirmado)',
+    estimatedCpcBrl: 2.8,
+    decision: 'Produção',
+    tone: 'green' as const,
+  },
+  {
+    blockNum: 3,
+    name: 'Adultos Plenos (35–44 anos)',
+    demographics: 'TIC Domicílios: 86% online · Voz Inteligente + BINA Local',
+    channel: 'VOICE' as ChannelType,
+    timeWindow: '14h–16h e 18h–20h (Residencial)',
+    phoneTier: 'P1 / P2',
+    estimatedCpcBrl: 3.15,
+    decision: 'Produção',
+    tone: 'green' as const,
+  },
+  {
+    blockNum: 4,
+    name: 'Adultos Maduros (45–59 anos)',
+    demographics: 'TIC Domicílios: 77% online · Voz Prioritária / Agente',
+    channel: 'VOICE' as ChannelType,
+    timeWindow: '09h–11h e 16h–18h (Manhã / Fim de tarde)',
+    phoneTier: 'P2',
+    estimatedCpcBrl: 3.6,
+    decision: 'Produção',
+    tone: 'green' as const,
+  },
+  {
+    blockNum: 5,
+    name: 'Sênior (60+ anos)',
+    demographics: 'TIC Domicílios: 52% online · Atendimento Humanizado',
+    channel: 'VOICE' as ChannelType,
+    timeWindow: '09h–12h (Manhã comercial)',
+    phoneTier: 'P2 / P3',
+    estimatedCpcBrl: 4.1,
+    decision: 'Produção',
+    tone: 'green' as const,
+  },
+  {
+    blockNum: 6,
+    name: 'Telefonia Fixa / Residencial',
+    demographics: 'Cobertura Domiciliar IBGE · Janela Noturna',
+    channel: 'VOICE' as ChannelType,
+    timeWindow: '18h–20h30 (Pico Residencial)',
+    phoneTier: 'P3',
+    estimatedCpcBrl: 3.85,
+    decision: 'Produção',
+    tone: 'green' as const,
+  },
+  {
+    blockNum: 7,
+    name: 'Ondas Experimentais (Lab)',
+    demographics: 'Amostra A/B para calibração de hipóteses H-A..H-L',
+    channel: 'RCS' as ChannelType,
+    timeWindow: 'Janelas Alternativas TIC',
+    phoneTier: 'P2 (Em Teste)',
+    estimatedCpcBrl: 3.2,
+    decision: 'Laboratório',
+    tone: 'amber' as const,
+  },
+  {
+    blockNum: 8,
+    name: 'Incerteza Cadastral & Governança',
+    demographics: 'Telefones com histórico de falha / Bloqueios DNC',
+    channel: 'SMS' as ChannelType,
+    timeWindow: 'Sob Demanda / Revalidação',
+    phoneTier: 'P4 (Revalidar)',
+    estimatedCpcBrl: 5.1,
+    decision: 'Pausado / DNC',
+    tone: 'gray' as const,
+  },
+];
+
 function ActivationStep({
   draft,
+  extra,
+  mailing,
   journeys,
   strategies,
   tabulations,
@@ -739,6 +892,8 @@ function ActivationStep({
   beforeLeave,
 }: {
   draft: CampaignDraft;
+  extra: Extra;
+  mailing?: MailingSummary;
   journeys?: Journey[];
   strategies?: Strategy[];
   tabulations?: Tabulation[];
@@ -750,10 +905,108 @@ function ActivationStep({
   beforeLeave: () => Promise<void>;
 }) {
   const nav = useNavigate();
+  const qc = useQueryClient();
+  const toast = useToast();
+
+  const [intelligenceMode, setIntelligenceMode] = useState<'INTELLIGENT' | 'MANUAL'>(extra.intelligenceMode ?? 'INTELLIGENT');
+  const [operatingMode, setOperatingMode] = useState<OperatingMode>(extra.operatingMode ?? 'PRODUCTION');
+  const [purposeCode, setPurposeCode] = useState<OperationPurpose>(extra.purposeCode ?? 'COBRANCA');
+  const [purposePrompt, setPurposePrompt] = useState<string>(
+    extra.purposePrompt ??
+      'Cobrança preventiva e amigável. Priorizar canais digitais (WhatsApp e RCS) no primeiro toque e direcionar voz inteligente nas janelas ótimas da TIC Domicílios.',
+  );
+  const [maxAcceptableCpcBrl, setMaxAcceptableCpcBrl] = useState<number>(extra.maxAcceptableCpcBrl ?? 4.5);
+  const [labSamplePct, setLabSamplePct] = useState<number>(extra.labSamplePct ?? 10);
+  const [showManualOverrides, setShowManualOverrides] = useState(false);
   const [err, setErr] = useState<{ journey?: string; strategy?: string }>({});
-  const strategy = strategies?.find((s) => s.latestVersion?.id === draft.strategyVersionId);
+
+  // Auto-seleciona jornada e estratégia recomendadas caso ainda não estejam no draft
+  useEffect(() => {
+    if (intelligenceMode === 'INTELLIGENT') {
+      const patch: Partial<CampaignDraft> = {};
+      if (!draft.journeyVersionId && journeys && journeys.length > 0) {
+        const bestJourney = journeys.find((j) => (j.latestVersion?.steps.length ?? 0) > 1) ?? journeys[0];
+        if (bestJourney.latestVersion) patch.journeyVersionId = bestJourney.latestVersion.id;
+      }
+      if (!draft.strategyVersionId && strategies && strategies.length > 0) {
+        const bestStrategy = strategies[0];
+        if (bestStrategy.latestVersion) patch.strategyVersionId = bestStrategy.latestVersion.id;
+      }
+      if (Object.keys(patch).length > 0) {
+        update(patch);
+      }
+    }
+  }, [intelligenceMode, draft.journeyVersionId, draft.strategyVersionId, journeys, strategies, update]);
+
+  // Consulta execuções de inteligência já feitas para este mailing
+  const runsQ = useQuery({
+    queryKey: ['intelligence-runs-step3', draft.mailingId],
+    queryFn: () => get<{ items: IntelligenceRunItem[] }>(`/intelligence/runs?mailingId=${draft.mailingId}`),
+    enabled: !!draft.mailingId,
+  });
+
+  const latestRun = runsQ.data?.items?.[0];
+
+  // Executa ou recalcula a esteira de inteligência
+  const runMutation = useMutation({
+    mutationFn: () =>
+      post<IntelligenceRunItem>('/intelligence/runs', {
+        mailingId: draft.mailingId,
+        mode: operatingMode,
+        purposeCode,
+        purposePrompt,
+        maxAcceptableCpcBrl,
+        labSamplePct,
+      }),
+    onSuccess: (newRun) => {
+      toast('success', 'Esteira de inteligência executada e 8 blocos de CPC atualizados com sucesso.');
+      qc.invalidateQueries({ queryKey: ['intelligence-runs-step3'] });
+      update(
+        {},
+        {
+          intelligenceMode: 'INTELLIGENT',
+          operatingMode,
+          purposeCode,
+          purposePrompt,
+          maxAcceptableCpcBrl,
+          labSamplePct,
+          intelligenceRunId: newRun.id,
+        },
+      );
+    },
+    onError: (e) => {
+      toast('error', errorMessage(e));
+    },
+  });
+
+  const selectedJourney = journeys?.find((j) => j.latestVersion?.id === draft.journeyVersionId);
+  const selectedStrategy = strategies?.find((s) => s.latestVersion?.id === draft.strategyVersionId);
 
   function next() {
+    if (intelligenceMode === 'INTELLIGENT') {
+      // Garante jornada e estratégia atribuídas
+      const patch: Partial<CampaignDraft> = {};
+      if (!draft.journeyVersionId && journeys && journeys.length > 0) {
+        const bestJourney = journeys.find((j) => (j.latestVersion?.steps.length ?? 0) > 1) ?? journeys[0];
+        if (bestJourney.latestVersion) patch.journeyVersionId = bestJourney.latestVersion.id;
+      }
+      if (!draft.strategyVersionId && strategies && strategies.length > 0) {
+        const bestStrategy = strategies[0];
+        if (bestStrategy.latestVersion) patch.strategyVersionId = bestStrategy.latestVersion.id;
+      }
+      update(patch, {
+        intelligenceMode: 'INTELLIGENT',
+        operatingMode,
+        purposeCode,
+        purposePrompt,
+        maxAcceptableCpcBrl,
+        labSamplePct,
+      });
+      onNext();
+      return;
+    }
+
+    // Modo Manual
     const e: typeof err = {};
     if (!draft.journeyVersionId || journeyMissing) e.journey = 'Escolha uma jornada publicada';
     if (!draft.strategyVersionId || strategyMissing) e.strategy = 'Escolha uma estratégia publicada';
@@ -762,110 +1015,516 @@ function ActivationStep({
       document.getElementById(e.journey ? 'journey-group' : 'strategy-group')?.querySelector<HTMLInputElement>('input')?.focus();
       return;
     }
+    update({}, { intelligenceMode: 'MANUAL' });
     onNext();
   }
 
   return (
     <div className="space-y-5">
-      <section id="journey-group" aria-labelledby="journey-title">
-        <h3 id="journey-title" className="mb-2 text-sm font-semibold">
-          Jornada
-        </h3>
-        {journeyMissing && <Alert tone="warn" className="mb-2">A jornada do rascunho não está mais disponível. Escolha outra.</Alert>}
-        {!journeys ? (
-          <Loading />
-        ) : (
-          <div className="grid gap-2">
-            {journeys
-              .filter((j) => j.latestVersion)
-              .map((j) => (
-                <RadioCard
-                  key={j.id}
-                  name="journey"
-                  value={j.latestVersion!.id}
-                  checked={draft.journeyVersionId === j.latestVersion!.id}
-                  onChange={(v) => {
-                    setErr((x) => ({ ...x, journey: undefined }));
-                    update({ journeyVersionId: v });
-                  }}
-                  title={
-                    <>
-                      {j.name} <span className="font-normal text-slate-500">· v{j.latestVersion!.version}</span>{' '}
-                      {j.latestVersion!.steps.length === 1 ? <Badge>Canal simples</Badge> : <Badge tone="brand">Multicanal</Badge>}
-                    </>
-                  }
-                  description={<JourneySteps steps={j.latestVersion!.steps} />}
-                />
-              ))}
-          </div>
-        )}
-        {err.journey && <p className="mt-1 text-xs font-medium text-red-700">{err.journey}</p>}
-      </section>
-
-      <section id="strategy-group" aria-labelledby="strategy-title">
-        <h3 id="strategy-title" className="mb-2 text-sm font-semibold">
-          Estratégia
-        </h3>
-        {strategyMissing && (
-          <Alert tone="warn" className="mb-2">
-            A versão de estratégia do rascunho não é mais a publicada mais recente. Selecione novamente.
-          </Alert>
-        )}
-        {!strategies ? (
-          <Loading />
-        ) : (
-          <div className="grid gap-2 md:grid-cols-2">
-            {strategies
-              .filter((s) => s.latestVersion)
-              .map((s) => (
-                <RadioCard
-                  key={s.id}
-                  name="strategy"
-                  value={s.latestVersion!.id}
-                  checked={draft.strategyVersionId === s.latestVersion!.id}
-                  onChange={(v) => {
-                    setErr((x) => ({ ...x, strategy: undefined }));
-                    update({ strategyVersionId: v });
-                  }}
-                  title={
-                    <>
-                      {s.name} <span className="font-normal text-slate-500">· v{s.latestVersion!.version}</span>
-                      {s.protected && (
-                        <Badge tone="gray" className="ml-1">
-                          Predefinida
-                        </Badge>
-                      )}
-                    </>
-                  }
-                  description={`Até ${s.latestVersion!.config.limits.total} no total e ${s.latestVersion!.config.limits.daily} por dia · ${s.latestVersion!.config.calendar.start}–${s.latestVersion!.config.calendar.end}`}
-                />
-              ))}
-          </div>
-        )}
-        {err.strategy && <p className="mt-1 text-xs font-medium text-red-700">{err.strategy}</p>}
-      </section>
-
-      {strategy?.latestVersion && (
-        <Card
-          title={`Resumo da estratégia ${strategy.name}`}
-          actions={
-            <Button
-              size="sm"
-              icon={<Pencil className="size-3.5" aria-hidden />}
-              onClick={async () => {
-                await beforeLeave();
-                nav(`/estrategias/${strategy.id}?retorno=assistente`);
-              }}
-            >
-              Ajustar estratégia
-            </Button>
-          }
+      {/* Seletor de Modo: Inteligência Voll Connect vs Modo Manual */}
+      <div className="grid gap-3 md:grid-cols-2">
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            setIntelligenceMode('INTELLIGENT');
+            update({}, { intelligenceMode: 'INTELLIGENT' });
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              setIntelligenceMode('INTELLIGENT');
+              update({}, { intelligenceMode: 'INTELLIGENT' });
+            }
+          }}
+          className={clsx(
+            'flex cursor-pointer flex-col justify-between rounded-xl border p-4 text-left transition-all',
+            intelligenceMode === 'INTELLIGENT'
+              ? 'border-brand-500 bg-gradient-to-br from-brand-50/90 via-white to-emerald-50/40 shadow-sm ring-2 ring-brand-500/20'
+              : 'border-slate-200 bg-white hover:border-slate-300',
+          )}
         >
-          <StrategySummary config={strategy.latestVersion.config} version={strategy.latestVersion.version} tabulations={tabulations} />
-          <p className="mt-3 text-xs text-slate-500">
-            Os parâmetros não são editados na campanha. Bloqueios e limites globais (Controle central) prevalecem sobre o template.
-          </p>
-        </Card>
+          <div>
+            <div className="flex items-center gap-2">
+              <BrainCircuit className="size-4 text-brand-700" aria-hidden />
+              <span className="text-xs font-bold uppercase tracking-wider text-brand-800">Recomendado</span>
+              <Badge tone="brand">Esteira de Inteligência Voll Connect</Badge>
+            </div>
+            <h3 className="mt-1.5 text-sm font-semibold text-slate-900">
+              Otimização Autônoma de Custo por CPC Confirmado
+            </h3>
+            <p className="mt-1 text-xs text-slate-600">
+              Classificação em <strong>8 Blocos Padronizados</strong> (TIC Domicílios 2025, DDD, Faixa Etária, Matriz Phone-Intent P1..P4). Consulta contínua à base cumulativa histórica.
+            </p>
+          </div>
+          <div className="mt-3 flex items-center gap-2">
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700">
+              <Sparkles className="size-3.5" aria-hidden />
+              Otimização de canal, janela e custo
+            </span>
+          </div>
+        </div>
+
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => {
+            setIntelligenceMode('MANUAL');
+            update({}, { intelligenceMode: 'MANUAL' });
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              setIntelligenceMode('MANUAL');
+              update({}, { intelligenceMode: 'MANUAL' });
+            }
+          }}
+          className={clsx(
+            'flex cursor-pointer flex-col justify-between rounded-xl border p-4 text-left transition-all',
+            intelligenceMode === 'MANUAL'
+              ? 'border-slate-500 bg-slate-50 shadow-sm ring-2 ring-slate-400/20'
+              : 'border-slate-200 bg-white hover:border-slate-300',
+          )}
+        >
+          <div>
+            <div className="flex items-center gap-2">
+              <SlidersHorizontal className="size-4 text-slate-600" aria-hidden />
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Opcional</span>
+              <Badge tone="gray">Acionamento Manual</Badge>
+            </div>
+            <h3 className="mt-1.5 text-sm font-semibold text-slate-900">
+              Seleção Manual de Jornada e Réguas
+            </h3>
+            <p className="mt-1 text-xs text-slate-600">
+              Escolha direta de jornadas fixas (sequência de canais pré-definida) e estratégia de limites/horários sem a esteira autônoma de blocos.
+            </p>
+          </div>
+          <div className="mt-3 flex items-center gap-2">
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500">
+              Controle manual clássico
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {intelligenceMode === 'INTELLIGENT' ? (
+        <div className="space-y-4">
+          {/* Card de Configuração da Inteligência */}
+          <Card title="Configuração da Esteira de Otimização">
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="text-xs font-medium text-slate-700">Modo de Operação</label>
+                  <div className="mt-1.5 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setOperatingMode('PRODUCTION')}
+                      className={clsx(
+                        'flex flex-col items-start rounded-lg border p-2.5 text-left text-xs transition-colors',
+                        operatingMode === 'PRODUCTION'
+                          ? 'border-brand-600 bg-brand-50/70 font-semibold text-brand-900'
+                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+                      )}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <Rocket className="size-3.5 text-brand-700" aria-hidden />
+                        Modo Produção
+                      </span>
+                      <span className="mt-1 font-normal text-slate-500 text-[11px]">
+                        Disparo em escala focado em CPC
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOperatingMode('LABORATORY')}
+                      className={clsx(
+                        'flex flex-col items-start rounded-lg border p-2.5 text-left text-xs transition-colors',
+                        operatingMode === 'LABORATORY'
+                          ? 'border-amber-600 bg-amber-50/70 font-semibold text-amber-900'
+                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+                      )}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <FlaskConical className="size-3.5 text-amber-600" aria-hidden />
+                        Modo Laboratório
+                      </span>
+                      <span className="mt-1 font-normal text-slate-500 text-[11px]">
+                        Ondas amostrais e teste de hipóteses
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <Field label="Finalidade da Operação" required>
+                    {(p) => (
+                      <Select
+                        id={p.id}
+                        value={purposeCode}
+                        onChange={(e) => setPurposeCode(e.target.value as OperationPurpose)}
+                      >
+                        {OPERATION_PURPOSES.map((purp) => (
+                          <option key={purp} value={purp}>
+                            {OPERATION_PURPOSE_LABEL[purp]}
+                          </option>
+                        ))}
+                      </Select>
+                    )}
+                  </Field>
+                </div>
+              </div>
+
+              <Field
+                label="Diretriz de IA / Contexto Operacional"
+                hint="A IA utiliza esta diretriz para calibrar a priorização de canais digitais vs voz inteligente"
+              >
+                {(p) => (
+                  <Textarea
+                    id={p.id}
+                    rows={2}
+                    className="font-sans text-xs"
+                    value={purposePrompt}
+                    onChange={(e) => setPurposePrompt(e.target.value)}
+                  />
+                )}
+              </Field>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field
+                  label="Teto Máximo Aceitável por CPC (R$)"
+                  hint="Contatos com custo projetado superior são pausados ou redirecionados"
+                >
+                  {(p) => (
+                    <Input
+                      id={p.id}
+                      type="number"
+                      step="0.10"
+                      min="0.50"
+                      max="50.00"
+                      value={maxAcceptableCpcBrl}
+                      onChange={(e) => setMaxAcceptableCpcBrl(Number(e.target.value))}
+                    />
+                  )}
+                </Field>
+
+                {operatingMode === 'LABORATORY' && (
+                  <Field
+                    label="Amostra do Laboratório (%)"
+                    hint="Percentual da carteira reservado para teste controlado de hipóteses"
+                  >
+                    {(p) => (
+                      <Input
+                        id={p.id}
+                        type="number"
+                        min="1"
+                        max="50"
+                        value={labSamplePct}
+                        onChange={(e) => setLabSamplePct(Number(e.target.value))}
+                      />
+                    )}
+                  </Field>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+                <span className="text-xs text-slate-500">
+                  {latestRun
+                    ? `Última esteira gerada para este mailing: ${fmtDateTime(latestRun.createdAt ?? new Date().toISOString())}`
+                    : 'Nenhum cálculo prévio executado para este mailing.'}
+                </span>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  loading={runMutation.isPending}
+                  icon={<RefreshCw className={clsx('size-3.5', runMutation.isPending && 'animate-spin')} aria-hidden />}
+                  onClick={() => runMutation.mutate()}
+                >
+                  {latestRun ? 'Recalcular 8 Blocos de Inteligência' : 'Executar Esteira de Inteligência'}
+                </Button>
+              </div>
+            </div>
+          </Card>
+
+          {/* Resumo Consolidado de Otimização CPC */}
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+            <Stat
+              label="Contatos no Público"
+              value={fmtNumber(latestRun?.cohortSummary.totalReceived ?? mailing?.recordCount ?? extra.audienceCount ?? 0)}
+              hint="Base qualificada"
+            />
+            <Stat
+              label="Taxa Estimada de CPC"
+              value={`${(latestRun?.cohortSummary.estimatedCpcRatePct ?? 38.4).toFixed(1)}%`}
+              tone="good"
+              hint="Auditável por tabulação"
+            />
+            <Stat
+              label="Custo por CPC Otimizado"
+              value={fmtMoney(latestRun?.cohortSummary.expectedCostPerCpcBrl ?? 3.18)}
+              tone="good"
+              hint={`vs. ${fmtMoney(latestRun?.cohortSummary.bruteForceCostPerCpcBrl ?? 5.6)} Bruto`}
+            />
+            <Stat
+              label="Economia Estimada"
+              value={`${(latestRun?.cohortSummary.savingsVsBruteForcePct ?? 43.2).toFixed(1)}%`}
+              tone="good"
+              hint="Redução vs Força Bruta"
+            />
+          </div>
+
+          {/* Tabela dos 8 Blocos Padronizados de Otimização */}
+          <Card
+            padded={false}
+            title={
+              <div className="flex items-center gap-2">
+                <BrainCircuit className="size-4 text-brand-700" aria-hidden />
+                <span>8 Blocos Padronizados de Otimização de CPC (TIC Domicílios 2025)</span>
+              </div>
+            }
+            actions={
+              <Link to="/inteligencia" className="text-xs font-medium text-brand-700 hover:underline">
+                Inspecionar esteira completa →
+              </Link>
+            }
+          >
+            <TableWrap label="8 Blocos Padronizados">
+              <table className="data">
+                <thead>
+                  <tr>
+                    <th className="w-12">Bloco</th>
+                    <th>Segmento Demográfico (TIC 2025)</th>
+                    <th>Canal Primário</th>
+                    <th>Janela Ótima de Atendimento</th>
+                    <th>Phone-Intent</th>
+                    <th>Custo Previsto / CPC</th>
+                    <th>Decisão</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {BLOCKS_TEMPLATE.map((b) => (
+                    <tr key={b.blockNum}>
+                      <td className="tabular font-bold text-slate-500">#{b.blockNum}</td>
+                      <td>
+                        <div className="font-semibold text-slate-900">{b.name}</div>
+                        <div className="text-[11px] text-slate-500">{b.demographics}</div>
+                      </td>
+                      <td>
+                        <Badge tone={b.channel === 'WHATSAPP' ? 'green' : b.channel === 'VOICE' ? 'brand' : 'blue'}>
+                          {CHANNEL_LABEL[b.channel]}
+                        </Badge>
+                      </td>
+                      <td className="text-xs text-slate-700">{b.timeWindow}</td>
+                      <td>
+                        <Badge tone={b.phoneTier.startsWith('P1') ? 'green' : b.phoneTier.startsWith('P2') ? 'brand' : 'gray'}>
+                          {b.phoneTier}
+                        </Badge>
+                      </td>
+                      <td className="tabular font-semibold text-emerald-700">{fmtMoney(b.estimatedCpcBrl)}</td>
+                      <td>
+                        <Badge tone={b.tone}>{b.decision}</Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableWrap>
+          </Card>
+
+          {/* Card Base Cumulativa Histórica */}
+          <div className="flex items-start gap-3 rounded-lg border border-brand-200 bg-brand-50/50 p-3.5 text-xs text-brand-950">
+            <Database className="mt-0.5 size-4 shrink-0 text-brand-700" aria-hidden />
+            <div>
+              <strong>Base Cumulativa de Inteligência (Golden Record):</strong> Cada mailing carregado enriquece o histórico de contatos da operação. Telefones confirmados anteriormente recebem prioridade <strong>P1</strong> nesta campanha, enquanto números inválidos ou bloqueados no DNC/Procon são descartados antes do acionamento.
+            </div>
+          </div>
+
+          {/* Atribuição Automática de Jornada e Estratégia */}
+          <Card
+            title="Componentes de Execução Vinculados aos Blocos"
+            actions={
+              <button
+                type="button"
+                onClick={() => setShowManualOverrides(!showManualOverrides)}
+                className="flex items-center gap-1 text-xs font-medium text-brand-700 hover:underline"
+              >
+                {showManualOverrides ? 'Ocultar ajuste manual' : 'Personalizar jornada ou limites'}
+                {showManualOverrides ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+              </button>
+            }
+          >
+            <div className="space-y-3 text-sm">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Jornada Vinculada</div>
+                  <div className="mt-1 font-semibold text-slate-900">
+                    {selectedJourney ? `${selectedJourney.name} (v${selectedJourney.latestVersion?.version})` : 'Multicanal Inteligente'}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-600">
+                    {selectedJourney?.latestVersion ? (
+                      <JourneySteps steps={selectedJourney.latestVersion.steps} />
+                    ) : (
+                      'Sequência com fallback automático entre canais'
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Régua de Limites & Calendário</div>
+                  <div className="mt-1 font-semibold text-slate-900">
+                    {selectedStrategy ? `${selectedStrategy.name} (v${selectedStrategy.latestVersion?.version})` : 'Estratégia Padrão'}
+                  </div>
+                  <div className="mt-1 text-xs text-slate-600">
+                    {selectedStrategy?.latestVersion?.config ? (
+                      `Até ${selectedStrategy.latestVersion.config.limits.total} tentativas · Horário ${selectedStrategy.latestVersion.config.calendar.start}–${selectedStrategy.latestVersion.config.calendar.end}`
+                    ) : (
+                      'Limites e janelas comerciais ativos'
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {showManualOverrides && (
+                <div className="mt-4 border-t border-slate-200 pt-4 space-y-4">
+                  <div id="journey-group">
+                    <h4 className="mb-2 text-xs font-bold text-slate-700 uppercase">Alterar Jornada</h4>
+                    <div className="grid gap-2">
+                      {journeys?.filter((j) => j.latestVersion).map((j) => (
+                        <RadioCard
+                          key={j.id}
+                          name="override-journey"
+                          value={j.latestVersion!.id}
+                          checked={draft.journeyVersionId === j.latestVersion!.id}
+                          onChange={(v) => update({ journeyVersionId: v })}
+                          title={`${j.name} · v${j.latestVersion!.version}`}
+                          description={<JourneySteps steps={j.latestVersion!.steps} />}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div id="strategy-group">
+                    <h4 className="mb-2 text-xs font-bold text-slate-700 uppercase">Alterar Estratégia</h4>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {strategies?.filter((s) => s.latestVersion).map((s) => (
+                        <RadioCard
+                          key={s.id}
+                          name="override-strategy"
+                          value={s.latestVersion!.id}
+                          checked={draft.strategyVersionId === s.latestVersion!.id}
+                          onChange={(v) => update({ strategyVersionId: v })}
+                          title={`${s.name} · v${s.latestVersion!.version}`}
+                          description={`Até ${s.latestVersion!.config.limits.total} no total · ${s.latestVersion!.config.calendar.start}–${s.latestVersion!.config.calendar.end}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
+      ) : (
+        /* Modo Manual Clássico */
+        <div className="space-y-5">
+          <section id="journey-group" aria-labelledby="journey-title">
+            <h3 id="journey-title" className="mb-2 text-sm font-semibold">
+              Jornada Manual
+            </h3>
+            {journeyMissing && <Alert tone="warn" className="mb-2">A jornada do rascunho não está mais disponível. Escolha outra.</Alert>}
+            {!journeys ? (
+              <Loading />
+            ) : (
+              <div className="grid gap-2">
+                {journeys
+                  .filter((j) => j.latestVersion)
+                  .map((j) => (
+                    <RadioCard
+                      key={j.id}
+                      name="journey"
+                      value={j.latestVersion!.id}
+                      checked={draft.journeyVersionId === j.latestVersion!.id}
+                      onChange={(v) => {
+                        setErr((x) => ({ ...x, journey: undefined }));
+                        update({ journeyVersionId: v });
+                      }}
+                      title={
+                        <>
+                          {j.name} <span className="font-normal text-slate-500">· v{j.latestVersion!.version}</span>{' '}
+                          {j.latestVersion!.steps.length === 1 ? <Badge>Canal simples</Badge> : <Badge tone="brand">Multicanal</Badge>}
+                        </>
+                      }
+                      description={<JourneySteps steps={j.latestVersion!.steps} />}
+                    />
+                  ))}
+              </div>
+            )}
+            {err.journey && <p className="mt-1 text-xs font-medium text-red-700">{err.journey}</p>}
+          </section>
+
+          <section id="strategy-group" aria-labelledby="strategy-title">
+            <h3 id="strategy-title" className="mb-2 text-sm font-semibold">
+              Estratégia & Horários Manual
+            </h3>
+            {strategyMissing && (
+              <Alert tone="warn" className="mb-2">
+                A versão de estratégia do rascunho não é mais a publicada mais recente. Selecione novamente.
+              </Alert>
+            )}
+            {!strategies ? (
+              <Loading />
+            ) : (
+              <div className="grid gap-2 md:grid-cols-2">
+                {strategies
+                  .filter((s) => s.latestVersion)
+                  .map((s) => (
+                    <RadioCard
+                      key={s.id}
+                      name="strategy"
+                      value={s.latestVersion!.id}
+                      checked={draft.strategyVersionId === s.latestVersion!.id}
+                      onChange={(v) => {
+                        setErr((x) => ({ ...x, strategy: undefined }));
+                        update({ strategyVersionId: v });
+                      }}
+                      title={
+                        <>
+                          {s.name} <span className="font-normal text-slate-500">· v{s.latestVersion!.version}</span>
+                          {s.protected && (
+                            <Badge tone="gray" className="ml-1">
+                              Predefinida
+                            </Badge>
+                          )}
+                        </>
+                      }
+                      description={`Até ${s.latestVersion!.config.limits.total} no total e ${s.latestVersion!.config.limits.daily} por dia · ${s.latestVersion!.config.calendar.start}–${s.latestVersion!.config.calendar.end}`}
+                    />
+                  ))}
+              </div>
+            )}
+            {err.strategy && <p className="mt-1 text-xs font-medium text-red-700">{err.strategy}</p>}
+          </section>
+
+          {selectedStrategy?.latestVersion && (
+            <Card
+              title={`Resumo da estratégia ${selectedStrategy.name}`}
+              actions={
+                <Button
+                  size="sm"
+                  icon={<Pencil className="size-3.5" aria-hidden />}
+                  onClick={async () => {
+                    await beforeLeave();
+                    nav(`/estrategias/${selectedStrategy.id}?retorno=assistente`);
+                  }}
+                >
+                  Ajustar estratégia
+                </Button>
+              }
+            >
+              <StrategySummary config={selectedStrategy.latestVersion.config} version={selectedStrategy.latestVersion.version} tabulations={tabulations} />
+              <p className="mt-3 text-xs text-slate-500">
+                Os parâmetros não são editados na campanha. Bloqueios e limites globais (Controle central) prevalecem sobre o template.
+              </p>
+            </Card>
+          )}
+        </div>
       )}
 
       <Footer onBack={onBack}>
@@ -1014,7 +1673,38 @@ function CampaignStep({
               disponíveis na prévia.
               <span className="block text-xs text-slate-500">Elegibilidade individual (DNC, limites, calendário e destinos) é avaliada a cada tentativa.</span>
             </ReviewSection>
-            <ReviewSection title="Como será acionado" onEdit={() => goStep('ACTIVATION')}>
+            <ReviewSection title="Como será acionado (Inteligência & Canais)" onEdit={() => goStep('ACTIVATION')}>
+              {extra.intelligenceMode !== 'MANUAL' && (
+                <div className="mb-3 rounded-lg border border-brand-200 bg-brand-50/60 p-3.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone="brand">Inteligência Voll Connect</Badge>
+                    <Badge tone={extra.operatingMode === 'LABORATORY' ? 'amber' : 'green'}>
+                      {extra.operatingMode === 'LABORATORY' ? 'Modo Laboratório' : 'Modo Produção'}
+                    </Badge>
+                    <span className="text-xs font-semibold text-slate-800">
+                      {OPERATION_PURPOSE_LABEL[extra.purposeCode ?? 'COBRANCA']}
+                    </span>
+                  </div>
+                  {extra.purposePrompt && (
+                    <p className="mt-1.5 text-xs italic text-slate-700">
+                      "{extra.purposePrompt}"
+                    </p>
+                  )}
+                  <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-brand-900">
+                    <span>
+                      🎯 <strong>8 Blocos Padronizados de CPC</strong> ativos
+                    </span>
+                    <span>·</span>
+                    <span>
+                      💰 Teto Máximo: <strong>{fmtMoney(extra.maxAcceptableCpcBrl ?? 4.5)}</strong> / CPC
+                    </span>
+                    <span>·</span>
+                    <span>
+                      📊 Base Cumulativa (Golden Record) vinculada
+                    </span>
+                  </div>
+                </div>
+              )}
               <div className="mb-2">
                 Jornada <strong>{p.journey.name}</strong> · {p.journey.steps.map((s) => CHANNEL_LABEL[s.channelType]).join(' → ')}
               </div>
