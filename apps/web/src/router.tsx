@@ -17,6 +17,9 @@ import { StrategiesPage, StrategyDetailPage } from './pages/Strategies';
 import { TabulationsPage } from './pages/Tabulations';
 import { ChannelsPage } from './pages/Channels';
 import { ControlPage } from './pages/Control';
+import { LimitsPage } from './pages/Limits';
+import { ObservabilityPage } from './pages/Observability';
+import { CentralIntelligencePage } from './pages/CentralIntelligence';
 import { ExperimentsPage } from './pages/Experiments';
 import { OptimizationPage } from './pages/Optimization';
 import { CostsPage } from './pages/Costs';
@@ -78,10 +81,12 @@ export const router = createBrowserRouter([
           { path: '/estrategias/:id', element: <StrategyDetailPage /> },
           { path: '/tabulacoes', element: <TabulationsPage /> },
           { path: '/canais', element: <ChannelsPage /> },
-          { path: '/controle', element: <ControlPage /> },
-          { path: '/inteligencia', element: <IntelligencePage /> },
+          { path: '/inteligencia', element: <CentralIntelligencePage /> },
+          { path: '/limites', element: <LimitsPage /> },
+          { path: '/observabilidade', element: <ObservabilityPage /> },
+          { path: '/controle', element: <Navigate to="/limites" replace /> },
+          { path: '/otimizacao', element: <Navigate to="/inteligencia" replace /> },
           { path: '/experimentos', element: <ExperimentsPage /> },
-          { path: '/otimizacao', element: <OptimizationPage /> },
           { path: '/custos', element: <CostsPage /> },
           { path: '/mais', element: <MorePage /> },
           { path: '*', element: <NotFoundPage /> },

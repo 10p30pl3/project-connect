@@ -20,6 +20,7 @@ import {
   Settings2,
   ShieldAlert,
   SlidersHorizontal,
+  Users,
 } from 'lucide-react';
 import { ROLE_LABEL } from '@voll/shared';
 import { useAuth } from '../lib/auth';
@@ -59,14 +60,9 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     items: [
       {
         to: '/',
-        label: 'Painel operacional',
+        label: 'Visão geral',
         icon: <Home className={ico} aria-hidden />,
         end: true,
-        matchPrefixes: ['/tentativas'],
-        subItems: [
-          { to: '/', label: 'Visão geral', end: true },
-          { to: '/tentativas', label: 'Tentativas em tempo real' },
-        ],
       },
       {
         to: '/campanhas',
@@ -79,60 +75,91 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
         ],
       },
       {
-        to: '/mailings',
-        label: 'Bases & Contatos',
-        icon: <Database className={ico} aria-hidden />,
-        matchPrefixes: ['/mailings', '/listas', '/contatos'],
+        to: '/inteligencia',
+        label: 'Central de inteligência',
+        icon: <BrainCircuit className={ico} aria-hidden />,
+        matchPrefixes: ['/inteligencia'],
         subItems: [
-          { to: '/mailings', label: 'Mailings (Cargas)' },
-          { to: '/listas', label: 'Listas de segmentação' },
-          { to: '/contatos', label: 'Contatos & DNC' },
+          { to: '/inteligencia?tab=decisao', label: 'Ajustar inteligência (Decisão)' },
+          { to: '/inteligencia?tab=testes', label: 'Desafiar inteligência (Testes)' },
         ],
       },
     ],
   },
   {
-    title: 'Configurações & Parâmetros',
+    title: 'Dados',
     items: [
+      {
+        to: '/contatos',
+        label: 'Contatos',
+        icon: <Users className={ico} aria-hidden />,
+        matchPrefixes: ['/contatos'],
+      },
+      {
+        to: '/mailings',
+        label: 'Mailings',
+        icon: <Database className={ico} aria-hidden />,
+        matchPrefixes: ['/mailings'],
+        subItems: [
+          { to: '/mailings', label: 'Bases & Cargas', end: true },
+          { to: '/mailings/importar', label: 'Importar novo mailing' },
+        ],
+      },
+      {
+        to: '/listas',
+        label: 'Listas',
+        icon: <ListFilter className={ico} aria-hidden />,
+        matchPrefixes: ['/listas'],
+        subItems: [
+          { to: '/listas', label: 'Todas as listas', end: true },
+          { to: '/listas/nova', label: 'Criar nova lista' },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'Configuração',
+    items: [
+      {
+        to: '/jornadas',
+        label: 'Jornadas',
+        icon: <Compass className={ico} aria-hidden />,
+        matchPrefixes: ['/jornadas'],
+      },
       {
         to: '/estrategias',
         label: 'Estratégias',
         icon: <SlidersHorizontal className={ico} aria-hidden />,
-        matchPrefixes: ['/estrategias', '/jornadas', '/tabulacoes'],
-        subItems: [
-          { to: '/estrategias', label: 'Templates' },
-          { to: '/jornadas', label: 'Jornadas' },
-          { to: '/tabulacoes', label: 'Tabulações' },
-        ],
+        matchPrefixes: ['/estrategias'],
+      },
+      {
+        to: '/tabulacoes',
+        label: 'Tabulações',
+        icon: <BookMarked className={ico} aria-hidden />,
+        matchPrefixes: ['/tabulacoes'],
       },
       {
         to: '/canais',
-        label: 'Canais & Conectores',
+        label: 'Canais',
         icon: <Cable className={ico} aria-hidden />,
         matchPrefixes: ['/canais'],
-        subItems: [
-          { to: '/canais', label: 'Conexões & Provedores' },
-        ],
       },
+    ],
+  },
+  {
+    title: 'Governança',
+    items: [
       {
-        to: '/otimizacao',
-        label: 'Central de Decisão & Custos',
-        icon: <Compass className={ico} aria-hidden />,
-        matchPrefixes: ['/otimizacao', '/experimentos', '/custos'],
-        subItems: [
-          { to: '/otimizacao', label: 'Otimização consultiva' },
-          { to: '/experimentos', label: 'Experimentos A/B' },
-          { to: '/custos', label: 'Custos & conciliação' },
-        ],
-      },
-      {
-        to: '/controle',
-        label: 'Governança & Controle Central',
+        to: '/limites',
+        label: 'Limites',
         icon: <ShieldAlert className={ico} aria-hidden />,
-        matchPrefixes: ['/controle'],
-        subItems: [
-          { to: '/controle', label: 'Limites institucionais & suspensão' },
-        ],
+        matchPrefixes: ['/limites', '/controle'],
+      },
+      {
+        to: '/observabilidade',
+        label: 'Observabilidade',
+        icon: <Activity className={ico} aria-hidden />,
+        matchPrefixes: ['/observabilidade', '/audit'],
       },
     ],
   },
@@ -141,8 +168,8 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
 const MOBILE: NavItem[] = [
   { to: '/', label: 'Início', icon: <Home className="size-5" aria-hidden />, end: true },
   { to: '/campanhas', label: 'Campanhas', icon: <Megaphone className="size-5" aria-hidden /> },
-  { to: '/listas', label: 'Listas', icon: <ListFilter className="size-5" aria-hidden /> },
-  { to: '/tentativas', label: 'Tentativas', icon: <Activity className="size-5" aria-hidden /> },
+  { to: '/inteligencia', label: 'Inteligência', icon: <BrainCircuit className="size-5" aria-hidden /> },
+  { to: '/contatos', label: 'Contatos', icon: <Users className="size-5" aria-hidden /> },
   { to: '/mais', label: 'Mais', icon: <Menu className="size-5" aria-hidden /> },
 ];
 
