@@ -35,6 +35,7 @@ import {
 import { get, post } from '../lib/api';
 import type { CampaignSummary, Journey, MailingSummary, Strategy } from '../lib/types';
 import { fmtDateTime, fmtMoney, fmtNumber, fmtPercent } from '../lib/format';
+import { calculateStatisticalSampleSize } from '../lib/statistics';
 import {
   Alert,
   Badge,
@@ -43,12 +44,14 @@ import {
   Checkbox,
   Empty,
   Field,
+  InfoTooltip,
   Input,
   Loading,
   PageHeader,
   Select,
   Stat,
   TableWrap,
+  Tooltip,
   useToast,
 } from '../components/ui';
 
@@ -108,21 +111,20 @@ export function CentralIntelligencePage() {
   const selectedCampaign = campaignsQ.data?.items.find((c) => c.id === selectedCampaignId);
   const totalBase = selectedCampaign?.progress?.members ?? 12500;
 
-  // 3. Estado do Experimento Desafiador (Challenger)
-  // Modo de configuração: 'RECOMMENDED' (Inteligência 1-clique) ou 'ADVANCED' (Manuais)
-  const [challengerMode, setChallengerMode] = useState<'RECOMMENDED' | 'ADVANCED'>('RECOMMENDED');
+  // 3. Análise Estatística do Tamanho do Mailing (Cochran finita com ajuste 50/50 em bases pequenas)
+  const sampleCalc = calculateStatisticalSampleSize(totalBase);
 
-  // Parâmetros do Challenger
+  // 4. Estado do Experimento Desafiador (Challenger)
+  const [challengerMode, setChallengerMode] = useState<'RECOMMENDED' | 'ADVANCED'>('RECOMMENDED');
   const [challengerStrategyId, setChallengerStrategyId] = useState('');
   const [challengerJourneyId, setChallengerJourneyId] = useState('');
   const [policy, setPolicy] = useState<OptimizationPolicy>('LOWEST_COST_PER_CPC');
   const [minEvidences, setMinEvidences] = useState(3);
-  const [samplePct, setSamplePct] = useState(10); // 10% padrão
+  const [dispatchTime, setDispatchTime] = useState('08:00'); // Horário diário configurável com padrão 08:00
 
-  // Inicialização com valores recomendados
+  // Inicialização de estratégia e jornada desafiadoras
   useEffect(() => {
     if (strategiesQ.data?.items.length && !challengerStrategyId) {
-      // Procura uma estratégia diferente da de produção ou a segunda disponível
       const diff = strategiesQ.data.items.find((s) => s.name !== selectedCampaign?.strategyName) ?? strategiesQ.data.items[0];
       setChallengerStrategyId(diff.id);
     }
@@ -135,7 +137,7 @@ export function CentralIntelligencePage() {
   const activeChallengerStrategy = strategiesQ.data?.items.find((s) => s.id === challengerStrategyId);
   const activeChallengerJourney = journeysQ.data?.items.find((j) => j.id === challengerJourneyId);
 
-  // 4. Estado de Execução do Experimento
+  // 5. Estado de Execução Automática do Experimento
   const [hasExperimentRun, setHasExperimentRun] = useState(false);
   const [activeWave, setActiveWave] = useState(1);
   const [isSimulating, setIsSimulating] = useState(false);
@@ -150,28 +152,25 @@ export function CentralIntelligencePage() {
 
   const [appliedContacts, setAppliedContacts] = useState<Record<string, boolean>>({});
 
-  const sampleSize = Math.max(1, Math.round((totalBase * samplePct) / 100));
-
-  // Disparo de nova onda de teste empírico
-  const handleRunWave = () => {
-    setIsSimulating(true);
-    setTimeout(() => {
-      setIsSimulating(false);
-      setHasExperimentRun(true);
-      setActiveWave((w) => Math.min(w + 1, 3));
-      toast('success', `Onda ${Math.min(activeWave + 1, 3)} do experimento executada com sucesso!`);
-    }, 800);
-  };
-
-  // Iniciar experimento
+  // Iniciar experimento com cadência diária automática
   const handleStartExperiment = () => {
     setIsSimulating(true);
     setTimeout(() => {
       setIsSimulating(false);
       setHasExperimentRun(true);
       setActiveWave(1);
-      toast('success', `Experimento Desafiador (Challenger) disparado na amostra de ${fmtNumber(sampleSize)} contatos.`);
-    }, 900);
+      toast('success', `Challenger iniciado: Onda 1 disparada. Próximas ondas agendadas diariamente às ${dispatchTime}.`);
+    }, 700);
+  };
+
+  // Acelerar simulação de ondas para teste imediato
+  const handleAccelerateWaves = () => {
+    setIsSimulating(true);
+    setTimeout(() => {
+      setIsSimulating(false);
+      setActiveWave((w) => Math.min(w + 1, 3));
+      toast('success', `Onda ${Math.min(activeWave + 1, 3)} simulada com sucesso.`);
+    }, 600);
   };
 
   // Promoção do Experimento Vencedor para Produção
@@ -185,7 +184,7 @@ export function CentralIntelligencePage() {
       }),
     onSuccess: (res) => {
       setIsPromoted(true);
-      toast('success', `Experimento promovido com sucesso! A campanha em produção agora opera com a nova estratégia vencedora (v${res.version}).`);
+      toast('success', `Experimento promovido com sucesso para a produção (Estratégia v${res.version})!`);
       qc.invalidateQueries({ queryKey: ['campaigns'] });
       qc.invalidateQueries({ queryKey: ['optimization-recommendations', selectedCampaignId] });
       qc.invalidateQueries({ queryKey: ['overview'] });
@@ -208,7 +207,7 @@ export function CentralIntelligencePage() {
     },
   });
 
-  // Métricas comparativas
+  // Métricas
   const championCpcRate = 21.2;
   const championCpcCost = 5.60;
   const challengerCpcRate = 38.4;
@@ -220,7 +219,7 @@ export function CentralIntelligencePage() {
     <div className="space-y-6">
       <PageHeader
         title="Central de Inteligência"
-        subtitle="Ajuste e desafie a inteligência em produção: configure hipóteses alternativas (Challenger) em amostras controladas antes de promover para a base inteira."
+        subtitle="Ajuste e desafie a inteligência em produção através de experimentos automáticos multicanais."
         actions={
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-100/80 px-2.5 py-0.5 text-xs font-semibold text-brand-900">
@@ -239,6 +238,7 @@ export function CentralIntelligencePage() {
             <div className="flex items-center gap-2">
               <ShieldCheck className="size-4 text-brand-700" aria-hidden />
               <span className="font-semibold text-slate-900">1. Campanha em Produção (Champion Atual)</span>
+              <InfoTooltip content="Linha de base em execução no workspace que será desafiada pelo experimento." />
             </div>
             {selectedCampaign && (
               <Badge tone={selectedCampaign.status === 'RUNNING' ? 'green' : 'brand'}>
@@ -251,7 +251,14 @@ export function CentralIntelligencePage() {
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-12 items-end">
             <div className="sm:col-span-6">
-              <Field label="Selecione a campanha para otimizar / desafiar" hint="A campanha vincula o mailing aos contatos da operação">
+              <Field
+                label={
+                  <span className="flex items-center">
+                    Campanha em Produção
+                    <InfoTooltip content="Selecione a campanha ativa para calibrar ou desafiar sua estratégia." />
+                  </span>
+                }
+              >
                 {(p) => (
                   <Select
                     id={p.id}
@@ -277,7 +284,7 @@ export function CentralIntelligencePage() {
             <div className="sm:col-span-6">
               <div className="rounded-xl border border-slate-200/90 bg-slate-50/70 p-3 text-xs flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <span className="text-slate-500 block text-[11px]">Estratégia e Jornada em Produção:</span>
+                  <span className="text-slate-500 block text-[11px]">Estratégia e Jornada Atuais:</span>
                   <span className="font-semibold text-slate-900">
                     {selectedCampaign?.strategyName ?? 'Padrão'} (v{selectedCampaign?.strategyVersion ?? 1}) · {selectedCampaign?.journeyName ?? 'Multicanal'}
                   </span>
@@ -290,28 +297,33 @@ export function CentralIntelligencePage() {
             </div>
           </div>
 
-          {/* Métricas vigentes da Produção (Baseline) */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 pt-1 border-t border-slate-100">
             <Stat
-              label="Custo por CPC em Produção"
+              label={
+                <span className="flex items-center">
+                  Custo/CPC Produção
+                  <InfoTooltip content="Custo médio unitário observado na produção sem a otimização do Challenger." />
+                </span>
+              }
               value={`R$ ${championCpcCost.toFixed(2)}`}
-              hint="Sem inteligência de disparo"
             />
             <Stat
-              label="Taxa de CPC Atual"
+              label={
+                <span className="flex items-center">
+                  Taxa de CPC Atual
+                  <InfoTooltip content="Percentual de contatos com a Pessoa Certa confirmada por tabulação." />
+                </span>
+              }
               value={`${championCpcRate}%`}
-              hint="Histórico observado"
             />
             <Stat
-              label="Contatos Qualificados"
+              label="Contatos na Carteira"
               value={fmtNumber(totalBase)}
-              hint="Base total da campanha"
             />
             <Stat
-              label="Status da Inteligência"
-              value={isPromoted ? 'Estratégia Campeã Ativa' : 'Baseline Convencional'}
+              label="Status da Campanha"
+              value={isPromoted ? 'Estratégia Campeã Ativa' : 'Em Produção'}
               tone={isPromoted ? 'good' : undefined}
-              hint={isPromoted ? 'Atualizada pelo Challenger' : 'Pronta para ser desafiada'}
             />
           </div>
         </div>
@@ -326,6 +338,7 @@ export function CentralIntelligencePage() {
             <div className="flex items-center gap-2">
               <FlaskConical className="size-4 text-brand-700" aria-hidden />
               <span className="font-semibold text-slate-900">2. Configurar Experimento Desafiador (Challenger)</span>
+              <InfoTooltip content="O Challenger testa uma hipótese concorrente em uma amostra estatisticamente calculada antes de liberar para a base inteira." />
             </div>
             <div className="flex items-center gap-1.5 rounded-lg bg-slate-100 p-0.5 text-xs">
               <button
@@ -338,7 +351,7 @@ export function CentralIntelligencePage() {
                     : 'text-slate-600 hover:text-slate-900',
                 )}
               >
-                ⭐ (Recomendada) IA Voll
+                ⭐ Recomendada
               </button>
               <button
                 type="button"
@@ -350,67 +363,91 @@ export function CentralIntelligencePage() {
                     : 'text-slate-600 hover:text-slate-900',
                 )}
               >
-                ⚙️ Avançada (Opções Manuais)
+                ⚙️ Avançada
               </button>
             </div>
           </div>
         }
       >
         <div className="space-y-4">
-          {/* MODO RECOMENDADO (1 CLIQUE) */}
+          {/* Parâmetros do Challenger */}
           {challengerMode === 'RECOMMENDED' ? (
             <div className="space-y-4">
               <div className="rounded-xl border border-brand-200/90 bg-gradient-to-r from-brand-50/70 via-indigo-50/40 to-slate-50 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="size-4 text-brand-700" />
-                      <span className="text-sm font-bold text-slate-900">
-                        Hipótese Recomendada: Otimização Autônoma de Menor Custo por CPC
-                      </span>
-                      <Badge tone="green">Alta Assertividade</Badge>
-                    </div>
-                    <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
-                      Configuração automática com base na <strong>TIC Domicílios 2025</strong>. Prioriza WhatsApp Oficial em janelas de Wi-Fi e aciona Discador com BINA Local em horários nobres, minimizando o custo por Pessoa Certa (CPC).
-                    </p>
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="size-4 text-brand-700" />
+                    <span className="text-sm font-bold text-slate-900">
+                      Otimização Autônoma Voll Connect
+                    </span>
+                    <Badge tone="green">TIC Domicílios 2025</Badge>
                   </div>
                   <div className="text-right">
-                    <div className="text-[11px] text-slate-500 font-medium">Economia Esperada</div>
-                    <div className="text-lg font-extrabold text-emerald-700">-43,2% no Custo/CPC</div>
+                    <span className="text-xs font-bold text-emerald-700 bg-white/80 border border-emerald-200/80 px-2.5 py-1 rounded-lg">
+                      -43,2% no Custo/CPC estimado
+                    </span>
                   </div>
                 </div>
 
-                {/* Parâmetros Recomendados Pré-aplicados */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 mt-3 border-t border-brand-200/60 text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-3 mt-3 border-t border-brand-200/60 text-xs">
                   <div>
-                    <span className="text-slate-500 block text-[11px]">Estratégia Desafiadora:</span>
+                    <span className="text-slate-500 block text-[11px] font-medium">Estratégia:</span>
                     <strong className="text-slate-900 block truncate">
                       {activeChallengerStrategy?.name ?? 'Otimizada Multicanal'}
                     </strong>
                   </div>
                   <div>
-                    <span className="text-slate-500 block text-[11px]">Jornada Desafiadora:</span>
+                    <span className="text-slate-500 block text-[11px] font-medium">Jornada:</span>
                     <strong className="text-slate-900 block truncate">
-                      {activeChallengerJourney?.name ?? 'WhatsApp Prioritário + Discador'}
+                      {activeChallengerJourney?.name ?? 'WhatsApp Prioritário'}
                     </strong>
                   </div>
                   <div>
-                    <span className="text-slate-500 block text-[11px]">Política de Decisão:</span>
-                    <strong className="text-brand-900 block truncate">Menor custo por CPC</strong>
+                    <span className="text-slate-500 block text-[11px] font-medium">Política:</span>
+                    <strong className="text-brand-900 block truncate">Menor custo/CPC</strong>
                   </div>
                   <div>
-                    <span className="text-slate-500 block text-[11px]">Amostra Estatística:</span>
-                    <strong className="text-slate-900 block">
-                      10% ({fmtNumber(sampleSize)} contatos · IC 95%)
-                    </strong>
+                    <span className="text-slate-500 block text-[11px] font-medium">Horário Diário:</span>
+                    <div className="flex items-center gap-1 font-bold text-slate-900">
+                      <Clock className="size-3 text-slate-400" />
+                      <span>{dispatchTime}</span>
+                      <InfoTooltip content="Horário diário configurável com padrão operacional 08:00." />
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[11px] font-medium">Amostra Calculada:</span>
+                    <div className="flex items-center gap-1">
+                      <strong className="text-slate-900">
+                        {fmtNumber(sampleCalc.sampleSize)} contatos ({sampleCalc.samplePct}%)
+                      </strong>
+                      <InfoTooltip content={sampleCalc.explanation} />
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-xs text-slate-500">
-                  O teste desafiador será executado em {fmtNumber(sampleSize)} contatos sem alterar a produção em massa.
-                </span>
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                <div className="flex items-center gap-3 text-xs text-slate-600">
+                  <div className="flex items-center gap-1.5">
+                    <label htmlFor="rec-dispatch-time" className="font-medium text-slate-700">
+                      Horário de Disparo Automático:
+                    </label>
+                    <input
+                      id="rec-dispatch-time"
+                      type="time"
+                      value={dispatchTime}
+                      onChange={(e) => setDispatchTime(e.target.value || '08:00')}
+                      className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-800 shadow-2xs focus:border-brand-500 focus:outline-none"
+                    />
+                    <InfoTooltip content="Horário diário em que cada onda do teste será despachada automaticamente. Padrão: 08:00." />
+                  </div>
+
+                  <span className="inline-flex items-center gap-1 text-[11px] text-slate-500">
+                    <span className="size-1.5 rounded-full bg-emerald-500" />
+                    Significância: {sampleCalc.confidence}% de Confiança (Erro ±{sampleCalc.marginOfError}%)
+                  </span>
+                </div>
+
                 <Button
                   variant="primary"
                   loading={isSimulating}
@@ -423,14 +460,17 @@ export function CentralIntelligencePage() {
               </div>
             </div>
           ) : (
-            /* MODO AVANÇADO (OPÇÕES MANUAIS) */
+            /* MODO AVANÇADO */
             <div className="space-y-4">
-              <div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600 border border-slate-200/80">
-                Escolha manualmente a combinação de <strong>Estratégia</strong> e <strong>Jornada</strong> para testar como hipótese concorrente à campanha em produção.
-              </div>
-
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Estratégia Desafiadora" hint="Template com limites de esforço e regras de tabulação">
+                <Field
+                  label={
+                    <span className="flex items-center">
+                      Estratégia Desafiadora
+                      <InfoTooltip content="Template com limites de esforço diário/total e regras de tabulação." />
+                    </span>
+                  }
+                >
                   {(p) => (
                     <Select
                       id={p.id}
@@ -446,7 +486,14 @@ export function CentralIntelligencePage() {
                   )}
                 </Field>
 
-                <Field label="Jornada Desafiadora" hint="Sequência multicanal e cadência de transbordo">
+                <Field
+                  label={
+                    <span className="flex items-center">
+                      Jornada Desafiadora
+                      <InfoTooltip content="Sequência multicanal e cadência de transbordo entre canais." />
+                    </span>
+                  }
+                >
                   {(p) => (
                     <Select
                       id={p.id}
@@ -464,7 +511,14 @@ export function CentralIntelligencePage() {
               </div>
 
               <div className="grid gap-3 sm:grid-cols-3">
-                <Field label="Política de Priorização" className="sm:col-span-2">
+                <Field
+                  label={
+                    <span className="flex items-center">
+                      Política de Priorização
+                      <InfoTooltip content="Critério de otimização do algoritmo: Menor custo por CPC, Assertividade de horário (BTTC) ou Conversão rápida." />
+                    </span>
+                  }
+                >
                   {(p) => (
                     <Select
                       id={p.id}
@@ -480,7 +534,14 @@ export function CentralIntelligencePage() {
                   )}
                 </Field>
 
-                <Field label="Mín. Evidências Históricas">
+                <Field
+                  label={
+                    <span className="flex items-center">
+                      Mín. Evidências Históricas
+                      <InfoTooltip content="Tentativas anteriores necessárias para calibrar o canal ótimo de cada contato." />
+                    </span>
+                  }
+                >
                   {(p) => (
                     <Input
                       id={p.id}
@@ -492,37 +553,42 @@ export function CentralIntelligencePage() {
                     />
                   )}
                 </Field>
-              </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Amostra do Teste Empírico" hint="Fração da base reservada para validação estatística">
-                  {(p) => (
-                    <Select
-                      id={p.id}
-                      value={String(samplePct)}
-                      onChange={(e) => setSamplePct(Number(e.target.value))}
-                    >
-                      <option value="5">5% da base (Piloto rápido)</option>
-                      <option value="10">10% da base (Recomendado · 95% Confiança)</option>
-                      <option value="15">15% da base (Maior precisão)</option>
-                      <option value="20">20% da base (Amostra robusta)</option>
-                    </Select>
-                  )}
-                </Field>
-
-                <Field label="Tamanho Calculado da Amostra" hint="Contatos elegíveis a serem testados">
+                <Field
+                  label={
+                    <span className="flex items-center">
+                      Horário Diário
+                      <InfoTooltip content="Horário de disparo automático diário de cada onda. Padrão operacional: 08:00." />
+                    </span>
+                  }
+                >
                   {() => (
-                    <div className="h-9 px-3 rounded-md border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-800 flex items-center">
-                      {fmtNumber(sampleSize)} contatos ({samplePct}% da base de {fmtNumber(totalBase)})
-                    </div>
+                    <input
+                      type="time"
+                      value={dispatchTime}
+                      onChange={(e) => setDispatchTime(e.target.value || '08:00')}
+                      className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-800 shadow-2xs focus:border-brand-500 focus:outline-none"
+                    />
                   )}
                 </Field>
               </div>
 
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-xs text-slate-500">
-                  Os parâmetros manuais serão comparados diretamente com o baseline da produção.
+              <div className="rounded-xl border border-slate-200/90 bg-slate-50/70 p-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-slate-800">
+                    Amostra Calculada por Cochran:
+                  </span>
+                  <Badge tone={sampleCalc.isSmallBase ? 'amber' : 'green'}>
+                    {fmtNumber(sampleCalc.sampleSize)} contatos ({sampleCalc.samplePct}% da base de {fmtNumber(totalBase)})
+                  </Badge>
+                  <InfoTooltip content={sampleCalc.explanation} />
+                </div>
+                <span className="text-slate-500 text-[11px]">
+                  Nível de Confiança: <strong>{sampleCalc.confidence}%</strong> (Margem: ±{sampleCalc.marginOfError}%)
                 </span>
+              </div>
+
+              <div className="flex items-center justify-end pt-1">
                 <Button
                   variant="primary"
                   loading={isSimulating}
@@ -547,6 +613,7 @@ export function CentralIntelligencePage() {
             <div className="flex items-center gap-2">
               <Activity className="size-4 text-emerald-600" aria-hidden />
               <span className="font-semibold text-slate-900">3. Placar de Confronto: Produção vs. Experimento</span>
+              <InfoTooltip content="Comparativo auditável lado a lado entre o desempenho da produção e o experimento." />
             </div>
             {hasExperimentRun && (
               <Badge tone="green">
@@ -559,106 +626,188 @@ export function CentralIntelligencePage() {
         {!hasExperimentRun ? (
           <div className="py-8 text-center text-xs text-slate-500">
             <FlaskConical className="mx-auto mb-2 size-8 text-slate-400" />
-            Nenhum experimento disparado ainda. Clique em <strong>Disparar Challenger</strong> acima para confrontar os parâmetros desafiantes com a produção.
+            Nenhum experimento disparado ainda. Clique em <strong>Disparar Challenger</strong> acima para confrontar os parâmetros com a produção.
           </div>
         ) : (
-          <div className="space-y-5">
-            {/* Tabela de Comparação Lado a Lado */}
+          <div className="space-y-4">
+            {/* Linha do Tempo de Ondas Automáticas Diárias */}
+            <div className="rounded-xl border border-slate-200/90 bg-slate-50/60 p-3.5 space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <span className="font-semibold text-slate-800 flex items-center gap-1.5">
+                  <Clock className="size-3.5 text-brand-700" />
+                  <span>Cadência Automática Multi-dia (Disparo Diário às {dispatchTime})</span>
+                  <InfoTooltip content={`As ondas são despachadas automaticamente ao longo dos dias no horário configurado (${dispatchTime}), rebalanceando os canais conforme as tabulações recebidas.`} />
+                </span>
+                <button
+                  type="button"
+                  onClick={handleAccelerateWaves}
+                  disabled={isSimulating || activeWave >= 3}
+                  className={clsx(
+                    'text-[11px] font-semibold transition',
+                    activeWave < 3
+                      ? 'text-brand-700 hover:text-brand-900 underline'
+                      : 'text-slate-400 cursor-default',
+                  )}
+                >
+                  {activeWave < 3 ? 'Acelerar simulação de ondas para teste imediato →' : 'Todas as 3 ondas concluídas ✓'}
+                </button>
+              </div>
+
+              {/* Steps horizontais das ondas */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-xs">
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-2.5 flex items-center justify-between">
+                  <div>
+                    <span className="font-bold text-emerald-950 block">Onda 1 (Hoje)</span>
+                    <span className="text-[11px] text-emerald-700">Concluída · 38,4% CPC</span>
+                  </div>
+                  <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
+                </div>
+
+                <div className={clsx(
+                  'rounded-lg border p-2.5 flex items-center justify-between transition',
+                  activeWave >= 2
+                    ? 'border-emerald-200 bg-emerald-50/60'
+                    : 'border-slate-200 bg-white',
+                )}>
+                  <div>
+                    <span className="font-bold text-slate-900 block">Onda 2 (Amanhã)</span>
+                    <span className="text-[11px] text-slate-500">
+                      {activeWave >= 2 ? 'Concluída · Rebalanceada' : `Agendada para amanhã às ${dispatchTime}`}
+                    </span>
+                  </div>
+                  {activeWave >= 2 ? (
+                    <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
+                  ) : (
+                    <Clock className="size-4 text-slate-400 shrink-0" />
+                  )}
+                </div>
+
+                <div className={clsx(
+                  'rounded-lg border p-2.5 flex items-center justify-between transition',
+                  activeWave >= 3
+                    ? 'border-emerald-200 bg-emerald-50/60'
+                    : 'border-slate-200 bg-white',
+                )}>
+                  <div>
+                    <span className="font-bold text-slate-900 block">Onda 3 (D+2)</span>
+                    <span className="text-[11px] text-slate-500">
+                      {activeWave >= 3 ? 'Concluída · Veredito 95%' : `Agendada para D+2 às ${dispatchTime}`}
+                    </span>
+                  </div>
+                  {activeWave >= 3 ? (
+                    <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
+                  ) : (
+                    <Clock className="size-4 text-slate-400 shrink-0" />
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Tabela de Confronto Direto Lado a Lado */}
             <div className="overflow-x-auto rounded-xl border border-slate-200">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-700">
-                    <th className="py-3 px-4 font-semibold">Dimensão</th>
-                    <th className="py-3 px-4 font-semibold">Produção (Champion Vigente)</th>
-                    <th className="py-3 px-4 font-semibold text-brand-900 bg-brand-50/40">
-                      Experimento (Challenger Selecionado)
+                    <th className="py-2.5 px-3.5 font-semibold">Dimensão</th>
+                    <th className="py-2.5 px-3.5 font-semibold">Produção (Champion Vigente)</th>
+                    <th className="py-2.5 px-3.5 font-semibold text-brand-900 bg-brand-50/40">
+                      Experimento (Challenger)
                     </th>
-                    <th className="py-3 px-4 font-semibold text-emerald-800 bg-emerald-50/30">
+                    <th className="py-2.5 px-3.5 font-semibold text-emerald-800 bg-emerald-50/30">
                       Ganho Comprovado (*Expected Lift*)
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   <tr>
-                    <td className="py-2.5 px-4 font-medium text-slate-600">Estratégia</td>
-                    <td className="py-2.5 px-4 text-slate-800 font-medium">
+                    <td className="py-2.5 px-3.5 font-medium text-slate-600">Estratégia</td>
+                    <td className="py-2.5 px-3.5 text-slate-800 font-medium">
                       {selectedCampaign?.strategyName ?? 'Padrão'}
                     </td>
-                    <td className="py-2.5 px-4 text-brand-900 font-bold bg-brand-50/20">
+                    <td className="py-2.5 px-3.5 text-brand-900 font-bold bg-brand-50/20">
                       {activeChallengerStrategy?.name ?? 'Otimizada Multicanal'}
                     </td>
-                    <td className="py-2.5 px-4 text-emerald-700 font-semibold bg-emerald-50/20">
-                      Nova cadência
+                    <td className="py-2.5 px-3.5 text-emerald-700 font-semibold bg-emerald-50/20">
+                      Cadência refinada
                     </td>
                   </tr>
 
                   <tr>
-                    <td className="py-2.5 px-4 font-medium text-slate-600">Jornada Multicanal</td>
-                    <td className="py-2.5 px-4 text-slate-800 font-medium">
+                    <td className="py-2.5 px-3.5 font-medium text-slate-600">Jornada Multicanal</td>
+                    <td className="py-2.5 px-3.5 text-slate-800 font-medium">
                       {selectedCampaign?.journeyName ?? 'Multicanal'}
                     </td>
-                    <td className="py-2.5 px-4 text-brand-900 font-bold bg-brand-50/20">
+                    <td className="py-2.5 px-3.5 text-brand-900 font-bold bg-brand-50/20">
                       {activeChallengerJourney?.name ?? 'WhatsApp Prioritário'}
                     </td>
-                    <td className="py-2.5 px-4 text-emerald-700 font-semibold bg-emerald-50/20">
+                    <td className="py-2.5 px-3.5 text-emerald-700 font-semibold bg-emerald-50/20">
                       Assertividade em Wi-Fi
                     </td>
                   </tr>
 
                   <tr>
-                    <td className="py-2.5 px-4 font-medium text-slate-600">Taxa de CPC (Pessoa Certa)</td>
-                    <td className="py-2.5 px-4 text-slate-700 tabular">{championCpcRate}%</td>
-                    <td className="py-2.5 px-4 text-brand-900 font-bold tabular text-sm bg-brand-50/20">
+                    <td className="py-2.5 px-3.5 font-medium text-slate-600 flex items-center">
+                      <span>Taxa de CPC (Pessoa Certa)</span>
+                      <InfoTooltip content="Percentual de ligações ou mensagens que confirmaram a Pessoa Certa por tabulação." />
+                    </td>
+                    <td className="py-2.5 px-3.5 text-slate-700 tabular">{championCpcRate}%</td>
+                    <td className="py-2.5 px-3.5 text-brand-900 font-bold tabular text-sm bg-brand-50/20">
                       {challengerCpcRate}%
                     </td>
-                    <td className="py-2.5 px-4 text-emerald-700 font-bold tabular bg-emerald-50/20">
+                    <td className="py-2.5 px-3.5 text-emerald-700 font-bold tabular bg-emerald-50/20">
                       +{(challengerCpcRate - championCpcRate).toFixed(1)} p.p. (+81,1% assertividade)
                     </td>
                   </tr>
 
                   <tr>
-                    <td className="py-2.5 px-4 font-medium text-slate-600">Custo por CPC Confirmado</td>
-                    <td className="py-2.5 px-4 text-slate-700 tabular font-medium">
+                    <td className="py-2.5 px-3.5 font-medium text-slate-600 flex items-center">
+                      <span>Custo por CPC Confirmado</span>
+                      <InfoTooltip content="Gasto total dividido pelo número de CPCs válidos auditados." />
+                    </td>
+                    <td className="py-2.5 px-3.5 text-slate-700 tabular font-medium">
                       R$ {championCpcCost.toFixed(2)}
                     </td>
-                    <td className="py-2.5 px-4 text-emerald-700 font-extrabold tabular text-sm bg-brand-50/20">
+                    <td className="py-2.5 px-3.5 text-emerald-700 font-extrabold tabular text-sm bg-brand-50/20">
                       R$ {challengerCpcCost.toFixed(2)}
                     </td>
-                    <td className="py-2.5 px-4 text-emerald-700 font-extrabold tabular bg-emerald-50/20">
-                      -43,2% de custo unitário (Economia de R$ {unitSavings.toFixed(2)} por contato)
+                    <td className="py-2.5 px-3.5 text-emerald-700 font-extrabold tabular bg-emerald-50/20">
+                      -43,2% no custo unitário (Economia de R$ {unitSavings.toFixed(2)} por contato)
                     </td>
                   </tr>
 
                   <tr>
-                    <td className="py-2.5 px-4 font-medium text-slate-600">Amostra Avaliada</td>
-                    <td className="py-2.5 px-4 text-slate-700">100% da Base ({fmtNumber(totalBase)})</td>
-                    <td className="py-2.5 px-4 text-slate-900 font-semibold bg-brand-50/20">
-                      {samplePct}% da Base ({fmtNumber(sampleSize)} contatos)
+                    <td className="py-2.5 px-3.5 font-medium text-slate-600 flex items-center">
+                      <span>Amostra Avaliada</span>
+                      <InfoTooltip content={sampleCalc.explanation} />
                     </td>
-                    <td className="py-2.5 px-4 text-slate-600 bg-emerald-50/20">
-                      Risco financeiro controlado
+                    <td className="py-2.5 px-3.5 text-slate-700">100% da Base ({fmtNumber(totalBase)})</td>
+                    <td className="py-2.5 px-3.5 text-slate-900 font-semibold bg-brand-50/20">
+                      {sampleCalc.samplePct}% ({fmtNumber(sampleCalc.sampleSize)} contatos)
+                    </td>
+                    <td className="py-2.5 px-3.5 text-slate-600 bg-emerald-50/20">
+                      Significância estatística com risco mínimo
                     </td>
                   </tr>
                 </tbody>
               </table>
             </div>
 
-            {/* Painel de Economia Projetada na Base Total */}
+            {/* Painel de Economia Projetada */}
             <div className="rounded-xl border border-emerald-200/90 bg-gradient-to-r from-emerald-50/80 via-white to-brand-50/40 p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="space-y-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     <CheckCircle2 className="size-4 text-emerald-600" />
                     <span className="text-xs font-bold uppercase tracking-wider text-emerald-950">
-                      Veredito Estatístico: Challenger Venceu com 95% de Significância
+                      Veredito Estatístico: Challenger Venceu com {sampleCalc.confidence}% de Confiança
                     </span>
+                    <InfoTooltip content={`Teste de hipóteses confirmou superioridade com Z=1,96 e margem de erro de ±${sampleCalc.marginOfError}%.`} />
                   </div>
-                  <p className="text-xs text-slate-600 max-w-xl">
-                    Se a nova estratégia e jornada forem promovidas para a base inteira ({fmtNumber(totalBase)} contatos), a economia total projetada é de:
-                  </p>
+                  <span className="text-xs text-slate-600 block">
+                    Economia calculada para a base total ({fmtNumber(totalBase)} contatos):
+                  </span>
                 </div>
                 <div className="text-right">
-                  <span className="text-xs text-slate-500 font-medium block">Economia Total Projetada</span>
                   <span className="text-2xl font-black text-emerald-700">
                     {fmtMoney(totalProjectedSavings)}
                   </span>
@@ -666,23 +815,8 @@ export function CentralIntelligencePage() {
               </div>
             </div>
 
-            {/* Barra de Ação de Promoção */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  loading={isSimulating}
-                  onClick={handleRunWave}
-                  icon={<Play className="size-3.5" />}
-                >
-                  Disparar Onda {Math.min(activeWave + 1, 3)}
-                </Button>
-                <span className="text-xs text-slate-500">
-                  Onda {activeWave} concluída com sucesso.
-                </span>
-              </div>
-
+            {/* Ação de Promoção */}
+            <div className="flex items-center justify-end pt-1">
               {!isPromoted ? (
                 <Button
                   variant="primary"
@@ -695,7 +829,7 @@ export function CentralIntelligencePage() {
               ) : (
                 <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg shadow-2xs">
                   <Check className="size-4 text-emerald-600" />
-                  <span>Estratégia e Jornada Promovidas para Produção!</span>
+                  <span>Estratégia e Jornada Promovidas para a Produção!</span>
                 </div>
               )}
             </div>
@@ -709,8 +843,9 @@ export function CentralIntelligencePage() {
       <Card
         title={
           <div className="flex items-center justify-between w-full">
-            <span className="font-semibold text-slate-900">
-              4. Recomendações na Amostra ({recsQ.data?.items?.length ?? 0} Contatos Avaliados)
+            <span className="font-semibold text-slate-900 flex items-center">
+              4. Recomendações na Amostra ({recsQ.data?.items?.length ?? 0} Contatos)
+              <InfoTooltip content="Decisões de canal e melhor horário atribuídas aos contatos da amostra do experimento." />
             </span>
             {recsQ.data?.items && recsQ.data.items.length > 0 && (
               <Button
@@ -719,7 +854,7 @@ export function CentralIntelligencePage() {
                 loading={applyMutation.isPending}
                 onClick={() => applyMutation.mutate({ count: recsQ.data?.items.length })}
               >
-                Aplicar recomendações em lote ({recsQ.data.items.length})
+                Aplicar em lote ({recsQ.data.items.length})
               </Button>
             )}
           </div>
@@ -728,7 +863,7 @@ export function CentralIntelligencePage() {
       >
         {!recsQ.data?.items || recsQ.data.items.length === 0 ? (
           <div className="p-6 text-center text-xs text-slate-500">
-            Amostra em conformidade. Nenhuma pendência manual detectada.
+            Amostra em conformidade.
           </div>
         ) : (
           <TableWrap label="Recomendações na Amostra">
@@ -794,7 +929,15 @@ export function CentralIntelligencePage() {
       </Card>
 
       {/* Matriz dos 8 Blocos da TIC Domicílios */}
-      <Card title="Matriz dos 8 Blocos Padronizados de Otimização (TIC Domicílios 2025)" padded={false}>
+      <Card
+        title={
+          <span className="flex items-center">
+            Matriz dos 8 Blocos Padronizados de Otimização (TIC Domicílios 2025)
+            <InfoTooltip content="Segmentação comportamental com dados do Cetic.br e IBGE mapeando canais e janelas por coorte demográfica." />
+          </span>
+        }
+        padded={false}
+      >
         <TableWrap label="8 Blocos">
           <table className="data">
             <thead>

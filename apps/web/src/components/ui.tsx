@@ -1,5 +1,6 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import * as RTabs from '@radix-ui/react-tabs';
+import * as RTooltip from '@radix-ui/react-tooltip';
 import clsx from 'clsx';
 import {
   AlertCircle,
@@ -10,6 +11,7 @@ import {
   CircleDashed,
   CircleDot,
   Clock,
+  HelpCircle,
   Info,
   Loader2,
   Pause,
@@ -577,5 +579,46 @@ export function KeyValue({ items }: { items: [ReactNode, ReactNode][] }) {
         </div>
       ))}
     </dl>
+  );
+}
+
+// ------------------------------------------------------------------ Tooltips Globais
+export function Tooltip({
+  content,
+  children,
+  side = 'top',
+  className,
+}: {
+  content: ReactNode;
+  children: ReactNode;
+  side?: 'top' | 'right' | 'bottom' | 'left';
+  className?: string;
+}) {
+  return (
+    <RTooltip.Provider delayDuration={150}>
+      <RTooltip.Root>
+        <RTooltip.Trigger asChild>
+          <span className={clsx('inline-flex items-center cursor-help', className)}>{children}</span>
+        </RTooltip.Trigger>
+        <RTooltip.Portal>
+          <RTooltip.Content
+            side={side}
+            sideOffset={5}
+            className="z-50 max-w-xs rounded-lg bg-slate-900 px-3 py-1.5 text-xs text-white shadow-xl animate-in fade-in-0 zoom-in-95 leading-relaxed border border-slate-800"
+          >
+            {content}
+            <RTooltip.Arrow className="fill-slate-900" />
+          </RTooltip.Content>
+        </RTooltip.Portal>
+      </RTooltip.Root>
+    </RTooltip.Provider>
+  );
+}
+
+export function InfoTooltip({ content, side = 'top' }: { content: ReactNode; side?: 'top' | 'right' | 'bottom' | 'left' }) {
+  return (
+    <Tooltip content={content} side={side}>
+      <HelpCircle className="size-3.5 text-slate-400 hover:text-slate-600 transition-colors ml-1 inline-block" aria-label="Ajuda / Informações" />
+    </Tooltip>
   );
 }
