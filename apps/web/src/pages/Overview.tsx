@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Activity, ArrowRight, Clock, Database, ListFilter, Megaphone, PlayCircle, Sparkles } from 'lucide-react';
+import { Activity, Clock, PlayCircle, Sparkles } from 'lucide-react';
 import { CHANNEL_LABEL } from '@voll/shared';
 import { get } from '../lib/api';
 import type { AttemptRow, CampaignSummary, Eligibility, Overview, OverviewQueueItem, Paginated } from '../lib/types';
@@ -10,7 +10,7 @@ import { AttemptsTable } from '../components/AttemptsTable';
 import { useAuth } from '../lib/auth';
 
 export function OverviewPage() {
-  const { me, can } = useAuth();
+  const { me } = useAuth();
   const q = useQuery({ queryKey: ['overview'], queryFn: () => get<Overview>('/overview'), refetchInterval: 5000 });
 
   // Caso a API real não envie workingRecords / nextInQueue diretamente no /overview, buscamos das rotas operacionais
@@ -59,12 +59,6 @@ export function OverviewPage() {
           }))
       : []);
 
-  const shortcuts = [
-    { to: '/campanhas/nova', label: 'Nova campanha', desc: 'Mailing, público, acionamento e revisão em 4 etapas.', icon: Megaphone, perm: 'campaigns.create' as const },
-    { to: '/mailings/importar', label: 'Importar mailing', desc: 'CSV ou conteúdo colado, com conferência por linha.', icon: Database, perm: 'mailings.write' as const },
-    { to: '/listas/nova', label: 'Preparar lista', desc: 'Filtros, ordenação e modalidade sobre um mailing.', icon: ListFilter, perm: 'lists.write' as const },
-  ];
-
   return (
     <div className="space-y-5">
       <PageHeader
@@ -76,28 +70,6 @@ export function OverviewPage() {
           Nenhuma nova reserva ou envio acontece até a liberação no Controle central. Retornos em andamento continuam sendo processados.
         </Alert>
       )}
-      <div className="grid gap-3 sm:grid-cols-3">
-        {shortcuts.map((s) =>
-          can(s.perm) ? (
-            <Link
-              key={s.to}
-              to={s.to}
-              className="group flex items-start gap-3.5 rounded-xl border border-slate-200/90 bg-white p-4 shadow-xs transition-all hover:border-brand-300 hover:bg-brand-50/30 hover:shadow-sm"
-            >
-              <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-200/60 transition-colors group-hover:bg-brand-700 group-hover:text-white">
-                <s.icon className="size-4.5" aria-hidden />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="flex items-center justify-between font-semibold text-slate-900 group-hover:text-brand-800">
-                  {s.label}
-                  <ArrowRight className="size-3.5 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-brand-700" aria-hidden />
-                </span>
-                <span className="mt-0.5 block text-xs leading-relaxed text-slate-600">{s.desc}</span>
-              </span>
-            </Link>
-          ) : null,
-        )}
-      </div>
       {q.isLoading ? (
         <Loading rows={5} />
       ) : q.error ? (
@@ -130,7 +102,7 @@ export function OverviewPage() {
               }
             >
               <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
-                <Stat label="Em trabalho" value={fmtNumber(q.data!.attempts.active)} tone="good" />
+                <Stat label="Ao vivo" value={fmtNumber(q.data!.attempts.active)} tone="good" />
                 <Stat
                   label="Reconciliação"
                   value={fmtNumber(q.data!.attempts.reconciliation)}
@@ -143,13 +115,13 @@ export function OverviewPage() {
             </Card>
           </div>
 
-          {/* Tabela 1: Registros em trabalho */}
+          {/* Tabela 1: Ao vivo */}
           <Card
             padded={false}
             title={
               <span className="inline-flex items-center gap-2">
                 <Activity className="size-4 text-brand-700" aria-hidden />
-                <span>Registros em trabalho</span>
+                <span>Ao vivo</span>
                 <Badge tone="brand">{workingRecords.length}</Badge>
               </span>
             }
@@ -165,7 +137,7 @@ export function OverviewPage() {
             <AttemptsTable
               items={workingRecords}
               showCampaign
-              emptyText="Nenhum registro em trabalho no momento. As reservas e envios ativos aparecerão aqui automaticamente."
+              emptyText="Nenhum registro ao vivo no momento. As reservas e envios ativos aparecerão aqui automaticamente."
             />
           </Card>
 

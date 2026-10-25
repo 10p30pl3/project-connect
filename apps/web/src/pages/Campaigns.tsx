@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import { ArrowRight, Database, ListFilter, Megaphone, Plus } from 'lucide-react';
 import { CAMPAIGN_STATUS, CAMPAIGN_STATUS_LABEL, type CampaignStatus } from '@voll/shared';
 import { get, qs } from '../lib/api';
 import type { CampaignSummary } from '../lib/types';
@@ -18,8 +18,14 @@ export function CampaignsPage() {
     refetchInterval: 5000,
   });
 
+  const shortcuts = [
+    { to: '/campanhas/nova', label: 'Nova campanha', desc: 'Mailing, público, acionamento e revisão em 4 etapas.', icon: Megaphone, perm: 'campaigns.create' as const },
+    { to: '/mailings/importar', label: 'Importar mailing', desc: 'CSV ou conteúdo colado, com conferência por linha.', icon: Database, perm: 'mailings.write' as const },
+    { to: '/listas/nova', label: 'Preparar lista', desc: 'Filtros, ordenação e modalidade sobre um mailing.', icon: ListFilter, perm: 'lists.write' as const },
+  ];
+
   return (
-    <div>
+    <div className="space-y-4">
       <PageHeader
         title="Campanhas"
         subtitle="Mailing ou lista + jornada + estratégia"
@@ -32,6 +38,30 @@ export function CampaignsPage() {
           )
         }
       />
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        {shortcuts.map((s) =>
+          can(s.perm) ? (
+            <Link
+              key={s.to}
+              to={s.to}
+              className="group flex items-start gap-3.5 rounded-xl border border-slate-200/90 bg-white p-4 shadow-xs transition-all hover:border-brand-300 hover:bg-brand-50/30 hover:shadow-sm"
+            >
+              <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-200/60 transition-colors group-hover:bg-brand-700 group-hover:text-white">
+                <s.icon className="size-4.5" aria-hidden />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center justify-between font-semibold text-slate-900 group-hover:text-brand-800">
+                  {s.label}
+                  <ArrowRight className="size-3.5 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-brand-700" aria-hidden />
+                </span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-slate-600">{s.desc}</span>
+              </span>
+            </Link>
+          ) : null,
+        )}
+      </div>
+
       <div className="mb-3 flex flex-wrap gap-1.5" role="group" aria-label="Filtrar por status">
         {(['', ...CAMPAIGN_STATUS] as const).map((s) => (
           <button
