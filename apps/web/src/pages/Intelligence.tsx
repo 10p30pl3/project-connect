@@ -825,7 +825,7 @@ export function IntelligencePage() {
                                 <li>
                                   <strong>Segmentação Phone-Intent (TitanX Pattern):</strong>{' '}
                                   {Object.entries(run.cohortSummary.byPhoneIntentTier ?? {})
-                                    .map(([t, n]) => `${t.split('_')[0]}: ${n}`)
+                                    .map(([t, n]) => `${(t ?? '').split('_')[0]}: ${n}`)
                                     .join(' · ')}
                                 </li>
                                 <li>
@@ -1099,10 +1099,10 @@ export function IntelligencePage() {
                                       </td>
                                       <td className="text-xs">
                                         <div className="font-medium text-slate-800">
-                                          DDD {p.ddd}/{p.uf} · {p.ageBracket.replace('_', '–')}
+                                          DDD {p.ddd ?? '—'}/{p.uf ?? '—'} · {(p.ageBracket ?? '').replace('_', '–') || 'Geral'}
                                         </div>
                                         <div className="text-[11px] text-slate-500">
-                                          Locator: <strong>{p.locatorScore}/100</strong> · Sem dados:{' '}
+                                          Locator: <strong>{p.locatorScore ?? 0}/100</strong> · Sem dados:{' '}
                                           {p.blocks?.evidence?.dataCapExhaustionPct ?? 39}%
                                         </div>
                                       </td>
@@ -1112,10 +1112,10 @@ export function IntelligencePage() {
                                         ) : (
                                           <>
                                             <div className="tabular font-bold text-emerald-700">
-                                              {(p.estimatedCpcProb * 100).toFixed(1)}% CPC
+                                              {((p.estimatedCpcProb ?? 0) * 100).toFixed(1)}% CPC
                                             </div>
                                             <div className="text-[11px] text-slate-500">
-                                              {p.phoneIntentTier.split('_')[0]} · Conf. {p.blocks?.cpc?.confidenceLevel}
+                                              {(p.phoneIntentTier ?? 'P2').split('_')[0]} · Conf. {p.blocks?.cpc?.confidenceLevel ?? 'MÉDIA'}
                                             </div>
                                           </>
                                         )}
@@ -1135,9 +1135,9 @@ export function IntelligencePage() {
                                         )}
                                       </td>
                                       <td className="text-xs">
-                                        <div className="font-medium text-slate-800">{p.localTimeWindow}</div>
+                                        <div className="font-medium text-slate-800">{p.localTimeWindow ?? '—'}</div>
                                         <div className="text-[11px] text-slate-500">
-                                          {p.timezoneIana.replace('America/', '')}
+                                          {(p.timezoneIana ?? '').replace('America/', '') || 'BRT'}
                                         </div>
                                       </td>
                                       <td className="text-xs">
@@ -1588,19 +1588,20 @@ export function IntelligencePage() {
                   <div className="font-bold uppercase tracking-wider text-brand-800">7. Bloco Evidência</div>
                   <div className="mt-1.5 space-y-1 text-slate-700">
                     <div>
-                      <strong>Locator Score (Destino):</strong> {inspectedPlan.locatorScore}/100
+                      <strong>Locator Score (Destino):</strong> {inspectedPlan.locatorScore ?? 0}/100
                     </div>
                     <div>
-                      <strong>Faixa Etária Cetic:</strong> {CETIC_AGE_BRACKET_LABEL[inspectedPlan.ageBracket]} (
-                      {inspectedPlan.blocks?.evidence?.ageSource})
+                      <strong>Faixa Etária Cetic:</strong>{' '}
+                      {inspectedPlan.ageBracket ? (CETIC_AGE_BRACKET_LABEL[inspectedPlan.ageBracket] ?? inspectedPlan.ageBracket) : 'Não informada'}{' '}
+                      ({inspectedPlan.blocks?.evidence?.ageSource ?? 'Estimativa'})
                     </div>
                     <div>
-                      <strong>DDD / Região / Fim de Dados:</strong> DDD {inspectedPlan.ddd}/{inspectedPlan.uf} (
-                      {inspectedPlan.blocks?.evidence?.dataCapExhaustionPct}% sem pacote)
+                      <strong>DDD / Região / Fim de Dados:</strong> DDD {inspectedPlan.ddd ?? '—'}/{inspectedPlan.uf ?? '—'} (
+                      {inspectedPlan.blocks?.evidence?.dataCapExhaustionPct ?? 39}% sem pacote)
                     </div>
                     <div>
                       <strong>Hipóteses Ativadas:</strong>{' '}
-                      {(inspectedPlan.blocks?.evidence?.appliedHypotheses ?? []).join(', ')}
+                      {(inspectedPlan.blocks?.evidence?.appliedHypotheses ?? []).join(', ') || 'Nenhuma'}
                     </div>
                   </div>
                 </div>
