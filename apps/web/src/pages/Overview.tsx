@@ -7,6 +7,7 @@ import type { AttemptRow, CampaignSummary, Eligibility, Overview, OverviewQueueI
 import { fmtDateTime, fmtNumber } from '../lib/format';
 import { Alert, Badge, btnClass, Card, Empty, ErrorState, Loading, PageHeader, Stat, TableWrap } from '../components/ui';
 import { AttemptsTable } from '../components/AttemptsTable';
+import { DashboardChartsGrid } from '../components/DashboardCharts';
 import { useAuth } from '../lib/auth';
 
 export function OverviewPage() {
@@ -109,6 +110,9 @@ export function OverviewPage() {
               hint="Telefones qualificados e DNC higienizado"
             />
           </div>
+
+          {/* Gráficos de Inteligência de CPC e Assertividade BTTC */}
+          <DashboardChartsGrid />
 
           <div className="grid gap-4 lg:grid-cols-2">
             <Card
