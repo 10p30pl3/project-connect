@@ -264,10 +264,6 @@ export function NewCampaignPage() {
             toast('success', `Campanha "${c.name}" criada com sucesso.`);
             setTimeout(() => nav(`/campanhas/${c.id}`));
           }}
-          onOpenManualWizard={() => {
-            update({}, { intelligenceMode: 'MANUAL' });
-            setIsManualWizard(true);
-          }}
         />
       </div>
     );
@@ -712,7 +708,6 @@ function UnifiedCampaignCreator({
   extra,
   update,
   onCreated,
-  onOpenManualWizard,
 }: {
   mailings?: MailingSummary[];
   lists?: ListSummary[];
@@ -722,7 +717,6 @@ function UnifiedCampaignCreator({
   extra: Extra;
   update: UpdateFn;
   onCreated: (c: Campaign) => void;
-  onOpenManualWizard: () => void;
 }) {
   const qc = useQueryClient();
   const toast = useToast();
@@ -1017,16 +1011,7 @@ function UnifiedCampaignCreator({
             </div>
           </Card>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-            <div>
-              <button
-                type="button"
-                onClick={onOpenManualWizard}
-                className="text-xs text-slate-500 hover:text-brand-700 underline underline-offset-2 transition"
-              >
-                Campanha manual avançada →
-              </button>
-            </div>
+          <div className="flex items-center justify-end gap-3 pt-2">
             <Button
               variant="primary"
               size="md"
