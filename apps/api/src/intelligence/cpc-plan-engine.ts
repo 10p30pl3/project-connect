@@ -10,6 +10,7 @@
  * 5. Ao comando do usuário ("Colocar em Produção"), promover os parâmetros validados no Laboratório para a Produção.
  */
 import type {
+  AudienceSegment,
   CeticAgeBracket,
   ChannelType,
   OperatingMode,
@@ -70,7 +71,7 @@ export type Contact8Blocks = {
     timezoneIana: string;
     shiftRecyclingOrder: string[];
     suggestedDay: string;
-    scheduleBasis: 'PREFERENCIA_DECLARADA' | 'HISTORICO_BTTC_OBSERVADO' | 'JANELA_WIFI_DADOS_REGIONAL' | 'CONTEXTO_FINALIDADE_ROTINA';
+    scheduleBasis: 'PREFERENCIA_DECLARADA' | 'HISTORICO_BTTC_OBSERVADO' | 'JANELA_WIFI_DADOS_REGIONAL' | 'CONTEXTO_FINALIDADE_ROTINA' | 'HORARIO_COMERCIAL_B2B';
   };
   attempts: {
     candidateSequence: StepCandidate[];
@@ -521,6 +522,21 @@ export async function runIntelligencePipeline(
       appliedHyps.push('H-G2', 'H-T1');
     }
 
+    // Detecção se o registro é B2B (Pessoa Jurídica) ou B2C (Pessoa Física)
+    const rawDoc = String(attrs.cnpj ?? attrs.cpf ?? attrs.documento ?? row.external_id ?? '').replace(/\D/g, '');
+    const isDocCnpj = rawDoc.length === 14;
+    const hasB2bAttrs = Boolean(attrs.cnpj || attrs.razao_social || attrs.empresa || attrs.nome_fantasia || attrs.ie || attrs.cargo);
+    const isContactB2b =
+      input.audienceSegment === 'B2B' ||
+      (input.audienceSegment !== 'B2C' && (isDocCnpj || hasB2bAttrs));
+
+    if (isContactB2b) {
+      // Estratégia B2B: Estritamente Horário Comercial Corporativo (Seg–Sex, 08h30 às 18h00, sem noites nem fins de semana)
+      localTimeWindow = '09:00–11:30 / 14:00–17:00 (Comercial Corporativo)';
+      shiftRecyclingOrder = ['MANHA_09_12', 'TARDE_14_17', 'ALMOCO_11_14'];
+      scheduleBasis = 'HORARIO_COMERCIAL_B2B';
+    }
+
     // 4. Construção da Sequência Otimizada de Tentativas (Passos 1..K) minimizando o ECPC
     const candidateSteps: StepCandidate[] = [];
     const maxSteps = Math.min(input.maxAttemptsPerContact, Math.max(1, totalCap - prevAttemptsCount));
@@ -551,7 +567,68 @@ export async function runIntelligencePipeline(
       attrs.horario_agendamento ??
       '';
 
-    if (isAgendamentos) {
+    if (isContactB2b) {
+      // Sequência Estratégica B2B: E-mail Corporativo (#1), WhatsApp Business formal e Voz com identificação institucional
+      if (emailDests.length > 0) {
+        candidateSteps.push({
+          step: candidateSteps.length + 1,
+          channel: 'EMAIL',
+          destinationId: emailDests[0].id,
+          address: emailDests[0].address,
+          shiftSlot: 'MANHA_09_12',
+          localTimeWindow: '09:00–11:00 (Abertura Comercial)',
+          waitMinutesAfterPrev: 0,
+          warmupNote: isCobranca
+            ? 'E-mail corporativo institucional: envio de 2ª via de boleto/DDA faturado com código de barras, espelho de fatura e chave PIX PJ'
+            : isVendas
+            ? 'Apresentação formal de proposta corporativa para contratação e upgrade empresarial'
+            : isAgendamentos
+            ? 'Confirmação corporativa formal de reunião/visita técnica agendada com gestor'
+            : 'Comunicação corporativa formal em horário comercial',
+          tariffBrl: defaultTariffs.EMAIL,
+          conditionalCpcProb: 0.42,
+          stopCondition: 'Encerrar após resposta do responsável ou confirmação de faturamento',
+        });
+      }
+
+      if (effectiveWaDests.length > 0 && candidateSteps.length < maxSteps) {
+        candidateSteps.push({
+          step: candidateSteps.length + 1,
+          channel: 'WHATSAPP',
+          destinationId: effectiveWaDests[0].id,
+          address: effectiveWaDests[0].address,
+          shiftSlot: 'TARDE_14_17',
+          localTimeWindow: '14:00–16:30 (Expediente Comercial)',
+          waitMinutesAfterPrev: candidateSteps.length ? 180 : 0,
+          warmupNote: isCobranca
+            ? 'WhatsApp Business institucional: contato formal direcionado ao setor financeiro/contas a pagar da empresa'
+            : isVendas
+            ? 'Apresentação corporativa de condições empresariais via WhatsApp Business'
+            : isAgendamentos
+            ? 'Confirmação corporativa de agendamento de visita/reunião técnica com responsável'
+            : 'Contato comercial formal em horário comercial',
+          tariffBrl: defaultTariffs.WHATSAPP,
+          conditionalCpcProb: 0.54,
+          stopCondition: 'Encerrar após validação com o decisor corporativo',
+        });
+      }
+
+      if (voiceDests.length > 0 && candidateSteps.length < maxSteps) {
+        candidateSteps.push({
+          step: candidateSteps.length + 1,
+          channel: 'VOICE',
+          destinationId: voiceDests[0].id,
+          address: voiceDests[0].address,
+          shiftSlot: 'MANHA_09_12',
+          localTimeWindow: '10:00–11:30',
+          waitMinutesAfterPrev: candidateSteps.length ? 120 : 0,
+          warmupNote: `Discagem BINA DDD ${dddProfile.ddd} Local com identificação institucional imediata para transferência a ramal/financeiro`,
+          tariffBrl: defaultTariffs.VOICE,
+          conditionalCpcProb: 0.58,
+          stopCondition: 'Encerrar ao falar com o responsável ou obter agendamento de retorno corporativo',
+        });
+      }
+    } else if (isAgendamentos) {
       // Cadência Especial de Agendamentos: Lembrete 1 dia antes (D-1) + Lembrete no dia (D-0)
       if (effectiveWaDests.length > 0) {
         candidateSteps.push({

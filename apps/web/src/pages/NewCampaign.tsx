@@ -6,31 +6,41 @@ import {
   ArrowLeft,
   ArrowRight,
   BrainCircuit,
+  Building2,
   CalendarCheck,
   CalendarClock,
   Check,
+  CheckCircle2,
   ChevronDown,
   ChevronUp,
   CloudOff,
   Coins,
   Database,
   FileSpreadsheet,
+  FileText,
   Filter,
   FlaskConical,
+  Paperclip,
   Pencil,
   Plus,
   RefreshCw,
   Rocket,
   Save,
+  Send,
   ShieldCheck,
   ShoppingBag,
+  Shuffle,
   SlidersHorizontal,
   Sparkles,
   TrendingDown,
   UploadCloud,
+  User,
   Users,
 } from 'lucide-react';
 import {
+  AUDIENCE_SEGMENTS,
+  AUDIENCE_SEGMENT_LABEL,
+  AUDIENCE_SEGMENT_METADATA,
   CETIC_AGE_BRACKET_LABEL,
   CHANNEL_LABEL,
   OPERATING_MODE_LABEL,
@@ -38,11 +48,13 @@ import {
   OPERATION_PURPOSES,
   PRIMARY_OPERATION_PURPOSES,
   PURPOSE_METADATA,
+  type AudienceSegment,
   type CampaignDraft,
   type ChannelType,
   type OperatingMode,
   type OperationPurpose,
 } from '@voll/shared';
+import { parseCampaignPrompt, type ParsedCampaignResult } from '../lib/campaign-prompt-parser';
 import { ApiError, del, errorMessage, get, newIdempotencyKey, post, put } from '../lib/api';
 import type {
   Campaign,
@@ -105,6 +117,8 @@ type Extra = {
   maxAcceptableCpcBrl?: number;
   labSamplePct?: number;
   intelligenceRunId?: string;
+  audienceSegment?: AudienceSegment;
+  creationExperience?: 'AI_PROMPT' | 'STRUCTURED';
 };
 
 const EMPTY: CampaignDraft = { step: 'MAILING', extra: {} };
@@ -630,11 +644,20 @@ const BLOCKS_TEMPLATE = [
 const PROMPT_TEMPLATES = [
   // Cobrança
   {
+    label: 'Cobrança B2B Faturamento & Boletos (PJ)',
+    prompt:
+      'Cobrança corporativa B2B para títulos e faturamento com atraso superior a 30 dias e valor acima de R$ 1.000, ordenando por maior valor primeiro. Priorizar e-mail corporativo com boleto/DDA e WhatsApp Business formal em horário comercial (08:30 às 18:00).',
+    defaultName: 'Cobrança B2B · Faturamento',
+    purposeCode: 'COBRANCA' as OperationPurpose,
+    audienceSegment: 'B2B' as AudienceSegment,
+  },
+  {
     label: 'Cobrança Preventiva (1–30 dias)',
     prompt:
       'Cobrança preventiva e amigável para atrasos recentes de até 30 dias. Priorizar canais digitais de baixo custo (WhatsApp e RCS) no primeiro toque e direcionar voz inteligente nas janelas de maior probabilidade de atendimento residencial.',
     defaultName: 'Cobrança Preventiva · Faixa 1-30d',
     purposeCode: 'COBRANCA' as OperationPurpose,
+    audienceSegment: 'B2C' as AudienceSegment,
   },
   {
     label: 'Recuperação Crítica (> 60 dias)',
@@ -642,6 +665,7 @@ const PROMPT_TEMPLATES = [
       'Recuperação de crédito para dívidas vencidas há mais de 60 dias. Acionamento multicanal intensivo com voz inteligente e BINA local na janela de almoço e noite, respeitando limites e DNC.',
     defaultName: 'Recuperação Crítica · Atraso 60d+',
     purposeCode: 'COBRANCA' as OperationPurpose,
+    audienceSegment: 'B2C' as AudienceSegment,
   },
   {
     label: 'Renegociação com PIX Instantâneo',
@@ -649,15 +673,25 @@ const PROMPT_TEMPLATES = [
       'Proposta de acordo e renegociação com envio de link seguro e chave PIX copiável diretamente no WhatsApp, com desconto especial para quitação à vista.',
     defaultName: 'Acordo PIX · Renegociação',
     purposeCode: 'COBRANCA' as OperationPurpose,
+    audienceSegment: 'B2C' as AudienceSegment,
   },
 
   // Vendas
+  {
+    label: 'Venda Ativa Corporativa B2B (PME)',
+    prompt:
+      'Prospecção ativa e venda corporativa de novos planos e serviços para empresas e PMEs (B2B). Abordagem consultiva por e-mail institucional e WhatsApp Business em horário comercial.',
+    defaultName: 'Venda Corporativa · Planos PME',
+    purposeCode: 'VENDAS' as OperationPurpose,
+    audienceSegment: 'B2B' as AudienceSegment,
+  },
   {
     label: 'Venda Ativa de Novos Planos',
     prompt:
       'Campanha de venda ativa comercial e oferta de planos e serviços. Disparo inicial via WhatsApp interativo com catálogo de ofertas e encaminhamento imediato para consultor de vendas.',
     defaultName: 'Venda Ativa · Novos Planos',
     purposeCode: 'VENDAS' as OperationPurpose,
+    audienceSegment: 'B2C' as AudienceSegment,
   },
   {
     label: 'Up-sell & Renovação Comercial',
@@ -665,6 +699,7 @@ const PROMPT_TEMPLATES = [
       'Oferta de upgrade de plano e renovação para clientes da base. Abordagem consultiva multicanal em janelas de receptividade (almoço e pós-expediente comercial).',
     defaultName: 'Up-sell · Oferta Exclusiva',
     purposeCode: 'VENDAS' as OperationPurpose,
+    audienceSegment: 'B2C' as AudienceSegment,
   },
   {
     label: 'Reativação de Inativos',
@@ -672,15 +707,25 @@ const PROMPT_TEMPLATES = [
       'Campanha de reengajamento e resgate de clientes inativos com condições especiais de retorno e atendimento prioritário.',
     defaultName: 'Reativação Comercial · Clientes',
     purposeCode: 'VENDAS' as OperationPurpose,
+    audienceSegment: 'B2C' as AudienceSegment,
   },
 
   // Agendamentos
+  {
+    label: 'Confirmação de Reunião B2B (D-1 e D-0)',
+    prompt:
+      'Confirmação de reuniões comerciais e demonstrações corporativas B2B: Lembrete 1 dia antes (D-1) com link de videoconferência e lembrete no dia (D-0) 2h antes com material preparatório.',
+    defaultName: 'Confirmação Reuniões · B2B',
+    purposeCode: 'AGENDAMENTOS' as OperationPurpose,
+    audienceSegment: 'B2B' as AudienceSegment,
+  },
   {
     label: 'Lembrete de Consulta / Exame (D-1 e D-0)',
     prompt:
       'Cadência de confirmação de consultas e exames: Lembrete 1 dia antes (D-1) via WhatsApp interativo com botões de confirmação rápida e lembrete no dia (D-0) 2h antes com endereço e orientações.',
     defaultName: 'Confirmação Consultas · D-1 e D-0',
     purposeCode: 'AGENDAMENTOS' as OperationPurpose,
+    audienceSegment: 'B2C' as AudienceSegment,
   },
   {
     label: 'Confirmação de Visita Técnica (D-1 e D-0)',
@@ -688,6 +733,7 @@ const PROMPT_TEMPLATES = [
       'Confirmação de agendamento de visita técnica domiciliar com verificação de presença do responsável no D-1 e envio de dados do técnico no dia (D-0 2h antes).',
     defaultName: 'Visitas Técnicas · Lembretes',
     purposeCode: 'AGENDAMENTOS' as OperationPurpose,
+    audienceSegment: 'B2C' as AudienceSegment,
   },
   {
     label: 'Reagendamento de Faltas (No-Show)',
@@ -695,6 +741,7 @@ const PROMPT_TEMPLATES = [
       'Campanha preventiva para recuperação de faltas e reagendamento amigável de horários vagos com botão de escolha rápida de nova data.',
     defaultName: 'Prevenção No-Show · Reagendamento',
     purposeCode: 'AGENDAMENTOS' as OperationPurpose,
+    audienceSegment: 'B2C' as AudienceSegment,
   },
 ];
 
@@ -736,6 +783,19 @@ function UnifiedCampaignCreator({
     extra.listId || lists?.[0]?.id || '',
   );
 
+  // Segmento do Público (B2B vs B2C vs MIXED)
+  const [audienceSegment, setAudienceSegment] = useState<AudienceSegment>(
+    extra.audienceSegment || 'B2C',
+  );
+
+  // Switcher de Experiências (§Requisito: Prompt IA vs Forma Estruturada)
+  const [experience, setExperience] = useState<'AI_PROMPT' | 'STRUCTURED'>(
+    extra.creationExperience || 'AI_PROMPT',
+  );
+
+  // Upload/Anexo de Mailing no Modo Prompt
+  const [showImportInPrompt, setShowImportInPrompt] = useState(false);
+
   // 2. Prompt & Identification
   const [promptText, setPromptText] = useState<string>(
     extra.purposePrompt || PROMPT_TEMPLATES[0].prompt,
@@ -770,9 +830,27 @@ function UnifiedCampaignCreator({
   const bestJourney = journeys?.find((j) => (j.latestVersion?.steps.length ?? 0) > 1) ?? journeys?.[0];
   const bestStrategy = strategies?.[0];
 
+  // Motor NLP Parser: Interpretação contínua do prompt em linguagem natural
+  const parsedPrompt = useMemo(() => {
+    return parseCampaignPrompt(promptText, activeMailing);
+  }, [promptText, activeMailing]);
+
+  // Sincroniza detecção B2B automática a partir do nome do mailing
+  useEffect(() => {
+    if (activeMailing?.name) {
+      const n = activeMailing.name.toLowerCase();
+      if (n.includes('b2b') || n.includes('cnpj') || n.includes('pj') || n.includes('empresa')) {
+        setAudienceSegment('B2B');
+      }
+    }
+  }, [activeMailing?.name]);
+
   const handleApplyTemplate = (tmpl: (typeof PROMPT_TEMPLATES)[number]) => {
     setPromptText(tmpl.prompt);
     setPurposeCode(tmpl.purposeCode);
+    if (tmpl.audienceSegment) {
+      setAudienceSegment(tmpl.audienceSegment);
+    }
     const dateStr = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
     setCampaignName(`${tmpl.defaultName} · ${dateStr}`);
   };
@@ -781,21 +859,40 @@ function UnifiedCampaignCreator({
     setPurposeCode(purp);
     const tmpl = PROMPT_TEMPLATES.find((t) => t.purposeCode === purp) ?? PROMPT_TEMPLATES[0];
     setPromptText(tmpl.prompt);
+    if (tmpl.audienceSegment) {
+      setAudienceSegment(tmpl.audienceSegment);
+    }
     const dateStr = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
     setCampaignName(`${tmpl.defaultName} · ${dateStr}`);
+  };
+
+  // Transfere o estado interpretado do prompt IA para as etapas da forma estruturada
+  const handleRefineInStructured = () => {
+    setPurposeCode(parsedPrompt.purposeCode);
+    setAudienceSegment(parsedPrompt.audienceSegment);
+    if (!draft.name && parsedPrompt.campaignName) {
+      setCampaignName(parsedPrompt.campaignName);
+    }
+    setExperience('STRUCTURED');
+    setWizardStep(selectedMailingId || activeMailing?.id ? 2 : 1);
+    toast('info', 'Configuração transferida para a Forma Estruturada. Refine os detalhes.');
   };
 
   const handleCreate = async (startMode: 'NOW' | 'READY') => {
     setFormError(null);
     const mailingIdToUse = selectedMailingId || activeMailing?.id;
     if (!mailingIdToUse) {
-      setFormError('Selecione ou importe uma base de contatos para continuar.');
-      setWizardStep(1);
+      setFormError('Selecione ou anexe uma base de contatos (mailing) para continuar.');
+      if (experience === 'STRUCTURED') setWizardStep(1);
       return;
     }
-    if (!campaignName.trim()) {
+    const finalName = (
+      campaignName.trim() ||
+      (experience === 'AI_PROMPT' ? parsedPrompt.campaignName : '')
+    ).trim();
+    if (!finalName) {
       setFormError('Informe o nome da campanha.');
-      setWizardStep(4);
+      if (experience === 'STRUCTURED') setWizardStep(4);
       return;
     }
     if (!bestJourney?.latestVersion?.id || !bestStrategy?.latestVersion?.id) {
@@ -808,18 +905,22 @@ function UnifiedCampaignCreator({
     idemRef.current ??= newIdempotencyKey();
 
     try {
+      const activePurpose = experience === 'AI_PROMPT' ? parsedPrompt.purposeCode : purposeCode;
+      const activeSegment = experience === 'AI_PROMPT' ? parsedPrompt.audienceSegment : audienceSegment;
+
       const desc = skipAiOptimization
         ? (promptText.trim() ? `${promptText.trim()} [Disparo direto sem otimização IA]` : 'Disparo direto sem otimização IA')
         : (promptText.trim() || undefined);
 
       const payload = {
-        name: campaignName.trim(),
+        name: finalName,
         description: desc,
         mailingId: mailingIdToUse,
         listVersionId: useList && activeList?.latestVersion ? activeList.latestVersion.id : null,
         journeyVersionId: bestJourney.latestVersion.id,
         strategyVersionId: bestStrategy.latestVersion.id,
-        purposeCode,
+        purposeCode: activePurpose,
+        audienceSegment: activeSegment,
         startMode,
         scheduledAt: null,
       };
@@ -845,27 +946,398 @@ function UnifiedCampaignCreator({
 
   return (
     <div className="space-y-6">
-      {/* Wizard Header & Stepper */}
-      <div className="space-y-4 border-b border-slate-200/80 pb-5">
+      {formError && (
+        <Alert tone="error">
+          {formError}
+        </Alert>
+      )}
+
+      {/* Header com Switcher das Duas Experiências (§Requisito: Prompt IA vs Forma Estruturada) */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200/80 pb-5">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900">Nova campanha</h1>
-          <p className="text-sm text-slate-500">
-            Prepare o público e o acionamento. Crie a campanha ao concluir.
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold tracking-tight text-slate-900">Nova campanha</h1>
+            <Badge tone={experience === 'AI_PROMPT' ? 'brand' : 'gray'}>
+              {experience === 'AI_PROMPT' ? '✨ Criar com IA' : '📋 Forma Estruturada'}
+            </Badge>
+          </div>
+          <p className="text-sm text-slate-500 mt-0.5">
+            {experience === 'AI_PROMPT'
+              ? 'Descreva a campanha em texto livre, anexe o arquivo e a IA estrutura filtros, ordenação e acionamento.'
+              : 'Configure passo a passo: mailing, estratégias B2B/B2C, acionamento multicanal e disparo.'}
           </p>
         </div>
 
-        {/* 4-Step Stepper Bar (matching reference screenshot) */}
-        <nav aria-label="Etapas da campanha" className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 pt-1">
-          {WIZARD_STEPS.map((s) => {
-            const isActive = wizardStep === s.num;
-            const isDone = wizardStep > s.num;
-            const isClickable =
-              s.num === 1 ||
-              (s.num === 2 && Boolean(selectedMailingId || activeMailing?.id)) ||
-              (s.num === 3 && Boolean(selectedMailingId || activeMailing?.id)) ||
-              (s.num === 4 && Boolean(selectedMailingId || activeMailing?.id));
+        {/* Switcher Interativo de Experiências */}
+        <div className="flex items-center rounded-xl bg-slate-100 p-1 border border-slate-200/80 shadow-2xs self-start md:self-auto">
+          <button
+            type="button"
+            onClick={() => setExperience('AI_PROMPT')}
+            className={clsx(
+              'flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition-all cursor-pointer',
+              experience === 'AI_PROMPT'
+                ? 'bg-white text-brand-900 shadow-xs ring-1 ring-slate-200/60'
+                : 'text-slate-600 hover:text-slate-900',
+            )}
+          >
+            <Sparkles className="size-4 text-brand-600 shrink-0" />
+            <span>Criar com IA (Prompt)</span>
+            <span className="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-bold text-brand-700">Rápido</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setExperience('STRUCTURED')}
+            className={clsx(
+              'flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition-all cursor-pointer',
+              experience === 'STRUCTURED'
+                ? 'bg-white text-slate-900 shadow-xs ring-1 ring-slate-200/60'
+                : 'text-slate-600 hover:text-slate-900',
+            )}
+          >
+            <SlidersHorizontal className="size-4 text-slate-600 shrink-0" />
+            <span>Forma Estruturada</span>
+            <span className="rounded bg-slate-200/70 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">4 Etapas</span>
+          </button>
+        </div>
+      </div>
 
-            return (
+      {/* ============================================================== */}
+      {/* EXPERIÊNCIA 1: CRIAR COM IA (PROMPT & ANEXOS)                  */}
+      {/* ============================================================== */}
+      {experience === 'AI_PROMPT' && (
+        <div className="space-y-6">
+          <Card
+            title={
+              <div className="flex items-center justify-between w-full">
+                <span className="flex items-center gap-2">
+                  <Sparkles className="size-4 text-brand-700" aria-hidden />
+                  <span>Montagem Inteligente da Campanha</span>
+                </span>
+                <Badge tone="brand">Experiência Prompt com IA</Badge>
+              </div>
+            }
+          >
+            <div className="space-y-5">
+              {/* 1. Bar de Anexo de Mailing (Arquivo CSV / Base Existente) */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Database className="size-4 text-brand-700 shrink-0" />
+                    <span className="text-xs font-bold text-slate-800">
+                      Base de Contatos / Mailing da Campanha
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowImportInPrompt((v) => !v)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs cursor-pointer"
+                    >
+                      <UploadCloud className="size-3.5 text-brand-600" />
+                      <span>{showImportInPrompt ? 'Selecionar existente' : 'Anexar novo arquivo (CSV)'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {!showImportInPrompt ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+                    <div>
+                      <Select
+                        id="prompt-mailing-select"
+                        value={selectedMailingId}
+                        onChange={(e) => setSelectedMailingId(e.target.value)}
+                        className="text-xs"
+                      >
+                        <option value="">Selecione uma base existente...</option>
+                        {mailings?.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.name} — {fmtNumber(m.recordCount)} contatos
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+
+                    {activeMailing ? (
+                      <div className="flex items-center gap-2 text-xs text-emerald-800 bg-emerald-50 border border-emerald-200/80 rounded-lg px-3 py-2">
+                        <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
+                        <span className="truncate">
+                          Base vinculada: <strong>{activeMailing.name}</strong> ({fmtNumber(activeMailing.recordCount)} contatos)
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200/80 rounded-lg px-3 py-2">
+                        Selecione um mailing acima ou clique em "Anexar novo arquivo (CSV)".
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-brand-200 bg-white p-3 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-semibold text-brand-900 border-b border-slate-100 pb-2">
+                      <span className="flex items-center gap-1.5">
+                        <Paperclip className="size-3.5 text-brand-600" /> Anexar arquivo de contatos (CSV / Planilha)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowImportInPrompt(false)}
+                        className="text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
+                      >
+                        ✕ Voltar para mailing existente
+                      </button>
+                    </div>
+                    <ImportFlow
+                      onImported={(r) => {
+                        qc.invalidateQueries({ queryKey: ['mailings'] });
+                        setSelectedMailingId(r.mailingId);
+                        setShowImportInPrompt(false);
+                        toast('success', `Arquivo "${r.name}" importado e selecionado!`);
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* 2. Textarea do Prompt */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="ai-campaign-prompt" className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Sparkles className="size-3.5 text-brand-600" />
+                    <span>Descreva a campanha (objetivo, regras, filtros e ordenação)</span>
+                  </label>
+                  <span className="text-[11px] text-slate-500">
+                    A IA interpreta filtros (ex: atraso &gt; 30, valor &gt; 1000) e ordenação por escrito
+                  </span>
+                </div>
+
+                <Textarea
+                  id="ai-campaign-prompt"
+                  rows={4}
+                  className="font-sans text-sm p-3.5 rounded-xl border-slate-200 focus:border-brand-500 shadow-2xs leading-relaxed"
+                  placeholder="Ex: Cobrança B2B faturamento corporativo para empresas com atraso superior a 30 dias e valor acima de R$ 1.000, ordenar por maior valor primeiro. Priorizar e-mail com boleto bancário e WhatsApp formal em horário comercial..."
+                  value={promptText}
+                  onChange={(e) => setPromptText(e.target.value)}
+                />
+              </div>
+
+              {/* 3. Sugestões Rápidas de Prompt */}
+              <div className="space-y-1.5">
+                <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  Exemplos prontos de acionamento (clique para preencher):
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPromptText('Cobrança B2B faturamento corporativo para empresas com atraso superior a 30 dias e valor acima de R$ 1.000, ordenar por maior valor primeiro. Priorizar e-mail institucional com boleto/DDA e WhatsApp Business formal em horário comercial.');
+                    }}
+                    className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50/70 px-2.5 py-1 text-xs font-medium text-indigo-900 hover:bg-indigo-100 transition cursor-pointer"
+                  >
+                    <Building2 className="size-3 text-indigo-600" />
+                    <span>Cobrança B2B (Faturamento atraso &gt; 30d e valor &gt; 1k)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPromptText('Cobrança amigável B2C para pessoas físicas com atraso recente de até 30 dias e envio de chave PIX instantânea com desconto para quitação.');
+                    }}
+                    className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50/70 px-2.5 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100 transition cursor-pointer"
+                  >
+                    <Coins className="size-3 text-amber-600" />
+                    <span>Cobrança B2C PIX (Atraso recente 1-30d)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPromptText('Venda ativa corporativa B2B de novos planos empresariais para empresas e PMEs, com abordagem consultiva em horário comercial.');
+                    }}
+                    className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50/70 px-2.5 py-1 text-xs font-medium text-blue-900 hover:bg-blue-100 transition cursor-pointer"
+                  >
+                    <ShoppingBag className="size-3 text-blue-600" />
+                    <span>Venda B2B Corporativa (Planos PME)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPromptText('Confirmação de consultas e exames com cadência automática: enviar lembrete 1 dia antes (D-1) com botões e no dia (D-0) 2h antes com endereço.');
+                    }}
+                    className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50/70 px-2.5 py-1 text-xs font-medium text-emerald-900 hover:bg-emerald-100 transition cursor-pointer"
+                  >
+                    <CalendarCheck className="size-3 text-emerald-600" />
+                    <span>Agendamentos D-1 e D-0 (Prevenção de No-Show)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 4. Card Interativo de Interpretação e Pré-visualização da IA */}
+              <div className="rounded-xl border border-brand-200 bg-gradient-to-br from-brand-50/40 via-white to-slate-50 p-4 space-y-4 shadow-xs">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-brand-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="size-4 text-brand-600" />
+                    <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                      Interpretação e Configuração da Campanha pela IA
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge tone={parsedPrompt.purposeCode === 'AGENDAMENTOS' ? 'green' : parsedPrompt.purposeCode === 'VENDAS' ? 'blue' : 'brand'}>
+                      {parsedPrompt.purposeCode === 'AGENDAMENTOS' ? '📅 Agendamentos' : parsedPrompt.purposeCode === 'VENDAS' ? '🛍️ Vendas' : '🪙 Cobrança'}
+                    </Badge>
+                    <Badge tone={parsedPrompt.audienceSegment === 'B2B' ? 'blue' : parsedPrompt.audienceSegment === 'MIXED' ? 'brand' : 'gray'}>
+                      {parsedPrompt.audienceSegment === 'B2B' ? '🏢 B2B · Pessoa Jurídica' : parsedPrompt.audienceSegment === 'MIXED' ? '🔄 Misto / Dinâmico' : '👤 B2C · Consumidor'}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Grade de Configurações Extraídas */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                  {/* Nome Gerado */}
+                  <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1">
+                    <span className="text-slate-500 text-[11px] font-medium block">Nome Sugerido</span>
+                    <div className="font-semibold text-slate-900 text-sm">{parsedPrompt.campaignName}</div>
+                  </div>
+
+                  {/* Base de Destino */}
+                  <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1">
+                    <span className="text-slate-500 text-[11px] font-medium block">Mailing Alvo</span>
+                    <div className="font-semibold text-slate-900 text-sm">
+                      {activeMailing ? activeMailing.name : 'Nenhum mailing selecionado'}
+                    </div>
+                    {activeMailing && (
+                      <span className="text-slate-500 text-[11px] block">
+                        {fmtNumber(activeMailing.recordCount)} contatos disponíveis
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Filtros Extraídos na Escrita */}
+                  <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1.5 md:col-span-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500 text-[11px] font-medium flex items-center gap-1">
+                        <Filter className="size-3 text-brand-600" />
+                        <span>Filtros Identificados na Escrita</span>
+                      </span>
+                      <span className="text-[10px] text-slate-400">Extraídos automaticamente do prompt</span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5 pt-0.5">
+                      {parsedPrompt.extractedFilters.map((f, i) => (
+                        <span
+                          key={i}
+                          className="inline-flex items-center gap-1 rounded-md bg-brand-50 border border-brand-200/70 px-2.5 py-1 text-xs font-semibold text-brand-900"
+                        >
+                          <Check className="size-3 text-brand-600" />
+                          <span>{f.label}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Ordenação Extraída */}
+                  <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1">
+                    <span className="text-slate-500 text-[11px] font-medium flex items-center gap-1">
+                      <SlidersHorizontal className="size-3 text-brand-600" />
+                      <span>Critério de Ordenação dos Contatos</span>
+                    </span>
+                    <div className="font-semibold text-slate-900 text-xs flex items-center gap-1.5 pt-0.5">
+                      <span className="rounded bg-slate-100 px-2 py-0.5 border border-slate-200">
+                        {parsedPrompt.extractedSort.label}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Canais Prioritários */}
+                  <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1">
+                    <span className="text-slate-500 text-[11px] font-medium block">Canais Prioritários</span>
+                    <div className="flex flex-wrap gap-1 pt-0.5">
+                      {parsedPrompt.recommendedChannels.map((ch) => (
+                        <Badge key={ch} tone="brand">{CHANNEL_LABEL[ch] ?? ch}</Badge>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Cadência & Janelas Operacionais */}
+                  <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1 md:col-span-2">
+                    <span className="text-slate-500 text-[11px] font-medium block">Cadência &amp; Janelas Operacionais</span>
+                    <p className="text-slate-700 text-xs leading-relaxed font-medium">
+                      {parsedPrompt.cadenceSummary}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Métricas Estimadas de Eficiência */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-1 border-t border-slate-100 text-xs">
+                  <div>
+                    <span className="text-slate-500 text-[11px] block">Custo Unitário Estimado</span>
+                    <strong className="text-emerald-700 text-sm">{fmtMoney(parsedPrompt.unitCostBrl)}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 text-[11px] block">Taxa de Resposta / Contato</span>
+                    <strong className="text-slate-900 text-sm">~{parsedPrompt.expectedRatePct}%</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 text-[11px] block">Economia / Ganho IA</span>
+                    <strong className="text-brand-700 text-sm">+{parsedPrompt.gainOrSavingsPct}%</strong>
+                  </div>
+                </div>
+
+                {/* Ações do Card de Pré-visualização */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-brand-100">
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    onClick={handleRefineInStructured}
+                    icon={<SlidersHorizontal className="size-4" />}
+                  >
+                    Refinar na Forma Estruturada →
+                  </Button>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="secondary"
+                      size="md"
+                      onClick={() => handleCreate('READY')}
+                      loading={isCreating && createStartMode === 'READY'}
+                      icon={<Save className="size-4" />}
+                    >
+                      Salvar como Pronta
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="md"
+                      onClick={() => handleCreate('NOW')}
+                      loading={isCreating && createStartMode === 'NOW'}
+                      icon={<Rocket className="size-4" />}
+                    >
+                      Criar e Iniciar Agora
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* EXPERIÊNCIA 2: FORMA ESTRUTURADA (4 ETAPAS)                    */}
+      {/* ============================================================== */}
+      {experience === 'STRUCTURED' && (
+        <div className="space-y-6">
+          {/* Stepper Bar das 4 Etapas */}
+          <div className="border-b border-slate-200/80 pb-4">
+            <nav aria-label="Etapas da campanha" className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 pt-1">
+            {WIZARD_STEPS.map((s) => {
+              const isActive = wizardStep === s.num;
+              const isDone = wizardStep > s.num;
+              const isClickable =
+                s.num === 1 ||
+                (s.num === 2 && Boolean(selectedMailingId || activeMailing?.id)) ||
+                (s.num === 3 && Boolean(selectedMailingId || activeMailing?.id)) ||
+                (s.num === 4 && Boolean(selectedMailingId || activeMailing?.id));
+
+              return (
               <button
                 key={s.num}
                 type="button"
@@ -1042,6 +1514,164 @@ function UnifiedCampaignCreator({
             }
           >
             <div className="space-y-4">
+              {/* Seletor Estratégico B2B vs B2C (§Requisito: Estratégias Diferentes em Público) */}
+              <div className="space-y-3 border-b border-slate-200/80 pb-5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-800 uppercase tracking-wider">
+                    Segmento do Público &amp; Estratégia de Contato
+                  </span>
+                  <span className="text-[11px] text-slate-500">
+                    Calibra janelas de horário comercial/residencial, tom e canais prioritários
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* B2C */}
+                  <button
+                    type="button"
+                    onClick={() => setAudienceSegment('B2C')}
+                    className={clsx(
+                      'flex flex-col text-left p-3.5 rounded-xl border transition-all text-xs space-y-2 cursor-pointer',
+                      audienceSegment === 'B2C'
+                        ? 'border-brand-600 bg-brand-50/50 shadow-xs ring-2 ring-brand-500/20'
+                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60',
+                    )}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-2 font-bold text-slate-900">
+                        <User className="size-4 text-brand-600 shrink-0" />
+                        <span>👤 B2C · Pessoa Física</span>
+                      </div>
+                      {audienceSegment === 'B2C' && <span className="size-2 rounded-full bg-brand-600" />}
+                    </div>
+                    <p className="text-[11px] text-slate-600">
+                      Consumidor final (CPF). Acionamento em janelas residenciais com PIX instantâneo e BINA local.
+                    </p>
+                    <div className="pt-1 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100">
+                      <span>Janelas</span>
+                      <strong className="text-slate-800">Almoço, Noite Wi-Fi e Sábados</strong>
+                    </div>
+                  </button>
+
+                  {/* B2B */}
+                  <button
+                    type="button"
+                    onClick={() => setAudienceSegment('B2B')}
+                    className={clsx(
+                      'flex flex-col text-left p-3.5 rounded-xl border transition-all text-xs space-y-2 cursor-pointer',
+                      audienceSegment === 'B2B'
+                        ? 'border-indigo-600 bg-indigo-50/50 shadow-xs ring-2 ring-indigo-500/20'
+                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60',
+                    )}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-2 font-bold text-slate-900">
+                        <Building2 className="size-4 text-indigo-600 shrink-0" />
+                        <span>🏢 B2B · Pessoa Jurídica</span>
+                      </div>
+                      {audienceSegment === 'B2B' && <span className="size-2 rounded-full bg-indigo-600" />}
+                    </div>
+                    <p className="text-[11px] text-slate-600">
+                      Empresas e PMEs (CNPJ). Foco no financeiro/contas a pagar com boleto bancário e E-mail corporativo.
+                    </p>
+                    <div className="pt-1 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100">
+                      <span>Horários</span>
+                      <strong className="text-indigo-800">Seg–Sex 08:30–18:00 (Comercial)</strong>
+                    </div>
+                  </button>
+
+                  {/* Misto */}
+                  <button
+                    type="button"
+                    onClick={() => setAudienceSegment('MIXED')}
+                    className={clsx(
+                      'flex flex-col text-left p-3.5 rounded-xl border transition-all text-xs space-y-2 cursor-pointer',
+                      audienceSegment === 'MIXED'
+                        ? 'border-purple-600 bg-purple-50/50 shadow-xs ring-2 ring-purple-500/20'
+                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60',
+                    )}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-2 font-bold text-slate-900">
+                        <Shuffle className="size-4 text-purple-600 shrink-0" />
+                        <span>🔄 Misto / Dinâmico</span>
+                      </div>
+                      {audienceSegment === 'MIXED' && <span className="size-2 rounded-full bg-purple-600" />}
+                    </div>
+                    <p className="text-[11px] text-slate-600">
+                      Base mista. Roteamento automático da régua por tamanho de documento (11 dígitos CPF / 14 dígitos CNPJ).
+                    </p>
+                    <div className="pt-1 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100">
+                      <span>Roteamento</span>
+                      <strong className="text-purple-800">Segmentação Inteligente</strong>
+                    </div>
+                  </button>
+                </div>
+
+                {/* Painel Informativo da Estratégia Calibrada */}
+                <div
+                  className={clsx(
+                    'rounded-xl border p-3.5 text-xs space-y-2',
+                    audienceSegment === 'B2B'
+                      ? 'border-indigo-200 bg-indigo-50/70 text-indigo-950'
+                      : audienceSegment === 'MIXED'
+                      ? 'border-purple-200 bg-purple-50/70 text-purple-950'
+                      : 'border-brand-200 bg-brand-50/70 text-brand-950',
+                  )}
+                >
+                  <div className="flex items-center gap-2 font-bold">
+                    {audienceSegment === 'B2B' ? (
+                      <>
+                        <Building2 className="size-4 text-indigo-700 shrink-0" />
+                        <span>Estratégia Calibrada para Pessoa Jurídica (B2B Corporativo)</span>
+                      </>
+                    ) : audienceSegment === 'MIXED' ? (
+                      <>
+                        <Shuffle className="size-4 text-purple-700 shrink-0" />
+                        <span>Estratégia Híbrida Dinâmica (Roteamento Automático por CPF / CNPJ)</span>
+                      </>
+                    ) : (
+                      <>
+                        <User className="size-4 text-brand-700 shrink-0" />
+                        <span>Estratégia Calibrada para Consumidor Final (B2C)</span>
+                      </>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-[11px]">
+                    <div className="rounded-lg bg-white/90 p-2.5 border border-slate-200/60 shadow-2xs">
+                      <span className="text-slate-500 font-semibold block">Canais Prioritários</span>
+                      <strong className="text-slate-900 block mt-0.5">
+                        {audienceSegment === 'B2B'
+                          ? 'E-mail Corporativo + WhatsApp Business + Voz Comercial'
+                          : audienceSegment === 'MIXED'
+                          ? 'Dinâmico por tipo de documento'
+                          : 'WhatsApp Oficial + Discador BINA Local'}
+                      </strong>
+                    </div>
+                    <div className="rounded-lg bg-white/90 p-2.5 border border-slate-200/60 shadow-2xs">
+                      <span className="text-slate-500 font-semibold block">Janelas de Operação</span>
+                      <strong className="text-slate-900 block mt-0.5">
+                        {audienceSegment === 'B2B'
+                          ? 'Seg–Sex 08:30 às 18:00 (Comercial)'
+                          : audienceSegment === 'MIXED'
+                          ? 'Comercial (CNPJ) e Residencial (CPF)'
+                          : 'Almoço 11:30–13:30 e Noite Wi-Fi 18:00–20:45'}
+                      </strong>
+                    </div>
+                    <div className="rounded-lg bg-white/90 p-2.5 border border-slate-200/60 shadow-2xs">
+                      <span className="text-slate-500 font-semibold block">Formato do Acordo</span>
+                      <strong className="text-slate-900 block mt-0.5">
+                        {audienceSegment === 'B2B'
+                          ? 'Boleto bancário / DDA com código de barras'
+                          : audienceSegment === 'MIXED'
+                          ? 'Boleto (PJ) / Chave PIX copiável (PF)'
+                          : 'Chave PIX instantânea copiável no WhatsApp'}
+                      </strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="text-xs text-slate-600">
                 Mailing de origem: <strong className="text-slate-900">{activeMailing?.name}</strong> ({fmtNumber(activeMailing?.recordCount ?? 0)} registros totais)
               </div>
@@ -1432,25 +2062,41 @@ function UnifiedCampaignCreator({
               </div>
 
               <div>
-                <div className="text-xs font-medium text-slate-500 mb-1.5">Sugestões rápidas para {OPERATION_PURPOSE_LABEL[purposeCode] ?? 'o objetivo'}:</div>
+                <div className="flex items-center justify-between text-xs font-medium text-slate-500 mb-1.5">
+                  <span>Sugestões rápidas para {OPERATION_PURPOSE_LABEL[purposeCode] ?? 'o objetivo'} ({AUDIENCE_SEGMENT_LABEL[audienceSegment]}):</span>
+                  <span className="text-[11px] text-slate-400">Clique para aplicar</span>
+                </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {PROMPT_TEMPLATES.filter((t) => t.purposeCode === purposeCode).map((tmpl) => (
-                    <button
-                      key={tmpl.label}
-                      type="button"
-                      onClick={() => handleApplyTemplate(tmpl)}
-                      className="inline-flex items-center gap-1 rounded-full border border-brand-200 bg-brand-50/60 px-2.5 py-1 text-xs font-medium text-brand-900 hover:border-brand-300 hover:bg-brand-100 transition cursor-pointer"
-                    >
-                      <Sparkles className="size-3 text-brand-600" aria-hidden />
-                      {tmpl.label}
-                    </button>
-                  ))}
+                  {PROMPT_TEMPLATES.filter((t) => t.purposeCode === purposeCode).map((tmpl) => {
+                    const isSegmentMatch = tmpl.audienceSegment === audienceSegment;
+                    return (
+                      <button
+                        key={tmpl.label}
+                        type="button"
+                        onClick={() => handleApplyTemplate(tmpl)}
+                        className={clsx(
+                          'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition cursor-pointer',
+                          isSegmentMatch
+                            ? 'border border-brand-300 bg-brand-50 text-brand-900 font-semibold shadow-2xs hover:bg-brand-100'
+                            : 'border border-slate-200 bg-slate-50/70 text-slate-600 hover:border-slate-300 hover:bg-slate-100 opacity-80 hover:opacity-100',
+                        )}
+                      >
+                        <Sparkles className="size-3 text-brand-600" aria-hidden />
+                        <span>{tmpl.label}</span>
+                        {tmpl.audienceSegment && (
+                          <span className="rounded bg-white/80 px-1 py-0.2 text-[9px] font-bold uppercase text-slate-500">
+                            {tmpl.audienceSegment}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
                   {PROMPT_TEMPLATES.filter((t) => t.purposeCode !== purposeCode).map((tmpl) => (
                     <button
                       key={tmpl.label}
                       type="button"
                       onClick={() => handleApplyTemplate(tmpl)}
-                      className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50/70 px-2.5 py-1 text-xs font-medium text-slate-600 hover:border-slate-300 hover:bg-slate-100 transition cursor-pointer opacity-75 hover:opacity-100"
+                      className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50/70 px-2.5 py-1 text-xs font-medium text-slate-600 hover:border-slate-300 hover:bg-slate-100 transition cursor-pointer opacity-70 hover:opacity-100"
                     >
                       {tmpl.label}
                     </button>
@@ -1480,9 +2126,25 @@ function UnifiedCampaignCreator({
                       </Field>
 
                       <div className="flex flex-col justify-end">
-                        <div className="text-xs text-slate-500 pb-1">Canais Prioritários Recomendados</div>
-                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-                          {meta.code === 'AGENDAMENTOS' ? (
+                        <div className="text-xs text-slate-500 pb-1">
+                          Canais Prioritários Recomendados ({audienceSegment === 'B2B' ? 'B2B Corporativo' : audienceSegment === 'MIXED' ? 'Misto Dinâmico' : 'B2C Residencial'})
+                        </div>
+                        <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-800 flex-wrap">
+                          {audienceSegment === 'B2B' ? (
+                            <>
+                              <Badge tone="blue">E-mail Corporativo (#1)</Badge>
+                              <span className="text-xs text-slate-400">+</span>
+                              <Badge tone="brand">WhatsApp Business</Badge>
+                              <span className="text-xs text-slate-400">+</span>
+                              <Badge tone="gray">Voz Comercial</Badge>
+                            </>
+                          ) : audienceSegment === 'MIXED' ? (
+                            <>
+                              <Badge tone="blue">E-mail PJ (#1) / WhatsApp PF (#1)</Badge>
+                              <span className="text-xs text-slate-400">+</span>
+                              <Badge tone="brand">Voz Inteligente</Badge>
+                            </>
+                          ) : meta.code === 'AGENDAMENTOS' ? (
                             <>
                               <Badge tone="green">WhatsApp com Botões</Badge>
                               <span className="text-xs text-slate-400">+</span>
@@ -1703,10 +2365,14 @@ function UnifiedCampaignCreator({
                   <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1">
                     <span className="text-slate-500 block text-[11px] font-medium">2. Público</span>
                     <span className="font-semibold text-slate-900 block truncate">
-                      {useList ? activeList?.name ?? 'Lista segmentada' : 'Toda a base'}
+                      {audienceSegment === 'B2B'
+                        ? '🏢 B2B · Pessoa Jurídica'
+                        : audienceSegment === 'MIXED'
+                        ? '🔄 Misto (CPF e CNPJ)'
+                        : '👤 B2C · Pessoa Física'}
                     </span>
                     <span className="text-emerald-700 font-semibold text-[11px] block">
-                      {fmtNumber(targetCount)} qualificados
+                      {fmtNumber(targetCount)} contatos ({useList ? activeList?.name ?? 'Lista' : 'Toda a base'})
                     </span>
                   </div>
 
@@ -1784,6 +2450,15 @@ function UnifiedCampaignCreator({
                     </span>
                   </div>
                 )}
+
+                {audienceSegment === 'B2B' && (
+                  <div className="rounded-xl border border-indigo-200 bg-indigo-50/70 p-3 text-xs text-indigo-950 flex items-center gap-2.5">
+                    <Building2 className="size-4 text-indigo-700 shrink-0" />
+                    <span>
+                      <strong>Compliance B2B Ativo:</strong> Disparos restritos ao horário comercial corporativo (Segunda a Sexta, 08h30 às 18h00). Finais de semana e noites são bloqueados automaticamente.
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </Card>
@@ -1820,6 +2495,8 @@ function UnifiedCampaignCreator({
               </Button>
             </div>
           </div>
+        </div>
+      )}
         </div>
       )}
     </div>

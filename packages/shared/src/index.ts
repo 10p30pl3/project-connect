@@ -308,6 +308,21 @@ export const CampaignDraftSchema = z.object({
 export type CampaignDraft = z.infer<typeof CampaignDraftSchema>;
 export const SaveDraftSchema = z.object({ data: CampaignDraftSchema, revision: z.number().int().min(0) });
 
+export const OPERATION_PURPOSES = [
+  'COBRANCA',
+  'VENDAS',
+  'AGENDAMENTOS',
+  'CONFIRMACAO_SERVICO',
+  'ATENDIMENTO_SUPORTE',
+  'PESQUISA_RELACIONAMENTO',
+] as const;
+export type OperationPurpose = (typeof OPERATION_PURPOSES)[number];
+
+export const PRIMARY_OPERATION_PURPOSES = ['COBRANCA', 'VENDAS', 'AGENDAMENTOS'] as const;
+
+export const AUDIENCE_SEGMENTS = ['B2C', 'B2B', 'MIXED'] as const;
+export type AudienceSegment = (typeof AUDIENCE_SEGMENTS)[number];
+
 export const CreateCampaignSchema = z
   .object({
     name: z.string().min(1, 'Informe o nome da campanha'),
@@ -316,6 +331,8 @@ export const CreateCampaignSchema = z
     listVersionId: z.string().uuid().nullable().optional(),
     journeyVersionId: z.string().uuid(),
     strategyVersionId: z.string().uuid(),
+    purposeCode: z.enum(OPERATION_PURPOSES).optional(),
+    audienceSegment: z.enum(AUDIENCE_SEGMENTS).optional(),
     startMode: z.enum(['NOW', 'SCHEDULE', 'READY']),
     scheduledAt: z.string().datetime({ offset: true }).nullable().optional(),
   })
@@ -410,17 +427,63 @@ export const OPERATING_MODE_LABEL: Record<OperatingMode, string> = {
   LABORATORY: 'Modo Laboratório (Amostra Viável → Testes Reais em Ondas)',
 };
 
-export const PRIMARY_OPERATION_PURPOSES = ['COBRANCA', 'VENDAS', 'AGENDAMENTOS'] as const;
+export const AUDIENCE_SEGMENT_LABEL: Record<AudienceSegment, string> = {
+  B2C: 'B2C · Pessoa Física (Consumidor Final)',
+  B2B: 'B2B · Pessoa Jurídica (Empresas & Decisores)',
+  MIXED: 'Misto · Híbrido (CPF e CNPJ)',
+};
 
-export const OPERATION_PURPOSES = [
-  'COBRANCA',
-  'VENDAS',
-  'AGENDAMENTOS',
-  'CONFIRMACAO_SERVICO',
-  'ATENDIMENTO_SUPORTE',
-  'PESQUISA_RELACIONAMENTO',
-] as const;
-export type OperationPurpose = (typeof OPERATION_PURPOSES)[number];
+export type AudienceSegmentMetadata = {
+  code: AudienceSegment;
+  title: string;
+  shortTitle: string;
+  tagline: string;
+  targetDescription: string;
+  operatingHours: string;
+  primaryChannels: string;
+  approach: string;
+  keyDocument: string;
+  paymentMethod: string;
+};
+
+export const AUDIENCE_SEGMENT_METADATA: Record<AudienceSegment, AudienceSegmentMetadata> = {
+  B2C: {
+    code: 'B2C',
+    title: 'Pessoa Física (Consumidor)',
+    shortTitle: 'B2C',
+    tagline: 'Titulares individuais, contas residenciais e pessoas físicas (CPF).',
+    targetDescription: 'Consumidores finais e titulares residenciais cadastrados sob CPF.',
+    operatingHours: 'TIC Domicílios 2025: Almoço (11h30–13h30), Noite Wi-Fi Residencial (18h00–20h45) e Sábados (09h00–13h00).',
+    primaryChannels: 'WhatsApp Conversacional, SMS curto e Discador com BINA DDD Local.',
+    approach: 'Acordos com PIX instantâneo, links de autosserviço e respeito à franquia móvel (H-G3).',
+    keyDocument: 'CPF / Nome',
+    paymentMethod: 'PIX Instantâneo / Cartão de Crédito',
+  },
+  B2B: {
+    code: 'B2B',
+    title: 'Pessoa Jurídica (Empresas)',
+    shortTitle: 'B2B',
+    tagline: 'Empresas, sócios, diretores, compras e departamento financeiro/contas a pagar (CNPJ).',
+    targetDescription: 'Organizações empresariais, decisores e gestores financeiros cadastrados sob CNPJ.',
+    operatingHours: 'Horário Comercial Corporativo: Segunda a Sexta, 08h30 às 18h00. Bloqueio estrito de noites e finais de semana.',
+    primaryChannels: 'E-mail Corporativo Institucional (#1), WhatsApp Business Formal e Voz com Identificação Corporativa.',
+    approach: 'Envio de 2ª via de boleto/DDA com código de barras, nota fiscal faturada e alinhamento corporativo.',
+    keyDocument: 'CNPJ / Razão Social',
+    paymentMethod: 'Boleto Faturado / DDA / Transferência TED/PIX PJ',
+  },
+  MIXED: {
+    code: 'MIXED',
+    title: 'Base Híbrida / Mista',
+    shortTitle: 'Misto',
+    tagline: 'Base contendo tanto pessoas físicas (B2C) quanto jurídicas (B2B). Roteamento dinâmico.',
+    targetDescription: 'Mailing híbrido com CPF e CNPJ. O motor aplica a estratégia adequada para cada contato.',
+    operatingHours: 'Roteamento dinâmico: B2B em horário comercial (08h30–18h) e B2C nas janelas TIC Domicílios.',
+    primaryChannels: 'Mix Multicanal Dinâmico (E-mail + WhatsApp + Discador).',
+    approach: 'Detecção automática por CPF/CNPJ aplicando a régua correspondente por registro.',
+    keyDocument: 'CPF ou CNPJ',
+    paymentMethod: 'PIX (PF) ou Boleto/DDA (PJ)',
+  },
+};
 
 export const OPERATION_PURPOSE_LABEL: Record<OperationPurpose, string> = {
   COBRANCA: 'Cobrança e Recuperação de Crédito',
@@ -557,6 +620,7 @@ export const StartIntelligenceRunSchema = z.object({
   mailingId: z.string().uuid('Selecione um mailing válido'),
   mode: z.enum(OPERATING_MODES).default('PARALLEL_BOTH'),
   purposeCode: z.enum(OPERATION_PURPOSES).default('COBRANCA'),
+  audienceSegment: z.enum(AUDIENCE_SEGMENTS).default('B2C').optional(),
   purposePrompt: z
     .string()
     .min(5, 'Descreva a finalidade e o contexto da operação no prompt inicial')
