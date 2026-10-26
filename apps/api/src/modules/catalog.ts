@@ -1,8 +1,16 @@
+import crypto from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import { ConnectionUpdateSchema, JourneyCreateSchema, StrategyCreateSchema, StrategyPublishSchema } from '@voll/shared';
+import {
+  ConnectionCreateSchema,
+  ConnectionUpdateSchema,
+  JourneyCreateSchema,
+  StrategyCreateSchema,
+  StrategyPublishSchema,
+  TabulationCreateSchema,
+} from '@voll/shared';
 import { getPool, one, q, tx } from '../db/pool.js';
 import { actor, requireRoles, CAN } from '../auth/context.js';
-import { forbidden, notFound, parse, unprocessable } from '../lib/problem.js';
+import { conflict, forbidden, notFound, parse, unprocessable } from '../lib/problem.js';
 import { audit } from '../lib/audit.js';
 import { DEFAULT_SIMULATION } from '../connectors/simulated.js';
 
@@ -53,9 +61,48 @@ export async function catalogRoutes(app: FastifyInstance) {
     return { items: rows };
   });
 
+  app.post('/tabulations', { preHandler: requireRoles(...CAN.manageData) }, async (req, reply) => {
+    const body = parse(TabulationCreateSchema, req.body);
+    const a = actor(req);
+    const existing = await one(getPool(), `SELECT id FROM tabulations WHERE workspace_id=$1 AND code=$2`, [a.workspaceId, body.code]);
+    if (existing) throw conflict('Já existe uma tabulação com este código');
+
+    const created = await tx(async (c) => {
+      const ins = await one(
+        c,
+        `INSERT INTO tabulations (workspace_id, code, name, is_cpc, is_conversion, is_opt_out, invalidates_destination, channel_types)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::channel_type[])
+         RETURNING id, code, name, is_cpc AS "isCpc", is_conversion AS "isConversion", is_opt_out AS "isOptOut",
+                   invalidates_destination AS "invalidatesDestination", channel_types::text[] AS "channelTypes"`,
+        [a.workspaceId, body.code, body.name, body.isCpc, body.isConversion, body.isOptOut, body.invalidatesDestination, body.channelTypes],
+      );
+      await audit(c, a, 'tabulation.create', 'tabulation', ins!.id, { after: ins });
+      return ins!;
+    });
+    return reply.code(201).send(created);
+  });
+
   app.get('/connections', async (req) => {
     const rows = await q(getPool(), `SELECT * FROM connections WHERE workspace_id=$1 ORDER BY channel_type, name`, [actor(req).workspaceId]);
     return { items: rows.map(connectionDto) };
+  });
+
+  app.post('/connections', { preHandler: requireRoles(...CAN.admin) }, async (req, reply) => {
+    const body = parse(ConnectionCreateSchema, req.body);
+    const a = actor(req);
+    const secret = crypto.randomBytes(24).toString('hex');
+    const created = await tx(async (c) => {
+      const ins = await one(
+        c,
+        `INSERT INTO connections (workspace_id, name, channel_type, provider, config, webhook_secret, tariff, tariff_updated_at, active)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, CASE WHEN $7 IS NOT NULL THEN now() ELSE null END, true)
+         RETURNING *`,
+        [a.workspaceId, body.name, body.channelType, body.provider, JSON.stringify({ simulation: DEFAULT_SIMULATION }), secret, body.tariff ?? null],
+      );
+      await audit(c, a, 'connection.create', 'connection', ins!.id, { after: connectionDto(ins) });
+      return connectionDto(ins);
+    });
+    return reply.code(201).send(created);
   });
 
   app.patch<{ Params: { id: string } }>('/connections/:id', { preHandler: requireRoles(...CAN.admin) }, async (req) => {

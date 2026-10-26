@@ -1,21 +1,30 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { CHANNEL_LABEL } from '@voll/shared';
-import { ApiError, errorMessage, get, patch } from '../lib/api';
+import { Plus } from 'lucide-react';
+import { CHANNEL_LABEL, type ChannelType } from '@voll/shared';
+import { ApiError, errorMessage, get, patch, post } from '../lib/api';
 import type { Connection, Simulation, Tabulation } from '../lib/types';
 import { fmtDateTime, fmtMoney } from '../lib/format';
 import { useAuth } from '../lib/auth';
-import { Alert, Badge, Button, Card, Checkbox, ErrorState, Field, Input, Loading, Modal, PageHeader, TableWrap, useToast } from '../components/ui';
+import { Alert, Badge, Button, Card, Checkbox, ErrorState, Field, Input, Loading, Modal, PageHeader, Select, TableWrap, useToast } from '../components/ui';
 
 export function ChannelsPage() {
   const { can } = useAuth();
   const q = useQuery({ queryKey: ['connections'], queryFn: () => get<{ items: Connection[] }>('/connections') });
   const [edit, setEdit] = useState<Connection | null>(null);
+  const [openNew, setOpenNew] = useState(false);
   return (
     <div>
       <PageHeader
         title="Canais"
         tooltip="Tarifa vazia significa desconhecida; zero significa gratuito. Cada envio preserva a tarifa vigente no momento — alterar a tarifa não recalcula envios anteriores."
+        actions={
+          can('connections.write') && (
+            <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setOpenNew(true)}>
+              Novo canal
+            </Button>
+          )
+        }
       />
       {q.isLoading ? (
         <Loading />
@@ -63,7 +72,104 @@ export function ChannelsPage() {
         </Card>
       )}
       {edit && <EditConnection c={edit} onClose={() => setEdit(null)} />}
+      <NewConnectionDialog open={openNew} onOpenChange={setOpenNew} />
     </div>
+  );
+}
+
+function NewConnectionDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [name, setName] = useState('');
+  const [channelType, setChannelType] = useState<ChannelType>('WHATSAPP');
+  const [provider, setProvider] = useState('SIMULATED');
+  const [tariff, setTariff] = useState('0.05');
+  const [err, setErr] = useState<string | null>(null);
+
+  const m = useMutation({
+    mutationFn: () =>
+      post<Connection>('/connections', {
+        name: name.trim(),
+        channelType,
+        provider: provider.trim() || 'SIMULATED',
+        tariff: tariff === '' ? null : Number(tariff),
+      }),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['connections'] });
+      toast('success', `Canal "${res.name}" criado com sucesso.`);
+      setName('');
+      setChannelType('WHATSAPP');
+      setTariff('0.05');
+      setErr(null);
+      onOpenChange(false);
+    },
+    onError: (e) => setErr(errorMessage(e)),
+  });
+
+  return (
+    <Modal
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Novo Canal de Comunicação"
+      description="Cadastre uma nova conexão ou conector simulado para envio de mensagens e chamadas."
+      footer={
+        <>
+          <Button onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button
+            variant="primary"
+            loading={m.isPending}
+            onClick={() => {
+              if (!name.trim()) return setErr('Informe o nome da conexão');
+              m.mutate();
+            }}
+          >
+            Cadastrar canal
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        {err && <div className="text-xs text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-200">{err}</div>}
+        <Field label="Nome da conexão" required>
+          {(p) => <Input id={p.id} autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: WhatsApp Oficial Meta Cloud" />}
+        </Field>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Field label="Tipo do canal" required>
+            {(p) => (
+              <Select id={p.id} value={channelType} onChange={(e) => setChannelType(e.target.value as ChannelType)}>
+                <option value="WHATSAPP">WhatsApp</option>
+                <option value="VOICE">Discador (Voz)</option>
+                <option value="SMS">SMS / RCS</option>
+                <option value="EMAIL">E-mail</option>
+              </Select>
+            )}
+          </Field>
+          <Field label="Provedor do conector" required>
+            {(p) => (
+              <Select id={p.id} value={provider} onChange={(e) => setProvider(e.target.value)}>
+                <option value="SIMULATED">Simulado (Ambiente de Testes)</option>
+                <option value="META_CLOUD">Meta Cloud API (Oficial)</option>
+                <option value="TWILIO">Twilio Voice / SMS</option>
+                <option value="SENDGRID">SendGrid E-mail</option>
+              </Select>
+            )}
+          </Field>
+        </div>
+        <Field label="Tarifa de referência por tentativa (R$)" tooltip="Custo estimado por envio para fins de cálculo de CPC. Deixe em branco se for desconhecido ou 0 para gratuito.">
+          {(p) => (
+            <Input
+              id={p.id}
+              type="number"
+              step="0.0001"
+              min="0"
+              value={tariff}
+              onChange={(e) => setTariff(e.target.value)}
+              placeholder="0,0500"
+            />
+          )}
+        </Field>
+      </div>
+    </Modal>
   );
 }
 

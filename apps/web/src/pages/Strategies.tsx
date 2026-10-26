@@ -1,13 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useState } from 'react';
-import { ArrowLeft, Copy, Lock } from 'lucide-react';
+import { ArrowLeft, Copy, Lock, Plus } from 'lucide-react';
 import type { StrategyConfig } from '@voll/shared';
 import { errorMessage, get, post, put } from '../lib/api';
 import type { DraftEnvelope, Strategy, StrategyDetail, StrategyVersion, Tabulation } from '../lib/types';
 import { fmtDateTime } from '../lib/format';
 import { useAuth } from '../lib/auth';
-import { Alert, Badge, Button, Card, Empty, ErrorState, Field, InfoTooltip, Input, Loading, Modal, PageHeader, TableWrap, useToast } from '../components/ui';
+import { Alert, Badge, Button, Card, Empty, ErrorState, Field, InfoTooltip, Input, Loading, Modal, PageHeader, Select, TableWrap, useToast } from '../components/ui';
 import { StrategySummary, daysLabel } from '../components/Summaries';
 import { StrategyForm } from '../components/StrategyForm';
 import { WizardReturnBanner } from './NewCampaign';
@@ -72,14 +72,115 @@ export function StrategiesSection() {
   );
 }
 
+function NewStrategyDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+}) {
+  const qc = useQueryClient();
+  const nav = useNavigate();
+  const toast = useToast();
+  const [name, setName] = useState('');
+  const [sourceId, setSourceId] = useState('');
+  const [err, setErr] = useState<string | null>(null);
+  const strategiesQ = useQuery({
+    queryKey: ['strategies'],
+    queryFn: () => get<{ items: Strategy[] }>('/strategies'),
+    enabled: open,
+  });
+
+  const m = useMutation({
+    mutationFn: async () => {
+      const src = strategiesQ.data?.items.find((s) => s.id === sourceId) ?? strategiesQ.data?.items[0];
+      const config = src?.latestVersion?.config ?? {
+        calendar: { days: [1, 2, 3, 4, 5, 6], start: '08:00', end: '20:00', timezone: 'America/Sao_Paulo' },
+        limits: { total: 8, daily: 3, scope: 'WORKSPACE', incompleteHistory: 'USE_KNOWN' },
+        retry: { intervalMinutes: 30, maxPerDestination: 3 },
+        distribution: { batchSize: 20, maxPending: 50, leaseSeconds: 60 },
+        tabulationRules: {},
+      };
+      return post<{ id: string }>('/strategies', {
+        name,
+        config,
+        copyOf: src?.id,
+      });
+    },
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['strategies'] });
+      toast('success', `Estratégia "${name}" criada com sucesso.`);
+      setName('');
+      setSourceId('');
+      setErr(null);
+      onOpenChange(false);
+      nav(`/estrategias/${res.id}`);
+    },
+    onError: (e) => setErr(errorMessage(e)),
+  });
+
+  return (
+    <Modal
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Nova Estratégia"
+      description="Crie um novo template com limites de esforço, janelas de horário e regras de retentativa."
+      footer={
+        <>
+          <Button onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button
+            variant="primary"
+            loading={m.isPending}
+            onClick={() => {
+              if (!name.trim()) return setErr('Informe o nome da estratégia');
+              m.mutate();
+            }}
+          >
+            Criar estratégia
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        {err && <div className="text-xs text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-200">{err}</div>}
+        <Field label="Nome da nova estratégia" required>
+          {(p) => <Input id={p.id} autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Cobrança Preventiva Digital" />}
+        </Field>
+        <Field label="Basear parâmetros em template existente" tooltip="Herda os limites de esforço, regras de tabulação e janelas para você personalizar.">
+          {(p) => (
+            <Select id={p.id} value={sourceId} onChange={(e) => setSourceId(e.target.value)}>
+              <option value="">Selecione um template base...</option>
+              {strategiesQ.data?.items.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} {s.protected ? '(Predefinida)' : ''}
+                </option>
+              ))}
+            </Select>
+          )}
+        </Field>
+      </div>
+    </Modal>
+  );
+}
+
 export function StrategiesPage() {
+  const { can } = useAuth();
+  const [openNew, setOpenNew] = useState(false);
   return (
     <div className="space-y-4">
       <PageHeader
         title="Templates de Estratégia"
         tooltip="Calendário operacional, limites de esforço diário/total, cadência de retentativas e regras por tabulação."
+        actions={
+          can('strategies.write') && (
+            <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setOpenNew(true)}>
+              Nova estratégia
+            </Button>
+          )
+        }
       />
       <StrategiesSection />
+      <NewStrategyDialog open={openNew} onOpenChange={setOpenNew} />
     </div>
   );
 }

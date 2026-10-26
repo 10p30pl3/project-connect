@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { DestinationCreateSchema, maskAddress } from '@voll/shared';
+import { ContactCreateSchema, DestinationCreateSchema, maskAddress } from '@voll/shared';
 import { getPool, one, q, tx } from '../db/pool.js';
 import { actor, requireRoles, CAN } from '../auth/context.js';
 import { conflict, notFound, parse, unprocessable } from '../lib/problem.js';
@@ -54,6 +54,52 @@ export async function contactRoutes(app: FastifyInstance) {
       nextCursor: rows.length > limit ? String(offset + limit) : null,
       total,
     };
+  });
+
+  app.post('/contacts', { preHandler: requireRoles(...CAN.manageData) }, async (req, reply) => {
+    const body = parse(ContactCreateSchema, req.body);
+    const a = actor(req);
+    const created = await tx(async (t) => {
+      const existing = await one(t, `SELECT id FROM contacts WHERE workspace_id=$1 AND external_id=$2`, [a.workspaceId, body.externalId]);
+      if (existing) throw conflict('Já existe um contato cadastrado com este identificador neste workspace');
+
+      const contact = await one(
+        t,
+        `INSERT INTO contacts (workspace_id, external_id, name, attributes)
+         VALUES ($1, $2, $3, $4)
+         RETURNING *`,
+        [a.workspaceId, body.externalId, body.name, JSON.stringify({})],
+      );
+
+      if (body.phone?.trim()) {
+        const normPhone = normalizePhone(body.phone.trim());
+        if (normPhone.ok) {
+          await t.query(
+            `INSERT INTO contact_destinations (workspace_id, contact_id, channel_type, address, priority, source)
+             VALUES ($1, $2, 'VOICE', $3, 1, 'MANUAL'),
+                    ($1, $2, 'WHATSAPP', $3, 1, 'MANUAL')
+             ON CONFLICT DO NOTHING`,
+            [a.workspaceId, contact!.id, normPhone.value],
+          );
+        }
+      }
+
+      if (body.email?.trim()) {
+        const normEmail = normalizeEmail(body.email.trim());
+        if (normEmail.ok) {
+          await t.query(
+            `INSERT INTO contact_destinations (workspace_id, contact_id, channel_type, address, priority, source)
+             VALUES ($1, $2, 'EMAIL', $3, 1, 'MANUAL')
+             ON CONFLICT DO NOTHING`,
+            [a.workspaceId, contact!.id, normEmail.value],
+          );
+        }
+      }
+
+      await audit(t, a, 'contact.create', 'contact', contact!.id, { after: { name: contact!.name, externalId: contact!.external_id } });
+      return contact!;
+    });
+    return reply.code(201).send(created);
   });
 
   app.get<{ Params: { id: string } }>('/contacts/:id', async (req) => {

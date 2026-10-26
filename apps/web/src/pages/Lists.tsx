@@ -22,11 +22,6 @@ export function ListsSection() {
           <h2 className="text-sm font-semibold text-slate-800">Listas de Segmentação</h2>
           <InfoTooltip content="Views versionadas sobre um mailing: filtros, ordenação multi-coluna e modalidade (Fotografia ou Dinâmica)." />
         </div>
-        {can('lists.write') && (
-          <Link to="/listas/nova" className={btnClass('primary', 'sm')}>
-            <Plus className="size-4" aria-hidden /> Nova lista
-          </Link>
-        )}
       </div>
       {q.isLoading ? (
         <Loading />
@@ -78,7 +73,7 @@ export function ListsPage() {
     <div className="space-y-4">
       <PageHeader
         title="Listas de Segmentação"
-        subtitle="Views versionadas sobre um mailing: filtros avançados, ordenação multi-coluna e modalidade"
+        tooltip="Views versionadas sobre um mailing: filtros avançados, ordenação multi-coluna e modalidade."
         actions={
           can('lists.write') && (
             <Link to="/listas/nova" className={btnClass('primary')}>

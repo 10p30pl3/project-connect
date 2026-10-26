@@ -1,15 +1,16 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
-import { Ban, Download, Sparkles } from 'lucide-react';
+import { Ban, Download, Plus, Sparkles } from 'lucide-react';
 import { CHANNEL_LABEL } from '@voll/shared';
 import clsx from 'clsx';
-import { get, qs } from '../lib/api';
+import { errorMessage, get, post, qs } from '../lib/api';
 import type { ContactRow, Paginated } from '../lib/types';
 import { fmtDateTime, fmtMoney, fmtNumber } from '../lib/format';
 import { buildContactIntelligenceRationale } from '../lib/intelligence-rationale';
 import { useCursorPager, useDebounced } from '../lib/hooks';
-import { Badge, Card, ErrorState, Field, InfoTooltip, Input, Loading, PageHeader, Pager, TableWrap } from '../components/ui';
+import { useAuth } from '../lib/auth';
+import { Badge, Button, Card, ErrorState, Field, InfoTooltip, Input, Loading, Modal, PageHeader, Pager, TableWrap, useToast } from '../components/ui';
 
 export function ContactsSection() {
   const [text, setText] = useState('');
@@ -161,14 +162,91 @@ export function ContactsSection() {
   );
 }
 
+function NewContactDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [name, setName] = useState('');
+  const [externalId, setExternalId] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [err, setErr] = useState<string | null>(null);
+
+  const m = useMutation({
+    mutationFn: () => post<{ id: string }>('/contacts', { name, externalId, phone, email }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contacts'] });
+      toast('success', `Contato "${name}" cadastrado com sucesso.`);
+      setName('');
+      setExternalId('');
+      setPhone('');
+      setEmail('');
+      setErr(null);
+      onOpenChange(false);
+    },
+    onError: (e) => setErr(errorMessage(e)),
+  });
+
+  return (
+    <Modal
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Novo Contato"
+      description="Cadastre um novo contato manualmente na base persistente do workspace."
+      footer={
+        <>
+          <Button onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button
+            variant="primary"
+            loading={m.isPending}
+            onClick={() => {
+              if (!name.trim() || !externalId.trim()) return setErr('Nome e Documento/ID são obrigatórios');
+              m.mutate();
+            }}
+          >
+            Cadastrar contato
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        {err && <div className="text-xs text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-200">{err}</div>}
+        <Field label="Nome completo" required>
+          {(p) => <Input id={p.id} autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Maria Oliveira Santos" />}
+        </Field>
+        <Field label="Documento ou Identificador (CPF / CNPJ / ID)" required tooltip="Identificador único para evitar duplicidades na esteira.">
+          {(p) => <Input id={p.id} value={externalId} onChange={(e) => setExternalId(e.target.value)} placeholder="Ex: 123.456.789-00 ou CLI-0098" />}
+        </Field>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Field label="Telefone / WhatsApp" tooltip="Destino cadastrado automaticamente nos canais de Voz e WhatsApp.">
+            {(p) => <Input id={p.id} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(11) 98765-4321" />}
+          </Field>
+          <Field label="E-mail" tooltip="Destino para envio de faturas e comunicados institucionais.">
+            {(p) => <Input id={p.id} type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="cliente@empresa.com.br" />}
+          </Field>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export function ContactsPage() {
+  const { can } = useAuth();
+  const [openNewContact, setOpenNewContact] = useState(false);
   return (
     <div className="space-y-4">
       <PageHeader
         title="Contatos & DNC"
-        subtitle="Identidade persistente do cliente em todas as cargas e campanhas, com histórico acumulado e bloqueios"
+        tooltip="Identidade persistente do cliente em todas as cargas e campanhas, com histórico acumulado e bloqueios."
+        actions={
+          can('contacts.write') && (
+            <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setOpenNewContact(true)}>
+              Novo contato
+            </Button>
+          )
+        }
       />
       <ContactsSection />
+      <NewContactDialog open={openNewContact} onOpenChange={setOpenNewContact} />
     </div>
   );
 }

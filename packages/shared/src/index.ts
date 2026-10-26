@@ -291,6 +291,38 @@ export const ConnectionUpdateSchema = z.object({
     .optional(),
 });
 
+export const ConnectionCreateSchema = z.object({
+  name: z.string().min(1, 'Informe o nome da conexão').max(100),
+  channelType: z.enum(['VOICE', 'WHATSAPP', 'SMS', 'EMAIL']),
+  provider: z.string().min(1).default('SIMULATED'),
+  tariff: z.number().min(0, 'A tarifa deve ser maior ou igual a zero').nullable().optional(),
+});
+export type ConnectionCreate = z.infer<typeof ConnectionCreateSchema>;
+
+export const ContactCreateSchema = z.object({
+  name: z.string().min(1, 'Informe o nome do contato'),
+  externalId: z.string().min(1, 'Informe o identificador ou CPF/CNPJ'),
+  phone: z.string().optional(),
+  email: z.string().optional(),
+});
+export type ContactCreate = z.infer<typeof ContactCreateSchema>;
+
+export const TabulationCreateSchema = z.object({
+  code: z
+    .string()
+    .min(1, 'Código é obrigatório')
+    .max(50)
+    .regex(/^[A-Za-z0-9_]+$/, 'Código deve conter apenas letras, números e sublinhados')
+    .transform((v) => v.toUpperCase()),
+  name: z.string().min(1, 'Nome é obrigatório').max(100),
+  isCpc: z.boolean().default(false),
+  isConversion: z.boolean().default(false),
+  isOptOut: z.boolean().default(false),
+  invalidatesDestination: z.boolean().default(false),
+  channelTypes: z.array(z.enum(['VOICE', 'WHATSAPP', 'SMS', 'EMAIL'])).default(['VOICE', 'WHATSAPP', 'SMS', 'EMAIL']),
+});
+export type TabulationCreate = z.infer<typeof TabulationCreateSchema>;
+
 export const CampaignDraftSchema = z.object({
   step: z.enum(['MAILING', 'AUDIENCE', 'ACTIVATION', 'CAMPAIGN']),
   mailingId: z.string().uuid().nullable().optional(),
