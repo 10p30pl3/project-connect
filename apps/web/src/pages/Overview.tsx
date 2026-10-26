@@ -64,7 +64,7 @@ export function OverviewPage() {
     <div className="space-y-5">
       <PageHeader
         title={`Olá, ${me?.name.split(' ')[0] ?? ''}`}
-        subtitle="Painel operacional do workspace — acompanhe campanhas, inteligência de CPC e a fila de próximos acionamentos"
+        tooltip="Painel operacional do workspace — acompanhe campanhas, inteligência de CPC e a fila de acionamentos."
         actions={
           <Link to="/campanhas/nova" className={btnClass('primary')}>
             <Plus className="size-4" aria-hidden />
@@ -89,25 +89,26 @@ export function OverviewPage() {
               label="Taxa Média de CPC"
               value="38,4%"
               tone="good"
-              hint="Pessoa Certa confirmada por tabulação"
+              tooltip="Percentual de contatos com a Pessoa Certa confirmada por tabulação auditável."
             />
             <Stat
               label="Custo por CPC Otimizado"
               value="R$ 3,18"
               tone="good"
-              hint="vs. R$ 5,60 sem inteligência (Força Bruta)"
+              hint="vs. R$ 5,60 tradicional"
+              tooltip="Custo médio para alcançar um CPC efetivo através da inteligência, comparado a R$ 5,60 sem otimização."
             />
             <Stat
               label="Economia Conquistada"
               value="43,2%"
               tone="good"
-              hint="Redução em relação ao disparo cego"
+              tooltip="Redução percentual de gastos obtida pela supressão de tentativas improdutivas."
             />
             <Stat
               label="Contatos no Golden Record"
               value={fmtNumber(q.data!.contacts)}
               tone="good"
-              hint="Telefones qualificados e DNC higienizado"
+              tooltip="Base unificada de pessoas físicas e jurídicas com telefones ranqueados e DNC higienizado."
             />
           </div>
 
@@ -163,9 +164,9 @@ export function OverviewPage() {
                 <Badge tone="brand">{workingRecords.length}</Badge>
               </span>
             }
+            tooltip="Reservas ativas, envios em curso, aguardando retorno ou reconciliação."
             actions={
               <div className="flex items-center gap-3">
-                <span className="hidden text-xs text-slate-500 sm:inline">Reservas ativas, envios em curso, aguardando retorno ou reconciliação</span>
                 <Link to="/tentativas" className="text-xs font-medium text-brand-700 hover:underline">
                   Ver todas as tentativas →
                 </Link>
@@ -189,9 +190,9 @@ export function OverviewPage() {
                 <Badge tone="green">{nextInQueue.length}</Badge>
               </span>
             }
+            tooltip="Contatos elegíveis ordenados para reserva nas campanhas ativas."
             actions={
               <div className="flex items-center gap-3">
-                <span className="hidden text-xs text-slate-500 sm:inline">Contatos elegíveis ordenados para reserva nas campanhas ativas</span>
                 <Link to="/listas" className="text-xs font-medium text-brand-700 hover:underline">
                   Gerenciar listas →
                 </Link>

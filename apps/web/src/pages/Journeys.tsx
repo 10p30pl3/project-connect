@@ -5,7 +5,7 @@ import { CHANNEL_LABEL, CHANNEL_TYPES, type ChannelType, type JourneyStep } from
 import { ApiError, errorMessage, get, post } from '../lib/api';
 import type { Connection, Journey } from '../lib/types';
 import { useAuth } from '../lib/auth';
-import { Alert, Button, Card, Empty, ErrorState, Field, Input, Loading, Modal, PageHeader, Select, useToast } from '../components/ui';
+import { Alert, Button, Card, Empty, ErrorState, Field, InfoTooltip, Input, Loading, Modal, PageHeader, Select, useToast } from '../components/ui';
 import { JourneySteps } from '../components/Summaries';
 
 export function JourneysSection({
@@ -22,9 +22,9 @@ export function JourneysSection({
   const setOpen = extOnOpenChange !== undefined ? extOnOpenChange : setLocalOpen;
   return (
     <div className="space-y-3">
-      <div>
+      <div className="flex items-center gap-1.5">
         <h2 className="text-sm font-semibold text-slate-800">Jornadas de Acionamento (Sequência de Canais)</h2>
-        <p className="text-xs text-slate-500">Ordem dos canais, conexões e prazos de feedback (sem política de retentativa local).</p>
+        <InfoTooltip content="Ordem dos canais, conexões e prazos de feedback (sem política de retentativa local)." />
       </div>
       {q.isLoading ? (
         <Loading />
@@ -53,7 +53,7 @@ export function JourneysPage() {
     <div className="space-y-4">
       <PageHeader
         title="Jornadas de Canal"
-        subtitle="Sequência e ordem dos canais, conexões e prazos de feedback para acionamento multicanal"
+        tooltip="Sequência e ordem dos canais, conexões e prazos de feedback para acionamento multicanal."
         actions={
           can('journeys.write') && (
             <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setOpen(true)}>

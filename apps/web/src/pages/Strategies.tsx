@@ -7,7 +7,7 @@ import { errorMessage, get, post, put } from '../lib/api';
 import type { DraftEnvelope, Strategy, StrategyDetail, StrategyVersion, Tabulation } from '../lib/types';
 import { fmtDateTime } from '../lib/format';
 import { useAuth } from '../lib/auth';
-import { Alert, Badge, Button, Card, Empty, ErrorState, Field, Input, Loading, Modal, PageHeader, TableWrap, useToast } from '../components/ui';
+import { Alert, Badge, Button, Card, Empty, ErrorState, Field, InfoTooltip, Input, Loading, Modal, PageHeader, TableWrap, useToast } from '../components/ui';
 import { StrategySummary, daysLabel } from '../components/Summaries';
 import { StrategyForm } from '../components/StrategyForm';
 import { WizardReturnBanner } from './NewCampaign';
@@ -16,9 +16,9 @@ export function StrategiesSection() {
   const q = useQuery({ queryKey: ['strategies'], queryFn: () => get<{ items: Strategy[] }>('/strategies') });
   return (
     <div className="space-y-3">
-      <div>
+      <div className="flex items-center gap-1.5">
         <h2 className="text-sm font-semibold text-slate-800">Estratégias de Cobrança (Templates Versionados)</h2>
-        <p className="text-xs text-slate-500">Calendário operacional, limites de esforço, cadência de retentativas, otimização consultiva e regras por tabulação.</p>
+        <InfoTooltip content="Calendário operacional, limites de esforço, cadência de retentativas, otimização consultiva e regras por tabulação." />
       </div>
       {q.isLoading ? (
         <Loading />
@@ -77,7 +77,7 @@ export function StrategiesPage() {
     <div className="space-y-4">
       <PageHeader
         title="Templates de Estratégia"
-        subtitle="Calendário operacional, limites de esforço diário/total, cadência de retentativas e regras por tabulação"
+        tooltip="Calendário operacional, limites de esforço diário/total, cadência de retentativas e regras por tabulação."
       />
       <StrategiesSection />
     </div>

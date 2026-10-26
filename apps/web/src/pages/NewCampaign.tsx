@@ -76,6 +76,7 @@ import {
   Card,
   Empty,
   Field,
+  InfoTooltip,
   Input,
   Loading,
   Modal,
@@ -953,19 +954,21 @@ function UnifiedCampaignCreator({
       )}
 
       {/* Header com Switcher das Duas Experiências (§Requisito: Prompt IA vs Forma Estruturada) */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200/80 pb-5">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200/80 pb-4">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-bold tracking-tight text-slate-900">Nova campanha</h1>
+            <InfoTooltip
+              content={
+                experience === 'AI_PROMPT'
+                  ? 'Descreva a campanha em texto livre, anexe o arquivo e a IA estrutura filtros, ordenação e plano de acionamento.'
+                  : 'Configure passo a passo: mailing, estratégias de público B2B/B2C, acionamento multicanal e disparo.'
+              }
+            />
             <Badge tone={experience === 'AI_PROMPT' ? 'brand' : 'gray'}>
               {experience === 'AI_PROMPT' ? '✨ Criar com IA' : '📋 Forma Estruturada'}
             </Badge>
           </div>
-          <p className="text-sm text-slate-500 mt-0.5">
-            {experience === 'AI_PROMPT'
-              ? 'Descreva a campanha em texto livre, anexe o arquivo e a IA estrutura filtros, ordenação e acionamento.'
-              : 'Configure passo a passo: mailing, estratégias B2B/B2C, acionamento multicanal e disparo.'}
-          </p>
         </div>
 
         {/* Switcher Interativo de Experiências */}
@@ -1021,11 +1024,12 @@ function UnifiedCampaignCreator({
               {/* 1. Bar de Anexo de Mailing (Arquivo CSV / Base Existente) */}
               <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     <Database className="size-4 text-brand-700 shrink-0" />
                     <span className="text-xs font-bold text-slate-800">
-                      Base de Contatos / Mailing da Campanha
+                      Base de Contatos
                     </span>
+                    <InfoTooltip content="Selecione um mailing existente do workspace ou anexe uma nova planilha de contatos em CSV." />
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -1099,14 +1103,12 @@ function UnifiedCampaignCreator({
 
               {/* 2. Textarea do Prompt */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label htmlFor="ai-campaign-prompt" className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <Sparkles className="size-3.5 text-brand-600" />
-                    <span>Descreva a campanha (objetivo, regras, filtros e ordenação)</span>
+                <div className="flex items-center gap-1.5">
+                  <Sparkles className="size-3.5 text-brand-600" />
+                  <label htmlFor="ai-campaign-prompt" className="text-xs font-bold text-slate-800">
+                    Prompt de Configuração
                   </label>
-                  <span className="text-[11px] text-slate-500">
-                    A IA interpreta filtros (ex: atraso &gt; 30, valor &gt; 1000) e ordenação por escrito
-                  </span>
+                  <InfoTooltip content="A IA interpreta automaticamente em linguagem natural o objetivo (cobrança, venda, agendamento), público (B2B/B2C), filtros escritos (ex: atraso > 30, valor > 1000) e ordenação." />
                 </div>
 
                 <Textarea
@@ -1121,8 +1123,9 @@ function UnifiedCampaignCreator({
 
               {/* 3. Sugestões Rápidas de Prompt */}
               <div className="space-y-1.5">
-                <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                  Exemplos prontos de acionamento (clique para preencher):
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  <span>Sugestões rápidas</span>
+                  <InfoTooltip content="Modelos pré-configurados com filtros e regras de acionamento prontas para uso imediato." />
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   <button
@@ -1179,6 +1182,7 @@ function UnifiedCampaignCreator({
                     <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
                       Interpretação e Configuração da Campanha pela IA
                     </span>
+                    <InfoTooltip content="Parâmetros estruturados pela IA a partir do prompt livre e do mailing vinculado." />
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge tone={parsedPrompt.purposeCode === 'AGENDAMENTOS' ? 'green' : parsedPrompt.purposeCode === 'VENDAS' ? 'blue' : 'brand'}>
@@ -1194,13 +1198,19 @@ function UnifiedCampaignCreator({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                   {/* Nome Gerado */}
                   <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1">
-                    <span className="text-slate-500 text-[11px] font-medium block">Nome Sugerido</span>
+                    <div className="flex items-center gap-1 text-slate-500 text-[11px] font-medium">
+                      <span>Nome Sugerido</span>
+                      <InfoTooltip content="Nome intuitivo gerado para identificação da campanha nas listagens e relatórios." />
+                    </div>
                     <div className="font-semibold text-slate-900 text-sm">{parsedPrompt.campaignName}</div>
                   </div>
 
                   {/* Base de Destino */}
                   <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1">
-                    <span className="text-slate-500 text-[11px] font-medium block">Mailing Alvo</span>
+                    <div className="flex items-center gap-1 text-slate-500 text-[11px] font-medium">
+                      <span>Mailing Alvo</span>
+                      <InfoTooltip content="Base de contatos que será utilizada como fonte de dados para o acionamento." />
+                    </div>
                     <div className="font-semibold text-slate-900 text-sm">
                       {activeMailing ? activeMailing.name : 'Nenhum mailing selecionado'}
                     </div>
@@ -1213,12 +1223,10 @@ function UnifiedCampaignCreator({
 
                   {/* Filtros Extraídos na Escrita */}
                   <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1.5 md:col-span-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-500 text-[11px] font-medium flex items-center gap-1">
-                        <Filter className="size-3 text-brand-600" />
-                        <span>Filtros Identificados na Escrita</span>
-                      </span>
-                      <span className="text-[10px] text-slate-400">Extraídos automaticamente do prompt</span>
+                    <div className="flex items-center gap-1 text-slate-500 text-[11px] font-medium">
+                      <Filter className="size-3 text-brand-600" />
+                      <span>Filtros Identificados</span>
+                      <InfoTooltip content="Filtros e regras de elegibilidade extraídos da descrição em linguagem natural." />
                     </div>
 
                     <div className="flex flex-wrap gap-1.5 pt-0.5">
@@ -1236,10 +1244,11 @@ function UnifiedCampaignCreator({
 
                   {/* Ordenação Extraída */}
                   <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1">
-                    <span className="text-slate-500 text-[11px] font-medium flex items-center gap-1">
+                    <div className="flex items-center gap-1 text-slate-500 text-[11px] font-medium">
                       <SlidersHorizontal className="size-3 text-brand-600" />
-                      <span>Critério de Ordenação dos Contatos</span>
-                    </span>
+                      <span>Critério de Ordenação</span>
+                      <InfoTooltip content="Critério de priorização na fila de disparo (ex: maior valor, maior atraso, score preditivo)." />
+                    </div>
                     <div className="font-semibold text-slate-900 text-xs flex items-center gap-1.5 pt-0.5">
                       <span className="rounded bg-slate-100 px-2 py-0.5 border border-slate-200">
                         {parsedPrompt.extractedSort.label}
@@ -1249,7 +1258,10 @@ function UnifiedCampaignCreator({
 
                   {/* Canais Prioritários */}
                   <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1">
-                    <span className="text-slate-500 text-[11px] font-medium block">Canais Prioritários</span>
+                    <div className="flex items-center gap-1 text-slate-500 text-[11px] font-medium">
+                      <span>Canais Prioritários</span>
+                      <InfoTooltip content="Canais de comunicação recomendados pelo modelo preditivo com base no perfil e objetivo." />
+                    </div>
                     <div className="flex flex-wrap gap-1 pt-0.5">
                       {parsedPrompt.recommendedChannels.map((ch) => (
                         <Badge key={ch} tone="brand">{CHANNEL_LABEL[ch] ?? ch}</Badge>
@@ -1259,7 +1271,10 @@ function UnifiedCampaignCreator({
 
                   {/* Cadência & Janelas Operacionais */}
                   <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1 md:col-span-2">
-                    <span className="text-slate-500 text-[11px] font-medium block">Cadência &amp; Janelas Operacionais</span>
+                    <div className="flex items-center gap-1 text-slate-500 text-[11px] font-medium">
+                      <span>Cadência &amp; Horários</span>
+                      <InfoTooltip content="Janelas regulatórias de disparo e espaçamento entre tentativas." />
+                    </div>
                     <p className="text-slate-700 text-xs leading-relaxed font-medium">
                       {parsedPrompt.cadenceSummary}
                     </p>
@@ -1269,15 +1284,24 @@ function UnifiedCampaignCreator({
                 {/* Métricas Estimadas de Eficiência */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-1 border-t border-slate-100 text-xs">
                   <div>
-                    <span className="text-slate-500 text-[11px] block">Custo Unitário Estimado</span>
+                    <div className="flex items-center gap-1 text-slate-500 text-[11px]">
+                      <span>Custo Unitário Estimado</span>
+                      <InfoTooltip content="Custo médio estimado por contato considerando tarifas dos canais recomendados." />
+                    </div>
                     <strong className="text-emerald-700 text-sm">{fmtMoney(parsedPrompt.unitCostBrl)}</strong>
                   </div>
                   <div>
-                    <span className="text-slate-500 text-[11px] block">Taxa de Resposta / Contato</span>
+                    <div className="flex items-center gap-1 text-slate-500 text-[11px]">
+                      <span>Taxa de Resposta / Contato</span>
+                      <InfoTooltip content="Taxa projetada de engajamento baseada no histórico de campanhas com perfil semelhante." />
+                    </div>
                     <strong className="text-slate-900 text-sm">~{parsedPrompt.expectedRatePct}%</strong>
                   </div>
                   <div>
-                    <span className="text-slate-500 text-[11px] block">Economia / Ganho IA</span>
+                    <div className="flex items-center gap-1 text-slate-500 text-[11px]">
+                      <span>Economia / Ganho IA</span>
+                      <InfoTooltip content="Ganho percentual de eficiência estimado pela IA em relação ao acionamento convencional." />
+                    </div>
                     <strong className="text-brand-700 text-sm">+{parsedPrompt.gainOrSavingsPct}%</strong>
                   </div>
                 </div>
@@ -1516,13 +1540,11 @@ function UnifiedCampaignCreator({
             <div className="space-y-4">
               {/* Seletor Estratégico B2B vs B2C (§Requisito: Estratégias Diferentes em Público) */}
               <div className="space-y-3 border-b border-slate-200/80 pb-5">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
                   <span className="text-xs font-semibold text-slate-800 uppercase tracking-wider">
                     Segmento do Público &amp; Estratégia de Contato
                   </span>
-                  <span className="text-[11px] text-slate-500">
-                    Calibra janelas de horário comercial/residencial, tom e canais prioritários
-                  </span>
+                  <InfoTooltip content="Calibra janelas de horário (comercial corporativo vs. residencial), canais prioritários e tom de comunicação." />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -1538,14 +1560,15 @@ function UnifiedCampaignCreator({
                     )}
                   >
                     <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-2 font-bold text-slate-900">
+                      <div className="flex items-center gap-1.5 font-bold text-slate-900">
                         <User className="size-4 text-brand-600 shrink-0" />
                         <span>👤 B2C · Pessoa Física</span>
+                        <InfoTooltip content="Consumidor final (CPF). Prioriza horários de almoço, noites Wi-Fi e sábados, com envio de chave PIX instantânea e discador com BINA local." />
                       </div>
                       {audienceSegment === 'B2C' && <span className="size-2 rounded-full bg-brand-600" />}
                     </div>
                     <p className="text-[11px] text-slate-600">
-                      Consumidor final (CPF). Acionamento em janelas residenciais com PIX instantâneo e BINA local.
+                      Consumidor final (CPF). Janelas residenciais, PIX instantâneo e BINA local.
                     </p>
                     <div className="pt-1 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100">
                       <span>Janelas</span>
@@ -1565,14 +1588,15 @@ function UnifiedCampaignCreator({
                     )}
                   >
                     <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-2 font-bold text-slate-900">
+                      <div className="flex items-center gap-1.5 font-bold text-slate-900">
                         <Building2 className="size-4 text-indigo-600 shrink-0" />
                         <span>🏢 B2B · Pessoa Jurídica</span>
+                        <InfoTooltip content="Empresas e PMEs (CNPJ). Foco no financeiro/contas a pagar com boleto bancário, DDA e e-mail corporativo em horário comercial." />
                       </div>
                       {audienceSegment === 'B2B' && <span className="size-2 rounded-full bg-indigo-600" />}
                     </div>
                     <p className="text-[11px] text-slate-600">
-                      Empresas e PMEs (CNPJ). Foco no financeiro/contas a pagar com boleto bancário e E-mail corporativo.
+                      Empresas e PMEs (CNPJ). Foco no contas a pagar com boleto e e-mail corporativo.
                     </p>
                     <div className="pt-1 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100">
                       <span>Horários</span>
@@ -1592,14 +1616,15 @@ function UnifiedCampaignCreator({
                     )}
                   >
                     <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-2 font-bold text-slate-900">
+                      <div className="flex items-center gap-1.5 font-bold text-slate-900">
                         <Shuffle className="size-4 text-purple-600 shrink-0" />
                         <span>🔄 Misto / Dinâmico</span>
+                        <InfoTooltip content="Base híbrida. Roteamento automático da régua por tamanho de documento (11 dígitos CPF / 14 dígitos CNPJ)." />
                       </div>
                       {audienceSegment === 'MIXED' && <span className="size-2 rounded-full bg-purple-600" />}
                     </div>
                     <p className="text-[11px] text-slate-600">
-                      Base mista. Roteamento automático da régua por tamanho de documento (11 dígitos CPF / 14 dígitos CNPJ).
+                      Base mista. Roteamento dinâmico de horário e canal por CPF ou CNPJ.
                     </p>
                     <div className="pt-1 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100">
                       <span>Roteamento</span>
@@ -1689,9 +1714,12 @@ function UnifiedCampaignCreator({
                 >
                   <Users className="size-5 text-brand-700 shrink-0 mt-0.5" aria-hidden />
                   <div>
-                    <div className="text-sm font-semibold">Toda a base do mailing</div>
+                    <div className="flex items-center gap-1.5 text-sm font-semibold">
+                      <span>Toda a base do mailing</span>
+                      <InfoTooltip content="Dispara para todos os contatos válidos do mailing, sem filtros restritivos adicionais." />
+                    </div>
                     <div className="text-xs font-normal text-slate-500 mt-0.5">
-                      Disparar para todos os {fmtNumber(activeMailing?.recordCount ?? 0)} contatos do mailing
+                      {fmtNumber(activeMailing?.recordCount ?? 0)} contatos disponíveis
                     </div>
                   </div>
                 </button>
@@ -1708,9 +1736,12 @@ function UnifiedCampaignCreator({
                 >
                   <SlidersHorizontal className="size-5 text-brand-700 shrink-0 mt-0.5" aria-hidden />
                   <div>
-                    <div className="text-sm font-semibold">Lista segmentada</div>
+                    <div className="flex items-center gap-1.5 text-sm font-semibold">
+                      <span>Lista segmentada</span>
+                      <InfoTooltip content="Filtre e ordene contatos específicos a partir de regras customizadas sobre o mailing." />
+                    </div>
                     <div className="text-xs font-normal text-slate-500 mt-0.5">
-                      Filtrar contatos por regras e segmentações específicas
+                      Filtros avançados e segmentações salvas
                     </div>
                   </div>
                 </button>
@@ -1719,13 +1750,11 @@ function UnifiedCampaignCreator({
               {useList && (
                 <div className="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 space-y-4">
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-3">
-                    <div>
+                    <div className="flex items-center gap-1.5">
                       <span className="text-xs font-semibold text-slate-800 uppercase tracking-wider">
                         Configuração do Público (Lista)
                       </span>
-                      <p className="text-xs text-slate-500">
-                        Selecione um público existente ou crie uma nova lista com filtros sobre o mailing.
-                      </p>
+                      <InfoTooltip content="Selecione um público existente já publicado ou crie uma nova lista com filtros sobre o mailing." />
                     </div>
 
                     <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-0.5 text-xs font-medium">
@@ -1917,13 +1946,11 @@ function UnifiedCampaignCreator({
 
               {/* Seletor Visual dos 3 Objetivos da Plataforma */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
                   <span className="text-xs font-semibold text-slate-800">
                     Objetivo Principal da Operação
                   </span>
-                  <span className="text-[11px] text-slate-500">
-                    Calibra réguas, canais prioritários e o modelo preditivo
-                  </span>
+                  <InfoTooltip content="Calibra réguas de disparo, canais prioritários e o modelo preditivo de contato com a pessoa certa." />
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -1942,14 +1969,12 @@ function UnifiedCampaignCreator({
                       <div className="flex items-center gap-1.5 font-bold text-slate-900">
                         <Coins className="size-4 text-amber-600 shrink-0" />
                         <span>🪙 Cobrança</span>
+                        <InfoTooltip content="Localização de titular, renegociação amigável e acordos com envio de PIX instantâneo ou boleto." />
                       </div>
                       {purposeCode === 'COBRANCA' && (
                         <span className="size-2 rounded-full bg-brand-600" />
                       )}
                     </div>
-                    <p className="text-[11px] text-slate-600 line-clamp-2">
-                      Localização de titular, renegociação amigável e acordos com PIX.
-                    </p>
                     <div className="pt-1 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100">
                       <span>Custo/CPC Otimizado</span>
                       <strong className="text-emerald-700">R$ 3,18</strong>
@@ -1971,14 +1996,12 @@ function UnifiedCampaignCreator({
                       <div className="flex items-center gap-1.5 font-bold text-slate-900">
                         <ShoppingBag className="size-4 text-blue-600 shrink-0" />
                         <span>🛍️ Venda</span>
+                        <InfoTooltip content="Ofertas ativas, upgrade de planos e conversão consultiva de leads com maior propensão de compra." />
                       </div>
                       {purposeCode === 'VENDAS' && (
                         <span className="size-2 rounded-full bg-brand-600" />
                       )}
                     </div>
-                    <p className="text-[11px] text-slate-600 line-clamp-2">
-                      Ofertas ativas, upgrade de planos e conversão consultiva de leads.
-                    </p>
                     <div className="pt-1 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100">
                       <span>Custo/Lead Otimizado</span>
                       <strong className="text-emerald-700">R$ 8,20</strong>
@@ -2000,14 +2023,12 @@ function UnifiedCampaignCreator({
                       <div className="flex items-center gap-1.5 font-bold text-slate-900">
                         <CalendarCheck className="size-4 text-emerald-600 shrink-0" />
                         <span>📅 Agendamentos</span>
+                        <InfoTooltip content="Confirmação de presença e prevenção de no-show em duas etapas: D-1 com botões interativos e D-0 2h antes com localização." />
                       </div>
                       {purposeCode === 'AGENDAMENTOS' && (
                         <span className="size-2 rounded-full bg-emerald-600" />
                       )}
                     </div>
-                    <p className="text-[11px] text-slate-600 line-clamp-2">
-                      Confirmação de presença e redução de no-show (Lembretes D-1 e D-0).
-                    </p>
                     <div className="pt-1 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100">
                       <span>Custo/Confirmação</span>
                       <strong className="text-emerald-700">R$ 0,42</strong>
@@ -2022,17 +2043,15 @@ function UnifiedCampaignCreator({
                   <div className="flex items-center gap-2 font-bold text-emerald-900">
                     <CalendarClock className="size-4 text-emerald-700 shrink-0" />
                     <span>Cadência Automática de Agendamento (Prevenção de No-Show)</span>
+                    <InfoTooltip content="Disparos inteligentes calibrados para confirmação prévia e redução comprovada de faltas." />
                   </div>
-                  <p className="text-slate-700 text-xs leading-relaxed">
-                    Se o mailing possuir data de agendamento, o Voll Connect envia lembrete 1 dia antes e no dia:
-                  </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
                     <div className="rounded-lg border border-emerald-200/80 bg-white/95 p-2.5 space-y-0.5 shadow-2xs">
                       <div className="font-bold text-emerald-900 flex items-center gap-1.5 text-xs">
                         <span>🔔 Lembrete 1 dia antes (D-1)</span>
                       </div>
                       <p className="text-slate-600 text-[11px] leading-snug">
-                        WhatsApp Oficial interativo com botões de 1 toque: <strong>[1 - Sim, confirmo]</strong> e <strong>[2 - Quero reagendar]</strong>.
+                        WhatsApp Oficial interativo com botões: <strong>[1 - Confirmo]</strong> e <strong>[2 - Reagendar]</strong>.
                       </p>
                     </div>
                     <div className="rounded-lg border border-emerald-200/80 bg-white/95 p-2.5 space-y-0.5 shadow-2xs">
@@ -2040,7 +2059,7 @@ function UnifiedCampaignCreator({
                         <span>📍 Lembrete no dia (D-0 · 2h antes)</span>
                       </div>
                       <p className="text-slate-600 text-[11px] leading-snug">
-                        WhatsApp informativo (ou SMS fallback) com endereço completo, mapa de localização e orientações de chegada.
+                        WhatsApp (ou SMS fallback) com endereço completo e instruções de chegada.
                       </p>
                     </div>
                   </div>
@@ -2048,9 +2067,12 @@ function UnifiedCampaignCreator({
               )}
 
               <div className="space-y-2">
-                <label htmlFor="campaign-prompt" className="text-xs font-medium text-slate-700">
-                  Descreva o objetivo do acionamento
-                </label>
+                <div className="flex items-center gap-1.5">
+                  <label htmlFor="campaign-prompt" className="text-xs font-medium text-slate-700">
+                    Descreva o objetivo do acionamento
+                  </label>
+                  <InfoTooltip content="Descreva em linguagem natural o contexto da ação para calibrar tom de voz e canais prioritários." />
+                </div>
                 <Textarea
                   id="campaign-prompt"
                   rows={3}
@@ -2062,9 +2084,9 @@ function UnifiedCampaignCreator({
               </div>
 
               <div>
-                <div className="flex items-center justify-between text-xs font-medium text-slate-500 mb-1.5">
-                  <span>Sugestões rápidas para {OPERATION_PURPOSE_LABEL[purposeCode] ?? 'o objetivo'} ({AUDIENCE_SEGMENT_LABEL[audienceSegment]}):</span>
-                  <span className="text-[11px] text-slate-400">Clique para aplicar</span>
+                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 mb-1.5">
+                  <span>Sugestões rápidas ({AUDIENCE_SEGMENT_LABEL[audienceSegment]}):</span>
+                  <InfoTooltip content="Modelos prontos de acionamento adaptados para o objetivo e segmento selecionados." />
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {PROMPT_TEMPLATES.filter((t) => t.purposeCode === purposeCode).map((tmpl) => {
@@ -2112,7 +2134,10 @@ function UnifiedCampaignCreator({
                 return (
                   <>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                      <Field label={`${meta.metricLabel} Máximo (R$)`}>
+                      <Field
+                        label={`${meta.metricLabel} Máximo (R$)`}
+                        tooltip="Teto orçamentário aceitável por resultado alcançado. A IA suprime canais mais caros se ultrapassarem esta meta."
+                      >
                         {(p) => (
                           <Input
                             id={p.id}
@@ -2126,8 +2151,9 @@ function UnifiedCampaignCreator({
                       </Field>
 
                       <div className="flex flex-col justify-end">
-                        <div className="text-xs text-slate-500 pb-1">
-                          Canais Prioritários Recomendados ({audienceSegment === 'B2B' ? 'B2B Corporativo' : audienceSegment === 'MIXED' ? 'Misto Dinâmico' : 'B2C Residencial'})
+                        <div className="flex items-center gap-1 text-xs text-slate-500 pb-1">
+                          <span>Canais Prioritários ({audienceSegment === 'B2B' ? 'B2B Corporativo' : audienceSegment === 'MIXED' ? 'Misto Dinâmico' : 'B2C Residencial'})</span>
+                          <InfoTooltip content="Canais de disparo ordenados por custo-efetividade para este segmento de público." />
                         </div>
                         <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-800 flex-wrap">
                           {audienceSegment === 'B2B' ? (
@@ -2172,19 +2198,20 @@ function UnifiedCampaignCreator({
                       <Stat
                         label="Contatos Qualificados"
                         value={fmtNumber(targetCount)}
-                        hint="Base qualificada"
+                        tooltip="Total de destinatários aptos no público configurado."
                       />
                       <Stat
                         label={meta.secondaryMetricLabel}
                         value={`${meta.expectedRatePct.toFixed(1)}%`}
                         tone="good"
-                        hint="Auditável por tabulação"
+                        tooltip="Taxa média projetada para contatos assertivos."
                       />
                       <Stat
                         label={meta.metricLabel}
                         value={fmtMoney(meta.optimizedUnitCostBrl)}
                         tone="good"
                         hint={`vs. ${fmtMoney(meta.benchmarkUnitCostBrl)} Tradicional`}
+                        tooltip={`Custo unitário estimado pelo modelo preditivo versus benchmark de mercado (${fmtMoney(meta.benchmarkUnitCostBrl)}).`}
                       />
                       <Stat
                         label={
@@ -2196,7 +2223,7 @@ function UnifiedCampaignCreator({
                         }
                         value={`${meta.code === 'VENDAS' ? '+' : '-'}${meta.savingsOrGainPct.toFixed(1)}%`}
                         tone="good"
-                        hint={meta.cadenceSummary.slice(0, 32) + '...'}
+                        tooltip={meta.cadenceSummary}
                       />
                     </div>
                   </>
@@ -2348,8 +2375,9 @@ function UnifiedCampaignCreator({
 
               {/* Resumo consolidado dos 4 passos */}
               <div className="rounded-xl border border-slate-200/90 bg-slate-50/60 p-4 space-y-3">
-                <div className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                  Resumo dos parâmetros configurados
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                  <span>Resumo dos parâmetros</span>
+                  <InfoTooltip content="Conferência dos blocos configurados antes da criação ou disparo da campanha." />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
                   <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1">

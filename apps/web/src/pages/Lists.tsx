@@ -7,7 +7,7 @@ import type { ListDetail, ListMember, ListSummary, MailingSummary, Paginated } f
 import { fmtDateTime, fmtNumber } from '../lib/format';
 import { useCursorPager } from '../lib/hooks';
 import { useAuth } from '../lib/auth';
-import { Badge, btnClass, Button, Card, Empty, ErrorState, Field, Loading, PageHeader, Pager, Select, TableWrap, useToast } from '../components/ui';
+import { Badge, btnClass, Button, Card, Empty, ErrorState, Field, InfoTooltip, Loading, PageHeader, Pager, Select, TableWrap, useToast } from '../components/ui';
 import { formatCell, ListEditor } from '../components/ListEditor';
 
 const modeBadge = (m: 'SNAPSHOT' | 'DYNAMIC') => <Badge tone={m === 'DYNAMIC' ? 'blue' : 'gray'}>{m === 'DYNAMIC' ? 'Dinâmica' : 'Fotografia'}</Badge>;
@@ -18,9 +18,9 @@ export function ListsSection() {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
+        <div className="flex items-center gap-1.5">
           <h2 className="text-sm font-semibold text-slate-800">Listas de Segmentação</h2>
-          <p className="text-xs text-slate-500">Views versionadas sobre um mailing: filtros, ordenação multi-coluna e modalidade (Fotografia ou Dinâmica).</p>
+          <InfoTooltip content="Views versionadas sobre um mailing: filtros, ordenação multi-coluna e modalidade (Fotografia ou Dinâmica)." />
         </div>
         {can('lists.write') && (
           <Link to="/listas/nova" className={btnClass('primary', 'sm')}>

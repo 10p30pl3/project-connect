@@ -7,7 +7,7 @@ import type { MailingDetail, MailingRecord, MailingSummary, Paginated } from '..
 import { fmtDateTime, fmtNumber } from '../lib/format';
 import { useCursorPager, useDebounced } from '../lib/hooks';
 import { useAuth } from '../lib/auth';
-import { Badge, btnClass, Card, Empty, ErrorState, Field, Input, Loading, PageHeader, Pager, TableWrap, useToast } from '../components/ui';
+import { Badge, btnClass, Card, Empty, ErrorState, Field, InfoTooltip, Input, Loading, PageHeader, Pager, TableWrap, useToast } from '../components/ui';
 import { ImportFlow } from '../components/ImportFlow';
 import { formatCell } from '../components/ListEditor';
 
@@ -17,9 +17,9 @@ export function MailingsSection() {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
+        <div className="flex items-center gap-1.5">
           <h2 className="text-sm font-semibold text-slate-800">Mailings (Cargas Originais)</h2>
-          <p className="text-xs text-slate-500">Arquivos CSV e cargas importadas com versionamento e conferência de linhas.</p>
+          <InfoTooltip content="Arquivos CSV e cargas importadas com versionamento e conferência de linhas." />
         </div>
         <div className="flex items-center gap-2">
           <a
@@ -135,7 +135,7 @@ export function MailingImportPage() {
           </Link>
         }
         title="Importar mailing"
-        subtitle="A importação não cria campanha. O mailing fica disponível para listas e campanhas."
+        tooltip="A importação não cria campanha. O mailing fica disponível para listas e campanhas."
       />
       <Card>
         <ImportFlow

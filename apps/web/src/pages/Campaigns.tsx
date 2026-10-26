@@ -47,9 +47,9 @@ export function CampaignsPage() {
   });
 
   const shortcuts = [
-    { to: '/campanhas/nova', label: 'Nova campanha', desc: 'Jornada única: defina a base e o objetivo para a IA estruturar o plano de CPC.', icon: Sparkles, perm: 'campaigns.create' as const },
-    { to: '/contatos', label: 'Bases & Contatos', desc: 'Consulte a base unificada com o estudo do racional de inteligência de cada contato.', icon: Users, perm: 'contacts.write' as const },
-    { to: '/mailings/importar', label: 'Importar mailing', desc: 'CSV ou conteúdo colado, com conferência por linha e validação automática.', icon: Database, perm: 'mailings.write' as const },
+    { to: '/campanhas/nova', label: 'Nova campanha', desc: 'Crie com IA via prompt ou em 4 etapas estruturadas.', icon: Sparkles, perm: 'campaigns.create' as const },
+    { to: '/contatos', label: 'Bases & Contatos', desc: 'Base unificada com estudo de propensão e DNC.', icon: Users, perm: 'contacts.write' as const },
+    { to: '/mailings/importar', label: 'Importar mailing', desc: 'Upload de arquivo CSV com validação por linha.', icon: Database, perm: 'mailings.write' as const },
   ];
 
   const canOperate = can('campaigns.operate');
@@ -58,7 +58,7 @@ export function CampaignsPage() {
     <div className="space-y-4">
       <PageHeader
         title="Campanhas"
-        subtitle="Mailing ou lista + jornada + estratégia"
+        tooltip="Gerencie campanhas ativas, pausadas e agendadas com controle em tempo real de réguas e estratégias."
         actions={
           can('campaigns.create') && (
             <Link to="/campanhas/nova" className={btnClass('primary')}>

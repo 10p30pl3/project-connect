@@ -52,7 +52,7 @@ export function ObservabilityPage() {
     <div className="space-y-6">
       <PageHeader
         title="Observabilidade & Auditoria"
-        subtitle="Trilha completa de auditoria operacional, telemetria de governança e rastreabilidade LGPD (Art. 20)."
+        tooltip="Trilha completa de auditoria operacional, telemetria de governança e rastreabilidade LGPD (Art. 20)."
         actions={
           <Link
             to="/limites"
@@ -70,24 +70,24 @@ export function ObservabilityPage() {
           label="Status da Trilha"
           value="Ativa · Imutável"
           tone="good"
-          hint="Append-only log no banco de dados"
+          tooltip="Gravação atômica em log imutável de todas as mutações e ações de campanha."
         />
         <Stat
           label="Conformidade LGPD"
           value="Art. 20 Pleno"
           tone="good"
-          hint="Decisões automatizadas auditáveis"
+          tooltip="Garantia legal de auditabilidade sobre todas as decisões automatizadas e critérios de inteligência artificial."
         />
         <Stat
           label="Registros nesta página"
           value={String(filteredItems.length)}
-          hint="Eventos operacionais capturados"
+          tooltip="Total de eventos na página atual do log de auditoria operacional."
         />
         <Stat
           label="Revisão Humana"
           value="Disponível"
           tone="good"
-          hint="Sobrescrita com motivo registrado"
+          tooltip="Possibilidade de auditoria e intervenção manual com justificativa formal registrada."
         />
       </div>
 

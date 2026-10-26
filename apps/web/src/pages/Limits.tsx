@@ -89,7 +89,7 @@ export function LimitsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Limites Institucionais"
-        subtitle="Tetos de volume e suspensão global preventiva — prevalecem sobre qualquer campanha ou estratégia."
+        tooltip="Tetos de volume e suspensão global preventiva — prevalecem sobre qualquer campanha ou estratégia."
         actions={
           <Link
             to="/observabilidade"
@@ -103,7 +103,10 @@ export function LimitsPage() {
 
       <div className="grid gap-6 lg:grid-cols-12">
         <div className="lg:col-span-8">
-          <Card title="Parâmetros de Proteção Institucional">
+          <Card
+            title="Parâmetros de Proteção Institucional"
+            tooltip="Estes limites são as travas máximas da organização. Um valor preenchido aqui pode restringir, mas nunca ser superado por templates de estratégia ou jornadas. Deixe em branco para respeitar o limite individual de cada estratégia."
+          >
             {q.isLoading ? (
               <Loading />
             ) : q.error ? (
@@ -112,16 +115,12 @@ export function LimitsPage() {
               <div className="space-y-4">
                 {errors.form && <Alert tone="error">{errors.form}</Alert>}
 
-                <div className="rounded-xl border border-slate-200/90 bg-slate-50/60 p-3.5 text-xs text-slate-600">
-                  <p>
-                    <strong>Regra de Prevalência:</strong> Estes limites são as travas máximas da organização.
-                    Um valor preenchido aqui pode restringir, mas nunca ser superado por templates de estratégia ou jornadas.
-                    Deixe em branco para respeitar o limite individual de cada estratégia.
-                  </p>
-                </div>
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Field label="Máximo de tentativas diárias" error={errors.dailyLimit} hint="Teto de tentativas por dia para todo o cliente">
+                  <Field
+                    label="Máximo de tentativas diárias"
+                    error={errors.dailyLimit}
+                    tooltip="Teto de tentativas por dia para todo o cliente."
+                  >
                     {(p) => (
                       <Input
                         id="ctl-daily"
@@ -136,7 +135,11 @@ export function LimitsPage() {
                       />
                     )}
                   </Field>
-                  <Field label="Máximo de tentativas totais" error={errors.totalLimit} hint="Teto acumulado por contato durante o ciclo">
+                  <Field
+                    label="Máximo de tentativas totais"
+                    error={errors.totalLimit}
+                    tooltip="Teto acumulado por contato durante o ciclo."
+                  >
                     {(p) => (
                       <Input
                         id="ctl-total"

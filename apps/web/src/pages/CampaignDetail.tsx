@@ -243,9 +243,11 @@ function OverviewTab({ c }: { c: CampaignDetail }) {
         <div className="mb-2 text-sm font-medium">{c.journeyName}</div>
         <JourneySteps steps={c.journey.steps} />
       </Card>
-      <Card title={`Estratégia ${c.strategyName}`}>
+      <Card
+        title={`Estratégia ${c.strategyName}`}
+        tooltip="Versão preservada na campanha; uma nova publicação do template não altera tentativas em andamento."
+      >
         <StrategySummary config={c.strategy.config} version={c.strategy.version} compact />
-        <p className="mt-2 text-xs text-slate-500">Versão preservada na campanha; uma nova publicação do template não altera tentativas em andamento.</p>
       </Card>
     </div>
   );

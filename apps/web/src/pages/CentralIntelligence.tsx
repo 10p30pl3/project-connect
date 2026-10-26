@@ -241,7 +241,7 @@ export function CentralIntelligencePage() {
     <div className="space-y-6">
       <PageHeader
         title="Central de Inteligência"
-        subtitle="Ajuste e desafie a inteligência em produção através de experimentos automáticos multicanais."
+        tooltip="Ajuste e desafie a inteligência em produção através de testes A/B, aprendizado por tabulação e experimentos automáticos."
         actions={
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-100/80 px-2.5 py-0.5 text-xs font-semibold text-brand-900">

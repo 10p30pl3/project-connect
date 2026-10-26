@@ -9,7 +9,7 @@ import type { ContactRow, Paginated } from '../lib/types';
 import { fmtDateTime, fmtMoney, fmtNumber } from '../lib/format';
 import { buildContactIntelligenceRationale } from '../lib/intelligence-rationale';
 import { useCursorPager, useDebounced } from '../lib/hooks';
-import { Badge, Card, ErrorState, Field, Input, Loading, PageHeader, Pager, TableWrap } from '../components/ui';
+import { Badge, Card, ErrorState, Field, InfoTooltip, Input, Loading, PageHeader, Pager, TableWrap } from '../components/ui';
 
 export function ContactsSection() {
   const [text, setText] = useState('');
@@ -23,9 +23,9 @@ export function ContactsSection() {
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
+        <div className="flex items-center gap-1.5">
           <h2 className="text-sm font-semibold text-slate-800">Contatos e Bloqueios (DNC)</h2>
-          <p className="text-xs text-slate-500">Identidade persistente do cliente em todas as cargas e campanhas, com contadores compartilhados.</p>
+          <InfoTooltip content="Identidade persistente do cliente em todas as cargas e campanhas, com contadores globais e lista de Não Perturbe (DNC)." />
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <Field label="Buscar por nome ou ID" className="w-full sm:w-80">

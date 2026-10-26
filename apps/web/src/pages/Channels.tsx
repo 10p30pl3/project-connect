@@ -13,11 +13,10 @@ export function ChannelsPage() {
   const [edit, setEdit] = useState<Connection | null>(null);
   return (
     <div>
-      <PageHeader title="Canais" subtitle="Conexões por tipo de canal, tarifa de referência e parâmetros do conector simulado" />
-      <Alert tone="info" className="mb-4">
-        Tarifa vazia significa <strong>desconhecida</strong>; zero significa <strong>gratuito</strong>. Cada envio preserva a tarifa vigente no momento —
-        alterar a tarifa não muda o custo de envios anteriores.
-      </Alert>
+      <PageHeader
+        title="Canais"
+        tooltip="Tarifa vazia significa desconhecida; zero significa gratuito. Cada envio preserva a tarifa vigente no momento — alterar a tarifa não recalcula envios anteriores."
+      />
       {q.isLoading ? (
         <Loading />
       ) : q.error ? (

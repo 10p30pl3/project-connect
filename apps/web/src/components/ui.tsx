@@ -91,26 +91,120 @@ export const Button = forwardRef<HTMLButtonElement, BtnProps>(function Button(
   );
 });
 
+// ------------------------------------------------------------------ Tooltips Globais
+export function Tooltip({
+  content,
+  children,
+  side = 'top',
+  className,
+}: {
+  content: ReactNode;
+  children: ReactNode;
+  side?: 'top' | 'right' | 'bottom' | 'left';
+  className?: string;
+}) {
+  return (
+    <RTooltip.Provider delayDuration={150}>
+      <RTooltip.Root>
+        <RTooltip.Trigger asChild>
+          <span className={clsx('inline-flex items-center cursor-help', className)}>{children}</span>
+        </RTooltip.Trigger>
+        <RTooltip.Portal>
+          <RTooltip.Content
+            side={side}
+            sideOffset={5}
+            className="z-50 max-w-xs rounded-lg bg-slate-900 px-3 py-1.5 text-xs text-white shadow-xl animate-in fade-in-0 zoom-in-95 leading-relaxed border border-slate-800 font-normal"
+          >
+            {content}
+            <RTooltip.Arrow className="fill-slate-900" />
+          </RTooltip.Content>
+        </RTooltip.Portal>
+      </RTooltip.Root>
+    </RTooltip.Provider>
+  );
+}
+
+export function InfoTooltip({
+  content,
+  side = 'top',
+  className,
+}: {
+  content: ReactNode;
+  side?: 'top' | 'right' | 'bottom' | 'left';
+  className?: string;
+}) {
+  if (!content) return null;
+  return (
+    <Tooltip content={content} side={side}>
+      <span
+        role="button"
+        tabIndex={-1}
+        className={clsx(
+          'inline-flex items-center justify-center size-4 rounded-full text-slate-400 hover:text-slate-600 transition-colors cursor-help',
+          className,
+        )}
+        aria-label="Ajuda / Informações"
+      >
+        <HelpCircle className="size-3.5 shrink-0" aria-hidden />
+      </span>
+    </Tooltip>
+  );
+}
+
 // ------------------------------------------------------------------ Layout bits
-export function PageHeader({ title, subtitle, actions, back }: { title: ReactNode; subtitle?: ReactNode; actions?: ReactNode; back?: ReactNode }) {
+export function PageHeader({
+  title,
+  subtitle,
+  tooltip,
+  actions,
+  back,
+}: {
+  title: ReactNode;
+  subtitle?: ReactNode;
+  tooltip?: ReactNode;
+  actions?: ReactNode;
+  back?: ReactNode;
+}) {
   return (
     <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0">
         {back}
-        <h1 className="text-xl font-semibold tracking-tight text-slate-900">{title}</h1>
-        {subtitle && <p className="mt-0.5 text-sm text-slate-600">{subtitle}</p>}
+        <div className="flex items-center gap-1.5">
+          <h1 className="text-xl font-bold tracking-tight text-slate-900">{title}</h1>
+          {tooltip && <InfoTooltip content={tooltip} />}
+        </div>
+        {subtitle && <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
   );
 }
 
-export function Card({ title, actions, children, className, padded = true }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; padded?: boolean }) {
+export function Card({
+  title,
+  tooltip,
+  actions,
+  children,
+  className,
+  padded = true,
+}: {
+  title?: ReactNode;
+  tooltip?: ReactNode;
+  actions?: ReactNode;
+  children: ReactNode;
+  className?: string;
+  padded?: boolean;
+}) {
   return (
     <section className={clsx('rounded-xl border border-slate-200/90 bg-white shadow-xs', className)}>
       {(title || actions) && (
         <header className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
-          {title && <h2 className="text-sm font-semibold text-slate-800">{title}</h2>}
+          {title && (
+            <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+              {typeof title === 'string' ? <h2>{title}</h2> : title}
+              {tooltip && <InfoTooltip content={tooltip} />}
+            </div>
+          )}
           {actions}
         </header>
       )}
@@ -119,10 +213,25 @@ export function Card({ title, actions, children, className, padded = true }: { t
   );
 }
 
-export function Stat({ label, value, hint, tone }: { label: ReactNode; value: ReactNode; hint?: ReactNode; tone?: 'warn' | 'bad' | 'good' }) {
+export function Stat({
+  label,
+  value,
+  hint,
+  tooltip,
+  tone,
+}: {
+  label: ReactNode;
+  value: ReactNode;
+  hint?: ReactNode;
+  tooltip?: ReactNode;
+  tone?: 'warn' | 'bad' | 'good';
+}) {
   return (
     <div className="rounded-xl border border-slate-200/90 bg-white px-4 py-3 shadow-xs transition-colors hover:border-slate-300/80">
-      <div className="text-xs font-medium text-slate-500">{label}</div>
+      <div className="flex items-center gap-1 text-xs font-medium text-slate-500">
+        <span>{label}</span>
+        {tooltip && <InfoTooltip content={tooltip} />}
+      </div>
       <div
         className={clsx(
           'tabular mt-1 text-2xl font-semibold tracking-tight text-slate-900',
@@ -271,25 +380,26 @@ type FieldProps = {
   label: ReactNode;
   error?: string;
   hint?: ReactNode;
+  tooltip?: ReactNode;
   required?: boolean;
   className?: string;
   children: (ids: { id: string; describedBy?: string; invalid: boolean }) => ReactElement;
 };
-export function Field({ label, error, hint, required, className, children }: FieldProps) {
+export function Field({ label, error, hint, tooltip, required, className, children }: FieldProps) {
   const id = useId();
   const hintId = hint ? `${id}-hint` : undefined;
   const errId = error ? `${id}-err` : undefined;
   const describedBy = [hintId, errId].filter(Boolean).join(' ') || undefined;
   return (
     <div className={clsx('flex flex-col gap-1.5', className)}>
-      <label htmlFor={id} className="block text-[13px] font-medium leading-snug text-slate-700">
-        {label}
+      <label htmlFor={id} className="flex items-center gap-1.5 text-[13px] font-medium leading-snug text-slate-700">
+        <span>{label}</span>
         {required && (
           <span className="text-red-600" aria-hidden>
-            {' '}
             *
           </span>
         )}
+        {tooltip && <InfoTooltip content={tooltip} />}
       </label>
       <div className="mt-auto">{children({ id, describedBy, invalid: !!error })}</div>
       {hint && !error && (
@@ -579,46 +689,5 @@ export function KeyValue({ items }: { items: [ReactNode, ReactNode][] }) {
         </div>
       ))}
     </dl>
-  );
-}
-
-// ------------------------------------------------------------------ Tooltips Globais
-export function Tooltip({
-  content,
-  children,
-  side = 'top',
-  className,
-}: {
-  content: ReactNode;
-  children: ReactNode;
-  side?: 'top' | 'right' | 'bottom' | 'left';
-  className?: string;
-}) {
-  return (
-    <RTooltip.Provider delayDuration={150}>
-      <RTooltip.Root>
-        <RTooltip.Trigger asChild>
-          <span className={clsx('inline-flex items-center cursor-help', className)}>{children}</span>
-        </RTooltip.Trigger>
-        <RTooltip.Portal>
-          <RTooltip.Content
-            side={side}
-            sideOffset={5}
-            className="z-50 max-w-xs rounded-lg bg-slate-900 px-3 py-1.5 text-xs text-white shadow-xl animate-in fade-in-0 zoom-in-95 leading-relaxed border border-slate-800"
-          >
-            {content}
-            <RTooltip.Arrow className="fill-slate-900" />
-          </RTooltip.Content>
-        </RTooltip.Portal>
-      </RTooltip.Root>
-    </RTooltip.Provider>
-  );
-}
-
-export function InfoTooltip({ content, side = 'top' }: { content: ReactNode; side?: 'top' | 'right' | 'bottom' | 'left' }) {
-  return (
-    <Tooltip content={content} side={side}>
-      <HelpCircle className="size-3.5 text-slate-400 hover:text-slate-600 transition-colors ml-1 inline-block" aria-label="Ajuda / Informações" />
-    </Tooltip>
   );
 }
