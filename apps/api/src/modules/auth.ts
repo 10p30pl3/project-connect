@@ -28,11 +28,14 @@ export async function loadMe(userId: string) {
   };
 }
 
+// Hash dummy pré-computado para mitigar enumeração de e-mails via ataque de tempo (timing side-channel)
+const DUMMY_BCRYPT_HASH = '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy';
+
 export async function authRoutes(app: FastifyInstance, opts: { loginRateMax: number }) {
   app.post('/auth/login', { config: { rateLimit: { max: opts.loginRateMax, timeWindow: '1 minute' } } }, async (req, reply) => {
     const body = parse(LoginSchema, req.body);
     const u = await one(getPool(), `SELECT * FROM users WHERE lower(email)=lower($1) AND active`, [body.email]);
-    const ok = u ? await bcrypt.compare(body.password, u.password_hash) : false;
+    const ok = await bcrypt.compare(body.password, u ? u.password_hash : DUMMY_BCRYPT_HASH);
     if (!u || !ok) throw new HttpError(401, 'Credenciais inválidas', 'E-mail ou senha incorretos');
     const me = await loadMe(u.id);
     const token = app.jwt.sign({ sub: u.id, role: u.role, org: u.organization_id, ws: me!.workspace.id });

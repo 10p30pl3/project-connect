@@ -241,7 +241,7 @@ export function buildPreview(content: string, delimiter: string, hasHeader: bool
   };
 }
 
-/** Persiste a importação (somente válidos) numa transação. */
+/** Persiste a importação (somente válidos) numa transação em lotes UNNEST de alta performance. */
 export async function commitImport(
   c: Client,
   ws: { id: string },
@@ -255,7 +255,7 @@ export async function commitImport(
   const [mailing] = (
     await c.query(`INSERT INTO mailings (workspace_id, name, created_by) VALUES ($1,$2,$3) RETURNING id`, [ws.id, name, userId])
   ).rows;
-  const report = rejected.map((r) => ({ rowNumber: r.rowNumber, values: r.values, errors: r.errors }));
+  const report = rejected.slice(0, 5000).map((r) => ({ rowNumber: r.rowNumber, values: r.values, errors: r.errors }));
   const [version] = (
     await c.query(
       `INSERT INTO mailing_versions (mailing_id, version, field_mapping, headers, total_rows, valid_rows, rejected_rows, rejected_report, created_by)
@@ -263,42 +263,124 @@ export async function commitImport(
       [mailing.id, JSON.stringify(effective), JSON.stringify(parsed.headers), parsed.rows.length, valid.length, rejected.length, JSON.stringify(report), userId],
     )
   ).rows;
-  for (const r of valid) {
-    // reimportação reutiliza a identidade; campos ausentes não apagam dados conhecidos (§12)
-    const [contact] = (
-      await c.query(
-        `INSERT INTO contacts (workspace_id, external_id, name, attributes, history_total, history_reference_date)
-         VALUES ($1,$2,$3,$4,$5, CASE WHEN $5::int IS NULL THEN NULL ELSE current_date END)
-         ON CONFLICT (workspace_id, external_id) DO UPDATE SET
-           name = COALESCE(EXCLUDED.name, contacts.name),
-           attributes = contacts.attributes || (SELECT COALESCE(jsonb_object_agg(k, v), '{}'::jsonb) FROM jsonb_each(EXCLUDED.attributes) AS t(k, v) WHERE v <> 'null'::jsonb),
-           history_total = COALESCE(EXCLUDED.history_total, contacts.history_total),
-           history_reference_date = COALESCE(EXCLUDED.history_reference_date, contacts.history_reference_date),
-           updated_at = now()
-         RETURNING id`,
-        [ws.id, r.externalId, r.name ?? null, JSON.stringify(r.typed), r.historyTotal ?? null],
-      )
-    ).rows;
-    for (const d of r.destinations) {
+
+  const BATCH_SIZE = 1000;
+  for (let offset = 0; offset < valid.length; offset += BATCH_SIZE) {
+    const chunk = valid.slice(offset, offset + BATCH_SIZE);
+
+    // 1. Consolida contatos únicos por externalId no lote (evita conflito duplo no mesmo comando UNNEST)
+    const contactByExt = new Map<
+      string,
+      { externalId: string; name: string | null; typed: Record<string, unknown>; historyTotal: number | null }
+    >();
+    for (const r of chunk) {
+      const ext = r.externalId!;
+      const prev = contactByExt.get(ext);
+      const nonNullTyped = Object.fromEntries(Object.entries(r.typed).filter(([, v]) => v !== null && v !== undefined));
+      if (!prev) {
+        contactByExt.set(ext, {
+          externalId: ext,
+          name: r.name ?? null,
+          typed: { ...nonNullTyped },
+          historyTotal: r.historyTotal ?? null,
+        });
+      } else {
+        if (r.name) prev.name = r.name;
+        Object.assign(prev.typed, nonNullTyped);
+        if (r.historyTotal !== null && r.historyTotal !== undefined) prev.historyTotal = r.historyTotal;
+      }
+    }
+
+    const uniqueContacts = Array.from(contactByExt.values());
+    const upserted = await c.query(
+      `INSERT INTO contacts (workspace_id, external_id, name, attributes, history_total, history_reference_date)
+       SELECT $1,
+              x.ext_id,
+              x.cname,
+              x.attrs,
+              x.hist,
+              CASE WHEN x.hist IS NULL THEN NULL ELSE current_date END
+         FROM unnest($2::text[], $3::text[], $4::jsonb[], $5::int[]) AS x(ext_id, cname, attrs, hist)
+       ON CONFLICT (workspace_id, external_id) DO UPDATE SET
+         name = COALESCE(EXCLUDED.name, contacts.name),
+         attributes = contacts.attributes || (SELECT COALESCE(jsonb_object_agg(k, v), '{}'::jsonb) FROM jsonb_each(EXCLUDED.attributes) AS t(k, v) WHERE v <> 'null'::jsonb),
+         history_total = COALESCE(EXCLUDED.history_total, contacts.history_total),
+         history_reference_date = COALESCE(EXCLUDED.history_reference_date, contacts.history_reference_date),
+         updated_at = now()
+       RETURNING id, external_id`,
+      [
+        ws.id,
+        uniqueContacts.map((u) => u.externalId),
+        uniqueContacts.map((u) => u.name),
+        uniqueContacts.map((u) => JSON.stringify(u.typed)),
+        uniqueContacts.map((u) => u.historyTotal),
+      ],
+    );
+
+    const idByExt = new Map<string, string>();
+    for (const row of upserted.rows) {
+      idByExt.set(row.external_id, row.id);
+    }
+
+    // 2. Insere destinos em lote (deduplicados por contact_id + channel_type + address)
+    const destSeen = new Set<string>();
+    const destContactIds: string[] = [];
+    const destChannels: string[] = [];
+    const destAddresses: string[] = [];
+    const destLabels: string[] = [];
+    const destPriorities: number[] = [];
+
+    for (const r of chunk) {
+      const cid = idByExt.get(r.externalId!)!;
+      for (const d of r.destinations) {
+        const key = `${cid}:${d.channelType}:${d.address}`;
+        if (destSeen.has(key)) continue;
+        destSeen.add(key);
+        destContactIds.push(cid);
+        destChannels.push(d.channelType);
+        destAddresses.push(d.address);
+        destLabels.push(d.label);
+        destPriorities.push(d.priority);
+      }
+    }
+
+    if (destContactIds.length > 0) {
       await c.query(
         `INSERT INTO contact_destinations (workspace_id, contact_id, channel_type, address, label, priority, source)
-         VALUES ($1,$2,$3,$4,$5,$6,'IMPORT') ON CONFLICT (contact_id, channel_type, address) DO NOTHING`,
-        [ws.id, contact.id, d.channelType, d.address, d.label, d.priority],
+         SELECT $1, x.cid, x.ch::channel_type, x.addr, x.lbl, x.prio, 'IMPORT'
+           FROM unnest($2::uuid[], $3::text[], $4::text[], $5::text[], $6::int[]) AS x(cid, ch, addr, lbl, prio)
+         ON CONFLICT (contact_id, channel_type, address) DO NOTHING`,
+        [ws.id, destContactIds, destChannels, destAddresses, destLabels, destPriorities],
       );
     }
-    // Garante que o contato tenha Perfil Cumulativo de Inteligência (Golden Record)
-    await c.query(
-      `INSERT INTO contact_intelligence_profiles (workspace_id, contact_id, locator_score)
-       VALUES ($1, $2, 75)
-       ON CONFLICT (workspace_id, contact_id) DO UPDATE SET
-         updated_at = now()`,
-      [ws.id, contact.id],
-    );
+
+    // 3. Garante Perfil Cumulativo de Inteligência (Golden Record) em lote
+    const uniqueContactIds = Array.from(idByExt.values());
+    if (uniqueContactIds.length > 0) {
+      await c.query(
+        `INSERT INTO contact_intelligence_profiles (workspace_id, contact_id, locator_score)
+         SELECT $1, unnest($2::uuid[]), 75
+         ON CONFLICT (workspace_id, contact_id) DO UPDATE SET updated_at = now()`,
+        [ws.id, uniqueContactIds],
+      );
+    }
+
+    // 4. Insere mailing_records em lote
     await c.query(
       `INSERT INTO mailing_records (mailing_id, mailing_version_id, contact_id, row_number, business_key, raw_fields, typed_fields)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-      [mailing.id, version.id, contact.id, r.rowNumber, r.externalId, JSON.stringify(r.values), JSON.stringify(r.typed)],
+       SELECT $1, $2, x.cid, x.rnum, x.bkey, x.rawf, x.typf
+         FROM unnest($3::uuid[], $4::int[], $5::text[], $6::jsonb[], $7::jsonb[]) AS x(cid, rnum, bkey, rawf, typf)`,
+      [
+        mailing.id,
+        version.id,
+        chunk.map((r) => idByExt.get(r.externalId!)!),
+        chunk.map((r) => r.rowNumber),
+        chunk.map((r) => r.externalId!),
+        chunk.map((r) => JSON.stringify(r.values)),
+        chunk.map((r) => JSON.stringify(r.typed)),
+      ],
     );
   }
+
   return { mailingId: mailing.id as string, versionId: version.id as string, validRows: valid.length, rejectedRows: rejected.length };
 }

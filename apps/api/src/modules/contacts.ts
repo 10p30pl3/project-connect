@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { ContactCreateSchema, DestinationCreateSchema, maskAddress } from '@voll/shared';
-import { getPool, one, q, tx } from '../db/pool.js';
+import { getPool, likePattern, one, q, tx } from '../db/pool.js';
 import { actor, requireRoles, CAN } from '../auth/context.js';
 import { conflict, notFound, parse, unprocessable } from '../lib/problem.js';
 import { normalizeEmail, normalizePhone } from '../lib/phone.js';
@@ -16,10 +16,17 @@ export async function contactRoutes(app: FastifyInstance) {
     const a = actor(req);
     const limit = Math.min(200, Math.max(1, Number(req.query.limit ?? 50)));
     const offset = Math.max(0, Number(req.query.cursor ?? 0) || 0);
-    const search = req.query.q?.trim() ? `%${req.query.q.trim()}%` : null;
+    const search = likePattern(req.query.q);
     const rows = await q(
       getPool(),
-      `SELECT c.id, c.external_id, c.name, c.history_total,
+      `WITH page AS (
+         SELECT c.id, c.external_id, c.name, c.history_total
+           FROM contacts c
+          WHERE c.workspace_id=$1 AND ($2::text IS NULL OR c.name ILIKE $2 OR c.external_id ILIKE $2)
+          ORDER BY c.name ASC NULLS LAST, c.external_id ASC
+          OFFSET $3 LIMIT $4
+       )
+       SELECT c.id, c.external_id, c.name, c.history_total,
               EXISTS (SELECT 1 FROM blocks b WHERE b.contact_id=c.id AND b.scope='CONTACT' AND b.revoked_at IS NULL) AS blocked,
               (SELECT COALESCE(json_agg(json_build_object('channelType', x.channel_type, 'count', x.n)), '[]'::json)
                  FROM (SELECT channel_type, count(*)::int AS n FROM contact_destinations d WHERE d.contact_id=c.id GROUP BY channel_type) x) AS destinations,
@@ -28,9 +35,7 @@ export async function contactRoutes(app: FastifyInstance) {
                  FROM attempts a LEFT JOIN tabulations t ON t.workspace_id=a.workspace_id AND t.code=a.tabulation_code
                 WHERE a.contact_id=c.id AND a.tabulation_code IS NOT NULL ORDER BY a.finalized_at DESC LIMIT 1) AS last_tab,
               (SELECT count(DISTINCT campaign_id)::int FROM enrollments e WHERE e.contact_id=c.id) AS campaigns
-         FROM contacts c
-        WHERE c.workspace_id=$1 AND ($2::text IS NULL OR c.name ILIKE $2 OR c.external_id ILIKE $2)
-        ORDER BY c.name NULLS LAST, c.external_id OFFSET $3 LIMIT $4`,
+         FROM page c`,
       [a.workspaceId, search, offset, limit + 1],
     );
     const [{ total }] = await q(

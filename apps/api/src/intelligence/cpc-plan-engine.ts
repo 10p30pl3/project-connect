@@ -118,6 +118,8 @@ export type Contact8Blocks = {
 };
 
 export async function ensureWorkspaceHypotheses(c: Client, workspaceId: string) {
+  const existing = await c.query(`SELECT count(*)::int AS n FROM cpc_study_hypotheses WHERE workspace_id=$1`, [workspaceId]);
+  if ((existing.rows[0]?.n ?? 0) >= DEFAULT_STUDY_HYPOTHESES.length) return;
   for (const h of DEFAULT_STUDY_HYPOTHESES) {
     await c.query(
       `INSERT INTO cpc_study_hypotheses
@@ -1165,16 +1167,11 @@ export async function runIntelligencePipeline(
 
   const runId = runRow.id as string;
 
-  // Insere os planos individuais (8 blocos) de todos os contatos
+  // Insere os planos individuais (8 blocos) de todos os contatos em lotes UNNEST (500 por comando)
   const allOrdered = [...eligibleItems, ...excludedItems];
-  for (const item of allOrdered) {
-    const b = item.blocks;
-    const isDispatchedProd =
-      b.decision.operatingTrack === 'PRODUCTION' &&
-      item.eligible &&
-      input.mode !== 'LABORATORY' &&
-      input.autoDispatchProduction;
-
+  const PLAN_BATCH = 500;
+  for (let offset = 0; offset < allOrdered.length; offset += PLAN_BATCH) {
+    const chunk = allOrdered.slice(offset, offset + PLAN_BATCH);
     await c.query(
       `INSERT INTO contact_cpc_plans
          (run_id, workspace_id, mailing_id, mailing_record_id, contact_id, operating_track, lab_wave_number,
@@ -1182,36 +1179,56 @@ export async function runIntelligencePipeline(
           expected_cost_to_cpc_brl, expected_cost_per_cpc_brl, brute_force_cpc_brl, primary_channel,
           preferred_destination, local_time_window, timezone_iana, age_bracket, ddd, uf, macro_region,
           city_tier, phone_intent_tier, locator_score, dispatched_to_actuator, blocks)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)`,
+       SELECT $1, $2, $3,
+              x.mrec_id, x.cid, x.track, x.wave, x.prank, x.pscore, x.dstatus, x.dreason,
+              x.eprob, x.ecost_to, x.ecost_per, x.bf_cost, x.pch, x.pdest, x.ltw, x.tz,
+              x.age_b, x.ddd, x.uf, x.mreg, x.ctier, x.pitier, x.lscore, x.disp, x.blks
+         FROM unnest(
+           $4::uuid[], $5::uuid[], $6::text[], $7::int[], $8::int[], $9::int[], $10::text[], $11::text[],
+           $12::numeric[], $13::numeric[], $14::numeric[], $15::numeric[], $16::text[], $17::text[],
+           $18::text[], $19::text[], $20::text[], $21::text[], $22::text[], $23::text[], $24::text[],
+           $25::text[], $26::int[], $27::boolean[], $28::jsonb[]
+         ) AS x(
+           mrec_id, cid, track, wave, prank, pscore, dstatus, dreason,
+           eprob, ecost_to, ecost_per, bf_cost, pch, pdest, ltw, tz,
+           age_b, ddd, uf, mreg, ctier, pitier, lscore, disp, blks
+         )
+       ON CONFLICT (run_id, contact_id) DO NOTHING`,
       [
         runId,
         workspaceId,
         input.mailingId,
-        item.row.mailing_record_id,
-        item.row.contact_id,
-        b.decision.operatingTrack,
-        b.decision.labWaveNumber,
-        b.decision.priorityRank,
-        b.decision.priorityScore,
-        b.decision.status,
-        b.decision.reason,
-        b.cpc.estimatedCpcProb,
-        b.economics.expectedCostToCpcBrl,
-        b.economics.expectedCostPerCpcBrl,
-        b.economics.bruteForceCostPerCpcBrl,
-        b.channel.primaryChannel,
-        b.channel.preferredDestination,
-        b.schedule.localTimeWindow,
-        b.schedule.timezoneIana,
-        b.evidence.ageBracket,
-        b.evidence.ddd,
-        b.evidence.uf,
-        b.evidence.macroRegion,
-        b.evidence.cityTier,
-        b.cpc.phoneIntentTier,
-        b.evidence.locatorValidityScore,
-        isDispatchedProd,
-        JSON.stringify(b),
+        chunk.map((item) => item.row.mailing_record_id),
+        chunk.map((item) => item.row.contact_id),
+        chunk.map((item) => item.blocks.decision.operatingTrack),
+        chunk.map((item) => item.blocks.decision.labWaveNumber),
+        chunk.map((item) => item.blocks.decision.priorityRank),
+        chunk.map((item) => item.blocks.decision.priorityScore),
+        chunk.map((item) => item.blocks.decision.status),
+        chunk.map((item) => item.blocks.decision.reason),
+        chunk.map((item) => item.blocks.cpc.estimatedCpcProb),
+        chunk.map((item) => item.blocks.economics.expectedCostToCpcBrl),
+        chunk.map((item) => item.blocks.economics.expectedCostPerCpcBrl),
+        chunk.map((item) => item.blocks.economics.bruteForceCostPerCpcBrl),
+        chunk.map((item) => item.blocks.channel.primaryChannel),
+        chunk.map((item) => item.blocks.channel.preferredDestination),
+        chunk.map((item) => item.blocks.schedule.localTimeWindow),
+        chunk.map((item) => item.blocks.schedule.timezoneIana),
+        chunk.map((item) => item.blocks.evidence.ageBracket),
+        chunk.map((item) => item.blocks.evidence.ddd),
+        chunk.map((item) => item.blocks.evidence.uf),
+        chunk.map((item) => item.blocks.evidence.macroRegion),
+        chunk.map((item) => item.blocks.evidence.cityTier),
+        chunk.map((item) => item.blocks.cpc.phoneIntentTier),
+        chunk.map((item) => item.blocks.evidence.locatorValidityScore),
+        chunk.map(
+          (item) =>
+            item.blocks.decision.operatingTrack === 'PRODUCTION' &&
+            item.eligible &&
+            input.mode !== 'LABORATORY' &&
+            input.autoDispatchProduction,
+        ),
+        chunk.map((item) => JSON.stringify(item.blocks)),
       ],
     );
   }
@@ -1282,12 +1299,20 @@ async function materializeProductionTrackToActuators(
     )
   ).rows;
 
-  for (let i = 0; i < prodContacts.length; i++) {
-    const item = prodContacts[i];
+  const MEMBER_BATCH = 2000;
+  for (let offset = 0; offset < prodContacts.length; offset += MEMBER_BATCH) {
+    const chunk = prodContacts.slice(offset, offset + MEMBER_BATCH);
     await c.query(
       `INSERT INTO list_members (list_version_id, contact_id, mailing_record_id, order_key)
-       VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
-      [lvRow.id, item.row.contact_id, item.row.mailing_record_id, i + 1],
+       SELECT $1, x.cid, x.mrec, x.okey
+         FROM unnest($2::uuid[], $3::uuid[], $4::int[]) AS x(cid, mrec, okey)
+       ON CONFLICT DO NOTHING`,
+      [
+        lvRow.id,
+        chunk.map((item) => item.row.contact_id),
+        chunk.map((item) => item.row.mailing_record_id),
+        chunk.map((_, idx) => offset + idx + 1),
+      ],
     );
   }
 

@@ -13,10 +13,23 @@ let pool: pg.Pool | null = null;
 
 export function getPool(): pg.Pool {
   if (!pool) {
-    pool = new pg.Pool({ connectionString: config.databaseUrl, max: 15 });
+    pool = new pg.Pool({
+      connectionString: config.databaseUrl,
+      max: Number(process.env.DB_POOL_MAX ?? 25),
+      idleTimeoutMillis: 30_000,
+      connectionTimeoutMillis: 5_000,
+      statement_timeout: 30_000,
+    });
     pool.on('error', () => {});
   }
   return pool;
+}
+
+/** Escapa caracteres curinga (% _ \) para uso seguro em cláusulas LIKE / ILIKE. */
+export function likePattern(raw?: string | null): string | null {
+  const s = raw?.trim();
+  if (!s) return null;
+  return `%${s.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
 }
 
 export function setPool(p: pg.Pool) {

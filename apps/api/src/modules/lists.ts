@@ -126,21 +126,29 @@ export async function listRoutes(app: FastifyInstance) {
       );
       if (!lv) throw notFound('Versão da lista');
       const limit = Math.min(200, Math.max(1, Number(req.query.limit ?? 50)));
-      const offset = Number(req.query.cursor ?? 0);
-      let all: { contactId: string; externalId: string; name: string | null; fields: Record<string, unknown> }[];
+      const offset = Math.max(0, Number(req.query.cursor ?? 0) || 0);
       if (lv.membership_mode === 'SNAPSHOT') {
         const rows = await q(
           getPool(),
           `SELECT lm.contact_id, c.external_id, c.name, r.typed_fields FROM list_members lm
              JOIN contacts c ON c.id=lm.contact_id JOIN mailing_records r ON r.id=lm.mailing_record_id
-            WHERE lm.list_version_id=$1 ORDER BY lm.order_key`,
-          [lv.id],
+            WHERE lm.list_version_id=$1 ORDER BY lm.order_key OFFSET $2 LIMIT $3`,
+          [lv.id, offset, limit + 1],
         );
-        all = rows.map((r) => ({ contactId: r.contact_id, externalId: r.external_id, name: r.name, fields: r.typed_fields }));
-      } else {
-        const r = await computeMembership(getPool(), a.workspaceId, lv.mailing_id, lv.filters, lv.sort);
-        all = r.members.map((x) => ({ contactId: x.contactId, externalId: x.externalId, name: x.name, fields: x.fields }));
+        const page = rows.slice(0, limit).map((r) => ({
+          contactId: r.contact_id,
+          externalId: r.external_id,
+          name: r.name,
+          fields: r.typed_fields,
+        }));
+        return {
+          items: page,
+          nextCursor: rows.length > limit ? String(offset + limit) : null,
+          total: lv.member_count,
+        };
       }
+      const r = await computeMembership(getPool(), a.workspaceId, lv.mailing_id, lv.filters, lv.sort);
+      const all = r.members.map((x) => ({ contactId: x.contactId, externalId: x.externalId, name: x.name, fields: x.fields }));
       const page = all.slice(offset, offset + limit);
       return { items: page, nextCursor: offset + limit < all.length ? String(offset + limit) : null, total: all.length };
     },

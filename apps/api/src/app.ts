@@ -64,6 +64,10 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     }
   });
 
+  if (config.isProduction && (!config.jwtSecret || config.jwtSecret === 'dev-secret-change-me' || config.jwtSecret.length < 32)) {
+    throw new Error('FATAL: JWT_SECRET inseguro em ambiente de produção (mínimo 32 caracteres exigido).');
+  }
+
   await app.register(cors, { origin: config.webOrigin, credentials: true });
   await app.register(cookie);
   await app.register(jwt, {
@@ -72,6 +76,17 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     sign: { expiresIn: '8h' },
   });
   await app.register(rateLimit, { global: false });
+
+  // Cabeçalhos de segurança HTTP padrão OWASP
+  app.addHook('onSend', async (_req, reply) => {
+    reply.header('X-Content-Type-Options', 'nosniff');
+    reply.header('X-Frame-Options', 'DENY');
+    reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+    reply.header('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+    if (config.isProduction) {
+      reply.header('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+    }
+  });
 
   app.setErrorHandler((err, req, reply) => {
     const p = toProblem(err);

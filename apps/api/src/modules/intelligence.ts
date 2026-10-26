@@ -5,7 +5,7 @@ import {
   StartIntelligenceRunSchema,
   UpdateHypothesisSchema,
 } from '@voll/shared';
-import { getPool, one, q, tx } from '../db/pool.js';
+import { getPool, likePattern, one, q, tx } from '../db/pool.js';
 import { actor, CAN, requireRoles } from '../auth/context.js';
 import { notFound, parse } from '../lib/problem.js';
 import { audit } from '../lib/audit.js';
@@ -228,7 +228,7 @@ export async function intelligenceRoutes(app: FastifyInstance) {
     const track = req.query.track && req.query.track !== 'ALL' ? req.query.track : null;
     const status = req.query.status && req.query.status !== 'ALL' ? req.query.status : null;
     const channel = req.query.channel && req.query.channel !== 'ALL' ? req.query.channel : null;
-    const search = req.query.q?.trim() ? `%${req.query.q.trim()}%` : null;
+    const search = likePattern(req.query.q);
     const limit = Math.min(200, Math.max(1, Number(req.query.limit ?? 100)));
 
     const rows = await q(

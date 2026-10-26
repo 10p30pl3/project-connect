@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { ResolveReconciliationSchema } from '@voll/shared';
-import { getPool, one, q, tx } from '../db/pool.js';
+import { getPool, likePattern, one, q, tx } from '../db/pool.js';
 import { actor, requireRoles, CAN } from '../auth/context.js';
 import { conflict, notFound, parse, unprocessable } from '../lib/problem.js';
 import { audit } from '../lib/audit.js';
@@ -77,7 +77,7 @@ export async function attemptRoutes(app: FastifyInstance) {
       const a = actor(req);
       const limit = Math.min(200, Math.max(1, Number(req.query.limit ?? 50)));
       const offset = Math.max(0, Number(req.query.cursor ?? 0) || 0);
-      const search = req.query.q?.trim() ? `%${req.query.q.trim()}%` : null;
+      const search = likePattern(req.query.q);
       const params = [a.workspaceId, req.query.state ?? null, req.query.campaignId ?? null, search];
       const where = `a.workspace_id=$1 AND ($2::text IS NULL OR a.state::text=$2) AND ($3::uuid IS NULL OR a.campaign_id=$3)
                      AND ($4::text IS NULL OR c.name ILIKE $4 OR c.external_id ILIKE $4 OR a.id::text ILIKE $4 OR a.trace_id::text ILIKE $4)`;

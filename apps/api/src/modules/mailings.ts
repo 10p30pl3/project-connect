@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { ImportCommitSchema, ImportPreviewSchema } from '@voll/shared';
-import { getPool, one, q, tx } from '../db/pool.js';
+import { getPool, likePattern, one, q, tx } from '../db/pool.js';
 import { actor, requireRoles, CAN } from '../auth/context.js';
 import { notFound, parse, unprocessable } from '../lib/problem.js';
 import { buildPreview, commitImport } from '../services/importer.js';
@@ -68,7 +68,7 @@ export async function mailingRoutes(app: FastifyInstance) {
       if (!m) throw notFound('Mailing');
       const limit = Math.min(200, Math.max(1, Number(req.query.limit ?? 50)));
       const cursor = Number(req.query.cursor ?? 0);
-      const search = req.query.q?.trim() ? `%${req.query.q.trim()}%` : null;
+      const search = likePattern(req.query.q);
       const rows = await q(
         getPool(),
         `SELECT r.id, r.row_number, r.contact_id, r.typed_fields, c.external_id, c.name,

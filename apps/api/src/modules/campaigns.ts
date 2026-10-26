@@ -380,6 +380,8 @@ export async function campaignRoutes(app: FastifyInstance) {
   );
 
   // ---------------------------------------------------------------- elegibilidade (§4.1, T07)
+  // Janela máxima avaliada em memória por requisição para proteger contra OOM em campanhas com milhões de inscritos
+  const MAX_ELIGIBILITY_EVAL_WINDOW = 5000;
   app.get<{ Params: { id: string }; Querystring: { reason?: string; cursor?: string; limit?: string } }>(
     '/campaigns/:id/eligibility',
     async (req) => {
@@ -387,10 +389,18 @@ export async function campaignRoutes(app: FastifyInstance) {
       await loadCampaignRow(getPool(), req.params.id, a.workspaceId);
       const rt = (await loadCampaignRuntime(getPool(), req.params.id))!;
       const now = new Date(); // mesmo instante lógico para cartões, motivos e linhas
+      const [enrStats] = await q(
+        getPool(),
+        `SELECT count(*)::int AS total_members,
+                count(*) FILTER (WHERE state <> 'ACTIVE')::int AS total_finished
+           FROM enrollments WHERE campaign_id=$1`,
+        [rt.id],
+      );
       const enr = await q(
         getPool(),
-        `SELECT id, contact_id, state, stage, destination_cursor, next_eligible_at, order_key FROM enrollments WHERE campaign_id=$1 ORDER BY order_key`,
-        [rt.id],
+        `SELECT id, contact_id, state, stage, destination_cursor, next_eligible_at, order_key
+           FROM enrollments WHERE campaign_id=$1 ORDER BY order_key LIMIT $2`,
+        [rt.id, MAX_ELIGIBILITY_EVAL_WINDOW],
       );
       const ctxs = await buildContexts(getPool(), rt, enr, now);
       const evals = enr.map((e) => {
@@ -412,17 +422,17 @@ export async function campaignRoutes(app: FastifyInstance) {
       const eligibleFilter = req.query.reason === 'ELIGIBLE';
       const filtered = evals.filter((x) => (eligibleFilter ? x.ev.eligible : filterReason ? x.ev.reasons.includes(filterReason) : true));
       const limit = Math.min(200, Math.max(1, Number(req.query.limit ?? 50)));
-      const offset = Number(req.query.cursor ?? 0);
+      const offset = Math.max(0, Number(req.query.cursor ?? 0) || 0);
       const page = filtered.slice(offset, offset + limit);
       return {
         evaluatedAt: now.toISOString(),
         cards: {
-          members: enr.length,
+          members: enrStats?.total_members ?? enr.length,
           eligibleNow: evals.filter((x) => x.ev.eligible).length,
           reserved: att.reserved,
           pending: att.pending,
           reconciliation: att.reconciliation,
-          finished: enr.filter((e) => e.state !== 'ACTIVE').length,
+          finished: enrStats?.total_finished ?? enr.filter((e) => e.state !== 'ACTIVE').length,
         },
         reasons: Object.entries(reasonCounts)
           .map(([reason, count]) => ({ reason, count }))
