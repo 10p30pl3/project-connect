@@ -10,7 +10,7 @@ import {
   TrendingDown,
   TrendingUp,
 } from 'lucide-react';
-import { Card, Badge } from './ui';
+import { Card, Badge, InfoTooltip } from './ui';
 
 interface ChannelComparison {
   key: string;
@@ -85,41 +85,32 @@ export function CpcChannelComparisonChart() {
 
   return (
     <Card
-      title={
-        <div className="flex items-center justify-between w-full">
-          <div>
-            <div className="flex items-center gap-2">
-              <TrendingDown className="size-4 text-emerald-600" aria-hidden />
-              <span className="font-semibold text-slate-900">Eficiência de Custo por CPC por Canal</span>
-            </div>
-            <p className="text-xs text-slate-500 font-normal mt-0.5">
-              Comparação auditável: Custo por CPC com Inteligência Voll Connect vs. Disparo Cego (Força Bruta)
-            </p>
-          </div>
-          <Badge tone="green">
-            <span className="font-bold">-43,2%</span> economia média
-          </Badge>
-        </div>
+      title="Eficiência de Custo por CPC por Canal"
+      tooltip="Comparação auditável: Custo por CPC com Inteligência Voll Connect vs. Disparo Cego (Força Bruta)."
+      actions={
+        <Badge tone="green">
+          <span className="font-bold">-43,2%</span> economia média
+        </Badge>
       }
     >
-      <div className="space-y-4 pt-1">
-        {/* Legenda */}
-        <div className="flex flex-wrap items-center justify-between gap-3 text-xs border-b border-slate-100 pb-2.5">
-          <div className="flex items-center gap-4">
+      <div className="space-y-2.5">
+        {/* Legenda compacta */}
+        <div className="flex items-center justify-between text-[11px] border-b border-slate-100 pb-1.5 text-slate-500">
+          <div className="flex items-center gap-3">
             <span className="flex items-center gap-1.5 text-slate-700 font-medium">
-              <span className="size-3 rounded-sm bg-brand-600" />
+              <span className="size-2 rounded-xs bg-brand-600" />
               <span>Com Inteligência Voll</span>
             </span>
             <span className="flex items-center gap-1.5 text-slate-500 font-medium">
-              <span className="size-3 rounded-sm bg-slate-300" />
+              <span className="size-2 rounded-xs bg-slate-300" />
               <span>Sem Inteligência (Força Bruta)</span>
             </span>
           </div>
-          <span className="text-slate-400 text-[11px]">Valores em R$ por Pessoa Certa</span>
+          <span className="text-slate-400 text-[10px]">R$ / Pessoa Certa</span>
         </div>
 
-        {/* Barras por Canal */}
-        <div className="space-y-3.5">
+        {/* Barras por Canal compactas */}
+        <div className="space-y-1.5">
           {CHANNELS_DATA.map((ch) => {
             const Icon = ch.icon;
             const isHovered = hoveredChannel === ch.key;
@@ -132,41 +123,41 @@ export function CpcChannelComparisonChart() {
                 onMouseEnter={() => setHoveredChannel(ch.key)}
                 onMouseLeave={() => setHoveredChannel(null)}
                 className={clsx(
-                  'rounded-lg p-2 transition-colors',
+                  'rounded-md px-2 py-1 transition-colors',
                   isHovered ? 'bg-slate-50' : 'bg-transparent',
                 )}
               >
-                <div className="flex items-center justify-between text-xs mb-1.5">
-                  <span className="flex items-center gap-2 font-semibold text-slate-800">
-                    <Icon className="size-3.5 text-slate-500" />
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className="flex items-center gap-1.5 font-medium text-slate-800">
+                    <Icon className="size-3 text-slate-400" />
                     <span>{ch.label}</span>
                   </span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-[11px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/60">
-                      ↓ {ch.savingsPct.toFixed(1)}% economia
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/60 leading-none">
+                      ↓ {ch.savingsPct.toFixed(1)}%
                     </span>
                     <span className="text-xs font-bold text-slate-900 tabular">
                       R$ {ch.withAiCpc.toFixed(2)}
-                      <span className="text-slate-400 font-normal line-through ml-1.5 text-[11px]">
+                      <span className="text-slate-400 font-normal line-through ml-1.5 text-[10px]">
                         R$ {ch.bruteForceCpc.toFixed(2)}
                       </span>
                     </span>
                   </div>
                 </div>
 
-                {/* Duas barras comparativas empilhadas */}
-                <div className="space-y-1">
+                {/* Duas barras comparativas finas */}
+                <div className="space-y-0.5">
                   {/* Barra IA */}
-                  <div className="h-3 w-full rounded-full bg-slate-100 overflow-hidden relative">
+                  <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden relative">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-brand-600 to-indigo-600 transition-all duration-500"
+                      className="h-full rounded-full bg-gradient-to-r from-brand-600 to-indigo-600 transition-all duration-300"
                       style={{ width: `${aiWidthPct}%` }}
                     />
                   </div>
                   {/* Barra Força Bruta */}
-                  <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden relative">
+                  <div className="h-1 w-full rounded-full bg-slate-100 overflow-hidden relative">
                     <div
-                      className="h-full rounded-full bg-slate-300 transition-all duration-500"
+                      className="h-full rounded-full bg-slate-300 transition-all duration-300"
                       style={{ width: `${bruteWidthPct}%` }}
                     />
                   </div>
@@ -176,16 +167,16 @@ export function CpcChannelComparisonChart() {
           })}
         </div>
 
-        {/* Resumo Ponderado Final */}
-        <div className="rounded-xl border border-brand-200/70 bg-gradient-to-r from-brand-50/70 via-indigo-50/40 to-emerald-50/50 p-3 flex flex-wrap items-center justify-between gap-2 text-xs">
-          <div className="flex items-center gap-2">
-            <Sparkles className="size-4 text-brand-700 shrink-0" />
-            <span className="text-slate-700">
-              Média Ponderada da Operação: <strong>R$ 3,18</strong> / CPC com inteligência vs. <strong>R$ 5,60</strong> no disparo cego.
+        {/* Resumo Ponderado Final compacto */}
+        <div className="rounded-lg border border-brand-200/70 bg-gradient-to-r from-brand-50/70 via-indigo-50/40 to-emerald-50/50 px-2.5 py-1.5 flex items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-1.5 text-slate-700">
+            <Sparkles className="size-3.5 text-brand-700 shrink-0" />
+            <span className="text-[11px]">
+              Média Operação: <strong>R$ 3,18</strong> vs. <span className="text-slate-500">R$ 5,60</span> cego
             </span>
           </div>
-          <span className="font-bold text-emerald-800 bg-white/80 border border-emerald-200 px-2.5 py-1 rounded-lg shadow-2xs">
-            R$ 2,42 economizados por contato
+          <span className="font-bold text-emerald-800 bg-white/90 border border-emerald-200 px-2 py-0.5 rounded text-[10px] shrink-0">
+            -R$ 2,42 / contato
           </span>
         </div>
       </div>
@@ -196,15 +187,12 @@ export function CpcChannelComparisonChart() {
 export function BttcHourlyTrendChart() {
   const [activePoint, setActivePoint] = useState<HourlyPoint>(HOURLY_DATA[2]); // 12h padrão
 
-  // Coordenadas para o SVG (viewBox 0 0 500 160)
-  // Largura: 500, Altura: 160
-  // X vai de 30 a 470
-  // Y vai de 20 (taxa 60%) a 140 (taxa 0%)
+  // Coordenadas para o SVG (viewBox 0 0 500 120)
   const width = 500;
-  const height = 160;
-  const padX = 40;
-  const padBottom = 30;
-  const padTop = 20;
+  const height = 120;
+  const padX = 36;
+  const padBottom = 22;
+  const padTop = 14;
   const plotWidth = width - padX * 2;
   const plotHeight = height - padBottom - padTop;
   const maxRate = 60; // escala Y de 0 a 60%
@@ -231,46 +219,37 @@ export function BttcHourlyTrendChart() {
 
   return (
     <Card
-      title={
-        <div className="flex items-center justify-between w-full">
-          <div>
-            <div className="flex items-center gap-2">
-              <Clock className="size-4 text-brand-700" aria-hidden />
-              <span className="font-semibold text-slate-900">Assertividade por Janela Horária (BTTC)</span>
-            </div>
-            <p className="text-xs text-slate-500 font-normal mt-0.5">
-              Taxa de contato com a pessoa certa (%) identificada ao longo das faixas do dia
-            </p>
-          </div>
-          <Badge tone="brand">
-            Pico Ativo: <span className="font-bold ml-1">12:00 (48,2%)</span>
-          </Badge>
-        </div>
+      title="Assertividade por Janela Horária (BTTC)"
+      tooltip="Taxa de contato com a pessoa certa (%) identificada ao longo das faixas horárias do dia."
+      actions={
+        <Badge tone="brand">
+          Pico Ativo: <span className="font-bold ml-1">12:00 (48,2%)</span>
+        </Badge>
       }
     >
-      <div className="space-y-3 pt-1">
-        {/* Banner do ponto selecionado / ativo */}
-        <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-1.5 text-xs border border-slate-200/80">
+      <div className="space-y-2.5">
+        {/* Banner do ponto selecionado / ativo compacto */}
+        <div className="flex items-center justify-between rounded-md bg-slate-50 px-2.5 py-1 text-xs border border-slate-200/80">
           <span className="text-slate-600">
             Faixa: <strong className="text-slate-900">{activePoint.label}</strong>
           </span>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <span className="text-slate-600">
-              Taxa de CPC: <strong className="text-brand-700">{activePoint.rate.toFixed(1)}%</strong>
+              Taxa: <strong className="text-brand-700">{activePoint.rate.toFixed(1)}%</strong>
             </span>
             <span className="text-slate-600">
-              Custo Estimado: <strong className="text-emerald-700">R$ {activePoint.cost.toFixed(2)}</strong>
+              Custo: <strong className="text-emerald-700">R$ {activePoint.cost.toFixed(2)}</strong>
             </span>
             {activePoint.isPeak && (
-              <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-1.5 py-0.5 rounded">
+              <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-1.5 py-0.5 rounded leading-none">
                 ⚡ Pico Assertivo
               </span>
             )}
           </div>
         </div>
 
-        {/* Gráfico SVG Responsivo */}
-        <div className="relative w-full h-44">
+        {/* Gráfico SVG Responsivo compacto */}
+        <div className="relative w-full h-32">
           <svg
             viewBox={`0 0 ${width} ${height}`}
             className="w-full h-full overflow-visible select-none"
@@ -370,7 +349,7 @@ export function BttcHourlyTrendChart() {
                   <circle
                     cx={p.x}
                     cy={p.y}
-                    r={isSelected ? 6 : p.isPeak ? 5 : 4}
+                    r={isSelected ? 5.5 : p.isPeak ? 4.5 : 3.5}
                     fill={isSelected ? '#4f46e5' : '#ffffff'}
                     stroke={isSelected ? '#ffffff' : '#4f46e5'}
                     strokeWidth={isSelected ? 2 : 2.5}
@@ -381,9 +360,9 @@ export function BttcHourlyTrendChart() {
                   {(p.isPeak || isSelected) && (
                     <text
                       x={p.x}
-                      y={p.y - 10}
+                      y={p.y - 8}
                       textAnchor="middle"
-                      className="text-[11px] font-bold fill-indigo-900 font-sans"
+                      className="text-[10px] font-bold fill-indigo-900 font-sans"
                     >
                       {p.rate.toFixed(0)}%
                     </text>
@@ -392,10 +371,10 @@ export function BttcHourlyTrendChart() {
                   {/* Rótulo do Eixo X */}
                   <text
                     x={p.x}
-                    y={baselineY + 18}
+                    y={baselineY + 16}
                     textAnchor="middle"
                     className={clsx(
-                      'text-[11px] font-sans transition-colors',
+                      'text-[10px] font-sans transition-colors',
                       isSelected ? 'font-bold fill-brand-700' : 'fill-slate-500 font-medium',
                     )}
                   >
@@ -408,9 +387,9 @@ export function BttcHourlyTrendChart() {
         </div>
 
         {/* Rodapé informativo */}
-        <div className="flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100 pt-2">
+        <div className="flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100 pt-1.5">
           <span>O motor BTTC direciona os disparos para os picos de almoço (12h) e fim de tarde (18h).</span>
-          <span className="font-medium text-brand-700">Clique nos pontos para detalhar</span>
+          <span className="font-medium text-brand-700">Clique para detalhar</span>
         </div>
       </div>
     </Card>
