@@ -773,6 +773,13 @@ function UnifiedCampaignCreator({
   // Wizard Step: 1 = Mailing, 2 = Público, 3 = Acionamento, 4 = Campanha
   const [wizardStep, setWizardStep] = useState<1 | 2 | 3 | 4>(1);
 
+  // IA Step: 1 = Objetivo e mailing, 2 = Revisão e início
+  const [aiStep, setAiStep] = useState<1 | 2>(1);
+
+  // Opção de salvar campanha como template no passo 2
+  const [saveAsTemplate, setSaveAsTemplate] = useState<boolean>(false);
+  const [scheduleChoice, setScheduleChoice] = useState<'NOW' | 'SCHEDULED'>('NOW');
+
   // 1. Base selection state
   const [sourceType, setSourceType] = useState<'EXISTING' | 'IMPORT'>('EXISTING');
   const [useList, setUseList] = useState<boolean>(draft.audienceMode === 'LIST');
@@ -1005,342 +1012,560 @@ function UnifiedCampaignCreator({
       </div>
 
       {/* ============================================================== */}
-      {/* EXPERIÊNCIA 1: CRIAR COM IA (PROMPT & ANEXOS)                  */}
+      {/* EXPERIÊNCIA 1: CRIAR COM IA (PROMPT & ANEXOS EM 2 PASSOS)      */}
       {/* ============================================================== */}
       {experience === 'AI_PROMPT' && (
         <div className="space-y-6">
-          <Card
-            title={
-              <div className="flex items-center justify-between w-full">
-                <span className="flex items-center gap-2">
-                  <Sparkles className="size-4 text-brand-700" aria-hidden />
-                  <span>Montagem Inteligente da Campanha</span>
+          {/* Stepper das 2 etapas da IA (conforme esboço) */}
+          <div className="border-b border-slate-200/80 pb-3">
+            <nav aria-label="Etapas da IA" className="flex items-center gap-8 pt-1">
+              {/* Passo 1 */}
+              <button
+                type="button"
+                onClick={() => setAiStep(1)}
+                className={clsx(
+                  'group flex items-center gap-2.5 pb-2.5 border-b-[3px] transition-all cursor-pointer',
+                  aiStep === 1
+                    ? 'border-brand-700 text-brand-900 font-bold'
+                    : 'border-transparent text-slate-400 font-medium hover:text-slate-600',
+                )}
+              >
+                <span
+                  className={clsx(
+                    'grid size-7 place-items-center rounded-full text-xs font-bold transition-all',
+                    aiStep === 1
+                      ? 'bg-brand-700 text-white shadow-xs'
+                      : 'bg-brand-100 text-brand-800',
+                  )}
+                >
+                  {aiStep > 1 ? <Check className="size-4 stroke-[2.5]" /> : '1'}
                 </span>
-                <Badge tone="brand">Experiência Prompt com IA</Badge>
-              </div>
-            }
-          >
-            <div className="space-y-5">
-              {/* 1. Bar de Anexo de Mailing (Arquivo CSV / Base Existente) */}
-              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5">
-                    <Database className="size-4 text-brand-700 shrink-0" />
-                    <span className="text-xs font-bold text-slate-800">
-                      Base de Contatos
-                    </span>
-                    <InfoTooltip content="Selecione um mailing existente do workspace ou anexe uma nova planilha de contatos em CSV." />
-                  </div>
+                <span className="text-base tracking-tight">Objetivo e mailing</span>
+              </button>
 
-                  <div className="flex items-center gap-2">
+              {/* Passo 2 */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (selectedMailingId || activeMailing?.id) {
+                    setAiStep(2);
+                  } else {
+                    setFormError('Selecione ou anexe uma base de contatos antes de avançar para a revisão.');
+                  }
+                }}
+                className={clsx(
+                  'group flex items-center gap-2.5 pb-2.5 border-b-[3px] transition-all',
+                  aiStep === 2
+                    ? 'border-brand-700 text-brand-900 font-bold cursor-pointer'
+                    : 'border-transparent text-slate-400 font-medium hover:text-slate-600 cursor-pointer',
+                )}
+              >
+                <span
+                  className={clsx(
+                    'grid size-7 place-items-center rounded-full text-xs font-bold transition-all',
+                    aiStep === 2
+                      ? 'bg-brand-700 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-400',
+                  )}
+                >
+                  2
+                </span>
+                <span className="text-base tracking-tight">Revisão e início</span>
+              </button>
+            </nav>
+          </div>
+
+          {/* PASSO 1 DA IA: OBJETIVO E MAILING */}
+          {aiStep === 1 && (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* Coluna Principal da Esquerda: Prompt, Templates e Anexo */}
+              <div className="lg:col-span-8 space-y-5">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900 tracking-tight">
+                    O que você precisa realizar?
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Descreva o objetivo; um template pode servir de ponto de partida.
+                  </p>
+                </div>
+
+                {/* Caixa de Texto do Prompt com botão circular de envio */}
+                <div className="relative rounded-2xl border border-slate-200 bg-white p-3 shadow-xs focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 transition">
+                  <Textarea
+                    id="ai-prompt-input"
+                    rows={4}
+                    className="w-full border-0 p-1 text-sm text-slate-800 placeholder-slate-400 focus:ring-0 resize-none leading-relaxed"
+                    placeholder="Descreva em linguagem natural..."
+                    value={promptText}
+                    onChange={(e) => setPromptText(e.target.value)}
+                  />
+
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100/80">
+                    <span className="text-[11px] text-slate-400">
+                      Descreva em linguagem natural
+                    </span>
+
                     <button
                       type="button"
-                      onClick={() => setShowImportInPrompt((v) => !v)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-2xs cursor-pointer"
+                      onClick={() => {
+                        if (selectedMailingId || activeMailing?.id) {
+                          setAiStep(2);
+                        } else {
+                          setFormError('Selecione ou anexe uma base de contatos antes de avançar para a revisão.');
+                        }
+                      }}
+                      className="grid size-8 place-items-center rounded-full bg-brand-700 text-white shadow-sm hover:bg-brand-800 transition cursor-pointer"
+                      title="Continuar para revisão"
                     >
-                      <UploadCloud className="size-3.5 text-brand-600" />
-                      <span>{showImportInPrompt ? 'Selecionar existente' : 'Anexar novo arquivo (CSV)'}</span>
+                      <ArrowRight className="size-4" />
                     </button>
                   </div>
                 </div>
 
-                {!showImportInPrompt ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-                    <div>
-                      <Select
-                        id="prompt-mailing-select"
-                        value={selectedMailingId}
-                        onChange={(e) => setSelectedMailingId(e.target.value)}
-                        className="text-xs"
-                      >
-                        <option value="">Selecione uma base existente...</option>
-                        {mailings?.map((m) => (
-                          <option key={m.id} value={m.id}>
-                            {m.name} — {fmtNumber(m.recordCount)} contatos
-                          </option>
-                        ))}
-                      </Select>
-                    </div>
-
-                    {activeMailing ? (
-                      <div className="flex items-center gap-2 text-xs text-emerald-800 bg-emerald-50 border border-emerald-200/80 rounded-lg px-3 py-2">
-                        <CheckCircle2 className="size-4 text-emerald-600 shrink-0" />
-                        <span className="truncate">
-                          Base vinculada: <strong>{activeMailing.name}</strong> ({fmtNumber(activeMailing.recordCount)} contatos)
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200/80 rounded-lg px-3 py-2">
-                        Selecione um mailing acima ou clique em "Anexar novo arquivo (CSV)".
-                      </div>
-                    )}
+                {/* Templates de Prompt */}
+                <div className="space-y-2">
+                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                    Usar template de prompt
                   </div>
-                ) : (
-                  <div className="rounded-xl border border-brand-200 bg-white p-3 space-y-2">
-                    <div className="flex items-center justify-between text-xs font-semibold text-brand-900 border-b border-slate-100 pb-2">
-                      <span className="flex items-center gap-1.5">
-                        <Paperclip className="size-3.5 text-brand-600" /> Anexar arquivo de contatos (CSV / Planilha)
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setShowImportInPrompt(false)}
-                        className="text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
-                      >
-                        ✕ Voltar para mailing existente
-                      </button>
-                    </div>
-                    <ImportFlow
-                      onImported={(r) => {
-                        qc.invalidateQueries({ queryKey: ['mailings'] });
-                        setSelectedMailingId(r.mailingId);
-                        setShowImportInPrompt(false);
-                        toast('success', `Arquivo "${r.name}" importado e selecionado!`);
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPromptText('Quero realizar cobrança amigável de títulos vencidos com envio de PIX instantâneo e desconto para quitação à vista.');
+                        setPurposeCode('COBRANCA');
                       }}
-                    />
-                  </div>
-                )}
-              </div>
+                      className={clsx(
+                        'rounded-xl border px-3.5 py-1.5 text-xs font-semibold transition cursor-pointer',
+                        parsedPrompt.purposeCode === 'COBRANCA'
+                          ? 'border-brand-300 bg-brand-50/70 text-brand-900 shadow-2xs'
+                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+                      )}
+                    >
+                      Cobrança
+                    </button>
 
-              {/* 2. Textarea do Prompt */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-1.5">
-                  <Sparkles className="size-3.5 text-brand-600" />
-                  <label htmlFor="ai-campaign-prompt" className="text-xs font-bold text-slate-800">
-                    Prompt de Configuração
-                  </label>
-                  <InfoTooltip content="A IA interpreta automaticamente em linguagem natural o objetivo (cobrança, venda, agendamento), público (B2B/B2C), filtros escritos (ex: atraso > 30, valor > 1000) e ordenação." />
-                </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPromptText('Campanha de vendas e oferta comercial de novos planos com abordagem consultiva multicanal em horário comercial.');
+                        setPurposeCode('VENDAS');
+                      }}
+                      className={clsx(
+                        'rounded-xl border px-3.5 py-1.5 text-xs font-semibold transition cursor-pointer',
+                        parsedPrompt.purposeCode === 'VENDAS'
+                          ? 'border-brand-300 bg-brand-50/70 text-brand-900 shadow-2xs'
+                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+                      )}
+                    >
+                      Vendas
+                    </button>
 
-                <Textarea
-                  id="ai-campaign-prompt"
-                  rows={4}
-                  className="font-sans text-sm p-3.5 rounded-xl border-slate-200 focus:border-brand-500 shadow-2xs leading-relaxed"
-                  placeholder="Ex: Cobrança B2B faturamento corporativo para empresas com atraso superior a 30 dias e valor acima de R$ 1.000, ordenar por maior valor primeiro. Priorizar e-mail com boleto bancário e WhatsApp formal em horário comercial..."
-                  value={promptText}
-                  onChange={(e) => setPromptText(e.target.value)}
-                />
-              </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPromptText('Quero confirmar os agendamentos de amanhã. Priorize a pessoa certa, use WhatsApp primeiro e telefone como alternativa, entre 9h e 18h, com até 3 tentativas.');
+                        setPurposeCode('AGENDAMENTOS');
+                      }}
+                      className={clsx(
+                        'rounded-xl border px-3.5 py-1.5 text-xs font-semibold transition cursor-pointer',
+                        parsedPrompt.purposeCode === 'AGENDAMENTOS'
+                          ? 'border-brand-300 bg-brand-50/70 text-brand-900 shadow-2xs'
+                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+                      )}
+                    >
+                      Confirmação de serviço
+                    </button>
 
-              {/* 3. Sugestões Rápidas de Prompt */}
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-                  <span>Sugestões rápidas</span>
-                  <InfoTooltip content="Modelos pré-configurados com filtros e regras de acionamento prontas para uso imediato." />
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPromptText('Cobrança B2B faturamento corporativo para empresas com atraso superior a 30 dias e valor acima de R$ 1.000, ordenar por maior valor primeiro. Priorizar e-mail institucional com boleto/DDA e WhatsApp Business formal em horário comercial.');
-                    }}
-                    className="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50/70 px-2.5 py-1 text-xs font-medium text-indigo-900 hover:bg-indigo-100 transition cursor-pointer"
-                  >
-                    <Building2 className="size-3 text-indigo-600" />
-                    <span>Cobrança B2B (Faturamento atraso &gt; 30d e valor &gt; 1k)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPromptText('Cobrança amigável B2C para pessoas físicas com atraso recente de até 30 dias e envio de chave PIX instantânea com desconto para quitação.');
-                    }}
-                    className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50/70 px-2.5 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100 transition cursor-pointer"
-                  >
-                    <Coins className="size-3 text-amber-600" />
-                    <span>Cobrança B2C PIX (Atraso recente 1-30d)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPromptText('Venda ativa corporativa B2B de novos planos empresariais para empresas e PMEs, com abordagem consultiva em horário comercial.');
-                    }}
-                    className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50/70 px-2.5 py-1 text-xs font-medium text-blue-900 hover:bg-blue-100 transition cursor-pointer"
-                  >
-                    <ShoppingBag className="size-3 text-blue-600" />
-                    <span>Venda B2B Corporativa (Planos PME)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPromptText('Confirmação de consultas e exames com cadência automática: enviar lembrete 1 dia antes (D-1) com botões e no dia (D-0) 2h antes com endereço.');
-                    }}
-                    className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50/70 px-2.5 py-1 text-xs font-medium text-emerald-900 hover:bg-emerald-100 transition cursor-pointer"
-                  >
-                    <CalendarCheck className="size-3 text-emerald-600" />
-                    <span>Agendamentos D-1 e D-0 (Prevenção de No-Show)</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* 4. Card Interativo de Interpretação e Pré-visualização da IA */}
-              <div className="rounded-xl border border-brand-200 bg-gradient-to-br from-brand-50/40 via-white to-slate-50 p-4 space-y-4 shadow-xs">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-brand-100 pb-3">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="size-4 text-brand-600" />
-                    <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                      Interpretação e Configuração da Campanha pela IA
-                    </span>
-                    <InfoTooltip content="Parâmetros estruturados pela IA a partir do prompt livre e do mailing vinculado." />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge tone={parsedPrompt.purposeCode === 'AGENDAMENTOS' ? 'green' : parsedPrompt.purposeCode === 'VENDAS' ? 'blue' : 'brand'}>
-                      {parsedPrompt.purposeCode === 'AGENDAMENTOS' ? '📅 Agendamentos' : parsedPrompt.purposeCode === 'VENDAS' ? '🛍️ Vendas' : '🪙 Cobrança'}
-                    </Badge>
-                    <Badge tone={parsedPrompt.audienceSegment === 'B2B' ? 'blue' : parsedPrompt.audienceSegment === 'MIXED' ? 'brand' : 'gray'}>
-                      {parsedPrompt.audienceSegment === 'B2B' ? '🏢 B2B · Pessoa Jurídica' : parsedPrompt.audienceSegment === 'MIXED' ? '🔄 Misto / Dinâmico' : '👤 B2C · Consumidor'}
-                    </Badge>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPromptText('Pesquisa rápida de satisfação e feedback de atendimento via WhatsApp interativo com escala de 1 a 5.');
+                      }}
+                      className="rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                    >
+                      Pesquisa
+                    </button>
                   </div>
                 </div>
 
-                {/* Grade de Configurações Extraídas */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                  {/* Nome Gerado */}
-                  <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1">
-                    <div className="flex items-center gap-1 text-slate-500 text-[11px] font-medium">
-                      <span>Nome Sugerido</span>
-                      <InfoTooltip content="Nome intuitivo gerado para identificação da campanha nas listagens e relatórios." />
-                    </div>
-                    <div className="font-semibold text-slate-900 text-sm">{parsedPrompt.campaignName}</div>
-                  </div>
+                {/* Seleção / Anexo de Mailing */}
+                <div className="space-y-2 pt-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowImportInPrompt((v) => !v)}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs transition cursor-pointer"
+                    >
+                      <Paperclip className="size-3.5 text-brand-600" />
+                      <span>{showImportInPrompt ? 'Selecionar existente' : 'Anexar CSV'}</span>
+                    </button>
 
-                  {/* Base de Destino */}
-                  <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1">
-                    <div className="flex items-center gap-1 text-slate-500 text-[11px] font-medium">
-                      <span>Mailing Alvo</span>
-                      <InfoTooltip content="Base de contatos que será utilizada como fonte de dados para o acionamento." />
-                    </div>
-                    <div className="font-semibold text-slate-900 text-sm">
-                      {activeMailing ? activeMailing.name : 'Nenhum mailing selecionado'}
-                    </div>
-                    {activeMailing && (
-                      <span className="text-slate-500 text-[11px] block">
-                        {fmtNumber(activeMailing.recordCount)} contatos disponíveis
-                      </span>
+                    {!showImportInPrompt && (
+                      <div className="flex-1 min-w-[240px]">
+                        <Select
+                          id="ai-mailing-select"
+                          value={selectedMailingId}
+                          onChange={(e) => setSelectedMailingId(e.target.value)}
+                          className="text-xs rounded-xl"
+                        >
+                          <option value="">Ou selecionar mailing ou lista existente...</option>
+                          {mailings?.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.name} ({fmtNumber(m.recordCount)} contatos)
+                            </option>
+                          ))}
+                        </Select>
+                      </div>
                     )}
                   </div>
 
-                  {/* Filtros Extraídos na Escrita */}
-                  <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1.5 md:col-span-2">
-                    <div className="flex items-center gap-1 text-slate-500 text-[11px] font-medium">
-                      <Filter className="size-3 text-brand-600" />
-                      <span>Filtros Identificados</span>
-                      <InfoTooltip content="Filtros e regras de elegibilidade extraídos da descrição em linguagem natural." />
-                    </div>
-
-                    <div className="flex flex-wrap gap-1.5 pt-0.5">
-                      {parsedPrompt.extractedFilters.map((f, i) => (
-                        <span
-                          key={i}
-                          className="inline-flex items-center gap-1 rounded-md bg-brand-50 border border-brand-200/70 px-2.5 py-1 text-xs font-semibold text-brand-900"
-                        >
-                          <Check className="size-3 text-brand-600" />
-                          <span>{f.label}</span>
+                  {showImportInPrompt && (
+                    <div className="rounded-xl border border-brand-200 bg-white p-3 space-y-2">
+                      <div className="flex items-center justify-between text-xs font-semibold text-brand-900 border-b border-slate-100 pb-2">
+                        <span className="flex items-center gap-1.5">
+                          <Paperclip className="size-3.5 text-brand-600" /> Anexar arquivo de contatos (CSV / Planilha)
                         </span>
-                      ))}
+                        <button
+                          type="button"
+                          onClick={() => setShowImportInPrompt(false)}
+                          className="text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
+                        >
+                          ✕ Fechar importação
+                        </button>
+                      </div>
+                      <ImportFlow
+                        onImported={(r) => {
+                          qc.invalidateQueries({ queryKey: ['mailings'] });
+                          setSelectedMailingId(r.mailingId);
+                          setShowImportInPrompt(false);
+                          toast('success', `Arquivo "${r.name}" importado e selecionado!`);
+                        }}
+                      />
                     </div>
-                  </div>
+                  )}
 
-                  {/* Ordenação Extraída */}
-                  <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1">
-                    <div className="flex items-center gap-1 text-slate-500 text-[11px] font-medium">
-                      <SlidersHorizontal className="size-3 text-brand-600" />
-                      <span>Critério de Ordenação</span>
-                      <InfoTooltip content="Critério de priorização na fila de disparo (ex: maior valor, maior atraso, score preditivo)." />
-                    </div>
-                    <div className="font-semibold text-slate-900 text-xs flex items-center gap-1.5 pt-0.5">
-                      <span className="rounded bg-slate-100 px-2 py-0.5 border border-slate-200">
-                        {parsedPrompt.extractedSort.label}
+                  {/* Tag do Mailing Selecionado */}
+                  {activeMailing && (
+                    <div className="flex items-center justify-between rounded-xl border border-emerald-200/90 bg-emerald-50/60 px-3.5 py-2.5 text-xs text-emerald-900">
+                      <div className="flex items-center gap-2 truncate">
+                        <FileSpreadsheet className="size-4 text-emerald-700 shrink-0" />
+                        <span className="font-semibold truncate">{activeMailing.name}</span>
+                      </div>
+                      <span className="text-emerald-700 text-[11px] shrink-0 font-medium">
+                        {fmtNumber(activeMailing.recordCount)} linhas · campos reconhecidos
                       </span>
                     </div>
-                  </div>
-
-                  {/* Canais Prioritários */}
-                  <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1">
-                    <div className="flex items-center gap-1 text-slate-500 text-[11px] font-medium">
-                      <span>Canais Prioritários</span>
-                      <InfoTooltip content="Canais de comunicação recomendados pelo modelo preditivo com base no perfil e objetivo." />
-                    </div>
-                    <div className="flex flex-wrap gap-1 pt-0.5">
-                      {parsedPrompt.recommendedChannels.map((ch) => (
-                        <Badge key={ch} tone="brand">{CHANNEL_LABEL[ch] ?? ch}</Badge>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Cadência & Janelas Operacionais */}
-                  <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1 md:col-span-2">
-                    <div className="flex items-center gap-1 text-slate-500 text-[11px] font-medium">
-                      <span>Cadência &amp; Horários</span>
-                      <InfoTooltip content="Janelas regulatórias de disparo e espaçamento entre tentativas." />
-                    </div>
-                    <p className="text-slate-700 text-xs leading-relaxed font-medium">
-                      {parsedPrompt.cadenceSummary}
-                    </p>
-                  </div>
+                  )}
                 </div>
 
-                {/* Métricas Estimadas de Eficiência */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-1 border-t border-slate-100 text-xs">
-                  <div>
-                    <div className="flex items-center gap-1 text-slate-500 text-[11px]">
-                      <span>Custo Unitário Estimado</span>
-                      <InfoTooltip content="Custo médio estimado por contato considerando tarifas dos canais recomendados." />
-                    </div>
-                    <strong className="text-emerald-700 text-sm">{fmtMoney(parsedPrompt.unitCostBrl)}</strong>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-1 text-slate-500 text-[11px]">
-                      <span>Taxa de Resposta / Contato</span>
-                      <InfoTooltip content="Taxa projetada de engajamento baseada no histórico de campanhas com perfil semelhante." />
-                    </div>
-                    <strong className="text-slate-900 text-sm">~{parsedPrompt.expectedRatePct}%</strong>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-1 text-slate-500 text-[11px]">
-                      <span>Economia / Ganho IA</span>
-                      <InfoTooltip content="Ganho percentual de eficiência estimado pela IA em relação ao acionamento convencional." />
-                    </div>
-                    <strong className="text-brand-700 text-sm">+{parsedPrompt.gainOrSavingsPct}%</strong>
-                  </div>
-                </div>
-
-                {/* Ações do Card de Pré-visualização */}
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-brand-100">
+                {/* Botão de Ação: Continuar para revisão */}
+                <div className="pt-2">
                   <Button
-                    variant="secondary"
+                    variant="primary"
                     size="md"
-                    onClick={handleRefineInStructured}
-                    icon={<SlidersHorizontal className="size-4" />}
+                    onClick={() => {
+                      if (!selectedMailingId && !activeMailing?.id) {
+                        setFormError('Selecione ou anexe uma base de contatos (mailing) para continuar.');
+                        return;
+                      }
+                      setFormError(null);
+                      setAiStep(2);
+                    }}
+                    className="w-full sm:w-auto"
+                    icon={<ArrowRight className="size-4" />}
                   >
-                    Refinar na Forma Estruturada →
+                    Continuar para revisão →
                   </Button>
+                </div>
+              </div>
 
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="secondary"
-                      size="md"
-                      onClick={() => handleCreate('READY')}
-                      loading={isCreating && createStartMode === 'READY'}
-                      icon={<Save className="size-4" />}
-                    >
-                      Salvar como Pronta
-                    </Button>
-                    <Button
-                      variant="primary"
-                      size="md"
-                      onClick={() => handleCreate('NOW')}
-                      loading={isCreating && createStartMode === 'NOW'}
-                      icon={<Rocket className="size-4" />}
-                    >
-                      Criar e Iniciar Agora
-                    </Button>
+              {/* Coluna Lateral da Direita: Checklist da Campanha */}
+              <div className="lg:col-span-4">
+                <div className="rounded-2xl border border-slate-200/90 bg-slate-50/50 p-4 space-y-4">
+                  <div className="text-xs font-bold text-slate-800 tracking-tight">
+                    Checklist da campanha
+                  </div>
+
+                  <div className="space-y-3 text-xs">
+                    {/* Item 1: Descritivo */}
+                    <div className="flex items-start gap-2.5">
+                      <div className="grid size-5 place-items-center rounded-full bg-emerald-100 text-emerald-700 shrink-0 mt-0.5">
+                        <Check className="size-3 stroke-[2.5]" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-slate-800">Descritivo</div>
+                        <div className="text-slate-500 text-[11px] leading-tight line-clamp-2">
+                          {promptText.trim() ? promptText : 'Descreva o objetivo da campanha'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Item 2: Canal */}
+                    <div className="flex items-start gap-2.5">
+                      <div className="grid size-5 place-items-center rounded-full bg-emerald-100 text-emerald-700 shrink-0 mt-0.5">
+                        <Check className="size-3 stroke-[2.5]" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-slate-800">Canal</div>
+                        <div className="text-slate-500 text-[11px]">
+                          {parsedPrompt.recommendedChannels.map((c) => CHANNEL_LABEL[c] ?? c).join(' → ')}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Item 3: Dias */}
+                    <div className="flex items-start gap-2.5">
+                      <div className="grid size-5 place-items-center rounded-full bg-emerald-100 text-emerald-700 shrink-0 mt-0.5">
+                        <Check className="size-3 stroke-[2.5]" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-slate-800">Dias</div>
+                        <div className="text-slate-500 text-[11px]">
+                          {parsedPrompt.audienceSegment === 'B2B' ? 'Segunda a sexta' : 'Todos os dias permitidos'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Item 4: Tentativas */}
+                    <div className="flex items-start gap-2.5">
+                      <div className="grid size-5 place-items-center rounded-full bg-emerald-100 text-emerald-700 shrink-0 mt-0.5">
+                        <Check className="size-3 stroke-[2.5]" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-slate-800">Tentativas</div>
+                        <div className="text-slate-500 text-[11px]">
+                          Até 3 por contato
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Item 5: CSV */}
+                    <div className="flex items-start gap-2.5">
+                      <div className={clsx(
+                        'grid size-5 place-items-center rounded-full shrink-0 mt-0.5',
+                        activeMailing ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-400'
+                      )}>
+                        <Check className="size-3 stroke-[2.5]" />
+                      </div>
+                      <div>
+                        <div className="font-bold text-slate-800">CSV</div>
+                        <div className="text-slate-500 text-[11px]">
+                          {activeMailing
+                            ? `${fmtNumber(activeMailing.recordCount)} contatos · campos reconhecidos`
+                            : 'Pendente anexar ou selecionar'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-200/80 text-[10px] text-slate-400 leading-tight">
+                    O checklist acompanha o que já foi definido no prompt e na lista.
                   </div>
                 </div>
               </div>
             </div>
-          </Card>
+          )}
+
+          {/* PASSO 2 DA IA: REVISÃO E INÍCIO */}
+          {aiStep === 2 && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 tracking-tight">
+                  Revisar e iniciar
+                </h2>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                {/* Coluna Principal da Esquerda: Configurações estruturadas da campanha */}
+                <div className="lg:col-span-8 rounded-2xl border border-slate-200 bg-white p-5 space-y-5 shadow-xs">
+                  <div className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3">
+                    Configuração da campanha
+                  </div>
+
+                  {/* Nome da Campanha */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-600 block">
+                      Nome da campanha
+                    </label>
+                    <Input
+                      id="review-campaign-name"
+                      value={campaignName}
+                      onChange={(e) => setCampaignName(e.target.value)}
+                      className="text-sm rounded-xl font-medium"
+                      placeholder="Identificação da campanha"
+                    />
+                  </div>
+
+                  {/* Mailing */}
+                  <div className="space-y-1">
+                    <div className="text-xs font-semibold text-slate-600">
+                      Mailing
+                    </div>
+                    <div className="font-bold text-sm text-slate-900">
+                      {activeMailing?.name ?? 'mailing_clientes.csv'}
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      {activeMailing ? fmtNumber(activeMailing.recordCount) : '1.248'} contatos · campos validados · DNC aplicado
+                    </div>
+                  </div>
+
+                  {/* Prioridade */}
+                  <div className="space-y-1 border-t border-slate-100 pt-3">
+                    <div className="text-xs font-semibold text-slate-600">
+                      Prioridade
+                    </div>
+                    <div className="font-bold text-sm text-slate-900">
+                      Maior chance de falar com a pessoa certa
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      Exclusões e ordem ficam visíveis na lista processada
+                    </div>
+                  </div>
+
+                  {/* Canais e Tentativas */}
+                  <div className="space-y-2 border-t border-slate-100 pt-3">
+                    <div className="text-xs font-semibold text-slate-600">
+                      Canais e tentativas
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50/80 px-3 py-1.5 text-xs font-bold text-brand-900">
+                        <span>1</span>
+                        <span>WhatsApp</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700">
+                        <span>2</span>
+                        <span>Telefonia</span>
+                      </div>
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      Até 3 tentativas por contato · aguardar feedback entre canais
+                    </div>
+                  </div>
+
+                  {/* Horário Permitido */}
+                  <div className="space-y-2 border-t border-slate-100 pt-3">
+                    <div className="text-xs font-semibold text-slate-600">
+                      Horário permitido
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {['Seg', 'Ter', 'Qua', 'Qui', 'Sex'].map((d) => (
+                        <span
+                          key={d}
+                          className="rounded-lg border border-brand-200 bg-brand-50/80 px-2.5 py-1 text-xs font-semibold text-brand-900"
+                        >
+                          {d}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      09:00–18:00 · horário local do contato
+                    </div>
+                  </div>
+                </div>
+
+                {/* Coluna Lateral da Direita: Resumo, Início e Ações de Disparo */}
+                <div className="lg:col-span-4 space-y-4">
+                  <div className="rounded-2xl border border-slate-200/90 bg-slate-50/50 p-4 space-y-4">
+                    <div className="text-xs font-bold text-slate-800 tracking-tight">
+                      Resumo
+                    </div>
+
+                    {/* Card 1: Base elegível */}
+                    <div className="rounded-xl border border-slate-200/80 bg-white p-3 space-y-0.5">
+                      <div className="text-[11px] font-medium text-slate-500">Base elegível</div>
+                      <div className="text-base font-bold text-slate-900">
+                        {activeMailing ? fmtNumber(activeMailing.recordCount) : '1.248'} contatos
+                      </div>
+                    </div>
+
+                    {/* Card 2: Estratégia */}
+                    <div className="rounded-xl border border-slate-200/80 bg-white p-3 space-y-0.5">
+                      <div className="text-[11px] font-medium text-slate-500">Estratégia</div>
+                      <div className="text-sm font-bold text-slate-900">
+                        Confirmação básica · v1
+                      </div>
+                    </div>
+
+                    {/* Card 3: Custo estimado */}
+                    <div className="rounded-xl border border-slate-200/80 bg-white p-3 space-y-0.5">
+                      <div className="text-[11px] font-medium text-slate-500">Custo estimado</div>
+                      <div className="text-sm font-bold text-slate-900">
+                        {fmtMoney((activeMailing?.recordCount ?? 1248) * 0.05)} · 1ª tentativa
+                      </div>
+                    </div>
+
+                    <div className="text-[11px] text-slate-500 leading-snug">
+                      Conexões e bloqueios globais serão verificados antes de cada acionamento.
+                    </div>
+
+                    {/* Seletor de Início */}
+                    <div className="space-y-1.5 pt-1 border-t border-slate-200/80">
+                      <label className="text-xs font-semibold text-slate-700 block">
+                        Início
+                      </label>
+                      <Select
+                        id="start-choice-select"
+                        value={scheduleChoice}
+                        onChange={(e) => setScheduleChoice(e.target.value as 'NOW' | 'SCHEDULED')}
+                        className="text-xs rounded-xl"
+                      >
+                        <option value="NOW">Iniciar agora</option>
+                        <option value="SCHEDULED">Agendar para mais tarde</option>
+                      </Select>
+                    </div>
+
+                    {/* Checkbox Salvar como template */}
+                    <div className="flex items-center gap-2 pt-1">
+                      <input
+                        type="checkbox"
+                        id="save-as-template-check"
+                        checked={saveAsTemplate}
+                        onChange={(e) => setSaveAsTemplate(e.target.checked)}
+                        className="size-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
+                      />
+                      <label htmlFor="save-as-template-check" className="text-xs font-medium text-slate-700 cursor-pointer">
+                        Salvar campanha como template
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Botões do Rodapé no Passo 2 */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200">
+                <Button
+                  variant="secondary"
+                  size="md"
+                  onClick={() => setAiStep(1)}
+                  icon={<ArrowLeft className="size-4" />}
+                >
+                  ← Voltar à conversa
+                </Button>
+
+                <div className="flex items-center gap-2.5">
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    onClick={() => handleCreate('READY')}
+                    loading={isCreating && createStartMode === 'READY'}
+                    disabled={isCreating}
+                  >
+                    Salvar como pronta
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="md"
+                    onClick={() => handleCreate('NOW')}
+                    loading={isCreating && createStartMode === 'NOW'}
+                    disabled={isCreating}
+                    icon={<Rocket className="size-4" />}
+                  >
+                    Iniciar campanha
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
