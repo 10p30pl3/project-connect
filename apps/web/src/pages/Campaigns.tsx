@@ -129,13 +129,13 @@ export function CampaignsPage() {
               <thead>
                 <tr>
                   <th>Campanha</th>
+                  {canOperate && <th>Controles</th>}
                   <th>Status</th>
                   <th>Público</th>
                   <th>Jornada</th>
                   <th>Estratégia</th>
                   <th>Progresso</th>
                   <th>Criada</th>
-                  {canOperate && <th className="text-right">Controles</th>}
                 </tr>
               </thead>
               <tbody>
@@ -154,24 +154,9 @@ export function CampaignsPage() {
                         </Link>
                         <div className="text-xs text-slate-500">{c.operationalExplanation}</div>
                       </td>
-                      <td>
-                        <CampaignStatusBadge status={c.status} />
-                      </td>
-                      <td>
-                        <span className="text-xs text-slate-500">{c.audience.type === 'LIST' ? 'Lista' : 'Mailing'}</span>
-                        <div>{c.audience.name}</div>
-                      </td>
-                      <td>{c.journeyName}</td>
-                      <td>
-                        {c.strategyName} <span className="text-slate-500">v{c.strategyVersion}</span>
-                      </td>
-                      <td className="min-w-36">
-                        <Progress {...c.progress} />
-                      </td>
-                      <td className="whitespace-nowrap text-slate-600">{fmtDateTime(c.createdAt)}</td>
                       {canOperate && (
-                        <td className="whitespace-nowrap text-right">
-                          <div className="inline-flex items-center justify-end gap-1">
+                        <td className="whitespace-nowrap">
+                          <div className="inline-flex items-center gap-1">
                             {/* Start / Resume */}
                             <Button
                               size="sm"
@@ -232,6 +217,21 @@ export function CampaignsPage() {
                           </div>
                         </td>
                       )}
+                      <td>
+                        <CampaignStatusBadge status={c.status} />
+                      </td>
+                      <td>
+                        <span className="text-xs text-slate-500">{c.audience.type === 'LIST' ? 'Lista' : 'Mailing'}</span>
+                        <div>{c.audience.name}</div>
+                      </td>
+                      <td>{c.journeyName}</td>
+                      <td>
+                        {c.strategyName} <span className="text-slate-500">v{c.strategyVersion}</span>
+                      </td>
+                      <td className="min-w-36">
+                        <Progress {...c.progress} />
+                      </td>
+                      <td className="whitespace-nowrap text-slate-600">{fmtDateTime(c.createdAt)}</td>
                     </tr>
                   );
                 })}
