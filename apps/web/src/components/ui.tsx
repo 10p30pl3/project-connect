@@ -39,19 +39,24 @@ import { errorMessage } from '../lib/api';
 
 // ------------------------------------------------------------------ Brand Logo
 export function BrandLogo({ size = 'md', showTagline = false }: { size?: 'sm' | 'md' | 'lg'; showTagline?: boolean }) {
-  const iconCls = size === 'lg' ? 'size-10 rounded-xl' : size === 'sm' ? 'size-7 rounded-lg' : 'size-8 rounded-lg';
-  const textCls = size === 'lg' ? 'text-xl' : size === 'sm' ? 'text-sm' : 'text-[15px]';
+  const logoH = size === 'lg' ? 'h-7' : size === 'sm' ? 'h-4.5' : 'h-5.5';
+  const textCls = size === 'lg' ? 'text-lg' : size === 'sm' ? 'text-xs' : 'text-sm';
   return (
-    <div className="inline-flex items-center gap-2.5 select-none">
-      <div className={clsx('relative shrink-0 shadow-sm ring-1 ring-brand-700/15 overflow-hidden', iconCls)}>
-        <img src="/favicon.svg" alt="" className="size-full object-cover" />
-      </div>
-      <div className="flex flex-col leading-none">
-        <div className={clsx('font-bold tracking-tight text-slate-900 flex items-center gap-1', textCls)}>
-          <span>Voll</span>
-          <span className="bg-gradient-to-r from-brand-700 to-indigo-600 bg-clip-text text-transparent">Connect</span>
-        </div>
-        {showTagline && <span className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-slate-400">Orquestração Inteligente</span>}
+    <div className="inline-flex items-center gap-2 select-none">
+      <img
+        src="/voll-logo.svg"
+        alt="Voll Solutions"
+        className={clsx('w-auto object-contain', logoH)}
+      />
+      <div className="flex items-center gap-1.5 border-l border-slate-200 pl-2">
+        <span className={clsx('font-bold tracking-tight text-slate-800', textCls)}>
+          Connect
+        </span>
+        {showTagline && (
+          <span className="hidden xl:inline-block rounded-full bg-brand-50 px-2 py-0.5 text-[9px] font-bold text-brand-700 tracking-wider uppercase border border-brand-200/60">
+            Omnichannel
+          </span>
+        )}
       </div>
     </div>
   );
