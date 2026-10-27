@@ -6,6 +6,7 @@ import { setDemoRole } from '../lib/api';
 import clsx from 'clsx';
 import {
   Activity,
+  BarChart3,
   BookMarked,
   BrainCircuit,
   Cable,
@@ -127,6 +128,17 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
         label: 'Canais',
         icon: <Cable className={ico} aria-hidden />,
         matchPrefixes: ['/canais'],
+      },
+    ],
+  },
+  {
+    title: 'Relatórios',
+    items: [
+      {
+        to: '/relatorios',
+        label: 'Relatórios',
+        icon: <BarChart3 className={ico} aria-hidden />,
+        matchPrefixes: ['/relatorios'],
       },
     ],
   },

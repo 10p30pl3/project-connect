@@ -24,17 +24,30 @@ async function demoUser(req: FastifyRequest): Promise<SessionUser> {
   const role: Role = (ROLES as readonly string[]).includes(h) ? (h as Role) : 'ADMIN';
   const cached = demoCache.get(role);
   if (cached) return cached;
-  const u = await one(
-    getPool(),
-    `SELECT u.id, u.role, u.organization_id AS org,
-            (SELECT id FROM workspaces w WHERE w.organization_id=u.organization_id ORDER BY created_at LIMIT 1) AS ws
-       FROM users u WHERE u.active ORDER BY (u.role=$1) DESC, (u.role='ADMIN') DESC, u.created_at LIMIT 1`,
-    [role],
-  );
-  if (!u) throw new HttpError(401, 'Não autenticado', 'Nenhum usuário cadastrado; rode npm run db:seed');
-  const s: SessionUser = { sub: u.id, role: u.role, org: u.org, ws: u.ws };
-  demoCache.set(role, s);
-  return s;
+  try {
+    const u = await one(
+      getPool(),
+      `SELECT u.id, u.role, u.organization_id AS org,
+              (SELECT id FROM workspaces w WHERE w.organization_id=u.organization_id ORDER BY created_at LIMIT 1) AS ws
+         FROM users u WHERE u.active ORDER BY (u.role=$1) DESC, (u.role='ADMIN') DESC, u.created_at LIMIT 1`,
+      [role],
+    );
+    if (u) {
+      const s: SessionUser = { sub: u.id, role: u.role, org: u.org, ws: u.ws };
+      demoCache.set(role, s);
+      return s;
+    }
+  } catch {
+    // DB offline fallback no modo demo
+  }
+  const fallback: SessionUser = {
+    sub: '00000000-0000-4000-8000-000000000001',
+    role,
+    org: '00000000-0000-4000-8000-000000000010',
+    ws: '00000000-0000-4000-8000-000000000020',
+  };
+  demoCache.set(role, fallback);
+  return fallback;
 }
 
 export async function authenticate(req: FastifyRequest, _reply: FastifyReply) {

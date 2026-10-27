@@ -20,6 +20,7 @@ import { ControlPage } from './pages/Control';
 import { LimitsPage } from './pages/Limits';
 import { ObservabilityPage } from './pages/Observability';
 import { CentralIntelligencePage } from './pages/CentralIntelligence';
+import { ReportsPage } from './pages/Reports';
 import { ExperimentsPage } from './pages/Experiments';
 import { OptimizationPage } from './pages/Optimization';
 import { CostsPage } from './pages/Costs';
@@ -81,6 +82,7 @@ export const router = createBrowserRouter([
           { path: '/estrategias/:id', element: <StrategyDetailPage /> },
           { path: '/tabulacoes', element: <TabulationsPage /> },
           { path: '/canais', element: <ChannelsPage /> },
+          { path: '/relatorios', element: <ReportsPage /> },
           { path: '/inteligencia', element: <CentralIntelligencePage /> },
           { path: '/limites', element: <LimitsPage /> },
           { path: '/observabilidade', element: <ObservabilityPage /> },
