@@ -801,6 +801,28 @@ function UnifiedCampaignCreator({
     extra.creationExperience || 'AI_PROMPT',
   );
 
+  // Chat Conversacional da IA: histórico de mensagens interativas
+  type ChatMessage = {
+    id: string;
+    sender: 'user' | 'assistant';
+    text: string;
+    missingInfo?: 'MAILING' | 'PURPOSE' | 'AUDIENCE_SEGMENT' | 'CHANNELS' | null;
+    actions?: Array<{ label: string; onClick: () => void }>;
+    timestamp: Date;
+  };
+
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => [
+    {
+      id: 'welcome',
+      sender: 'assistant',
+      text: 'Olá! Sou o assistente de IA da Voll Solutions. O que você precisa realizar hoje com esta campanha? Pode me descrever o objetivo em linguagem natural (ex: cobrança de títulos atrasados, oferta de vendas ou confirmação de agendamentos).',
+      missingInfo: 'PURPOSE',
+      timestamp: new Date(),
+    },
+  ]);
+  const [chatInput, setChatInput] = useState('');
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+
   // Upload/Anexo de Mailing no Modo Prompt
   const [showImportInPrompt, setShowImportInPrompt] = useState(false);
 
@@ -853,6 +875,75 @@ function UnifiedCampaignCreator({
     }
   }, [activeMailing?.name]);
 
+  // Rolagem suave do chat sempre que uma nova mensagem for postada
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  }, [chatMessages]);
+
+  // Handler de envio do usuário no chat
+  const handleSendChatMessage = (textToSend?: string) => {
+    const raw = (textToSend ?? chatInput).trim();
+    if (!raw) return;
+
+    setChatInput('');
+    setPromptText(raw);
+
+    const userMsg: ChatMessage = {
+      id: `user-${Date.now()}`,
+      sender: 'user',
+      text: raw,
+      timestamp: new Date(),
+    };
+
+    // Analisa o que o usuário disse
+    const currentParsed = parseCampaignPrompt(raw, activeMailing);
+    setPurposeCode(currentParsed.purposeCode);
+    setAudienceSegment(currentParsed.audienceSegment);
+    const dateStr = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    const pTitle = currentParsed.purposeCode === 'AGENDAMENTOS' ? 'Confirmação de Agendamentos' : currentParsed.purposeCode === 'VENDAS' ? 'Venda Ativa Comercial' : 'Cobrança e Recuperação';
+    setCampaignName(`${pTitle} · ${dateStr}`);
+
+    // Verifica o que ainda falta
+    const hasMailing = Boolean(selectedMailingId && activeMailing);
+
+    let assistantReply: ChatMessage;
+
+    if (!hasMailing || !activeMailing) {
+      assistantReply = {
+        id: `ai-${Date.now() + 1}`,
+        sender: 'assistant',
+        text: `Entendi perfeitamente! Configurei o objetivo como "${pTitle}". Para que eu possa identificar os melhores canais (WhatsApp, Voz, E-mail) e calcular a melhor hora de chamar os contatos, ainda preciso da base de contatos (mailing). Você gostaria de selecionar um mailing existente do workspace ou anexar um novo arquivo CSV?`,
+        missingInfo: 'MAILING',
+        timestamp: new Date(),
+      };
+    } else {
+      assistantReply = {
+        id: `ai-${Date.now() + 1}`,
+        sender: 'assistant',
+        text: `Excelente! Objetivo identificado como "${pTitle}" e base vinculada a "${activeMailing.name}" (${fmtNumber(activeMailing.recordCount)} contatos). Identifiquei os canais recomendados (${currentParsed.recommendedChannels.map((c) => CHANNEL_LABEL[c] ?? c).join(' → ')}) e os horários ideais para chamar. Todas as informações necessárias estão preenchidas! Clique em "Continuar para revisão" para conferir e disparar.`,
+        missingInfo: null,
+        timestamp: new Date(),
+      };
+    }
+
+    setChatMessages((prev) => [...prev, userMsg, assistantReply]);
+  };
+
+  // Responde quando o usuário anexa ou seleciona o mailing
+  const handleMailingAttached = (mId: string, mName: string, count: number) => {
+    setSelectedMailingId(mId);
+    const systemNotice: ChatMessage = {
+      id: `sys-${Date.now()}`,
+      sender: 'assistant',
+      text: `Base "${mName}" (${fmtNumber(count)} contatos) conectada com sucesso! Agora consigo analisar os DDDs e canais disponíveis para calibrar os melhores horários e régua de acionamento. Se quiser refinar alguma regra ou limite de tentativas, pode digitar aqui ou avançar para a revisão.`,
+      missingInfo: null,
+      timestamp: new Date(),
+    };
+    setChatMessages((prev) => [...prev, systemNotice]);
+  };
+
   const handleApplyTemplate = (tmpl: (typeof PROMPT_TEMPLATES)[number]) => {
     setPromptText(tmpl.prompt);
     setPurposeCode(tmpl.purposeCode);
@@ -861,6 +952,7 @@ function UnifiedCampaignCreator({
     }
     const dateStr = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
     setCampaignName(`${tmpl.defaultName} · ${dateStr}`);
+    handleSendChatMessage(tmpl.prompt);
   };
 
   const handleSelectPurpose = (purp: 'COBRANCA' | 'VENDAS' | 'AGENDAMENTOS') => {
@@ -1075,121 +1167,164 @@ function UnifiedCampaignCreator({
             </nav>
           </div>
 
-          {/* PASSO 1 DA IA: OBJETIVO E MAILING */}
+          {/* PASSO 1 DA IA: OBJETIVO E MAILING (CHAT CONVERSACIONAL) */}
           {aiStep === 1 && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-              {/* Coluna Principal da Esquerda: Prompt, Templates e Anexo */}
-              <div className="lg:col-span-8 space-y-5">
-                <div>
-                  <h2 className="text-lg font-bold text-slate-900 tracking-tight">
-                    O que você precisa realizar?
-                  </h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Descreva o objetivo; um template pode servir de ponto de partida.
-                  </p>
+              {/* Coluna Principal da Esquerda: Chat Conversacional com IA */}
+              <div className="lg:col-span-8 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                      <Sparkles className="size-4.5 text-brand-600" />
+                      <span>Assistente de IA · Criação de Campanha</span>
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Descreva seu objetivo em linguagem natural. O assistente analisa e pergunta as informações que ainda faltam.
+                    </p>
+                  </div>
                 </div>
 
-                {/* Caixa de Texto do Prompt com botão circular de envio */}
-                <div className="relative rounded-2xl border border-slate-200 bg-white p-3 shadow-xs focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 transition">
+                {/* Janela de Histórico do Chat */}
+                <div
+                  ref={chatScrollRef}
+                  className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50/60 to-white p-4 h-[330px] overflow-y-auto space-y-3.5 shadow-2xs"
+                >
+                  {chatMessages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={clsx(
+                        'flex gap-2.5 max-w-[85%] text-xs leading-relaxed',
+                        msg.sender === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto',
+                      )}
+                    >
+                      {msg.sender === 'assistant' ? (
+                        <div className="grid size-7 place-items-center rounded-full bg-brand-700 text-white shrink-0 mt-0.5 shadow-2xs">
+                          <Sparkles className="size-3.5" />
+                        </div>
+                      ) : (
+                        <div className="grid size-7 place-items-center rounded-full bg-slate-800 text-white shrink-0 mt-0.5 shadow-2xs">
+                          <User className="size-3.5" />
+                        </div>
+                      )}
+
+                      <div
+                        className={clsx(
+                          'p-3 rounded-2xl shadow-2xs',
+                          msg.sender === 'user'
+                            ? 'bg-brand-600 text-white rounded-tr-xs'
+                            : 'bg-white border border-slate-200/90 text-slate-800 rounded-tl-xs',
+                        )}
+                      >
+                        <p className="whitespace-pre-wrap">{msg.text}</p>
+
+                        {/* Ações contextuais disparadas pela pergunta da IA */}
+                        {msg.missingInfo === 'MAILING' && !selectedMailingId && (
+                          <div className="mt-2.5 pt-2 border-t border-slate-100 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setShowImportInPrompt(true)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-brand-300 bg-brand-50 px-2.5 py-1 text-[11px] font-semibold text-brand-900 hover:bg-brand-100 transition cursor-pointer"
+                            >
+                              <Paperclip className="size-3 text-brand-600" />
+                              <span>Anexar CSV agora</span>
+                            </button>
+                            <span className="text-[11px] text-slate-400 self-center">ou selecione abaixo</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Input do Chat (onde a pessoa escreve) com botão circular de envio */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSendChatMessage();
+                  }}
+                  className="relative rounded-2xl border border-slate-200 bg-white p-2.5 shadow-xs focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 transition"
+                >
                   <Textarea
                     id="ai-prompt-input"
-                    rows={4}
+                    rows={2}
                     className="w-full border-0 p-1 text-sm text-slate-800 placeholder-slate-400 focus:ring-0 resize-none leading-relaxed"
-                    placeholder="Descreva em linguagem natural..."
-                    value={promptText}
-                    onChange={(e) => setPromptText(e.target.value)}
+                    placeholder="Escreva sua mensagem ou responda ao assistente..."
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendChatMessage();
+                      }
+                    }}
                   />
 
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-100/80">
+                  <div className="flex items-center justify-between pt-1.5 border-t border-slate-100/80">
                     <span className="text-[11px] text-slate-400">
-                      Descreva em linguagem natural
+                      Pressione Enter para enviar
                     </span>
 
                     <button
-                      type="button"
-                      onClick={() => {
-                        if (selectedMailingId || activeMailing?.id) {
-                          setAiStep(2);
-                        } else {
-                          setFormError('Selecione ou anexe uma base de contatos antes de avançar para a revisão.');
-                        }
-                      }}
-                      className="grid size-8 place-items-center rounded-full bg-brand-700 text-white shadow-sm hover:bg-brand-800 transition cursor-pointer"
-                      title="Continuar para revisão"
+                      type="submit"
+                      disabled={!chatInput.trim()}
+                      className="grid size-8 place-items-center rounded-full bg-brand-600 text-white shadow-sm hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+                      title="Enviar mensagem"
                     >
                       <ArrowRight className="size-4" />
                     </button>
                   </div>
-                </div>
+                </form>
 
                 {/* Templates de Prompt */}
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                    Usar template de prompt
+                    Sugestões prontas de conversa
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     <button
                       type="button"
                       onClick={() => {
-                        setPromptText('Quero realizar cobrança amigável de títulos vencidos com envio de PIX instantâneo e desconto para quitação à vista.');
-                        setPurposeCode('COBRANCA');
+                        handleApplyTemplate(PROMPT_TEMPLATES[0]);
                       }}
-                      className={clsx(
-                        'rounded-xl border px-3.5 py-1.5 text-xs font-semibold transition cursor-pointer',
-                        parsedPrompt.purposeCode === 'COBRANCA'
-                          ? 'border-brand-300 bg-brand-50/70 text-brand-900 shadow-2xs'
-                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
-                      )}
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
                     >
-                      Cobrança
+                      Cobrança B2B
                     </button>
 
                     <button
                       type="button"
                       onClick={() => {
-                        setPromptText('Campanha de vendas e oferta comercial de novos planos com abordagem consultiva multicanal em horário comercial.');
-                        setPurposeCode('VENDAS');
+                        handleApplyTemplate(PROMPT_TEMPLATES[1]);
                       }}
-                      className={clsx(
-                        'rounded-xl border px-3.5 py-1.5 text-xs font-semibold transition cursor-pointer',
-                        parsedPrompt.purposeCode === 'VENDAS'
-                          ? 'border-brand-300 bg-brand-50/70 text-brand-900 shadow-2xs'
-                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
-                      )}
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
                     >
-                      Vendas
+                      Cobrança Preventiva PIX
                     </button>
 
                     <button
                       type="button"
                       onClick={() => {
-                        setPromptText('Quero confirmar os agendamentos de amanhã. Priorize a pessoa certa, use WhatsApp primeiro e telefone como alternativa, entre 9h e 18h, com até 3 tentativas.');
-                        setPurposeCode('AGENDAMENTOS');
+                        handleApplyTemplate(PROMPT_TEMPLATES[4]);
                       }}
-                      className={clsx(
-                        'rounded-xl border px-3.5 py-1.5 text-xs font-semibold transition cursor-pointer',
-                        parsedPrompt.purposeCode === 'AGENDAMENTOS'
-                          ? 'border-brand-300 bg-brand-50/70 text-brand-900 shadow-2xs'
-                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
-                      )}
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
                     >
-                      Confirmação de serviço
+                      Vendas de Planos
                     </button>
 
                     <button
                       type="button"
                       onClick={() => {
-                        setPromptText('Pesquisa rápida de satisfação e feedback de atendimento via WhatsApp interativo com escala de 1 a 5.');
+                        handleApplyTemplate(PROMPT_TEMPLATES[9]);
                       }}
-                      className="rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
                     >
-                      Pesquisa
+                      Confirmação de Consultas
                     </button>
                   </div>
                 </div>
 
-                {/* Seleção / Anexo de Mailing */}
-                <div className="space-y-2 pt-1">
+                {/* Conexão de Mailing */}
+                <div className="space-y-2 pt-1 border-t border-slate-100">
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
@@ -1205,7 +1340,15 @@ function UnifiedCampaignCreator({
                         <Select
                           id="ai-mailing-select"
                           value={selectedMailingId}
-                          onChange={(e) => setSelectedMailingId(e.target.value)}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const found = mailings?.find((m) => m.id === val);
+                            if (found) {
+                              handleMailingAttached(found.id, found.name, found.recordCount);
+                            } else {
+                              setSelectedMailingId('');
+                            }
+                          }}
                           className="text-xs rounded-xl"
                         >
                           <option value="">Ou selecionar mailing ou lista existente...</option>
@@ -1236,7 +1379,7 @@ function UnifiedCampaignCreator({
                       <ImportFlow
                         onImported={(r) => {
                           qc.invalidateQueries({ queryKey: ['mailings'] });
-                          setSelectedMailingId(r.mailingId);
+                          handleMailingAttached(r.mailingId, r.name, r.validRows ?? 0);
                           setShowImportInPrompt(false);
                           toast('success', `Arquivo "${r.name}" importado e selecionado!`);
                         }}

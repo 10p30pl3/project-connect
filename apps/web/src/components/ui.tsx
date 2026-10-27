@@ -38,7 +38,7 @@ import { ATTEMPT_STATE_LABEL, CAMPAIGN_STATUS_LABEL, type AttemptState, type Cam
 import { errorMessage } from '../lib/api';
 
 // ------------------------------------------------------------------ Brand Logo
-export function BrandLogo({ size = 'md', showTagline = false }: { size?: 'sm' | 'md' | 'lg'; showTagline?: boolean }) {
+export function BrandLogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg'; showTagline?: boolean }) {
   const logoH = size === 'lg' ? 'h-7' : size === 'sm' ? 'h-4.5' : 'h-5.5';
   const textCls = size === 'lg' ? 'text-lg' : size === 'sm' ? 'text-xs' : 'text-sm';
   return (
@@ -52,11 +52,6 @@ export function BrandLogo({ size = 'md', showTagline = false }: { size?: 'sm' | 
         <span className={clsx('font-bold tracking-tight text-slate-800', textCls)}>
           Connect
         </span>
-        {showTagline && (
-          <span className="hidden xl:inline-block rounded-full bg-brand-50 px-2 py-0.5 text-[9px] font-bold text-brand-700 tracking-wider uppercase border border-brand-200/60">
-            Omnichannel
-          </span>
-        )}
       </div>
     </div>
   );

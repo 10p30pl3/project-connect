@@ -65,12 +65,6 @@ export function OverviewPage() {
       <PageHeader
         title={`Olá, ${me?.name.split(' ')[0] ?? ''}`}
         tooltip="Painel operacional do workspace — acompanhe campanhas, inteligência de CPC e a fila de acionamentos."
-        actions={
-          <Link to="/campanhas/nova" className={btnClass('primary')}>
-            <Plus className="size-4" aria-hidden />
-            Nova campanha
-          </Link>
-        }
       />
       {q.data?.globalSuspension && (
         <Alert tone="warn" title="Suspensão global ativa">
