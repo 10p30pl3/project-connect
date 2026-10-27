@@ -112,7 +112,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       },
       {
         to: '/estrategias',
-        label: 'Estratégias',
+        label: 'Estratégias avançadas',
         icon: <SlidersHorizontal className={ico} aria-hidden />,
         matchPrefixes: ['/estrategias'],
       },

@@ -206,7 +206,7 @@ export async function catalogRoutes(app: FastifyInstance) {
     await tx(async (c) => {
       const s = await one(c, `SELECT * FROM strategies WHERE id=$1 AND workspace_id=$2 FOR UPDATE`, [req.params.id, a.workspaceId]);
       if (!s) throw notFound('Estratégia');
-      if (s.protected) throw forbidden('Template predefinido é protegido: crie uma cópia para personalizar');
+      // Permite editar e publicar nova versão mesmo em templates predefinidos
       const body = parse(StrategyPublishSchema, req.body);
       const prev = await one(c, `SELECT version, config FROM strategy_versions WHERE strategy_id=$1 ORDER BY version DESC LIMIT 1`, [s.id]);
       const v = (prev?.version ?? 0) + 1;

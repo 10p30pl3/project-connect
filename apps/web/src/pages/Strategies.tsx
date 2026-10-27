@@ -1,14 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useState } from 'react';
-import { ArrowLeft, Copy, Lock, Plus } from 'lucide-react';
-import type { StrategyConfig } from '@voll/shared';
+import { clsx } from 'clsx';
+import { ArrowLeft, Check, Copy, Lock, Pencil, Plus, RotateCcw, Save } from 'lucide-react';
+import {
+  TABULATION_ACTIONS,
+  TABULATION_ACTION_LABEL,
+  type StrategyConfig,
+  type TabulationAction,
+} from '@voll/shared';
 import { errorMessage, get, post, put } from '../lib/api';
 import type { DraftEnvelope, Strategy, StrategyDetail, StrategyVersion, Tabulation } from '../lib/types';
-import { fmtDateTime } from '../lib/format';
+import { fmtDateTime, WEEKDAYS } from '../lib/format';
 import { useAuth } from '../lib/auth';
 import { Alert, Badge, Button, Card, Empty, ErrorState, Field, InfoTooltip, Input, Loading, Modal, PageHeader, Select, TableWrap, useToast } from '../components/ui';
-import { StrategySummary, daysLabel } from '../components/Summaries';
+import { StrategySummary, daysLabel, fmtMinutes } from '../components/Summaries';
 import { StrategyForm } from '../components/StrategyForm';
 import { WizardReturnBanner } from './NewCampaign';
 
@@ -17,7 +23,7 @@ export function StrategiesSection() {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-1.5">
-        <h2 className="text-sm font-semibold text-slate-800">Estratégias de Cobrança (Templates Versionados)</h2>
+        <h2 className="text-sm font-semibold text-slate-800">Estratégias Avançadas (Templates Versionados)</h2>
         <InfoTooltip content="Calendário operacional, limites de esforço, cadência de retentativas, otimização consultiva e regras por tabulação." />
       </div>
       {q.isLoading ? (
@@ -169,7 +175,7 @@ export function StrategiesPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Templates de Estratégia"
+        title="Estratégias Avançadas"
         tooltip="Calendário operacional, limites de esforço diário/total, cadência de retentativas e regras por tabulação."
         actions={
           can('strategies.write') && (
@@ -242,7 +248,7 @@ export function StrategyDetailPage() {
                 Voltar sem usar ajustes
               </Link>
             )}
-            {fromWizard && !s.protected && latest && (
+            {fromWizard && latest && (
               <Button variant="primary" loading={useInWizard.isPending} onClick={() => useInWizard.mutate(latest.id)}>
                 Usar estratégia publicada (v{latest.version})
               </Button>
@@ -250,11 +256,6 @@ export function StrategyDetailPage() {
             {can('strategies.write') && (
               <Button icon={<Copy className="size-4" aria-hidden />} onClick={() => setCopyOpen(true)}>
                 Criar cópia
-              </Button>
-            )}
-            {can('strategies.write') && !s.protected && !editing && (
-              <Button variant={fromWizard ? 'secondary' : 'primary'} onClick={() => setEditing(true)}>
-                Editar e publicar nova versão
               </Button>
             )}
           </>
@@ -271,48 +272,55 @@ export function StrategyDetailPage() {
         </Alert>
       )}
 
-      {editing && latest ? (
-        <Card title={`Nova versão (a partir de v${latest.version})`}>
-          <StrategyForm
-            initial={latest.config}
-            submitLabel="Publicar nova versão"
-            onCancel={() => setEditing(false)}
-            onSubmit={async (config) => {
-              const v = await post<StrategyVersion>(`/strategies/${id}/versions`, { config });
-              setJustPublished(v);
-              setEditing(false);
-              setSelected(null);
-              qc.invalidateQueries({ queryKey: ['strategy', id] });
-              qc.invalidateQueries({ queryKey: ['strategies'] });
-              toast('success', `Versão v${v.version ?? ''} publicada.`);
-            }}
-          />
+      <div className="grid gap-4 lg:grid-cols-[16rem_1fr]">
+        <Card title="Versões" padded={false}>
+          <ul className="divide-y divide-slate-100">
+            {versions.map((v) => (
+              <li key={v.id}>
+                <button
+                  type="button"
+                  aria-pressed={current?.id === v.id}
+                  onClick={() => setSelected(v.id)}
+                  className={`w-full px-4 py-2.5 text-left text-sm ${current?.id === v.id ? 'bg-brand-50' : 'hover:bg-slate-50'}`}
+                >
+                  <strong>v{v.version}</strong> {v.id === latest?.id && <Badge tone="green">Atual</Badge>}
+                  <div className="text-xs text-slate-500">{fmtDateTime(v.publishedAt)}</div>
+                </button>
+              </li>
+            ))}
+          </ul>
         </Card>
-      ) : (
-        <div className="grid gap-4 lg:grid-cols-[16rem_1fr]">
-          <Card title="Versões" padded={false}>
-            <ul className="divide-y divide-slate-100">
-              {versions.map((v) => (
-                <li key={v.id}>
-                  <button
-                    type="button"
-                    aria-pressed={current?.id === v.id}
-                    onClick={() => setSelected(v.id)}
-                    className={`w-full px-4 py-2.5 text-left text-sm ${current?.id === v.id ? 'bg-brand-50' : 'hover:bg-slate-50'}`}
-                  >
-                    <strong>v{v.version}</strong> {v.id === latest?.id && <Badge tone="green">Atual</Badge>}
-                    <div className="text-xs text-slate-500">{fmtDateTime(v.publishedAt)}</div>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </Card>
-          <Card title={current ? `Configuração v${current.version}` : 'Configuração'}>
-            {current ? <StrategySummary config={current.config} tabulations={tabs.data?.items} /> : <p>Sem versão publicada.</p>}
-            {current && latest && current.id !== latest.id && <VersionDiff a={current.config} b={latest.config} aLabel={`v${current.version}`} bLabel={`v${latest.version}`} />}
-          </Card>
+
+        <div>
+          {current ? (
+            <StrategyInteractiveConfig
+              strategyId={id}
+              version={current}
+              isLatest={current.id === latest?.id}
+              tabulations={tabs.data?.items}
+              onUpdated={(v) => {
+                setJustPublished(v);
+                setSelected(null);
+                qc.invalidateQueries({ queryKey: ['strategy', id] });
+                qc.invalidateQueries({ queryKey: ['strategies'] });
+              }}
+            />
+          ) : (
+            <Card title="Configuração">
+              <p>Sem versão publicada.</p>
+            </Card>
+          )}
+
+          {current && latest && current.id !== latest.id && (
+            <div className="mt-4">
+              <Card title="Comparação de Versões">
+                <VersionDiff a={current.config} b={latest.config} aLabel={`v${current.version}`} bLabel={`v${latest.version}`} />
+              </Card>
+            </div>
+          )}
         </div>
-      )}
+      </div>
+
       {latest && (
         <CopyDialog
           open={copyOpen}
@@ -322,6 +330,491 @@ export function StrategyDetailPage() {
           onCreated={(newId) => nav(`/estrategias/${newId}${fromWizard ? '?retorno=assistente' : ''}`)}
         />
       )}
+    </div>
+  );
+}
+
+// Painel de Configuração Avançada em 2 Colunas com Edição Direta dos Campos e Regras
+function StrategyInteractiveConfig({
+  strategyId,
+  version,
+  isLatest,
+  tabulations,
+  onUpdated,
+}: {
+  strategyId: string;
+  version: StrategyVersion;
+  isLatest: boolean;
+  tabulations?: Tabulation[];
+  onUpdated: (v: StrategyVersion) => void;
+}) {
+  const toast = useToast();
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [draftConfig, setDraftConfig] = useState<StrategyConfig>(() => JSON.parse(JSON.stringify(version.config)));
+
+  // Sincroniza draft se mudar de versão
+  const [lastVerId, setLastVerId] = useState(version.id);
+  if (version.id !== lastVerId) {
+    setLastVerId(version.id);
+    setDraftConfig(JSON.parse(JSON.stringify(version.config)));
+    setEditing(false);
+  }
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const v = await post<StrategyVersion>(`/strategies/${strategyId}/versions`, { config: draftConfig });
+      onUpdated(v);
+      setEditing(false);
+      toast('success', `Nova versão v${v.version} salva e publicada.`);
+    } catch (e) {
+      toast('error', errorMessage(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setDraftConfig(JSON.parse(JSON.stringify(version.config)));
+    setEditing(false);
+  };
+
+  const tabName = (code: string) => tabulations?.find((t) => t.code === code)?.name ?? code;
+
+  // Lista de todas as tabulações do workspace para mapeamento
+  const allTabs = tabulations ?? [];
+  const tabEntries = allTabs.map((t) => ({
+    code: t.code,
+    name: t.name,
+    action: (draftConfig.tabulationRules[t.code] ?? (t.isConversion ? 'FINISH_SUCCESS' : 'RETRY')) as TabulationAction,
+  }));
+
+  return (
+    <div className="space-y-4">
+      {/* Barra de Ações Superior do Painel de Configuração */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-bold text-slate-900">
+            Configuração v{version.version}
+          </span>
+          {isLatest && <Badge tone="green">Versão Ativa</Badge>}
+          {editing && <Badge tone="brand">Editando</Badge>}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {!editing ? (
+            <Button
+              size="sm"
+              variant="primary"
+              icon={<Pencil className="size-3.5" />}
+              onClick={() => setEditing(true)}
+            >
+              Editar parâmetros
+            </Button>
+          ) : (
+            <>
+              <Button size="sm" variant="secondary" onClick={handleCancel} disabled={saving}>
+                Cancelar
+              </Button>
+              <Button
+                size="sm"
+                variant="primary"
+                icon={<Save className="size-3.5" />}
+                loading={saving}
+                onClick={handleSave}
+              >
+                Salvar e publicar v{version.version + 1}
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Grade em 2 Colunas (§Requisito: Coluna 1 = Parâmetros, Coluna 2 = Regras de Tabulação) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* =================================================================== */}
+        {/* COLUNA 1: PARÂMETROS OPERACIONAIS DA ESTRATÉGIA                     */}
+        {/* =================================================================== */}
+        <div className="lg:col-span-6 rounded-2xl border border-slate-200/90 bg-white p-4 space-y-4 shadow-2xs">
+          <div className="text-xs font-bold uppercase tracking-wider text-slate-600 border-b border-slate-100 pb-2">
+            Parâmetros de Cadência &amp; Limites
+          </div>
+
+          <div className="space-y-3.5 text-xs">
+            {/* Limite Total por Cliente */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100/80 pb-2.5">
+              <span className="font-medium text-slate-600">Limite total por cliente</span>
+              {!editing ? (
+                <span className="font-bold text-slate-900">{draftConfig.limits.total} tentativas</span>
+              ) : (
+                <div className="flex items-center gap-1.5 w-36">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={50}
+                    value={draftConfig.limits.total}
+                    onChange={(e) =>
+                      setDraftConfig((prev) => ({
+                        ...prev,
+                        limits: { ...prev.limits, total: Math.max(1, parseInt(e.target.value) || 1) },
+                      }))
+                    }
+                    className="text-xs py-1 h-7"
+                  />
+                  <span className="text-slate-400 text-[11px]">tent.</span>
+                </div>
+              )}
+            </div>
+
+            {/* Limite Diário por Cliente */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100/80 pb-2.5">
+              <span className="font-medium text-slate-600">Limite diário por cliente</span>
+              {!editing ? (
+                <span className="font-bold text-slate-900">{draftConfig.limits.daily} tentativas</span>
+              ) : (
+                <div className="flex items-center gap-1.5 w-36">
+                  <Input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={draftConfig.limits.daily}
+                    onChange={(e) =>
+                      setDraftConfig((prev) => ({
+                        ...prev,
+                        limits: { ...prev.limits, daily: Math.max(1, parseInt(e.target.value) || 1) },
+                      }))
+                    }
+                    className="text-xs py-1 h-7"
+                  />
+                  <span className="text-slate-400 text-[11px]">tent.</span>
+                </div>
+              )}
+            </div>
+
+            {/* Escopo dos Limites */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100/80 pb-2.5">
+              <span className="font-medium text-slate-600">Escopo dos limites</span>
+              {!editing ? (
+                <span className="font-bold text-slate-900">
+                  {draftConfig.limits.scope === 'WORKSPACE'
+                    ? 'Cliente no workspace (compartilhado)'
+                    : 'Cliente nesta campanha'}
+                </span>
+              ) : (
+                <Select
+                  value={draftConfig.limits.scope}
+                  onChange={(e) =>
+                    setDraftConfig((prev) => ({
+                      ...prev,
+                      limits: { ...prev.limits, scope: e.target.value as 'WORKSPACE' | 'CAMPAIGN' },
+                    }))
+                  }
+                  className="text-xs py-1 h-7 w-48"
+                >
+                  <option value="WORKSPACE">Cliente no workspace</option>
+                  <option value="CAMPAIGN">Cliente nesta campanha</option>
+                </Select>
+              )}
+            </div>
+
+            {/* Dias Permitidos */}
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 border-b border-slate-100/80 pb-2.5">
+              <span className="font-medium text-slate-600 pt-1">Dias permitidos</span>
+              {!editing ? (
+                <span className="font-bold text-slate-900">{daysLabel(draftConfig.calendar.days)}</span>
+              ) : (
+                <div className="flex flex-wrap gap-1">
+                  {WEEKDAYS.map((d, i) => {
+                    const isSelected = draftConfig.calendar.days.includes(i);
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => {
+                          const currentDays = draftConfig.calendar.days;
+                          const nextDays = isSelected
+                            ? currentDays.filter((x) => x !== i)
+                            : [...currentDays, i].sort();
+                          if (nextDays.length > 0) {
+                            setDraftConfig((prev) => ({
+                              ...prev,
+                              calendar: { ...prev.calendar, days: nextDays },
+                            }));
+                          }
+                        }}
+                        className={clsx(
+                          'rounded-md px-2 py-0.5 text-[11px] font-semibold transition cursor-pointer',
+                          isSelected
+                            ? 'bg-brand-600 text-white shadow-2xs'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                        )}
+                      >
+                        {d}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Janela de Horário */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100/80 pb-2.5">
+              <span className="font-medium text-slate-600">Janela de horário</span>
+              {!editing ? (
+                <span className="font-bold text-slate-900">
+                  {draftConfig.calendar.start} às {draftConfig.calendar.end}
+                </span>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    type="time"
+                    value={draftConfig.calendar.start}
+                    onChange={(e) =>
+                      setDraftConfig((prev) => ({
+                        ...prev,
+                        calendar: { ...prev.calendar, start: e.target.value },
+                      }))
+                    }
+                    className="text-xs py-1 h-7 w-24"
+                  />
+                  <span className="text-slate-400">às</span>
+                  <Input
+                    type="time"
+                    value={draftConfig.calendar.end}
+                    onChange={(e) =>
+                      setDraftConfig((prev) => ({
+                        ...prev,
+                        calendar: { ...prev.calendar, end: e.target.value },
+                      }))
+                    }
+                    className="text-xs py-1 h-7 w-24"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Fuso Horário */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100/80 pb-2.5">
+              <span className="font-medium text-slate-600">Fuso horário</span>
+              {!editing ? (
+                <span className="font-bold text-slate-900">{draftConfig.calendar.timezone}</span>
+              ) : (
+                <Select
+                  value={draftConfig.calendar.timezone}
+                  onChange={(e) =>
+                    setDraftConfig((prev) => ({
+                      ...prev,
+                      calendar: { ...prev.calendar, timezone: e.target.value },
+                    }))
+                  }
+                  className="text-xs py-1 h-7 w-48"
+                >
+                  <option value="America/Sao_Paulo">America/Sao_Paulo</option>
+                  <option value="America/Manaus">America/Manaus</option>
+                  <option value="America/Fortaleza">America/Fortaleza</option>
+                  <option value="America/Cuiaba">America/Cuiaba</option>
+                </Select>
+              )}
+            </div>
+
+            {/* Retentativa & Intervalo */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100/80 pb-2.5">
+              <span className="font-medium text-slate-600">Retentativa</span>
+              {!editing ? (
+                <span className="font-bold text-slate-900">
+                  a cada {fmtMinutes(draftConfig.retry.intervalMinutes)}, até {draftConfig.retry.maxPerDestination} por destino
+                </span>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={720}
+                      value={draftConfig.retry.intervalMinutes}
+                      onChange={(e) =>
+                        setDraftConfig((prev) => ({
+                          ...prev,
+                          retry: {
+                            ...prev.retry,
+                            intervalMinutes: Math.max(1, parseInt(e.target.value) || 1),
+                          },
+                        }))
+                      }
+                      className="text-xs py-1 h-7 w-16"
+                    />
+                    <span className="text-[11px] text-slate-500">min</span>
+                  </div>
+                  <span className="text-slate-300">|</span>
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={draftConfig.retry.maxPerDestination}
+                      onChange={(e) =>
+                        setDraftConfig((prev) => ({
+                          ...prev,
+                          retry: {
+                            ...prev.retry,
+                            maxPerDestination: Math.max(1, parseInt(e.target.value) || 1),
+                          },
+                        }))
+                      }
+                      className="text-xs py-1 h-7 w-14"
+                    />
+                    <span className="text-[11px] text-slate-500">máx/dest.</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Histórico Incompleto */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100/80 pb-2.5">
+              <span className="font-medium text-slate-600">Histórico incompleto</span>
+              {!editing ? (
+                <span className="font-bold text-slate-900">
+                  {draftConfig.limits.incompleteHistory === 'BLOCK'
+                    ? 'Aguardar revisão (bloquear)'
+                    : 'Usar somente o histórico conhecido'}
+                </span>
+              ) : (
+                <Select
+                  value={draftConfig.limits.incompleteHistory}
+                  onChange={(e) =>
+                    setDraftConfig((prev) => ({
+                      ...prev,
+                      limits: {
+                        ...prev.limits,
+                        incompleteHistory: e.target.value as 'BLOCK' | 'USE_KNOWN',
+                      },
+                    }))
+                  }
+                  className="text-xs py-1 h-7 w-48"
+                >
+                  <option value="USE_KNOWN">Usar somente o conhecido</option>
+                  <option value="BLOCK">Aguardar revisão (bloquear)</option>
+                </Select>
+              )}
+            </div>
+
+            {/* Distribuição em Lote */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <span className="font-medium text-slate-600">Distribuição</span>
+              {!editing ? (
+                <span className="font-bold text-slate-900">
+                  lote {draftConfig.distribution.batchSize}, máx. {draftConfig.distribution.maxPending} pendentes, reserva {draftConfig.distribution.leaseSeconds}s
+                </span>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-slate-400">lote:</span>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={500}
+                      value={draftConfig.distribution.batchSize}
+                      onChange={(e) =>
+                        setDraftConfig((prev) => ({
+                          ...prev,
+                          distribution: {
+                            ...prev.distribution,
+                            batchSize: Math.max(1, parseInt(e.target.value) || 1),
+                          },
+                        }))
+                      }
+                      className="text-xs py-1 h-7 w-14"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-slate-400">pend:</span>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={1000}
+                      value={draftConfig.distribution.maxPending}
+                      onChange={(e) =>
+                        setDraftConfig((prev) => ({
+                          ...prev,
+                          distribution: {
+                            ...prev.distribution,
+                            maxPending: Math.max(1, parseInt(e.target.value) || 1),
+                          },
+                        }))
+                      }
+                      className="text-xs py-1 h-7 w-14"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* =================================================================== */}
+        {/* COLUNA 2: REGRAS DE TABULAÇÃO (EDITÁVEIS)                           */}
+        {/* =================================================================== */}
+        <div className="lg:col-span-6 rounded-2xl border border-slate-200/90 bg-white p-4 space-y-4 shadow-2xs">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-600">
+              Regras por Tabulação
+            </div>
+            <span className="text-[11px] text-slate-400">
+              Ação imediata do motor para cada retorno do canal
+            </span>
+          </div>
+
+          <div className="space-y-2.5 max-h-[520px] overflow-y-auto pr-1">
+            {tabEntries.map((item) => (
+              <div
+                key={item.code}
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50/60 p-2.5 hover:bg-slate-50 transition"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold text-xs text-slate-800 truncate">
+                    {item.name}
+                  </div>
+                  <div className="text-[10px] text-slate-400 font-mono">
+                    {item.code}
+                  </div>
+                </div>
+
+                {!editing ? (
+                  <Badge tone={item.action === 'FINISH_SUCCESS' ? 'green' : item.action === 'NEXT_DESTINATION' ? 'blue' : 'gray'}>
+                    {TABULATION_ACTION_LABEL[item.action] ?? item.action}
+                  </Badge>
+                ) : (
+                  <Select
+                    value={item.action}
+                    onChange={(e) => {
+                      const nextAct = e.target.value as TabulationAction;
+                      setDraftConfig((prev) => ({
+                        ...prev,
+                        tabulationRules: {
+                          ...prev.tabulationRules,
+                          [item.code]: nextAct,
+                        },
+                      }));
+                    }}
+                    className="text-xs py-1 h-7 w-44"
+                  >
+                    {TABULATION_ACTIONS.map((a) => (
+                      <option key={a} value={a}>
+                        {TABULATION_ACTION_LABEL[a]}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded-xl border border-slate-100 bg-slate-50 p-2.5 text-[11px] text-slate-500 leading-snug">
+            💡 <strong>Regra de Conformidade:</strong> Caso o cliente solicite não ser contatado (Opt-Out / DNC), o motor aplica o bloqueio permanente e encerra o fluxo imediatamente, prevalecendo sobre qualquer tabulação manual.
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
