@@ -785,10 +785,10 @@ function UnifiedCampaignCreator({
   const [useList, setUseList] = useState<boolean>(draft.audienceMode === 'LIST');
   const [listSelectionMode, setListSelectionMode] = useState<'SELECT' | 'CREATE'>('SELECT');
   const [selectedMailingId, setSelectedMailingId] = useState<string>(
-    draft.mailingId || mailings?.[0]?.id || '',
+    draft.mailingId || '',
   );
   const [selectedListId, setSelectedListId] = useState<string>(
-    extra.listId || lists?.[0]?.id || '',
+    extra.listId || '',
   );
 
   // Segmento do Público (B2B vs B2C vs MIXED)
@@ -829,7 +829,7 @@ function UnifiedCampaignCreator({
   const [createStartMode, setCreateStartMode] = useState<'NOW' | 'READY'>('NOW');
   const [formError, setFormError] = useState<string | null>(null);
 
-  const activeMailing = mailings?.find((m) => m.id === selectedMailingId) ?? mailings?.[0];
+  const activeMailing = selectedMailingId ? mailings?.find((m) => m.id === selectedMailingId) : null;
   const activeList = useList ? lists?.find((l) => l.id === selectedListId) : null;
   const targetCount = useList
     ? (activeList?.latestVersion?.memberCount ?? activeMailing?.recordCount ?? 0)
@@ -1286,77 +1286,139 @@ function UnifiedCampaignCreator({
                     Checklist da campanha
                   </div>
 
-                  <div className="space-y-3 text-xs">
-                    {/* Item 1: Descritivo */}
-                    <div className="flex items-start gap-2.5">
-                      <div className="grid size-5 place-items-center rounded-full bg-emerald-100 text-emerald-700 shrink-0 mt-0.5">
-                        <Check className="size-3 stroke-[2.5]" />
-                      </div>
-                      <div>
-                        <div className="font-bold text-slate-800">Descritivo</div>
-                        <div className="text-slate-500 text-[11px] leading-tight line-clamp-2">
-                          {promptText.trim() ? promptText : 'Descreva o objetivo da campanha'}
-                        </div>
-                      </div>
-                    </div>
+                  {/* Verificadores das condições progressivas */}
+                  {(() => {
+                    const hasPrompt = promptText.trim().length > 0;
+                    const hasMailing = Boolean(selectedMailingId && activeMailing);
+                    // O Canal, Dias e Horário ideal dependem do mailing para aferir canais disponíveis, DDD/região e perfil da base
+                    const hasChannel = hasPrompt && hasMailing;
+                    const hasDays = hasPrompt && hasMailing;
+                    const hasAttempts = hasPrompt;
 
-                    {/* Item 2: Canal */}
-                    <div className="flex items-start gap-2.5">
-                      <div className="grid size-5 place-items-center rounded-full bg-emerald-100 text-emerald-700 shrink-0 mt-0.5">
-                        <Check className="size-3 stroke-[2.5]" />
-                      </div>
-                      <div>
-                        <div className="font-bold text-slate-800">Canal</div>
-                        <div className="text-slate-500 text-[11px]">
-                          {parsedPrompt.recommendedChannels.map((c) => CHANNEL_LABEL[c] ?? c).join(' → ')}
+                    return (
+                      <div className="space-y-3 text-xs">
+                        {/* Item 1: Descritivo */}
+                        <div className="flex items-start gap-2.5">
+                          <div
+                            className={clsx(
+                              'grid size-5 place-items-center rounded-full shrink-0 mt-0.5 transition-colors',
+                              hasPrompt
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : 'bg-slate-200 text-slate-400',
+                            )}
+                          >
+                            <Check className="size-3 stroke-[2.5]" />
+                          </div>
+                          <div>
+                            <div className="font-bold text-slate-800">Descritivo</div>
+                            <div className="text-slate-500 text-[11px] leading-tight line-clamp-2">
+                              {hasPrompt ? promptText : 'Descreva o objetivo da campanha'}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
 
-                    {/* Item 3: Dias */}
-                    <div className="flex items-start gap-2.5">
-                      <div className="grid size-5 place-items-center rounded-full bg-emerald-100 text-emerald-700 shrink-0 mt-0.5">
-                        <Check className="size-3 stroke-[2.5]" />
-                      </div>
-                      <div>
-                        <div className="font-bold text-slate-800">Dias</div>
-                        <div className="text-slate-500 text-[11px]">
-                          {parsedPrompt.audienceSegment === 'B2B' ? 'Segunda a sexta' : 'Todos os dias permitidos'}
+                        {/* Item 2: Canal */}
+                        <div className="flex items-start gap-2.5">
+                          <div
+                            className={clsx(
+                              'grid size-5 place-items-center rounded-full shrink-0 mt-0.5 transition-colors',
+                              hasChannel
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : 'bg-slate-200 text-slate-400',
+                            )}
+                          >
+                            <Check className="size-3 stroke-[2.5]" />
+                          </div>
+                          <div>
+                            <div className="font-bold text-slate-800">Canal</div>
+                            <div className="text-slate-500 text-[11px]">
+                              {hasChannel ? (
+                                parsedPrompt.recommendedChannels.map((c) => CHANNEL_LABEL[c] ?? c).join(' → ')
+                              ) : (
+                                <span className="text-slate-400 italic">
+                                  Aguardando mailing para identificar os melhores canais
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
 
-                    {/* Item 4: Tentativas */}
-                    <div className="flex items-start gap-2.5">
-                      <div className="grid size-5 place-items-center rounded-full bg-emerald-100 text-emerald-700 shrink-0 mt-0.5">
-                        <Check className="size-3 stroke-[2.5]" />
-                      </div>
-                      <div>
-                        <div className="font-bold text-slate-800">Tentativas</div>
-                        <div className="text-slate-500 text-[11px]">
-                          Até 3 por contato
+                        {/* Item 3: Dias e Horários */}
+                        <div className="flex items-start gap-2.5">
+                          <div
+                            className={clsx(
+                              'grid size-5 place-items-center rounded-full shrink-0 mt-0.5 transition-colors',
+                              hasDays
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : 'bg-slate-200 text-slate-400',
+                            )}
+                          >
+                            <Check className="size-3 stroke-[2.5]" />
+                          </div>
+                          <div>
+                            <div className="font-bold text-slate-800">Dias</div>
+                            <div className="text-slate-500 text-[11px]">
+                              {hasDays ? (
+                                parsedPrompt.audienceSegment === 'B2B'
+                                  ? 'Segunda a sexta (horário comercial)'
+                                  : 'Todos os dias permitidos'
+                              ) : (
+                                <span className="text-slate-400 italic">
+                                  Aguardando mailing para definir a melhor hora de chamar
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
 
-                    {/* Item 5: CSV */}
-                    <div className="flex items-start gap-2.5">
-                      <div className={clsx(
-                        'grid size-5 place-items-center rounded-full shrink-0 mt-0.5',
-                        activeMailing ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-400'
-                      )}>
-                        <Check className="size-3 stroke-[2.5]" />
-                      </div>
-                      <div>
-                        <div className="font-bold text-slate-800">CSV</div>
-                        <div className="text-slate-500 text-[11px]">
-                          {activeMailing
-                            ? `${fmtNumber(activeMailing.recordCount)} contatos · campos reconhecidos`
-                            : 'Pendente anexar ou selecionar'}
+                        {/* Item 4: Tentativas */}
+                        <div className="flex items-start gap-2.5">
+                          <div
+                            className={clsx(
+                              'grid size-5 place-items-center rounded-full shrink-0 mt-0.5 transition-colors',
+                              hasAttempts
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : 'bg-slate-200 text-slate-400',
+                            )}
+                          >
+                            <Check className="size-3 stroke-[2.5]" />
+                          </div>
+                          <div>
+                            <div className="font-bold text-slate-800">Tentativas</div>
+                            <div className="text-slate-500 text-[11px]">
+                              {hasAttempts ? (
+                                'Até 3 por contato'
+                              ) : (
+                                <span className="text-slate-400 italic">Definido pelo objetivo</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Item 5: CSV */}
+                        <div className="flex items-start gap-2.5">
+                          <div
+                            className={clsx(
+                              'grid size-5 place-items-center rounded-full shrink-0 mt-0.5 transition-colors',
+                              hasMailing
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : 'bg-slate-200 text-slate-400',
+                            )}
+                          >
+                            <Check className="size-3 stroke-[2.5]" />
+                          </div>
+                          <div>
+                            <div className="font-bold text-slate-800">CSV</div>
+                            <div className="text-slate-500 text-[11px]">
+                              {hasMailing && activeMailing
+                                ? `${fmtNumber(activeMailing.recordCount)} contatos · campos reconhecidos`
+                                : 'Pendente anexar ou selecionar'}
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </div>
+                    );
+                  })()}
 
                   <div className="pt-2 border-t border-slate-200/80 text-[10px] text-slate-400 leading-tight">
                     O checklist acompanha o que já foi definido no prompt e na lista.
