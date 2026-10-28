@@ -5,7 +5,7 @@ import { CHANNEL_LABEL, CHANNEL_TYPES, type ChannelType, type JourneyStep } from
 import { ApiError, errorMessage, get, post } from '../lib/api';
 import type { Connection, Journey, JourneyStepView } from '../lib/types';
 import { useAuth } from '../lib/auth';
-import { Alert, Badge, Button, Card, Empty, ErrorState, Field, InfoTooltip, Input, Loading, Modal, PageHeader, Select, useToast } from '../components/ui';
+import { Alert, Badge, Button, Card, Empty, ErrorState, Field, InfoTooltip, Input, Loading, Modal, PageHeader, Select, TableWrap, useToast, ViewModeToggle, type ViewMode } from '../components/ui';
 import { JourneySteps } from '../components/Summaries';
 
 function EditableJourneyCard({
@@ -329,9 +329,13 @@ function EditableJourneyCard({
 export function JourneysSection({
   open: extOpen,
   onOpenChange: extOnOpenChange,
+  viewMode: extViewMode,
+  onViewModeChange: extOnViewModeChange,
 }: {
   open?: boolean;
   onOpenChange?: (o: boolean) => void;
+  viewMode?: ViewMode;
+  onViewModeChange?: (v: ViewMode) => void;
 } = {}) {
   const { can } = useAuth();
   const q = useQuery({ queryKey: ['journeys'], queryFn: () => get<{ items: Journey[] }>('/journeys') });
@@ -341,16 +345,25 @@ export function JourneysSection({
   const open = extOpen !== undefined ? extOpen : localOpen;
   const setOpen = extOnOpenChange !== undefined ? extOnOpenChange : setLocalOpen;
 
+  const [localViewMode, setLocalViewMode] = useState<ViewMode>('cards');
+  const viewMode = extViewMode !== undefined ? extViewMode : localViewMode;
+  const setViewMode = extOnViewModeChange !== undefined ? extOnViewModeChange : setLocalViewMode;
+
+  const [editJourneyInModal, setEditJourneyInModal] = useState<Journey | null>(null);
+
   const canEdit = can('journeys.write');
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-1.5">
-        <h2 className="text-sm font-semibold text-slate-800">Jornadas de Acionamento (Sequência de Canais)</h2>
-        <InfoTooltip content="Ordem dos canais, conexões e prazos de feedback (sem política de retentativa local)." />
-        <span className="text-xs text-slate-400 italic ml-2">
-          Clique em &quot;Editar jornada&quot; no card para ajustar os canais ou publicar nova versão
-        </span>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-1.5">
+          <h2 className="text-sm font-semibold text-slate-800">Jornadas de Acionamento (Sequência de Canais)</h2>
+          <InfoTooltip content="Ordem dos canais, conexões e prazos de feedback (sem política de retentativa local)." />
+          <span className="text-xs text-slate-400 italic ml-2">
+            Clique em &quot;Editar jornada&quot; para ajustar os canais ou publicar nova versão
+          </span>
+        </div>
+        {extViewMode === undefined && <ViewModeToggle value={viewMode} onChange={setViewMode} />}
       </div>
 
       {q.isLoading || conns.isLoading ? (
@@ -359,7 +372,7 @@ export function JourneysSection({
         <ErrorState error={q.error} onRetry={() => q.refetch()} />
       ) : q.data!.items.length === 0 ? (
         <Empty title="Nenhuma jornada cadastrada" />
-      ) : (
+      ) : viewMode === 'cards' ? (
         <div className="grid gap-4 lg:grid-cols-2">
           {q.data!.items.map((j) => (
             <EditableJourneyCard
@@ -370,6 +383,71 @@ export function JourneysSection({
             />
           ))}
         </div>
+      ) : (
+        <Card padded={false}>
+          <TableWrap label="Jornadas">
+            <table className="data">
+              <thead>
+                <tr>
+                  <th>Jornada</th>
+                  <th>Versão</th>
+                  <th>Etapas</th>
+                  <th>Sequência de Canais</th>
+                  <th className="text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {q.data!.items.map((j) => {
+                  const steps = j.latestVersion?.steps ?? [];
+                  return (
+                    <tr key={j.id} className="hover:bg-slate-50/80 transition">
+                      <td className="font-semibold text-slate-800">{j.name}</td>
+                      <td>
+                        <Badge tone="gray">v{j.latestVersion?.version ?? 1}</Badge>
+                      </td>
+                      <td className="text-xs text-slate-600 tabular">{steps.length} etapa(s)</td>
+                      <td>
+                        {steps.length > 0 ? (
+                          <JourneySteps steps={steps} />
+                        ) : (
+                          <span className="text-xs text-slate-400">Sem versão publicada</span>
+                        )}
+                      </td>
+                      <td className="text-right">
+                        {canEdit && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            icon={<Pencil className="size-3.5" />}
+                            onClick={() => setEditJourneyInModal(j)}
+                          >
+                            Editar jornada
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </TableWrap>
+        </Card>
+      )}
+
+      {editJourneyInModal && (
+        <Modal
+          open
+          onOpenChange={(o) => !o && setEditJourneyInModal(null)}
+          wide
+          title={`Editar Jornada: ${editJourneyInModal.name}`}
+          description="Ajuste a sequência de canais e salve no topo do card para publicar uma nova versão."
+        >
+          <EditableJourneyCard
+            journey={q.data?.items.find((x) => x.id === editJourneyInModal.id) ?? editJourneyInModal}
+            canEdit={canEdit}
+            connections={conns.data?.items ?? []}
+          />
+        </Modal>
       )}
 
       <NewJourneyDialog open={open} onOpenChange={setOpen} />
@@ -380,20 +458,24 @@ export function JourneysSection({
 export function JourneysPage() {
   const { can } = useAuth();
   const [open, setOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('cards');
   return (
     <div className="space-y-4">
       <PageHeader
         title="Jornadas de Canal"
         tooltip="Sequência e ordem dos canais, conexões e prazos de feedback para acionamento multicanal."
         actions={
-          can('journeys.write') && (
-            <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setOpen(true)}>
-              Nova jornada
-            </Button>
-          )
+          <div className="flex items-center gap-2.5">
+            <ViewModeToggle value={viewMode} onChange={setViewMode} />
+            {can('journeys.write') && (
+              <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setOpen(true)}>
+                Nova jornada
+              </Button>
+            )}
+          </div>
         }
       />
-      <JourneysSection open={open} onOpenChange={setOpen} />
+      <JourneysSection open={open} onOpenChange={setOpen} viewMode={viewMode} onViewModeChange={setViewMode} />
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { clsx } from 'clsx';
 import { errorMessage, get, patch, post } from '../lib/api';
 import type { Tabulation } from '../lib/types';
 import { useAuth } from '../lib/auth';
-import { Badge, Button, Card, Checkbox, ErrorState, Field, InfoTooltip, Input, Loading, Modal, PageHeader, TableWrap, useToast } from '../components/ui';
+import { Badge, Button, Card, Checkbox, ErrorState, Field, InfoTooltip, Input, Loading, Modal, PageHeader, TableWrap, useToast, ViewModeToggle, type ViewMode } from '../components/ui';
 
 /** Aceita array ou literal de array do Postgres ("{VOICE,SMS}"). */
 function channelList(v: unknown): ChannelType[] {
@@ -54,10 +54,20 @@ const CHANNELS: { type: ChannelType; label: string; activeClass: string }[] = [
   { type: 'EMAIL', label: 'E-mail', activeClass: 'bg-sky-50 text-sky-700 border-sky-300 hover:bg-sky-100 font-semibold' },
 ];
 
-export function TabulationsSection() {
+export function TabulationsSection({
+  viewMode: extViewMode,
+  onViewModeChange: extOnViewModeChange,
+}: {
+  viewMode?: ViewMode;
+  onViewModeChange?: (v: ViewMode) => void;
+} = {}) {
   const qc = useQueryClient();
   const toast = useToast();
   const q = useQuery({ queryKey: ['tabulations'], queryFn: () => get<{ items: Tabulation[] }>('/tabulations') });
+
+  const [localViewMode, setLocalViewMode] = useState<ViewMode>('cards');
+  const viewMode = extViewMode !== undefined ? extViewMode : localViewMode;
+  const setViewMode = extOnViewModeChange !== undefined ? extOnViewModeChange : setLocalViewMode;
 
   const [edits, setEdits] = useState<Record<string, Partial<Tabulation>>>({});
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
@@ -199,6 +209,140 @@ export function TabulationsSection() {
         <Loading />
       ) : q.error ? (
         <ErrorState error={q.error} onRetry={() => q.refetch()} />
+      ) : viewMode === 'cards' ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {q.data!.items.map((t) => {
+            const edit = edits[t.id] || {};
+            const currentName = edit.name !== undefined ? edit.name : t.name;
+            const currentChannels = edit.channelTypes !== undefined ? edit.channelTypes : channelList(t.channelTypes);
+            const isItemDirty = dirtyItems.some((d) => d.id === t.id);
+
+            return (
+              <Card
+                key={t.id}
+                padded={false}
+                className={clsx(
+                  'group/row flex flex-col justify-between overflow-hidden transition',
+                  isItemDirty && 'ring-1 ring-amber-300 bg-amber-50/10',
+                )}
+              >
+                {/* Header do Card idêntico ao padrão de Jornadas */}
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/70 p-4">
+                  <div className="min-w-0 flex-1">
+                    {editingNameId === t.id ? (
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="text"
+                          autoFocus
+                          value={currentName}
+                          onChange={(e) => updateItem(t.id, { name: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === 'Escape') setEditingNameId(null);
+                          }}
+                          onBlur={() => setEditingNameId(null)}
+                          className="w-full max-w-xs rounded-lg border border-brand-300 bg-white px-2.5 py-1 text-xs font-bold text-slate-900 shadow-2xs focus:outline-hidden focus:ring-2 focus:ring-brand-500"
+                          placeholder="Nome da tabulação"
+                        />
+                        <Badge tone="gray">{t.code}</Badge>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span
+                          onClick={() => setEditingNameId(t.id)}
+                          className="font-bold text-sm text-slate-900 hover:text-brand-700 truncate cursor-pointer transition-colors"
+                          title="Clique para editar o nome da tabulação"
+                        >
+                          {currentName}
+                        </span>
+                        <Badge tone="gray">{t.code}</Badge>
+                        {isItemDirty && (
+                          <span className="size-2 rounded-full bg-amber-500 shrink-0" title="Alterações pendentes" />
+                        )}
+                      </div>
+                    )}
+                    <span className="text-[11px] text-slate-500">
+                      {currentChannels.length} canal(is) habilitado(s) · clique nos indicadores abaixo para alterar
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      icon={<Pencil className="size-3.5" />}
+                      onClick={() => setEditingNameId(t.id)}
+                    >
+                      Editar nome
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Corpo do Card com Indicadores e Canais interativos */}
+                <div className="p-4 space-y-3 flex-1">
+                  <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs space-y-1.5">
+                    <strong className="block text-slate-700">1. Indicadores de Resultado</strong>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {INDICATORS.map((ind) => {
+                        const val = edit[ind.key] !== undefined ? !!edit[ind.key] : !!t[ind.key];
+                        const isMod = edit[ind.key] !== undefined && edit[ind.key] !== t[ind.key];
+                        return (
+                          <button
+                            key={ind.key}
+                            type="button"
+                            onClick={() => toggleIndicator(t, ind.key, val)}
+                            title={`Clique para ${val ? 'desativar' : 'ativar'} ${ind.label} (${ind.tooltip})`}
+                            className={clsx(
+                              'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs transition cursor-pointer border shadow-2xs select-none',
+                              val
+                                ? ind.activeClass
+                                : clsx(
+                                    'text-slate-400 border-dashed border-slate-200 opacity-50 hover:!opacity-100 focus:opacity-100',
+                                    ind.hoverClass,
+                                  ),
+                            )}
+                          >
+                            <span>{ind.label}</span>
+                            {val && <Check className="size-2.5 text-current shrink-0 stroke-[2.5]" />}
+                            {isMod && <span className="size-1.5 rounded-full bg-amber-500 shrink-0" title="Modificado" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs space-y-1.5">
+                    <strong className="block text-slate-700">2. Canais Compatíveis</strong>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {CHANNELS.map((ch) => {
+                        const isSelected = currentChannels.includes(ch.type);
+                        const origChannels = channelList(t.channelTypes);
+                        const wasOrigSelected = origChannels.includes(ch.type);
+                        const isMod = isSelected !== wasOrigSelected;
+                        return (
+                          <button
+                            key={ch.type}
+                            type="button"
+                            onClick={() => toggleChannel(t, currentChannels, ch.type)}
+                            title={`Clique para ${isSelected ? 'remover' : 'adicionar'} canal ${ch.label}`}
+                            className={clsx(
+                              'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs transition cursor-pointer border shadow-2xs select-none',
+                              isSelected
+                                ? ch.activeClass
+                                : 'text-slate-400 border-dashed border-slate-200 opacity-50 hover:!opacity-100 focus:opacity-100 hover:border-slate-300 hover:text-slate-700 hover:bg-slate-50',
+                            )}
+                          >
+                            <span>{ch.label}</span>
+                            {isSelected && <Check className="size-2.5 text-current shrink-0 stroke-[2.5]" />}
+                            {isMod && <span className="size-1.5 rounded-full bg-amber-500 shrink-0" title="Canal modificado" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
       ) : (
         <Card padded={false}>
           <TableWrap label="Tabulações">
@@ -441,20 +585,24 @@ function NewTabulationDialog({ open, onOpenChange }: { open: boolean; onOpenChan
 export function TabulationsPage() {
   const { can } = useAuth();
   const [openNew, setOpenNew] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('cards');
   return (
     <div className="space-y-4">
       <PageHeader
         title="Dicionário de Tabulações"
         tooltip="Resultados normalizados de máquina ou humano e parametrização de CPC, conversão e DNC."
         actions={
-          can('strategies.write') && (
-            <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setOpenNew(true)}>
-              Nova tabulação
-            </Button>
-          )
+          <div className="flex items-center gap-2.5">
+            <ViewModeToggle value={viewMode} onChange={setViewMode} />
+            {can('strategies.write') && (
+              <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setOpenNew(true)}>
+                Nova tabulação
+              </Button>
+            )}
+          </div>
         }
       />
-      <TabulationsSection />
+      <TabulationsSection viewMode={viewMode} onViewModeChange={setViewMode} />
       <NewTabulationDialog open={openNew} onOpenChange={setOpenNew} />
     </div>
   );

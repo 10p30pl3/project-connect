@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useState } from 'react';
 import { clsx } from 'clsx';
-import { ArrowLeft, AlertCircle, Check, ChevronDown, Copy, Lock, Pencil, Plus, RotateCcw, Save } from 'lucide-react';
+import { ArrowLeft, ArrowRight, AlertCircle, Check, ChevronDown, Copy, Lock, Pencil, Plus, RotateCcw, Save } from 'lucide-react';
 import {
   TABULATION_ACTIONS,
   TABULATION_ACTION_LABEL,
@@ -13,25 +13,132 @@ import { errorMessage, get, post, put } from '../lib/api';
 import type { DraftEnvelope, Strategy, StrategyDetail, StrategyVersion, Tabulation } from '../lib/types';
 import { fmtDateTime, WEEKDAYS } from '../lib/format';
 import { useAuth } from '../lib/auth';
-import { Alert, Badge, Button, Card, Empty, ErrorState, Field, InfoTooltip, Input, Loading, Modal, PageHeader, Select, TableWrap, useToast } from '../components/ui';
+import { Alert, Badge, Button, Card, Empty, ErrorState, Field, InfoTooltip, Input, Loading, Modal, PageHeader, Select, TableWrap, useToast, ViewModeToggle, type ViewMode } from '../components/ui';
 import { StrategySummary, daysLabel, fmtMinutes } from '../components/Summaries';
 import { StrategyForm } from '../components/StrategyForm';
 import { WizardReturnBanner } from './NewCampaign';
 
-export function StrategiesSection() {
+export function StrategiesSection({
+  viewMode: extViewMode,
+  onViewModeChange: extOnViewModeChange,
+}: {
+  viewMode?: ViewMode;
+  onViewModeChange?: (v: ViewMode) => void;
+} = {}) {
+  const nav = useNavigate();
   const q = useQuery({ queryKey: ['strategies'], queryFn: () => get<{ items: Strategy[] }>('/strategies') });
+  const [localViewMode, setLocalViewMode] = useState<ViewMode>('cards');
+  const viewMode = extViewMode !== undefined ? extViewMode : localViewMode;
+  const setViewMode = extOnViewModeChange !== undefined ? extOnViewModeChange : setLocalViewMode;
+
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-1.5">
-        <h2 className="text-sm font-semibold text-slate-800">Estratégias Avançadas (Templates Versionados)</h2>
-        <InfoTooltip content="Calendário operacional, limites de esforço, cadência de retentativas, otimização consultiva e regras por tabulação." />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-1.5">
+          <h2 className="text-sm font-semibold text-slate-800">Estratégias Avançadas (Templates Versionados)</h2>
+          <InfoTooltip content="Calendário operacional, limites de esforço, cadência de retentativas, otimização consultiva e regras por tabulação." />
+          <span className="text-xs text-slate-400 italic ml-2">
+            Clique em &quot;Editar estratégia&quot; para parametrizar limites e regras de tabulação
+          </span>
+        </div>
+        {extViewMode === undefined && <ViewModeToggle value={viewMode} onChange={setViewMode} />}
       </div>
+
       {q.isLoading ? (
         <Loading />
       ) : q.error ? (
         <ErrorState error={q.error} onRetry={() => q.refetch()} />
       ) : q.data!.items.length === 0 ? (
         <Empty title="Nenhuma estratégia" />
+      ) : viewMode === 'cards' ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {q.data!.items.map((s) => {
+            const c = s.latestVersion?.config;
+            const rulesCount = c ? Object.keys(c.tabulationRules || {}).length : 0;
+            return (
+              <Card key={s.id} padded={false} className="flex flex-col justify-between overflow-hidden">
+                {/* Header do Card idêntico ao padrão de Jornadas */}
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/70 p-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <Link
+                        to={`/estrategias/${s.id}`}
+                        className="font-bold text-sm text-slate-900 hover:text-brand-700 truncate transition-colors"
+                      >
+                        {s.name}
+                      </Link>
+                      {s.latestVersion && <Badge tone="gray">v{s.latestVersion.version}</Badge>}
+                      {s.protected && (
+                        <Badge icon={<Lock className="size-3" aria-hidden />}>
+                          Predefinida
+                        </Badge>
+                      )}
+                    </div>
+                    <span className="text-[11px] text-slate-500">
+                      {c
+                        ? `${rulesCount} regra(s) de tabulação · publicada em ${fmtDateTime(s.latestVersion?.publishedAt)}`
+                        : 'Sem versão publicada'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      icon={<Pencil className="size-3.5" />}
+                      onClick={() => nav(`/estrategias/${s.id}`)}
+                    >
+                      Editar estratégia
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Corpo do Card com blocos encadeados igual ao JourneySteps */}
+                <div className="p-4 space-y-3 flex-1">
+                  {c ? (
+                    <div
+                      onClick={() => nav(`/estrategias/${s.id}`)}
+                      className="cursor-pointer group/steps rounded-lg p-1 -m-1 hover:bg-slate-50/80 transition"
+                      title="Clique para abrir e editar os parâmetros desta estratégia"
+                    >
+                      <ol className="flex flex-wrap items-center gap-2" aria-label="Parâmetros da estratégia">
+                        <li className="flex items-center gap-2">
+                          <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs">
+                            <strong>1. Limites de Esforço</strong>
+                            <span className="text-slate-500"> · {c.limits.total} total / {c.limits.daily} dia</span>
+                            <span className="block text-slate-500">
+                              Escopo: {c.limits.scope === 'WORKSPACE' ? 'Workspace' : 'Campanha'}
+                            </span>
+                          </span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <ArrowRight className="size-4 text-slate-400" aria-hidden />
+                          <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs">
+                            <strong>2. Calendário</strong>
+                            <span className="text-slate-500"> · {c.calendar.start}–{c.calendar.end}</span>
+                            <span className="block text-slate-500">{daysLabel(c.calendar.days)}</span>
+                          </span>
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <ArrowRight className="size-4 text-slate-400" aria-hidden />
+                          <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs">
+                            <strong>3. Retentativa</strong>
+                            <span className="text-slate-500"> · {fmtMinutes(c.retry.intervalMinutes)}</span>
+                            <span className="block text-slate-500">Até {c.retry.maxPerDestination}x por destino</span>
+                          </span>
+                        </li>
+                      </ol>
+                      <div className="mt-2 text-[11px] text-slate-400 opacity-0 group-hover/steps:opacity-100 transition flex items-center gap-1 text-brand-600 font-medium">
+                        <Pencil className="size-3" /> Clique para editar parâmetros e regras de tabulação
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-500">Sem configuração publicada.</p>
+                  )}
+                </div>
+              </Card>
+            );
+          })}
+        </div>
       ) : (
         <Card padded={false}>
           <TableWrap label="Estratégias">
@@ -44,13 +151,14 @@ export function StrategiesSection() {
                   <th>Calendário</th>
                   <th>Retentativa</th>
                   <th>Publicada</th>
+                  <th className="text-right">Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {q.data!.items.map((s) => {
                   const c = s.latestVersion?.config;
                   return (
-                    <tr key={s.id}>
+                    <tr key={s.id} className="hover:bg-slate-50/80 transition">
                       <td>
                         <Link to={`/estrategias/${s.id}`} className="font-medium text-brand-800 hover:underline">
                           {s.name}
@@ -61,11 +169,21 @@ export function StrategiesSection() {
                           </Badge>
                         )}
                       </td>
-                      <td>{s.latestVersion ? `v${s.latestVersion.version}` : '—'}</td>
+                      <td>{s.latestVersion ? <Badge tone="gray">v{s.latestVersion.version}</Badge> : '—'}</td>
                       <td className="tabular">{c ? `${c.limits.total} / ${c.limits.daily}` : '—'}</td>
                       <td className="text-xs">{c ? `${daysLabel(c.calendar.days)}, ${c.calendar.start}–${c.calendar.end}` : '—'}</td>
                       <td className="text-xs">{c ? `${c.retry.intervalMinutes} min · até ${c.retry.maxPerDestination}/destino` : '—'}</td>
                       <td className="text-xs">{fmtDateTime(s.latestVersion?.publishedAt)}</td>
+                      <td className="text-right">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          icon={<Pencil className="size-3.5" />}
+                          onClick={() => nav(`/estrategias/${s.id}`)}
+                        >
+                          Editar estratégia
+                        </Button>
+                      </td>
                     </tr>
                   );
                 })}
@@ -172,20 +290,24 @@ function NewStrategyDialog({
 export function StrategiesPage() {
   const { can } = useAuth();
   const [openNew, setOpenNew] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('cards');
   return (
     <div className="space-y-4">
       <PageHeader
         title="Estratégias Avançadas"
         tooltip="Calendário operacional, limites de esforço diário/total, cadência de retentativas e regras por tabulação."
         actions={
-          can('strategies.write') && (
-            <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setOpenNew(true)}>
-              Nova estratégia
-            </Button>
-          )
+          <div className="flex items-center gap-2.5">
+            <ViewModeToggle value={viewMode} onChange={setViewMode} />
+            {can('strategies.write') && (
+              <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setOpenNew(true)}>
+                Nova estratégia
+              </Button>
+            )}
+          </div>
         }
       />
-      <StrategiesSection />
+      <StrategiesSection viewMode={viewMode} onViewModeChange={setViewMode} />
       <NewStrategyDialog open={openNew} onOpenChange={setOpenNew} />
     </div>
   );

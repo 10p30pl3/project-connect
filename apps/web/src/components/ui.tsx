@@ -13,6 +13,8 @@ import {
   Clock,
   HelpCircle,
   Info,
+  LayoutGrid,
+  List,
   Loader2,
   Pause,
   PlayCircle,
@@ -689,5 +691,52 @@ export function KeyValue({ items }: { items: [ReactNode, ReactNode][] }) {
         </div>
       ))}
     </dl>
+  );
+}
+
+// ------------------------------------------------------------------ View Mode Toggle (Cards Default vs Lista)
+export type ViewMode = 'cards' | 'list';
+export function ViewModeToggle({
+  value,
+  onChange,
+}: {
+  value: ViewMode;
+  onChange: (v: ViewMode) => void;
+}) {
+  return (
+    <div
+      className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-100/80 p-0.5 shadow-2xs"
+      role="group"
+      aria-label="Alternar modo de visualização"
+    >
+      <button
+        type="button"
+        onClick={() => onChange('cards')}
+        aria-pressed={value === 'cards'}
+        className={clsx(
+          'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-all cursor-pointer',
+          value === 'cards'
+            ? 'bg-white text-brand-800 shadow-xs ring-1 ring-slate-200/80 font-semibold'
+            : 'text-slate-600 hover:text-slate-900',
+        )}
+      >
+        <LayoutGrid className="size-3.5 shrink-0" aria-hidden />
+        <span>Cards</span>
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange('list')}
+        aria-pressed={value === 'list'}
+        className={clsx(
+          'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-all cursor-pointer',
+          value === 'list'
+            ? 'bg-white text-brand-800 shadow-xs ring-1 ring-slate-200/80 font-semibold'
+            : 'text-slate-600 hover:text-slate-900',
+        )}
+      >
+        <List className="size-3.5 shrink-0" aria-hidden />
+        <span>Lista</span>
+      </button>
+    </div>
   );
 }

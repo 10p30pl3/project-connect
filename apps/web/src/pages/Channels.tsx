@@ -1,35 +1,142 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { ArrowRight, Pencil, Plus } from 'lucide-react';
 import { CHANNEL_LABEL, type ChannelType } from '@voll/shared';
 import { ApiError, errorMessage, get, patch, post } from '../lib/api';
 import type { Connection, Simulation, Tabulation } from '../lib/types';
 import { fmtDateTime, fmtMoney } from '../lib/format';
 import { useAuth } from '../lib/auth';
-import { Alert, Badge, Button, Card, Checkbox, ErrorState, Field, Input, Loading, Modal, PageHeader, Select, TableWrap, useToast } from '../components/ui';
+import { Alert, Badge, Button, Card, Checkbox, Empty, ErrorState, Field, InfoTooltip, Input, Loading, Modal, PageHeader, Select, TableWrap, useToast, ViewModeToggle, type ViewMode } from '../components/ui';
 
 export function ChannelsPage() {
   const { can } = useAuth();
   const q = useQuery({ queryKey: ['connections'], queryFn: () => get<{ items: Connection[] }>('/connections') });
   const [edit, setEdit] = useState<Connection | null>(null);
   const [openNew, setOpenNew] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('cards');
+  const canEdit = can('connections.write');
+
   return (
-    <div>
+    <div className="space-y-4">
       <PageHeader
         title="Canais"
         tooltip="Tarifa vazia significa desconhecida; zero significa gratuito. Cada envio preserva a tarifa vigente no momento — alterar a tarifa não recalcula envios anteriores."
         actions={
-          can('connections.write') && (
-            <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setOpenNew(true)}>
-              Novo canal
-            </Button>
-          )
+          <div className="flex items-center gap-2.5">
+            <ViewModeToggle value={viewMode} onChange={setViewMode} />
+            {canEdit && (
+              <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setOpenNew(true)}>
+                Novo canal
+              </Button>
+            )}
+          </div>
         }
       />
+
+      <div className="flex items-center gap-1.5">
+        <h2 className="text-sm font-semibold text-slate-800">Conexões e Conectores de Canal</h2>
+        <InfoTooltip content="Integrações configuradas para envio de mensagens, discagem e simulação de webhooks." />
+        <span className="text-xs text-slate-400 italic ml-2">
+          Clique em &quot;Editar canal&quot; para configurar tarifas, disponibilidade e parâmetros de simulação
+        </span>
+      </div>
+
       {q.isLoading ? (
         <Loading />
       ) : q.error ? (
         <ErrorState error={q.error} onRetry={() => q.refetch()} />
+      ) : q.data!.items.length === 0 ? (
+        <Empty title="Nenhum canal cadastrado" />
+      ) : viewMode === 'cards' ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {q.data!.items.map((c) => {
+            const sim = c.simulation;
+            return (
+              <Card key={c.id} padded={false} className="flex flex-col justify-between overflow-hidden">
+                {/* Header do Card idêntico ao padrão de Jornadas */}
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/70 p-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-sm text-slate-900 truncate">{c.name}</span>
+                      <Badge tone="gray">{CHANNEL_LABEL[c.channelType]}</Badge>
+                      {c.active ? <Badge tone="green">Ativa</Badge> : <Badge tone="gray">Inativa</Badge>}
+                    </div>
+                    <span className="text-[11px] text-slate-500">
+                      Provedor {c.provider === 'SIMULATED' ? 'Simulado' : c.provider}
+                      {c.tariffUpdatedAt ? ` · atualizado em ${fmtDateTime(c.tariffUpdatedAt)}` : ''}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {canEdit && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        icon={<Pencil className="size-3.5" />}
+                        onClick={() => setEdit(c)}
+                      >
+                        Editar canal
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Corpo do Card com blocos encadeados igual ao JourneySteps */}
+                <div className="p-4 space-y-3 flex-1">
+                  <div
+                    onClick={() => canEdit && setEdit(c)}
+                    className={canEdit ? 'cursor-pointer group/steps rounded-lg p-1 -m-1 hover:bg-slate-50/80 transition' : ''}
+                    title={canEdit ? 'Clique para configurar este canal' : undefined}
+                  >
+                    <ol className="flex flex-wrap items-center gap-2" aria-label="Parâmetros do canal">
+                      <li className="flex items-center gap-2">
+                        <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs">
+                          <strong>1. Canal &amp; Conector</strong>
+                          <span className="text-slate-500"> · {CHANNEL_LABEL[c.channelType]}</span>
+                          <span className="block text-slate-500">
+                            Provedor: {c.provider === 'SIMULATED' ? 'Simulado (Demo)' : c.provider}
+                          </span>
+                        </span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <ArrowRight className="size-4 text-slate-400" aria-hidden />
+                        <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs">
+                          <strong>2. Tarifa por Tentativa</strong>
+                          <span className="text-slate-500">
+                            {' '}
+                            · {c.tariff === null ? 'Desconhecida' : fmtMoney(c.tariff, 4)}
+                          </span>
+                          <span className="block text-slate-500">
+                            {c.tariffUpdatedAt ? `Desde ${fmtDateTime(c.tariffUpdatedAt)}` : 'Valor de referência'}
+                          </span>
+                        </span>
+                      </li>
+                      {sim && (
+                        <li className="flex items-center gap-2">
+                          <ArrowRight className="size-4 text-slate-400" aria-hidden />
+                          <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs">
+                            <strong>3. Simulação de Entrega</strong>
+                            <span className="text-slate-500">
+                              {' '}
+                              · {sim.minDelaySeconds}s–{sim.maxDelaySeconds}s
+                            </span>
+                            <span className="block text-slate-500">
+                              Sem retorno: {Math.round(sim.noReturnRate * 100)}% · Duplicado: {Math.round(sim.duplicateRate * 100)}%
+                            </span>
+                          </span>
+                        </li>
+                      )}
+                    </ol>
+                    {canEdit && (
+                      <div className="mt-2 text-[11px] text-slate-400 opacity-0 group-hover/steps:opacity-100 transition flex items-center gap-1 text-brand-600 font-medium">
+                        <Pencil className="size-3" /> Clique para configurar este canal
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
       ) : (
         <Card padded={false}>
           <TableWrap label="Conexões">
@@ -41,14 +148,12 @@ export function ChannelsPage() {
                   <th>Provedor</th>
                   <th>Tarifa por tentativa</th>
                   <th>Situação</th>
-                  <th>
-                    <span className="sr-only">Ações</span>
-                  </th>
+                  <th className="text-right">Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {q.data!.items.map((c) => (
-                  <tr key={c.id}>
+                  <tr key={c.id} className="hover:bg-slate-50/80 transition">
                     <td className="font-medium">{c.name}</td>
                     <td>{CHANNEL_LABEL[c.channelType]}</td>
                     <td>{c.provider === 'SIMULATED' ? <Badge tone="brand">Simulado</Badge> : c.provider}</td>
@@ -58,9 +163,14 @@ export function ChannelsPage() {
                     </td>
                     <td>{c.active ? <Badge tone="green">Ativa</Badge> : <Badge tone="gray">Inativa</Badge>}</td>
                     <td className="text-right">
-                      {can('connections.write') && (
-                        <Button size="sm" onClick={() => setEdit(c)}>
-                          Configurar
+                      {canEdit && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          icon={<Pencil className="size-3.5" />}
+                          onClick={() => setEdit(c)}
+                        >
+                          Editar canal
                         </Button>
                       )}
                     </td>
