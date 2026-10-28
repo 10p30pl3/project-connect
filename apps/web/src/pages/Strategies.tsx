@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useState } from 'react';
 import { clsx } from 'clsx';
-import { ArrowLeft, Check, Copy, Lock, Pencil, Plus, RotateCcw, Save } from 'lucide-react';
+import { ArrowLeft, AlertCircle, Check, ChevronDown, Copy, Lock, Pencil, Plus, RotateCcw, Save } from 'lucide-react';
 import {
   TABULATION_ACTIONS,
   TABULATION_ACTION_LABEL,
@@ -334,7 +334,7 @@ export function StrategyDetailPage() {
   );
 }
 
-// Painel de Configuração Avançada em 2 Colunas com Edição Direta dos Campos e Regras
+// Painel de Configuração Avançada em 2 Colunas com Edição Direta ao Clicar nas Opções
 function StrategyInteractiveConfig({
   strategyId,
   version,
@@ -349,24 +349,50 @@ function StrategyInteractiveConfig({
   onUpdated: (v: StrategyVersion) => void;
 }) {
   const toast = useToast();
-  const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [draftConfig, setDraftConfig] = useState<StrategyConfig>(() => JSON.parse(JSON.stringify(version.config)));
+  const [openRows, setOpenRows] = useState<Set<string>>(new Set());
 
-  // Sincroniza draft se mudar de versão
+  // Sincroniza draft se mudar de versão selecionada
   const [lastVerId, setLastVerId] = useState(version.id);
   if (version.id !== lastVerId) {
     setLastVerId(version.id);
     setDraftConfig(JSON.parse(JSON.stringify(version.config)));
-    setEditing(false);
+    setOpenRows(new Set());
   }
 
+  // Verifica se há qualquer alteração real em relação à versão original
+  const isDirty = JSON.stringify(draftConfig) !== JSON.stringify(version.config);
+
+  const toggleRow = (rowKey: string) => {
+    setOpenRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(rowKey)) {
+        next.delete(rowKey);
+      } else {
+        next.add(rowKey);
+      }
+      return next;
+    });
+  };
+
+  const handleDiscard = () => {
+    setDraftConfig(JSON.parse(JSON.stringify(version.config)));
+    setOpenRows(new Set());
+    toast('info', 'Alterações descartadas.');
+  };
+
   const handleSave = async () => {
+    // Só gera nova versão se houver mudança real (§Requisito do usuário)
+    if (!isDirty) {
+      toast('info', 'Nenhuma alteração foi realizada.');
+      return;
+    }
     setSaving(true);
     try {
       const v = await post<StrategyVersion>(`/strategies/${strategyId}/versions`, { config: draftConfig });
       onUpdated(v);
-      setEditing(false);
+      setOpenRows(new Set());
       toast('success', `Nova versão v${v.version} salva e publicada.`);
     } catch (e) {
       toast('error', errorMessage(e));
@@ -375,47 +401,41 @@ function StrategyInteractiveConfig({
     }
   };
 
-  const handleCancel = () => {
-    setDraftConfig(JSON.parse(JSON.stringify(version.config)));
-    setEditing(false);
-  };
-
-  const tabName = (code: string) => tabulations?.find((t) => t.code === code)?.name ?? code;
-
   // Lista de todas as tabulações do workspace para mapeamento
   const allTabs = tabulations ?? [];
   const tabEntries = allTabs.map((t) => ({
     code: t.code,
     name: t.name,
     action: (draftConfig.tabulationRules[t.code] ?? (t.isConversion ? 'FINISH_SUCCESS' : 'RETRY')) as TabulationAction,
+    isModified: draftConfig.tabulationRules[t.code] !== version.config.tabulationRules[t.code],
   }));
 
   return (
     <div className="space-y-4">
-      {/* Barra de Ações Superior do Painel de Configuração */}
+      {/* Barra Superior de Status & Ações */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-3">
         <div className="flex items-center gap-2">
           <span className="text-sm font-bold text-slate-900">
             Configuração v{version.version}
           </span>
           {isLatest && <Badge tone="green">Versão Ativa</Badge>}
-          {editing && <Badge tone="brand">Editando</Badge>}
+          {isDirty && (
+            <Badge tone="amber" icon={<AlertCircle className="size-3" />}>
+              Alterações pendentes
+            </Badge>
+          )}
         </div>
 
+        {/* Botão de salvar SÓ aparece se houver mudança (§Requisito do usuário) */}
         <div className="flex items-center gap-2">
-          {!editing ? (
-            <Button
-              size="sm"
-              variant="primary"
-              icon={<Pencil className="size-3.5" />}
-              onClick={() => setEditing(true)}
-            >
-              Editar parâmetros
-            </Button>
+          {!isDirty ? (
+            <span className="text-xs text-slate-400 italic">
+              Clique em cima de qualquer opção para editar
+            </span>
           ) : (
-            <>
-              <Button size="sm" variant="secondary" onClick={handleCancel} disabled={saving}>
-                Cancelar
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="secondary" icon={<RotateCcw className="size-3.5" />} onClick={handleDiscard} disabled={saving}>
+                Descartar
               </Button>
               <Button
                 size="sm"
@@ -426,33 +446,57 @@ function StrategyInteractiveConfig({
               >
                 Salvar e publicar v{version.version + 1}
               </Button>
-            </>
+            </div>
           )}
         </div>
       </div>
 
-      {/* Grade em 2 Colunas (§Requisito: Coluna 1 = Parâmetros, Coluna 2 = Regras de Tabulação) */}
+      {/* Grade em 2 Colunas */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* =================================================================== */}
         {/* COLUNA 1: PARÂMETROS OPERACIONAIS DA ESTRATÉGIA                     */}
         {/* =================================================================== */}
         <div className="lg:col-span-6 rounded-2xl border border-slate-200/90 bg-white p-4 space-y-4 shadow-2xs">
-          <div className="text-xs font-bold uppercase tracking-wider text-slate-600 border-b border-slate-100 pb-2">
-            Parâmetros de Cadência &amp; Limites
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-600">
+              Parâmetros de Cadência &amp; Limites
+            </div>
+            <span className="text-[11px] text-slate-400">
+              Clique na linha para alterar
+            </span>
           </div>
 
           <div className="space-y-3.5 text-xs">
-            {/* Limite Total por Cliente */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100/80 pb-2.5">
-              <span className="font-medium text-slate-600">Limite total por cliente</span>
-              {!editing ? (
-                <span className="font-bold text-slate-900">{draftConfig.limits.total} tentativas</span>
+            {/* 1. Limite Total por Cliente */}
+            <div
+              onClick={() => toggleRow('limits.total')}
+              className={clsx(
+                'flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100/80 pb-2.5 rounded-lg p-1.5 transition cursor-pointer',
+                openRows.has('limits.total')
+                  ? 'bg-brand-50/40 ring-1 ring-brand-200'
+                  : 'hover:bg-slate-50/80',
+              )}
+            >
+              <div className="flex items-center gap-1.5">
+                <span className="font-medium text-slate-600">Limite total por cliente</span>
+                {draftConfig.limits.total !== version.config.limits.total && (
+                  <span className="size-1.5 rounded-full bg-amber-500" title="Valor modificado" />
+                )}
+              </div>
+              {!openRows.has('limits.total') ? (
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-slate-900 hover:text-brand-700">
+                    {draftConfig.limits.total} tentativas
+                  </span>
+                  <Pencil className="size-3 text-slate-300 hover:text-brand-600" />
+                </div>
               ) : (
-                <div className="flex items-center gap-1.5 w-36">
+                <div className="flex items-center gap-1.5 w-36" onClick={(e) => e.stopPropagation()}>
                   <Input
                     type="number"
                     min={1}
                     max={50}
+                    autoFocus
                     value={draftConfig.limits.total}
                     onChange={(e) =>
                       setDraftConfig((prev) => ({
@@ -467,17 +511,36 @@ function StrategyInteractiveConfig({
               )}
             </div>
 
-            {/* Limite Diário por Cliente */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100/80 pb-2.5">
-              <span className="font-medium text-slate-600">Limite diário por cliente</span>
-              {!editing ? (
-                <span className="font-bold text-slate-900">{draftConfig.limits.daily} tentativas</span>
+            {/* 2. Limite Diário por Cliente */}
+            <div
+              onClick={() => toggleRow('limits.daily')}
+              className={clsx(
+                'flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100/80 pb-2.5 rounded-lg p-1.5 transition cursor-pointer',
+                openRows.has('limits.daily')
+                  ? 'bg-brand-50/40 ring-1 ring-brand-200'
+                  : 'hover:bg-slate-50/80',
+              )}
+            >
+              <div className="flex items-center gap-1.5">
+                <span className="font-medium text-slate-600">Limite diário por cliente</span>
+                {draftConfig.limits.daily !== version.config.limits.daily && (
+                  <span className="size-1.5 rounded-full bg-amber-500" title="Valor modificado" />
+                )}
+              </div>
+              {!openRows.has('limits.daily') ? (
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-slate-900">
+                    {draftConfig.limits.daily} tentativas
+                  </span>
+                  <Pencil className="size-3 text-slate-300 hover:text-brand-600" />
+                </div>
               ) : (
-                <div className="flex items-center gap-1.5 w-36">
+                <div className="flex items-center gap-1.5 w-36" onClick={(e) => e.stopPropagation()}>
                   <Input
                     type="number"
                     min={1}
                     max={20}
+                    autoFocus
                     value={draftConfig.limits.daily}
                     onChange={(e) =>
                       setDraftConfig((prev) => ({
@@ -492,81 +555,118 @@ function StrategyInteractiveConfig({
               )}
             </div>
 
-            {/* Escopo dos Limites */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100/80 pb-2.5">
-              <span className="font-medium text-slate-600">Escopo dos limites</span>
-              {!editing ? (
-                <span className="font-bold text-slate-900">
-                  {draftConfig.limits.scope === 'WORKSPACE'
-                    ? 'Cliente no workspace (compartilhado)'
-                    : 'Cliente nesta campanha'}
-                </span>
-              ) : (
-                <Select
-                  value={draftConfig.limits.scope}
-                  onChange={(e) =>
-                    setDraftConfig((prev) => ({
-                      ...prev,
-                      limits: { ...prev.limits, scope: e.target.value as 'WORKSPACE' | 'CAMPAIGN' },
-                    }))
-                  }
-                  className="text-xs py-1 h-7 w-48"
-                >
-                  <option value="WORKSPACE">Cliente no workspace</option>
-                  <option value="CAMPAIGN">Cliente nesta campanha</option>
-                </Select>
+            {/* 3. Escopo dos Limites */}
+            <div
+              onClick={() => toggleRow('limits.scope')}
+              className={clsx(
+                'flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100/80 pb-2.5 rounded-lg p-1.5 transition cursor-pointer',
+                openRows.has('limits.scope')
+                  ? 'bg-brand-50/40 ring-1 ring-brand-200'
+                  : 'hover:bg-slate-50/80',
               )}
-            </div>
-
-            {/* Dias Permitidos */}
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 border-b border-slate-100/80 pb-2.5">
-              <span className="font-medium text-slate-600 pt-1">Dias permitidos</span>
-              {!editing ? (
-                <span className="font-bold text-slate-900">{daysLabel(draftConfig.calendar.days)}</span>
+            >
+              <div className="flex items-center gap-1.5">
+                <span className="font-medium text-slate-600">Escopo dos limites</span>
+                {draftConfig.limits.scope !== version.config.limits.scope && (
+                  <span className="size-1.5 rounded-full bg-amber-500" title="Valor modificado" />
+                )}
+              </div>
+              {!openRows.has('limits.scope') ? (
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-slate-900">
+                    {draftConfig.limits.scope === 'WORKSPACE'
+                      ? 'Cliente no workspace (compartilhado)'
+                      : 'Cliente nesta campanha'}
+                  </span>
+                  <Pencil className="size-3 text-slate-300 hover:text-brand-600" />
+                </div>
               ) : (
-                <div className="flex flex-wrap gap-1">
-                  {WEEKDAYS.map((d, i) => {
-                    const isSelected = draftConfig.calendar.days.includes(i);
-                    return (
-                      <button
-                        key={d}
-                        type="button"
-                        onClick={() => {
-                          const currentDays = draftConfig.calendar.days;
-                          const nextDays = isSelected
-                            ? currentDays.filter((x) => x !== i)
-                            : [...currentDays, i].sort();
-                          if (nextDays.length > 0) {
-                            setDraftConfig((prev) => ({
-                              ...prev,
-                              calendar: { ...prev.calendar, days: nextDays },
-                            }));
-                          }
-                        }}
-                        className={clsx(
-                          'rounded-md px-2 py-0.5 text-[11px] font-semibold transition cursor-pointer',
-                          isSelected
-                            ? 'bg-brand-600 text-white shadow-2xs'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
-                        )}
-                      >
-                        {d}
-                      </button>
-                    );
-                  })}
+                <div onClick={(e) => e.stopPropagation()}>
+                  <Select
+                    value={draftConfig.limits.scope}
+                    onChange={(e) =>
+                      setDraftConfig((prev) => ({
+                        ...prev,
+                        limits: { ...prev.limits, scope: e.target.value as 'WORKSPACE' | 'CAMPAIGN' },
+                      }))
+                    }
+                    className="text-xs py-1 h-7 w-48"
+                  >
+                    <option value="WORKSPACE">Cliente no workspace</option>
+                    <option value="CAMPAIGN">Cliente nesta campanha</option>
+                  </Select>
                 </div>
               )}
             </div>
 
-            {/* Janela de Horário */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100/80 pb-2.5">
-              <span className="font-medium text-slate-600">Janela de horário</span>
-              {!editing ? (
-                <span className="font-bold text-slate-900">
-                  {draftConfig.calendar.start} às {draftConfig.calendar.end}
-                </span>
-              ) : (
+            {/* 4. Dias Permitidos (Edição Direta por Clique em Cada Dia) */}
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 border-b border-slate-100/80 pb-2.5 p-1.5 rounded-lg">
+              <div className="flex items-center gap-1.5 pt-1">
+                <span className="font-medium text-slate-600">Dias permitidos</span>
+                {JSON.stringify(draftConfig.calendar.days) !== JSON.stringify(version.config.calendar.days) && (
+                  <span className="size-1.5 rounded-full bg-amber-500" title="Valor modificado" />
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {WEEKDAYS.map((d, i) => {
+                  const isSelected = draftConfig.calendar.days.includes(i);
+                  return (
+                    <button
+                      key={d}
+                      type="button"
+                      title={isSelected ? `Remover ${d}` : `Adicionar ${d}`}
+                      onClick={() => {
+                        const currentDays = draftConfig.calendar.days;
+                        const nextDays = isSelected
+                          ? currentDays.filter((x) => x !== i)
+                          : [...currentDays, i].sort();
+                        if (nextDays.length > 0) {
+                          setDraftConfig((prev) => ({
+                            ...prev,
+                            calendar: { ...prev.calendar, days: nextDays },
+                          }));
+                        }
+                      }}
+                      className={clsx(
+                        'rounded-md px-2 py-0.5 text-[11px] font-semibold transition cursor-pointer border',
+                        isSelected
+                          ? 'bg-brand-600 text-white border-brand-700 shadow-2xs'
+                          : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200',
+                      )}
+                    >
+                      {d}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 5. Janela de Horário */}
+            <div
+              onClick={() => toggleRow('calendar.hours')}
+              className={clsx(
+                'flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100/80 pb-2.5 rounded-lg p-1.5 transition cursor-pointer',
+                openRows.has('calendar.hours')
+                  ? 'bg-brand-50/40 ring-1 ring-brand-200'
+                  : 'hover:bg-slate-50/80',
+              )}
+            >
+              <div className="flex items-center gap-1.5">
+                <span className="font-medium text-slate-600">Janela de horário</span>
+                {(draftConfig.calendar.start !== version.config.calendar.start ||
+                  draftConfig.calendar.end !== version.config.calendar.end) && (
+                  <span className="size-1.5 rounded-full bg-amber-500" title="Valor modificado" />
+                )}
+              </div>
+              {!openRows.has('calendar.hours') ? (
                 <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-slate-900">
+                    {draftConfig.calendar.start} às {draftConfig.calendar.end}
+                  </span>
+                  <Pencil className="size-3 text-slate-300 hover:text-brand-600" />
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                   <Input
                     type="time"
                     value={draftConfig.calendar.start}
@@ -594,39 +694,74 @@ function StrategyInteractiveConfig({
               )}
             </div>
 
-            {/* Fuso Horário */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100/80 pb-2.5">
-              <span className="font-medium text-slate-600">Fuso horário</span>
-              {!editing ? (
-                <span className="font-bold text-slate-900">{draftConfig.calendar.timezone}</span>
+            {/* 6. Fuso Horário */}
+            <div
+              onClick={() => toggleRow('calendar.timezone')}
+              className={clsx(
+                'flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100/80 pb-2.5 rounded-lg p-1.5 transition cursor-pointer',
+                openRows.has('calendar.timezone')
+                  ? 'bg-brand-50/40 ring-1 ring-brand-200'
+                  : 'hover:bg-slate-50/80',
+              )}
+            >
+              <div className="flex items-center gap-1.5">
+                <span className="font-medium text-slate-600">Fuso horário</span>
+                {draftConfig.calendar.timezone !== version.config.calendar.timezone && (
+                  <span className="size-1.5 rounded-full bg-amber-500" title="Valor modificado" />
+                )}
+              </div>
+              {!openRows.has('calendar.timezone') ? (
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-slate-900">{draftConfig.calendar.timezone}</span>
+                  <Pencil className="size-3 text-slate-300 hover:text-brand-600" />
+                </div>
               ) : (
-                <Select
-                  value={draftConfig.calendar.timezone}
-                  onChange={(e) =>
-                    setDraftConfig((prev) => ({
-                      ...prev,
-                      calendar: { ...prev.calendar, timezone: e.target.value },
-                    }))
-                  }
-                  className="text-xs py-1 h-7 w-48"
-                >
-                  <option value="America/Sao_Paulo">America/Sao_Paulo</option>
-                  <option value="America/Manaus">America/Manaus</option>
-                  <option value="America/Fortaleza">America/Fortaleza</option>
-                  <option value="America/Cuiaba">America/Cuiaba</option>
-                </Select>
+                <div onClick={(e) => e.stopPropagation()}>
+                  <Select
+                    value={draftConfig.calendar.timezone}
+                    onChange={(e) =>
+                      setDraftConfig((prev) => ({
+                        ...prev,
+                        calendar: { ...prev.calendar, timezone: e.target.value },
+                      }))
+                    }
+                    className="text-xs py-1 h-7 w-48"
+                  >
+                    <option value="America/Sao_Paulo">America/Sao_Paulo</option>
+                    <option value="America/Manaus">America/Manaus</option>
+                    <option value="America/Fortaleza">America/Fortaleza</option>
+                    <option value="America/Cuiaba">America/Cuiaba</option>
+                  </Select>
+                </div>
               )}
             </div>
 
-            {/* Retentativa & Intervalo */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100/80 pb-2.5">
-              <span className="font-medium text-slate-600">Retentativa</span>
-              {!editing ? (
-                <span className="font-bold text-slate-900">
-                  a cada {fmtMinutes(draftConfig.retry.intervalMinutes)}, até {draftConfig.retry.maxPerDestination} por destino
-                </span>
+            {/* 7. Retentativa & Intervalo */}
+            <div
+              onClick={() => toggleRow('retry')}
+              className={clsx(
+                'flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100/80 pb-2.5 rounded-lg p-1.5 transition cursor-pointer',
+                openRows.has('retry')
+                  ? 'bg-brand-50/40 ring-1 ring-brand-200'
+                  : 'hover:bg-slate-50/80',
+              )}
+            >
+              <div className="flex items-center gap-1.5">
+                <span className="font-medium text-slate-600">Retentativa</span>
+                {(draftConfig.retry.intervalMinutes !== version.config.retry.intervalMinutes ||
+                  draftConfig.retry.maxPerDestination !== version.config.retry.maxPerDestination) && (
+                  <span className="size-1.5 rounded-full bg-amber-500" title="Valor modificado" />
+                )}
+              </div>
+              {!openRows.has('retry') ? (
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-slate-900">
+                    a cada {fmtMinutes(draftConfig.retry.intervalMinutes)}, até {draftConfig.retry.maxPerDestination} por destino
+                  </span>
+                  <Pencil className="size-3 text-slate-300 hover:text-brand-600" />
+                </div>
               ) : (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-1">
                     <Input
                       type="number"
@@ -670,44 +805,79 @@ function StrategyInteractiveConfig({
               )}
             </div>
 
-            {/* Histórico Incompleto */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100/80 pb-2.5">
-              <span className="font-medium text-slate-600">Histórico incompleto</span>
-              {!editing ? (
-                <span className="font-bold text-slate-900">
-                  {draftConfig.limits.incompleteHistory === 'BLOCK'
-                    ? 'Aguardar revisão (bloquear)'
-                    : 'Usar somente o histórico conhecido'}
-                </span>
+            {/* 8. Histórico Incompleto */}
+            <div
+              onClick={() => toggleRow('limits.incompleteHistory')}
+              className={clsx(
+                'flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100/80 pb-2.5 rounded-lg p-1.5 transition cursor-pointer',
+                openRows.has('limits.incompleteHistory')
+                  ? 'bg-brand-50/40 ring-1 ring-brand-200'
+                  : 'hover:bg-slate-50/80',
+              )}
+            >
+              <div className="flex items-center gap-1.5">
+                <span className="font-medium text-slate-600">Histórico incompleto</span>
+                {draftConfig.limits.incompleteHistory !== version.config.limits.incompleteHistory && (
+                  <span className="size-1.5 rounded-full bg-amber-500" title="Valor modificado" />
+                )}
+              </div>
+              {!openRows.has('limits.incompleteHistory') ? (
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-slate-900">
+                    {draftConfig.limits.incompleteHistory === 'BLOCK'
+                      ? 'Aguardar revisão (bloquear)'
+                      : 'Usar somente o histórico conhecido'}
+                  </span>
+                  <Pencil className="size-3 text-slate-300 hover:text-brand-600" />
+                </div>
               ) : (
-                <Select
-                  value={draftConfig.limits.incompleteHistory}
-                  onChange={(e) =>
-                    setDraftConfig((prev) => ({
-                      ...prev,
-                      limits: {
-                        ...prev.limits,
-                        incompleteHistory: e.target.value as 'BLOCK' | 'USE_KNOWN',
-                      },
-                    }))
-                  }
-                  className="text-xs py-1 h-7 w-48"
-                >
-                  <option value="USE_KNOWN">Usar somente o conhecido</option>
-                  <option value="BLOCK">Aguardar revisão (bloquear)</option>
-                </Select>
+                <div onClick={(e) => e.stopPropagation()}>
+                  <Select
+                    value={draftConfig.limits.incompleteHistory}
+                    onChange={(e) =>
+                      setDraftConfig((prev) => ({
+                        ...prev,
+                        limits: {
+                          ...prev.limits,
+                          incompleteHistory: e.target.value as 'BLOCK' | 'USE_KNOWN',
+                        },
+                      }))
+                    }
+                    className="text-xs py-1 h-7 w-48"
+                  >
+                    <option value="USE_KNOWN">Usar somente o conhecido</option>
+                    <option value="BLOCK">Aguardar revisão (bloquear)</option>
+                  </Select>
+                </div>
               )}
             </div>
 
-            {/* Distribuição em Lote */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <span className="font-medium text-slate-600">Distribuição</span>
-              {!editing ? (
-                <span className="font-bold text-slate-900">
-                  lote {draftConfig.distribution.batchSize}, máx. {draftConfig.distribution.maxPending} pendentes, reserva {draftConfig.distribution.leaseSeconds}s
-                </span>
-              ) : (
+            {/* 9. Distribuição em Lote */}
+            <div
+              onClick={() => toggleRow('distribution')}
+              className={clsx(
+                'flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg p-1.5 transition cursor-pointer',
+                openRows.has('distribution')
+                  ? 'bg-brand-50/40 ring-1 ring-brand-200'
+                  : 'hover:bg-slate-50/80',
+              )}
+            >
+              <div className="flex items-center gap-1.5">
+                <span className="font-medium text-slate-600">Distribuição</span>
+                {(draftConfig.distribution.batchSize !== version.config.distribution.batchSize ||
+                  draftConfig.distribution.maxPending !== version.config.distribution.maxPending) && (
+                  <span className="size-1.5 rounded-full bg-amber-500" title="Valor modificado" />
+                )}
+              </div>
+              {!openRows.has('distribution') ? (
                 <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-slate-900">
+                    lote {draftConfig.distribution.batchSize}, máx. {draftConfig.distribution.maxPending} pendentes, reserva {draftConfig.distribution.leaseSeconds}s
+                  </span>
+                  <Pencil className="size-3 text-slate-300 hover:text-brand-600" />
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                   <div className="flex items-center gap-1">
                     <span className="text-[10px] text-slate-400">lote:</span>
                     <Input
@@ -753,7 +923,7 @@ function StrategyInteractiveConfig({
         </div>
 
         {/* =================================================================== */}
-        {/* COLUNA 2: REGRAS DE TABULAÇÃO (EDITÁVEIS)                           */}
+        {/* COLUNA 2: REGRAS DE TABULAÇÃO (EDITÁVEIS DIRETAMENTE POR CLIQUE)    */}
         {/* =================================================================== */}
         <div className="lg:col-span-6 rounded-2xl border border-slate-200/90 bg-white p-4 space-y-4 shadow-2xs">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2">
@@ -761,7 +931,7 @@ function StrategyInteractiveConfig({
               Regras por Tabulação
             </div>
             <span className="text-[11px] text-slate-400">
-              Ação imediata do motor para cada retorno do canal
+              Clique no desfecho para alterar a ação
             </span>
           </div>
 
@@ -772,20 +942,22 @@ function StrategyInteractiveConfig({
                 className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50/60 p-2.5 hover:bg-slate-50 transition"
               >
                 <div className="min-w-0 flex-1">
-                  <div className="font-semibold text-xs text-slate-800 truncate">
-                    {item.name}
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-semibold text-xs text-slate-800 truncate">
+                      {item.name}
+                    </span>
+                    {item.isModified && (
+                      <span className="size-1.5 rounded-full bg-amber-500 shrink-0" title="Regra modificada" />
+                    )}
                   </div>
                   <div className="text-[10px] text-slate-400 font-mono">
                     {item.code}
                   </div>
                 </div>
 
-                {!editing ? (
-                  <Badge tone={item.action === 'FINISH_SUCCESS' ? 'green' : item.action === 'NEXT_DESTINATION' ? 'blue' : 'gray'}>
-                    {TABULATION_ACTION_LABEL[item.action] ?? item.action}
-                  </Badge>
-                ) : (
-                  <Select
+                {/* Pill Select Interativo: Edição Direta ao Clicar na Opção */}
+                <div className="relative inline-block shrink-0">
+                  <select
                     value={item.action}
                     onChange={(e) => {
                       const nextAct = e.target.value as TabulationAction;
@@ -797,15 +969,24 @@ function StrategyInteractiveConfig({
                         },
                       }));
                     }}
-                    className="text-xs py-1 h-7 w-44"
+                    className={clsx(
+                      'cursor-pointer rounded-full px-3 py-1 text-xs font-semibold border transition appearance-none pr-6 text-center shadow-2xs',
+                      item.action === 'FINISH_SUCCESS' && 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100',
+                      item.action === 'NEXT_DESTINATION' && 'bg-blue-50 text-blue-700 border-blue-300 hover:bg-blue-100',
+                      item.action === 'NEXT_STEP' && 'bg-indigo-50 text-indigo-700 border-indigo-300 hover:bg-indigo-100',
+                      item.action === 'FINISH_FAIL' && 'bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-100',
+                      item.action === 'RETRY' && 'bg-slate-50 text-slate-700 border-slate-300 hover:bg-slate-100',
+                    )}
+                    title="Clique para alterar a ação do motor para esta tabulação"
                   >
                     {TABULATION_ACTIONS.map((a) => (
                       <option key={a} value={a}>
                         {TABULATION_ACTION_LABEL[a]}
                       </option>
                     ))}
-                  </Select>
-                )}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 size-3 text-slate-400" />
+                </div>
               </div>
             ))}
           </div>
@@ -815,6 +996,33 @@ function StrategyInteractiveConfig({
           </div>
         </div>
       </div>
+
+      {/* Barra Flutuante de Salvamento (se houver alteração) */}
+      {isDirty && (
+        <div className="sticky bottom-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50/95 p-3.5 shadow-lg backdrop-blur-xs">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="size-5 text-amber-600 shrink-0" />
+            <div className="text-xs">
+              <span className="font-bold text-amber-950">Alterações não salvas detectadas.</span>{' '}
+              <span className="text-amber-800">Uma nova versão v{version.version + 1} será publicada preservando o histórico das campanhas ativas.</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="secondary" onClick={handleDiscard} disabled={saving}>
+              Descartar
+            </Button>
+            <Button
+              size="sm"
+              variant="primary"
+              icon={<Save className="size-3.5" />}
+              loading={saving}
+              onClick={handleSave}
+            >
+              Salvar e publicar v{version.version + 1}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

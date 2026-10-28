@@ -1214,6 +1214,10 @@ export async function handleMockApi<T = unknown>(
   const stratVerMatch = pathname.match(/^\/strategies\/([^/]+)\/versions$/);
   if (stratVerMatch && method === 'POST') {
     const s = STRATEGIES.find((x) => x.id === stratVerMatch[1]) ?? STRATEGIES[0];
+    const prev = s.latestVersion;
+    if (prev && JSON.stringify(prev.config) === JSON.stringify(body.config)) {
+      throw new Error('Nenhuma alteração detectada na configuração; uma nova versão só é criada se houver mudanças.');
+    }
     const v: StrategyVersion = {
       id: nextUuid(),
       version: s.versions.length + 1,

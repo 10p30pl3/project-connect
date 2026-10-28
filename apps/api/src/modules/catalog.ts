@@ -10,7 +10,7 @@ import {
 } from '@voll/shared';
 import { getPool, one, q, tx } from '../db/pool.js';
 import { actor, requireRoles, CAN } from '../auth/context.js';
-import { conflict, forbidden, notFound, parse, unprocessable } from '../lib/problem.js';
+import { badRequest, conflict, forbidden, notFound, parse, unprocessable } from '../lib/problem.js';
 import { audit } from '../lib/audit.js';
 import { DEFAULT_SIMULATION } from '../connectors/simulated.js';
 
@@ -209,6 +209,9 @@ export async function catalogRoutes(app: FastifyInstance) {
       // Permite editar e publicar nova versão mesmo em templates predefinidos
       const body = parse(StrategyPublishSchema, req.body);
       const prev = await one(c, `SELECT version, config FROM strategy_versions WHERE strategy_id=$1 ORDER BY version DESC LIMIT 1`, [s.id]);
+      if (prev && JSON.stringify(prev.config) === JSON.stringify(body.config)) {
+        throw badRequest('Nenhuma alteração detectada na configuração; uma nova versão só é criada se houver mudanças.');
+      }
       const v = (prev?.version ?? 0) + 1;
       await c.query(`INSERT INTO strategy_versions (strategy_id, version, config, published_by) VALUES ($1,$2,$3,$4)`, [
         s.id, v, JSON.stringify(body.config), a.userId,
