@@ -82,13 +82,13 @@ export async function reportRoutes(app: FastifyInstance) {
       // DB offline ou não inicializado: usa valores analíticos padrão do workspace
     }
 
-    // Normalização / Dados Analíticos para os 5 Relatórios (padrão Aspect ALM & Altitude)
+    // Normalização / Dados Analíticos para os 5 Relatórios Operacionais
     const totalEnrolled = baseStats.total_enrolled > 0 ? baseStats.total_enrolled : Math.max(12500, baseStats.total_contacts * 25);
     const totalAttempts = baseStats.total_attempts > 0 ? baseStats.total_attempts : 28410;
     const cpcAttempts = baseStats.cpc_attempts > 0 ? baseStats.cpc_attempts : 10580;
     const conversionAttempts = baseStats.conversion_attempts > 0 ? baseStats.conversion_attempts : 2740;
 
-    // 1. RELATÓRIO: Penetração e Esgotamento da Base (Aspect ALM & Altitude List Progress)
+    // 1. RELATÓRIO: Penetração e Esgotamento da Base (Ciclo de Vida do Mailing)
     const workedRecords = Math.round(totalEnrolled * 0.842);
     const availableRecords = totalEnrolled - workedRecords;
     const inRetryRecords = Math.round(workedRecords * 0.285);
@@ -109,7 +109,7 @@ export async function reportRoutes(app: FastifyInstance) {
       churnRate: Number(((dncExcluded / totalEnrolled) * 100).toFixed(2)),
     };
 
-    // 2. RELATÓRIO: Eficiência de Discagem & Funil de Contato (Altitude Call Outcome & Aspect Hit Rate)
+    // 2. RELATÓRIO: Eficiência de Discagem & Funil de Contato (Discadas, Atendidas, Alô e CPC)
     const connectCount = Math.round(totalAttempts * 0.765);
     const humanAnswerCount = Math.round(totalAttempts * 0.482);
     const amdCount = Math.round(totalAttempts * 0.184); // Answering machine
@@ -181,7 +181,7 @@ export async function reportRoutes(app: FastifyInstance) {
       ],
     };
 
-    // 3. RELATÓRIO: Eficácia de Retentativas & Ponto de Rendimento (Aspect ALM Attempt Yield)
+    // 3. RELATÓRIO: Eficácia de Retentativas & Ponto de Rendimento Incremental
     const retrySteps = [
       { step: 1, attempts: 12500, cpc: 4625, cpcRate: 37.0, conversions: 1280, convRate: 10.24, costPerCpc: 1.45, cumulativeConvPct: 46.7 },
       { step: 2, attempts: 7875, cpc: 2598, cpcRate: 33.0, conversions: 695, convRate: 8.83, costPerCpc: 1.62, cumulativeConvPct: 72.1 },
@@ -199,7 +199,7 @@ export async function reportRoutes(app: FastifyInstance) {
       analysis: 'A partir da 5ª tentativa, a taxa de conversão cai abaixo de 3% e o custo por CPC triplica. 89.5% de todas as conversões são obtidas até a 4ª tentativa.',
     };
 
-    // 4. RELATÓRIO: Mapa de Calor e Melhor Horário (Best Time to Call - Aspect & Altitude)
+    // 4. RELATÓRIO: Mapa de Calor e Melhor Horário (Curva Horária de CPC)
     const hours = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00'];
     const weekdays = [
       { day: 'Segunda-feira', short: 'Seg', cpcHourly: [18, 28, 39, 44, 26, 22, 34, 41, 46, 42, 31, 20] },
@@ -218,7 +218,7 @@ export async function reportRoutes(app: FastifyInstance) {
       worstWindow: '12:00–13:30 (Horário de Almoço - Alta incidência de Não Atende)',
     };
 
-    // 5. RELATÓRIO: Tabulações & Desfechos (Aspect Campaign Dispositions & Altitude Wrap-up)
+    // 5. RELATÓRIO: Sintético de Tabulações & Desfechos
     const defaultTabs = [
       { code: 'CONVERSION', name: 'Acordo Fechado', category: 'POSITIVE', count: 2740, pct: 9.6, isConversion: true, isCpc: true },
       { code: 'PROMISE', name: 'Promessa de Pagamento', category: 'POSITIVE', count: 1890, pct: 6.7, isConversion: false, isCpc: true },

@@ -866,7 +866,7 @@ export async function handleMockApi<T = unknown>(
     return ov as T;
   }
 
-  // Reports Summary (Padrão Aspect ALM & Altitude)
+  // Reports Summary
   if (pathname === '/reports/summary' && method === 'GET') {
     return {
       filters: {
