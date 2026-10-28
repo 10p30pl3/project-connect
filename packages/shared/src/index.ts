@@ -272,6 +272,13 @@ export const JourneyCreateSchema = z.object({
   name: z.string().min(1),
   steps: z.array(JourneyStepSchema).min(1),
 });
+export type JourneyCreate = z.infer<typeof JourneyCreateSchema>;
+
+export const JourneyVersionCreateSchema = z.object({
+  name: z.string().min(1).optional(),
+  steps: z.array(JourneyStepSchema).min(1),
+});
+export type JourneyVersionCreate = z.infer<typeof JourneyVersionCreateSchema>;
 
 export const ConnectionUpdateSchema = z.object({
   name: z.string().min(1).optional(),

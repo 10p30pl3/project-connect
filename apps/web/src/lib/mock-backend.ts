@@ -1241,6 +1241,42 @@ export async function handleMockApi<T = unknown>(
     JOURNEYS.unshift(j);
     return j as T;
   }
+  const journeyVerMatch = pathname.match(/^\/journeys\/([^/]+)\/versions$/);
+  if (journeyVerMatch && method === 'POST') {
+    const j = JOURNEYS.find((x) => x.id === journeyVerMatch[1]);
+    if (!j) throw new Error('Jornada não encontrada');
+
+    const prevSteps = (j.latestVersion?.steps ?? []).map((s: any) => ({
+      channelType: s.channelType,
+      connectionId: s.connectionId,
+      feedbackTimeoutMinutes: s.feedbackTimeoutMinutes,
+    }));
+    const nextSteps = (body.steps ?? []).map((s: any) => ({
+      channelType: s.channelType,
+      connectionId: s.connectionId,
+      feedbackTimeoutMinutes: s.feedbackTimeoutMinutes,
+    }));
+    const nameChanged = body.name !== undefined && body.name.trim() !== j.name.trim();
+    const stepsChanged = JSON.stringify(prevSteps) !== JSON.stringify(nextSteps);
+
+    if (!nameChanged && !stepsChanged) {
+      throw new Error('Nenhuma alteração detectada na jornada; uma nova versão só é criada se houver mudanças.');
+    }
+
+    if (nameChanged && body.name) {
+      j.name = body.name.trim();
+    }
+    const nextVer = (j.latestVersion?.version ?? 1) + 1;
+    j.latestVersion = {
+      id: nextUuid(),
+      version: nextVer,
+      steps: (body.steps ?? []).map((s: any) => ({
+        ...s,
+        connectionName: CONNECTIONS.find((c) => c.id === s.connectionId)?.name ?? 'Conexão simulada',
+      })),
+    };
+    return j as T;
+  }
   if (pathname === '/strategies' && method === 'GET') {
     const items: Strategy[] = STRATEGIES.map(({ versions: _v, ...rest }) => rest);
     return { items } as T;

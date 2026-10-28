@@ -996,33 +996,6 @@ function StrategyInteractiveConfig({
           </div>
         </div>
       </div>
-
-      {/* Barra Flutuante de Salvamento (se houver alteração) */}
-      {isDirty && (
-        <div className="sticky bottom-4 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50/95 p-3.5 shadow-lg backdrop-blur-xs">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="size-5 text-amber-600 shrink-0" />
-            <div className="text-xs">
-              <span className="font-bold text-amber-950">Alterações não salvas detectadas.</span>{' '}
-              <span className="text-amber-800">Uma nova versão v{version.version + 1} será publicada preservando o histórico das campanhas ativas.</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="secondary" onClick={handleDiscard} disabled={saving}>
-              Descartar
-            </Button>
-            <Button
-              size="sm"
-              variant="primary"
-              icon={<Save className="size-3.5" />}
-              loading={saving}
-              onClick={handleSave}
-            >
-              Salvar e publicar v{version.version + 1}
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

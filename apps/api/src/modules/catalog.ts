@@ -4,6 +4,7 @@ import {
   ConnectionCreateSchema,
   ConnectionUpdateSchema,
   JourneyCreateSchema,
+  JourneyVersionCreateSchema,
   StrategyCreateSchema,
   StrategyPublishSchema,
   TabulationCreateSchema,
@@ -199,6 +200,57 @@ export async function catalogRoutes(app: FastifyInstance) {
       await audit(c, a, 'journey.publish', 'journey', j!.id, { after: body });
       return j!.id as string;
     });
+    return reply.code(201).send((await loadJourneys(a.workspaceId, id))[0]);
+  });
+
+  app.post<{ Params: { id: string } }>('/journeys/:id/versions', { preHandler: requireRoles(...CAN.manageData) }, async (req, reply) => {
+    const { id } = req.params;
+    const body = parse(JourneyVersionCreateSchema, req.body);
+    const a = actor(req);
+    const [j] = await loadJourneys(a.workspaceId, id);
+    if (!j) throw notFound('Jornada');
+
+    const conns = await q(getPool(), `SELECT id, channel_type FROM connections WHERE workspace_id=$1`, [a.workspaceId]);
+    const byId = Object.fromEntries(conns.map((c) => [c.id, c.channel_type]));
+    const fieldErrors: Record<string, string> = {};
+    body.steps.forEach((s, i) => {
+      if (!byId[s.connectionId]) fieldErrors[`steps.${i}.connectionId`] = 'Conexão não encontrada';
+      else if (byId[s.connectionId] !== s.channelType) fieldErrors[`steps.${i}.connectionId`] = 'Conexão incompatível com o canal';
+    });
+    if (Object.keys(fieldErrors).length) throw unprocessable('Corrija as etapas da jornada', fieldErrors);
+
+    const prevSteps = (j.latestVersion?.steps ?? []).map((s) => ({
+      channelType: s.channelType,
+      connectionId: s.connectionId,
+      feedbackTimeoutMinutes: s.feedbackTimeoutMinutes,
+    }));
+    const nextSteps = body.steps.map((s) => ({
+      channelType: s.channelType,
+      connectionId: s.connectionId,
+      feedbackTimeoutMinutes: s.feedbackTimeoutMinutes,
+    }));
+    const nameChanged = body.name !== undefined && body.name.trim() !== j.name.trim();
+    const stepsChanged = JSON.stringify(prevSteps) !== JSON.stringify(nextSteps);
+
+    if (!nameChanged && !stepsChanged) {
+      throw badRequest('Nenhuma alteração detectada na jornada; uma nova versão só é criada se houver mudanças.');
+    }
+
+    const nextVer = (j.latestVersion?.version ?? 0) + 1;
+    await tx(async (c) => {
+      if (nameChanged && body.name) {
+        await c.query(`UPDATE journeys SET name=$1 WHERE id=$2`, [body.name.trim(), id]);
+      }
+      await c.query(
+        `INSERT INTO journey_versions (journey_id, version, steps) VALUES ($1, $2, $3)`,
+        [id, nextVer, JSON.stringify(body.steps)],
+      );
+      await audit(c, a, 'journey.publish_version', 'journey', id, {
+        before: { name: j.name, steps: prevSteps },
+        after: { name: body.name ?? j.name, steps: nextSteps, version: nextVer },
+      });
+    });
+
     return reply.code(201).send((await loadJourneys(a.workspaceId, id))[0]);
   });
 
