@@ -1165,6 +1165,29 @@ export async function handleMockApi<T = unknown>(
 
   // Catalog
   if (pathname === '/tabulations' && method === 'GET') return { items: TABULATIONS } as T;
+  const tabPatchMatch = pathname.match(/^\/tabulations\/([^/]+)$/);
+  if (tabPatchMatch && method === 'PATCH') {
+    const tab = TABULATIONS.find((x) => x.id === tabPatchMatch[1]);
+    if (!tab) throw new Error('Tabulação não encontrada');
+    const b = body as Partial<Tabulation>;
+    const hasChange =
+      (b.name !== undefined && b.name !== tab.name) ||
+      (b.isCpc !== undefined && b.isCpc !== tab.isCpc) ||
+      (b.isConversion !== undefined && b.isConversion !== tab.isConversion) ||
+      (b.isOptOut !== undefined && b.isOptOut !== tab.isOptOut) ||
+      (b.invalidatesDestination !== undefined && b.invalidatesDestination !== tab.invalidatesDestination) ||
+      (b.channelTypes !== undefined && JSON.stringify((b.channelTypes ?? []).slice().sort()) !== JSON.stringify((tab.channelTypes ?? []).slice().sort()));
+    if (!hasChange) {
+      throw new Error('Nenhuma alteração detectada na tabulação.');
+    }
+    if (b.name !== undefined) tab.name = b.name;
+    if (b.isCpc !== undefined) tab.isCpc = b.isCpc;
+    if (b.isConversion !== undefined) tab.isConversion = b.isConversion;
+    if (b.isOptOut !== undefined) tab.isOptOut = b.isOptOut;
+    if (b.invalidatesDestination !== undefined) tab.invalidatesDestination = b.invalidatesDestination;
+    if (b.channelTypes !== undefined) tab.channelTypes = b.channelTypes;
+    return tab as T;
+  }
   if (pathname === '/connections' && method === 'GET') return { items: CONNECTIONS } as T;
   const connMatch = pathname.match(/^\/connections\/([^/]+)$/);
   if (connMatch && method === 'PATCH') {

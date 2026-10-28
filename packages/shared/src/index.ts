@@ -323,6 +323,16 @@ export const TabulationCreateSchema = z.object({
 });
 export type TabulationCreate = z.infer<typeof TabulationCreateSchema>;
 
+export const TabulationUpdateSchema = z.object({
+  name: z.string().min(1, 'Nome é obrigatório').max(100).optional(),
+  isCpc: z.boolean().optional(),
+  isConversion: z.boolean().optional(),
+  isOptOut: z.boolean().optional(),
+  invalidatesDestination: z.boolean().optional(),
+  channelTypes: z.array(z.enum(['VOICE', 'WHATSAPP', 'SMS', 'EMAIL'])).optional(),
+});
+export type TabulationUpdate = z.infer<typeof TabulationUpdateSchema>;
+
 export const CampaignDraftSchema = z.object({
   step: z.enum(['MAILING', 'AUDIENCE', 'ACTIVATION', 'CAMPAIGN']),
   mailingId: z.string().uuid().nullable().optional(),

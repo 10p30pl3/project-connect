@@ -7,6 +7,7 @@ import {
   StrategyCreateSchema,
   StrategyPublishSchema,
   TabulationCreateSchema,
+  TabulationUpdateSchema,
 } from '@voll/shared';
 import { getPool, one, q, tx } from '../db/pool.js';
 import { actor, requireRoles, CAN } from '../auth/context.js';
@@ -80,6 +81,54 @@ export async function catalogRoutes(app: FastifyInstance) {
       return ins!;
     });
     return reply.code(201).send(created);
+  });
+
+  app.patch('/tabulations/:id', { preHandler: requireRoles(...CAN.manageData) }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const body = parse(TabulationUpdateSchema, req.body);
+    const a = actor(req);
+    const current = await one(
+      getPool(),
+      `SELECT id, code, name, is_cpc AS "isCpc", is_conversion AS "isConversion", is_opt_out AS "isOptOut",
+              invalidates_destination AS "invalidatesDestination", channel_types::text[] AS "channelTypes"
+         FROM tabulations WHERE workspace_id=$1 AND id=$2`,
+      [a.workspaceId, id],
+    );
+    if (!current) throw notFound('Tabulação não encontrada');
+
+    const nextName = body.name !== undefined ? body.name : current.name;
+    const nextIsCpc = body.isCpc !== undefined ? body.isCpc : current.isCpc;
+    const nextIsConversion = body.isConversion !== undefined ? body.isConversion : current.isConversion;
+    const nextIsOptOut = body.isOptOut !== undefined ? body.isOptOut : current.isOptOut;
+    const nextInvalidates = body.invalidatesDestination !== undefined ? body.invalidatesDestination : current.invalidatesDestination;
+    const nextChannels = body.channelTypes !== undefined ? body.channelTypes : current.channelTypes;
+
+    const noChanges =
+      nextName === current.name &&
+      nextIsCpc === current.isCpc &&
+      nextIsConversion === current.isConversion &&
+      nextIsOptOut === current.isOptOut &&
+      nextInvalidates === current.invalidatesDestination &&
+      JSON.stringify((nextChannels ?? []).slice().sort()) === JSON.stringify((current.channelTypes ?? []).slice().sort());
+
+    if (noChanges) {
+      throw badRequest('Nenhuma alteração detectada na tabulação.');
+    }
+
+    const updated = await tx(async (c) => {
+      const row = await one(
+        c,
+        `UPDATE tabulations
+            SET name=$1, is_cpc=$2, is_conversion=$3, is_opt_out=$4, invalidates_destination=$5, channel_types=$6::channel_type[]
+          WHERE workspace_id=$7 AND id=$8
+          RETURNING id, code, name, is_cpc AS "isCpc", is_conversion AS "isConversion", is_opt_out AS "isOptOut",
+                    invalidates_destination AS "invalidatesDestination", channel_types::text[] AS "channelTypes"`,
+        [nextName, nextIsCpc, nextIsConversion, nextIsOptOut, nextInvalidates, nextChannels, a.workspaceId, id],
+      );
+      await audit(c, a, 'tabulation.update', 'tabulation', id, { before: current, after: row });
+      return row!;
+    });
+    return updated;
   });
 
   app.get('/connections', async (req) => {
