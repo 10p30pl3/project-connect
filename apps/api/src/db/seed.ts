@@ -115,6 +115,7 @@ export async function seed(opts: { withSampleMailing?: boolean } = {}) {
     const wsId = ws!.id as string;
 
     const adminId = await ensureUser(c, orgId, config.seedAdminEmail, 'Administrador Voll', 'ADMIN', config.seedAdminPassword);
+    await ensureUser(c, orgId, 'ricardo@vollsolutions.com.br', 'Ricardo (Voll Solutions)', 'ADMIN', 'Voll@2026');
     await ensureUser(c, orgId, 'gestor@voll.local', 'Gestora Exemplo', 'MANAGER', 'Voll@2026');
     await ensureUser(c, orgId, 'supervisor@voll.local', 'Supervisor Exemplo', 'SUPERVISOR', 'Voll@2026');
     await ensureUser(c, orgId, 'operador@voll.local', 'Operador Exemplo', 'OPERATOR', 'Voll@2026');

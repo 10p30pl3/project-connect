@@ -210,10 +210,10 @@ function UserMenu() {
             </div>
           </div>
           <DropdownMenu.Separator className="my-1 h-px bg-slate-100" />
-          {me.demoMode ? (
+          {me.demoMode && (
             <>
               <DropdownMenu.Label className="px-2 pb-1 pt-1.5 text-xs font-medium text-slate-500">
-                Mockup sem login · ver como
+                Alternar perfil (Demonstração)
               </DropdownMenu.Label>
               <DropdownMenu.RadioGroup
                 value={me.role}
@@ -236,18 +236,18 @@ function UserMenu() {
                   </DropdownMenu.RadioItem>
                 ))}
               </DropdownMenu.RadioGroup>
+              <DropdownMenu.Separator className="my-1 h-px bg-slate-100" />
             </>
-          ) : (
-            <DropdownMenu.Item
-              className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 outline-none data-[highlighted]:bg-slate-100"
-              onSelect={async () => {
-                await logout();
-                navigate('/login', { replace: true });
-              }}
-            >
-              <LogOut className="size-4" aria-hidden /> Sair
-            </DropdownMenu.Item>
           )}
+          <DropdownMenu.Item
+            className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 outline-none data-[highlighted]:bg-slate-100 text-slate-700 hover:text-rose-600"
+            onSelect={async () => {
+              await logout();
+              navigate('/login', { replace: true });
+            }}
+          >
+            <LogOut className="size-4" aria-hidden /> Sair
+          </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>

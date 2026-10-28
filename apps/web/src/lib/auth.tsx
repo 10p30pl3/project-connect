@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ApiError, get, post, setUnauthorizedHandler } from './api';
+import { ApiError, get, post, setDemoRole, setUnauthorizedHandler } from './api';
 import type { Me } from './types';
 import { can, type Permission } from './permissions';
 
@@ -41,6 +41,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const r = await post<{ user: Me }>('/auth/login', { email, password });
       // garante dados completos (organization/workspace)
       let me = r.user;
+      if (me?.role) {
+        setDemoRole(me.role);
+      }
       try {
         me = await get<Me>('/auth/me');
       } catch {
@@ -57,6 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await post('/auth/logout');
     } finally {
+      setDemoRole('ADMIN');
       qc.setQueryData(['me'], null);
       qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' });
     }

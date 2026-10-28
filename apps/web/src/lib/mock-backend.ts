@@ -799,7 +799,28 @@ export async function handleMockApi<T = unknown>(
 
   // Auth
   if (pathname === '/auth/me' && method === 'GET') return me as T;
-  if (pathname === '/auth/login' && method === 'POST') return { user: me } as T;
+  if (pathname === '/auth/login' && method === 'POST') {
+    const emailNorm = String(body.email || '').trim().toLowerCase();
+    let userMatch = Object.values(DEMO_USERS).find((u) => u.email.toLowerCase() === emailNorm);
+    if (!userMatch) {
+      if (emailNorm.includes('supervisor')) userMatch = DEMO_USERS.SUPERVISOR;
+      else if (emailNorm.includes('admin') || emailNorm.includes('ricardo')) userMatch = DEMO_USERS.ADMIN;
+      else if (emailNorm.includes('gestor')) userMatch = DEMO_USERS.MANAGER;
+      else if (emailNorm.includes('operador')) userMatch = DEMO_USERS.OPERATOR;
+      else if (emailNorm.includes('analista')) userMatch = DEMO_USERS.ANALYST;
+      else userMatch = DEMO_USERS.ADMIN;
+    }
+    const userMe: Me = {
+      id: userMatch.id,
+      email: userMatch.email,
+      name: userMatch.name,
+      role: userMatch.role,
+      organization: ORG,
+      workspace: WS,
+      demoMode: true,
+    };
+    return { user: userMe } as T;
+  }
   if (pathname === '/auth/logout' && method === 'POST') return undefined as T;
   if (pathname === '/users' && method === 'GET') return { items: Object.values(DEMO_USERS) } as T;
   if (pathname === '/users' && method === 'POST') {
