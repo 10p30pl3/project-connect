@@ -382,6 +382,59 @@ export async function aiRoutes(app: FastifyInstance) {
     };
   });
 
+  app.post<{ Body: { apiKey?: string; model?: string } }>('/ai/test', async (req) => {
+    const body = (req.body ?? {}) as { apiKey?: string; model?: string };
+    const keyToTest = (body.apiKey?.trim() || runtimeOpenAiKey || '').trim();
+    const modelToTest = (body.model?.trim() || runtimeOpenAiModel || 'gpt-4o-mini').trim();
+
+    if (!keyToTest) {
+      return {
+        ok: false,
+        message: 'Nenhum token da OpenAI informado.',
+      };
+    }
+
+    const t0 = Date.now();
+    try {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${keyToTest}`,
+        },
+        body: JSON.stringify({
+          model: modelToTest,
+          messages: [{ role: 'user', content: 'ping' }],
+          max_tokens: 2,
+        }),
+      });
+
+      const latencyMs = Date.now() - t0;
+      if (!res.ok) {
+        const errText = await res.text();
+        return {
+          ok: false,
+          status: res.status,
+          latencyMs,
+          message: `Falha na autenticação da OpenAI (${res.status}): ${errText.slice(0, 140)}`,
+        };
+      }
+
+      return {
+        ok: true,
+        status: 200,
+        latencyMs,
+        model: modelToTest,
+        message: `Token validado com sucesso pela OpenAI! Modelo ${modelToTest} respondeu em ${latencyMs}ms.`,
+      };
+    } catch (err) {
+      return {
+        ok: false,
+        message: `Erro de conexão com os servidores da OpenAI: ${(err as Error).message}`,
+      };
+    }
+  });
+
   app.post('/ai/campaign-chat', async (req) => {
     const body = parse(AiCampaignChatRequestSchema, req.body);
     const activeKey = (body.apiKey?.trim() || runtimeOpenAiKey || '').trim();

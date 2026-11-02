@@ -18,6 +18,7 @@ import {
   LogOut,
   Megaphone,
   Menu,
+  Settings,
   Settings2,
   ShieldAlert,
   SlidersHorizontal,
@@ -156,6 +157,17 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
         label: 'Observabilidade',
         icon: <Activity className={ico} aria-hidden />,
         matchPrefixes: ['/observabilidade', '/audit'],
+      },
+    ],
+  },
+  {
+    title: 'Sistema',
+    items: [
+      {
+        to: '/sistema',
+        label: 'Sistema',
+        icon: <Settings className={ico} aria-hidden />,
+        matchPrefixes: ['/sistema'],
       },
     ],
   },

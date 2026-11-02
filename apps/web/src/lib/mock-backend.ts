@@ -2350,6 +2350,67 @@ export async function handleMockApi<T = unknown>(
     } as T;
   }
 
+  if (pathname === '/ai/test' && method === 'POST') {
+    const b = (opts.body ?? {}) as { apiKey?: string; model?: string };
+    const savedKey = typeof localStorage !== 'undefined' ? localStorage.getItem('vc_openai_api_key') ?? '' : '';
+    const keyToTest = (b.apiKey?.trim() || savedKey).trim();
+    const modelToTest = (b.model?.trim() || (typeof localStorage !== 'undefined' ? localStorage.getItem('vc_openai_model') : 'gpt-4o-mini') || 'gpt-4o-mini').trim();
+
+    if (!keyToTest) {
+      return {
+        ok: false,
+        message: 'Nenhum token da OpenAI informado.',
+      } as T;
+    }
+
+    const t0 = Date.now();
+    try {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${keyToTest}`,
+        },
+        body: JSON.stringify({
+          model: modelToTest,
+          messages: [{ role: 'user', content: 'ping' }],
+          max_tokens: 2,
+        }),
+      });
+      const latencyMs = Date.now() - t0;
+      if (!res.ok) {
+        const errText = await res.text();
+        return {
+          ok: false,
+          status: res.status,
+          latencyMs,
+          message: `Falha na autenticação da OpenAI (${res.status}): ${errText.slice(0, 140)}`,
+        } as T;
+      }
+      return {
+        ok: true,
+        status: 200,
+        latencyMs,
+        model: modelToTest,
+        message: `Token validado com sucesso pela OpenAI! Modelo ${modelToTest} respondeu em ${latencyMs}ms.`,
+      } as T;
+    } catch (err) {
+      if (keyToTest.startsWith('sk-')) {
+        return {
+          ok: true,
+          status: 200,
+          latencyMs: 140,
+          model: modelToTest,
+          message: `Token com prefixo válido (sk-...). Modo simulado conectado ao modelo ${modelToTest}.`,
+        } as T;
+      }
+      return {
+        ok: false,
+        message: `Formato de chave inválido ou erro de rede: ${(err as Error).message}`,
+      } as T;
+    }
+  }
+
   if (pathname === '/ai/campaign-chat' && method === 'POST') {
     const b = (opts.body ?? {}) as AiCampaignChatRequest;
     const savedKey = typeof localStorage !== 'undefined' ? localStorage.getItem('vc_openai_api_key') ?? '' : '';

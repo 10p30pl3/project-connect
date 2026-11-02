@@ -24,6 +24,7 @@ import { ReportsPage } from './pages/Reports';
 import { ExperimentsPage } from './pages/Experiments';
 import { OptimizationPage } from './pages/Optimization';
 import { CostsPage } from './pages/Costs';
+import { SystemPage } from './pages/System';
 import { MorePage } from './pages/More';
 import { NotFoundPage } from './pages/NotFound';
 import { IntelligencePage } from './pages/Intelligence';
@@ -86,6 +87,7 @@ export const router = createBrowserRouter([
           { path: '/inteligencia', element: <CentralIntelligencePage /> },
           { path: '/limites', element: <LimitsPage /> },
           { path: '/observabilidade', element: <ObservabilityPage /> },
+          { path: '/sistema', element: <SystemPage /> },
           { path: '/controle', element: <Navigate to="/limites" replace /> },
           { path: '/otimizacao', element: <Navigate to="/inteligencia" replace /> },
           { path: '/experimentos', element: <ExperimentsPage /> },
