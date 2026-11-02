@@ -20,6 +20,8 @@ import {
   FileText,
   Filter,
   FlaskConical,
+  KeyRound,
+  Loader2,
   Paperclip,
   Pencil,
   Plus,
@@ -27,6 +29,7 @@ import {
   Rocket,
   Save,
   Send,
+  Settings2,
   ShieldCheck,
   ShoppingBag,
   Shuffle,
@@ -48,6 +51,8 @@ import {
   OPERATION_PURPOSES,
   PRIMARY_OPERATION_PURPOSES,
   PURPOSE_METADATA,
+  type AiCampaignChatResponse,
+  type AiCampaignExtractedState,
   type AudienceSegment,
   type CampaignDraft,
   type ChannelType,
@@ -801,13 +806,15 @@ function UnifiedCampaignCreator({
     extra.creationExperience || 'AI_PROMPT',
   );
 
-  // Chat Conversacional da IA: histórico de mensagens interativas
+  // Chat Conversacional da IA (OpenAI API + Assistente Interativo): histórico de mensagens
   type ChatMessage = {
     id: string;
     sender: 'user' | 'assistant';
     text: string;
-    missingInfo?: 'MAILING' | 'PURPOSE' | 'AUDIENCE_SEGMENT' | 'CHANNELS' | null;
-    actions?: Array<{ label: string; onClick: () => void }>;
+    missingInfo?: 'MAILING' | 'PURPOSE' | 'AUDIENCE_SEGMENT' | 'CHANNELS' | 'SCHEDULE' | null;
+    suggestedReplies?: string[];
+    provider?: 'OPENAI' | 'LOCAL_ASSISTANT';
+    model?: string;
     timestamp: Date;
   };
 
@@ -815,20 +822,49 @@ function UnifiedCampaignCreator({
     {
       id: 'welcome',
       sender: 'assistant',
-      text: 'Olá! Sou o assistente de IA da Voll Solutions. O que você precisa realizar hoje com esta campanha? Pode me descrever o objetivo em linguagem natural (ex: cobrança de títulos atrasados, oferta de vendas ou confirmação de agendamentos).',
+      text: 'Olá! Sou o assistente de IA da Voll Connect. Qual campanha vamos criar hoje? Você pode descrever o objetivo com suas palavras ou escolher uma das opções abaixo para começarmos:',
       missingInfo: 'PURPOSE',
+      suggestedReplies: [
+        'Cobrança de faturas em atraso',
+        'Venda ativa de planos e ofertas',
+        'Confirmação de agendamentos (D-1 e D-0)',
+      ],
       timestamp: new Date(),
     },
   ]);
   const [chatInput, setChatInput] = useState('');
+  const [isAiTyping, setIsAiTyping] = useState(false);
+  const [aiExtracted, setAiExtracted] = useState<AiCampaignExtractedState>({});
   const chatScrollRef = useRef<HTMLDivElement>(null);
+
+  // Estado e Modal de Configuração da API da OpenAI
+  const [openAiModalOpen, setOpenAiModalOpen] = useState(false);
+  const [openAiApiKeyInput, setOpenAiApiKeyInput] = useState<string>(() => {
+    try {
+      return localStorage.getItem('vc_openai_api_key') ?? '';
+    } catch {
+      return '';
+    }
+  });
+  const [openAiModelInput, setOpenAiModelInput] = useState<string>(() => {
+    try {
+      return localStorage.getItem('vc_openai_model') || 'gpt-4o-mini';
+    } catch {
+      return 'gpt-4o-mini';
+    }
+  });
+  const aiStatusQ = useQuery({
+    queryKey: ['ai-status'],
+    queryFn: () => get<{ configured: boolean; provider: 'OPENAI' | 'LOCAL_ASSISTANT'; model: string }>('/ai/status'),
+  });
+  const isOpenAiConfigured = Boolean(aiStatusQ.data?.configured || openAiApiKeyInput.trim().length > 10);
 
   // Upload/Anexo de Mailing no Modo Prompt
   const [showImportInPrompt, setShowImportInPrompt] = useState(false);
 
   // 2. Prompt & Identification
   const [promptText, setPromptText] = useState<string>(
-    extra.purposePrompt || PROMPT_TEMPLATES[0].prompt,
+    extra.purposePrompt || '',
   );
   const [purposeCode, setPurposeCode] = useState<OperationPurpose>(
     extra.purposeCode || 'COBRANCA',
@@ -860,10 +896,28 @@ function UnifiedCampaignCreator({
   const bestJourney = journeys?.find((j) => (j.latestVersion?.steps.length ?? 0) > 1) ?? journeys?.[0];
   const bestStrategy = strategies?.[0];
 
-  // Motor NLP Parser: Interpretação contínua do prompt em linguagem natural
+  // Motor NLP Parser: combina o estado extraído pela OpenAI com o fallback local
   const parsedPrompt = useMemo(() => {
-    return parseCampaignPrompt(promptText, activeMailing);
-  }, [promptText, activeMailing]);
+    const base = parseCampaignPrompt(promptText || 'Cobrança', activeMailing);
+    return {
+      ...base,
+      purposeCode: aiExtracted.purposeCode ?? base.purposeCode,
+      audienceSegment: aiExtracted.audienceSegment ?? base.audienceSegment,
+      campaignName: aiExtracted.campaignName || base.campaignName,
+      description: aiExtracted.description || base.description,
+      recommendedChannels:
+        aiExtracted.recommendedChannels && aiExtracted.recommendedChannels.length > 0
+          ? aiExtracted.recommendedChannels
+          : base.recommendedChannels,
+      extractedFilters:
+        aiExtracted.extractedFilters && aiExtracted.extractedFilters.length > 0
+          ? aiExtracted.extractedFilters
+          : base.extractedFilters,
+      extractedSort: aiExtracted.extractedSort ?? base.extractedSort,
+      cadenceSummary: aiExtracted.cadenceSummary || base.cadenceSummary,
+      maxCpcBrl: aiExtracted.maxAcceptableCpcBrl ?? base.maxCpcBrl,
+    };
+  }, [promptText, activeMailing, aiExtracted]);
 
   // Sincroniza detecção B2B automática a partir do nome do mailing
   useEffect(() => {
@@ -880,15 +934,40 @@ function UnifiedCampaignCreator({
     if (chatScrollRef.current) {
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
     }
-  }, [chatMessages]);
+  }, [chatMessages, isAiTyping]);
 
-  // Handler de envio do usuário no chat
-  const handleSendChatMessage = (textToSend?: string) => {
+  // Salvar configuração da API Key da OpenAI
+  const handleSaveOpenAiConfig = async () => {
+    try {
+      localStorage.setItem('vc_openai_api_key', openAiApiKeyInput.trim());
+      localStorage.setItem('vc_openai_model', openAiModelInput.trim() || 'gpt-4o-mini');
+      await post('/ai/config', {
+        apiKey: openAiApiKeyInput.trim(),
+        model: openAiModelInput.trim() || 'gpt-4o-mini',
+      });
+      await qc.invalidateQueries({ queryKey: ['ai-status'] });
+      setOpenAiModalOpen(false);
+      toast(
+        'success',
+        openAiApiKeyInput.trim()
+          ? `OpenAI API (${openAiModelInput}) conectada com sucesso!`
+          : 'Chave OpenAI removida. Usando assistente interativo integrado.',
+      );
+    } catch (err) {
+      toast('error', `Falha ao salvar configuração OpenAI: ${errorMessage(err)}`);
+    }
+  };
+
+  // Handler de envio do usuário no chat (consulta POST /ai/campaign-chat -> OpenAI API)
+  const handleSendChatMessage = async (
+    textToSend?: string,
+    overrideMailing?: { id: string; name: string; count: number },
+  ) => {
     const raw = (textToSend ?? chatInput).trim();
-    if (!raw) return;
+    if (!raw || isAiTyping) return;
 
     setChatInput('');
-    setPromptText(raw);
+    setPromptText((prev) => (prev ? `${prev}\n${raw}` : raw));
 
     const userMsg: ChatMessage = {
       id: `user-${Date.now()}`,
@@ -897,51 +976,71 @@ function UnifiedCampaignCreator({
       timestamp: new Date(),
     };
 
-    // Analisa o que o usuário disse
-    const currentParsed = parseCampaignPrompt(raw, activeMailing);
-    setPurposeCode(currentParsed.purposeCode);
-    setAudienceSegment(currentParsed.audienceSegment);
-    const dateStr = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-    const pTitle = currentParsed.purposeCode === 'AGENDAMENTOS' ? 'Confirmação de Agendamentos' : currentParsed.purposeCode === 'VENDAS' ? 'Venda Ativa Comercial' : 'Cobrança e Recuperação';
-    setCampaignName(`${pTitle} · ${dateStr}`);
+    const nextMessages = [...chatMessages, userMsg];
+    setChatMessages(nextMessages);
+    setIsAiTyping(true);
 
-    // Verifica o que ainda falta
-    const hasMailing = Boolean(selectedMailingId && activeMailing);
+    const mId = overrideMailing?.id ?? selectedMailingId ?? activeMailing?.id ?? null;
+    const mName = overrideMailing?.name ?? activeMailing?.name ?? null;
+    const mCount = overrideMailing?.count ?? activeMailing?.recordCount ?? null;
 
-    let assistantReply: ChatMessage;
+    try {
+      const apiMessages = nextMessages.map((m) => ({
+        role: m.sender === 'user' ? ('user' as const) : ('assistant' as const),
+        content: m.text,
+      }));
 
-    if (!hasMailing || !activeMailing) {
-      assistantReply = {
+      const res = await post<AiCampaignChatResponse>('/ai/campaign-chat', {
+        messages: apiMessages,
+        currentState: aiExtracted,
+        selectedMailingId: mId,
+        selectedMailingName: mName,
+        selectedMailingCount: mCount,
+        apiKey: openAiApiKeyInput.trim() || undefined,
+        model: openAiModelInput.trim() || 'gpt-4o-mini',
+      });
+
+      setAiExtracted(res.extracted);
+      if (res.extracted.purposeCode) setPurposeCode(res.extracted.purposeCode);
+      if (res.extracted.audienceSegment) setAudienceSegment(res.extracted.audienceSegment);
+      if (res.extracted.campaignName) setCampaignName(res.extracted.campaignName);
+      if (res.extracted.maxAcceptableCpcBrl) setMaxAcceptableCpcBrl(res.extracted.maxAcceptableCpcBrl);
+
+      const assistantReply: ChatMessage = {
         id: `ai-${Date.now() + 1}`,
         sender: 'assistant',
-        text: `Entendi perfeitamente! Configurei o objetivo como "${pTitle}". Para que eu possa identificar os melhores canais (WhatsApp, Voz, E-mail) e calcular a melhor hora de chamar os contatos, ainda preciso da base de contatos (mailing). Você gostaria de selecionar um mailing existente do workspace ou anexar um novo arquivo CSV?`,
-        missingInfo: 'MAILING',
+        text: res.reply,
+        missingInfo: res.missingInfo,
+        suggestedReplies: res.suggestedReplies,
+        provider: res.provider,
+        model: res.model,
         timestamp: new Date(),
       };
-    } else {
-      assistantReply = {
+      setChatMessages((prev) => [...prev, assistantReply]);
+    } catch (err) {
+      const currentParsed = parseCampaignPrompt(raw, activeMailing);
+      setPurposeCode(currentParsed.purposeCode);
+      setAudienceSegment(currentParsed.audienceSegment);
+      const assistantReply: ChatMessage = {
         id: `ai-${Date.now() + 1}`,
         sender: 'assistant',
-        text: `Excelente! Objetivo identificado como "${pTitle}" e base vinculada a "${activeMailing.name}" (${fmtNumber(activeMailing.recordCount)} contatos). Identifiquei os canais recomendados (${currentParsed.recommendedChannels.map((c) => CHANNEL_LABEL[c] ?? c).join(' → ')}) e os horários ideais para chamar. Todas as informações necessárias estão preenchidas! Clique em "Continuar para revisão" para conferir e disparar.`,
-        missingInfo: null,
+        text: `Entendido! Atualizei os parâmetros da campanha (${currentParsed.campaignName}). ${!mId ? 'Agora selecione ou anexe o mailing de contatos abaixo para prosseguirmos.' : 'Clique em "Continuar para revisão" quando desejar iniciar.'}`,
+        missingInfo: !mId ? 'MAILING' : null,
         timestamp: new Date(),
       };
+      setChatMessages((prev) => [...prev, assistantReply]);
+    } finally {
+      setIsAiTyping(false);
     }
-
-    setChatMessages((prev) => [...prev, userMsg, assistantReply]);
   };
 
   // Responde quando o usuário anexa ou seleciona o mailing
   const handleMailingAttached = (mId: string, mName: string, count: number) => {
     setSelectedMailingId(mId);
-    const systemNotice: ChatMessage = {
-      id: `sys-${Date.now()}`,
-      sender: 'assistant',
-      text: `Base "${mName}" (${fmtNumber(count)} contatos) conectada com sucesso! Agora consigo analisar os DDDs e canais disponíveis para calibrar os melhores horários e régua de acionamento. Se quiser refinar alguma regra ou limite de tentativas, pode digitar aqui ou avançar para a revisão.`,
-      missingInfo: null,
-      timestamp: new Date(),
-    };
-    setChatMessages((prev) => [...prev, systemNotice]);
+    void handleSendChatMessage(
+      `Selecionei a base de contatos "${mName}" com ${fmtNumber(count)} registros.`,
+      { id: mId, name: mName, count },
+    );
   };
 
   const handleApplyTemplate = (tmpl: (typeof PROMPT_TEMPLATES)[number]) => {
@@ -1167,110 +1266,153 @@ function UnifiedCampaignCreator({
             </nav>
           </div>
 
-          {/* PASSO 1 DA IA: OBJETIVO E MAILING (CHAT CONVERSACIONAL) */}
+          {/* PASSO 1 DA IA: OBJETIVO E MAILING (CHAT CONVERSACIONAL COM OPENAI API) */}
           {aiStep === 1 && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               {/* Coluna Principal da Esquerda: Chat Conversacional com IA */}
               <div className="lg:col-span-8 space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <h2 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
                       <Sparkles className="size-4.5 text-brand-600" />
-                      <span>Assistente de IA · Criação de Campanha</span>
+                      <span>Assistente de IA · Criação Interativa</span>
+                      <Badge tone={isOpenAiConfigured ? 'green' : 'brand'}>
+                        {isOpenAiConfigured ? `OpenAI · ${aiStatusQ.data?.model || openAiModelInput}` : 'OpenAI Ready · Assistente Ativo'}
+                      </Badge>
                     </h2>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Descreva seu objetivo em linguagem natural. O assistente analisa e pergunta as informações que ainda faltam.
+                      Converse em linguagem natural. A IA extrai os parâmetros e pergunta apenas o que falta para montar sua campanha.
                     </p>
                   </div>
+
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    icon={<KeyRound className="size-3.5 text-brand-700" />}
+                    onClick={() => setOpenAiModalOpen(true)}
+                  >
+                    {isOpenAiConfigured ? 'Configurar OpenAI' : 'Conectar OpenAI API'}
+                  </Button>
                 </div>
 
                 {/* Janela de Histórico do Chat */}
                 <div
                   ref={chatScrollRef}
-                  className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50/60 to-white p-4 h-[330px] overflow-y-auto space-y-3.5 shadow-2xs"
+                  className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50/60 to-white p-4 h-[360px] overflow-y-auto space-y-3.5 shadow-2xs"
                 >
-                  {chatMessages.map((msg) => (
-                    <div
-                      key={msg.id}
-                      className={clsx(
-                        'flex gap-2.5 max-w-[85%] text-xs leading-relaxed',
-                        msg.sender === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto',
-                      )}
-                    >
-                      {msg.sender === 'assistant' ? (
-                        <div className="grid size-7 place-items-center rounded-full bg-brand-700 text-white shrink-0 mt-0.5 shadow-2xs">
-                          <Sparkles className="size-3.5" />
-                        </div>
-                      ) : (
-                        <div className="grid size-7 place-items-center rounded-full bg-slate-800 text-white shrink-0 mt-0.5 shadow-2xs">
-                          <User className="size-3.5" />
-                        </div>
-                      )}
-
+                  {chatMessages.map((msg, idx) => {
+                    const isLastAssistant = msg.sender === 'assistant' && idx === chatMessages.length - 1;
+                    return (
                       <div
+                        key={msg.id}
                         className={clsx(
-                          'p-3 rounded-2xl shadow-2xs',
-                          msg.sender === 'user'
-                            ? 'bg-brand-600 text-white rounded-tr-xs'
-                            : 'bg-white border border-slate-200/90 text-slate-800 rounded-tl-xs',
+                          'flex gap-2.5 max-w-[88%] text-xs leading-relaxed',
+                          msg.sender === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto',
                         )}
                       >
-                        <p className="whitespace-pre-wrap">{msg.text}</p>
-
-                        {/* Ações contextuais disparadas pela pergunta da IA */}
-                        {msg.missingInfo === 'MAILING' && !selectedMailingId && (
-                          <div className="mt-2.5 pt-2 border-t border-slate-100 flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              onClick={() => setShowImportInPrompt(true)}
-                              className="inline-flex items-center gap-1 rounded-lg border border-brand-300 bg-brand-50 px-2.5 py-1 text-[11px] font-semibold text-brand-900 hover:bg-brand-100 transition cursor-pointer"
-                            >
-                              <Paperclip className="size-3 text-brand-600" />
-                              <span>Anexar CSV agora</span>
-                            </button>
-                            <span className="text-[11px] text-slate-400 self-center">ou selecione abaixo</span>
+                        {msg.sender === 'assistant' ? (
+                          <div className="grid size-7 place-items-center rounded-full bg-brand-700 text-white shrink-0 mt-0.5 shadow-2xs">
+                            <Sparkles className="size-3.5" />
+                          </div>
+                        ) : (
+                          <div className="grid size-7 place-items-center rounded-full bg-slate-800 text-white shrink-0 mt-0.5 shadow-2xs">
+                            <User className="size-3.5" />
                           </div>
                         )}
+
+                        <div
+                          className={clsx(
+                            'p-3 rounded-2xl shadow-2xs space-y-2',
+                            msg.sender === 'user'
+                              ? 'bg-brand-600 text-white rounded-tr-xs'
+                              : 'bg-white border border-slate-200/90 text-slate-800 rounded-tl-xs',
+                          )}
+                        >
+                          <p className="whitespace-pre-wrap">{msg.text}</p>
+
+                          {/* Respostas rápidas sugeridas pela IA para conversa em 1 clique */}
+                          {isLastAssistant && msg.suggestedReplies && msg.suggestedReplies.length > 0 && !isAiTyping && (
+                            <div className="pt-1.5 border-t border-slate-100 flex flex-wrap gap-1.5">
+                              {msg.suggestedReplies.map((replyOpt) => (
+                                <button
+                                  key={replyOpt}
+                                  type="button"
+                                  onClick={() => handleSendChatMessage(replyOpt)}
+                                  className="inline-flex items-center gap-1 rounded-lg border border-brand-200 bg-brand-50/70 px-2.5 py-1 text-[11px] font-semibold text-brand-900 hover:bg-brand-100 transition cursor-pointer"
+                                >
+                                  <span>{replyOpt}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Ações contextuais disparadas pela pergunta da IA sobre o mailing */}
+                          {msg.missingInfo === 'MAILING' && !selectedMailingId && (
+                            <div className="pt-2 border-t border-slate-100 flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setShowImportInPrompt(true)}
+                                className="inline-flex items-center gap-1 rounded-lg border border-brand-300 bg-brand-50 px-2.5 py-1 text-[11px] font-semibold text-brand-900 hover:bg-brand-100 transition cursor-pointer"
+                              >
+                                <Paperclip className="size-3 text-brand-600" />
+                                <span>Anexar CSV agora</span>
+                              </button>
+                              <span className="text-[11px] text-slate-400 self-center">ou selecione um mailing abaixo</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {isAiTyping && (
+                    <div className="flex gap-2.5 max-w-[80%] text-xs mr-auto items-center">
+                      <div className="grid size-7 place-items-center rounded-full bg-brand-700 text-white shrink-0 shadow-2xs">
+                        <Loader2 className="size-3.5 animate-spin" />
+                      </div>
+                      <div className="rounded-2xl rounded-tl-xs border border-slate-200 bg-white px-3.5 py-2.5 text-slate-500 shadow-2xs flex items-center gap-2">
+                        <span>Analisando parâmetros da campanha...</span>
                       </div>
                     </div>
-                  ))}
+                  )}
                 </div>
 
                 {/* Input do Chat (onde a pessoa escreve) com botão circular de envio */}
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
-                    handleSendChatMessage();
+                    void handleSendChatMessage();
                   }}
                   className="relative rounded-2xl border border-slate-200 bg-white p-2.5 shadow-xs focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 transition"
                 >
                   <Textarea
                     id="ai-prompt-input"
                     rows={2}
+                    disabled={isAiTyping}
                     className="w-full border-0 p-1 text-sm text-slate-800 placeholder-slate-400 focus:ring-0 resize-none leading-relaxed"
-                    placeholder="Escreva sua mensagem ou responda ao assistente..."
+                    placeholder="Escreva sua mensagem ou responda ao assistente (ex: Cobrança B2B acima de R$ 1.000 via WhatsApp e Voz)..."
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
-                        handleSendChatMessage();
+                        void handleSendChatMessage();
                       }
                     }}
                   />
 
                   <div className="flex items-center justify-between pt-1.5 border-t border-slate-100/80">
                     <span className="text-[11px] text-slate-400">
-                      Pressione Enter para enviar
+                      Pressione Enter para enviar · Shift+Enter para quebrar linha
                     </span>
 
                     <button
                       type="submit"
-                      disabled={!chatInput.trim()}
+                      disabled={!chatInput.trim() || isAiTyping}
                       className="grid size-8 place-items-center rounded-full bg-brand-600 text-white shadow-sm hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
                       title="Enviar mensagem"
                     >
-                      <ArrowRight className="size-4" />
+                      {isAiTyping ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
                     </button>
                   </div>
                 </form>
@@ -1278,7 +1420,7 @@ function UnifiedCampaignCreator({
                 {/* Templates de Prompt */}
                 <div className="space-y-1.5">
                   <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                    Sugestões prontas de conversa
+                    Exemplos rápidos para iniciar
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     <button
@@ -1425,18 +1567,23 @@ function UnifiedCampaignCreator({
               {/* Coluna Lateral da Direita: Checklist da Campanha */}
               <div className="lg:col-span-4">
                 <div className="rounded-2xl border border-slate-200/90 bg-slate-50/50 p-4 space-y-4">
-                  <div className="text-xs font-bold text-slate-800 tracking-tight">
-                    Checklist da campanha
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800 tracking-tight">
+                      Checklist da campanha
+                    </span>
+                    <Badge tone="gray">Tempo real</Badge>
                   </div>
 
                   {/* Verificadores das condições progressivas */}
                   {(() => {
-                    const hasPrompt = promptText.trim().length > 0;
+                    const hasPrompt = Boolean(aiExtracted.purposeCode || promptText.trim().length > 0);
                     const hasMailing = Boolean(selectedMailingId && activeMailing);
-                    // O Canal, Dias e Horário ideal dependem do mailing para aferir canais disponíveis, DDD/região e perfil da base
-                    const hasChannel = hasPrompt && hasMailing;
-                    const hasDays = hasPrompt && hasMailing;
+                    const hasChannel = hasPrompt && (hasMailing || (aiExtracted.recommendedChannels?.length ?? 0) > 0);
+                    const hasDays = hasPrompt && (hasMailing || Boolean(aiExtracted.operatingStart));
                     const hasAttempts = hasPrompt;
+                    const maxAtt = aiExtracted.maxAttemptsPerContact ?? 3;
+                    const startH = aiExtracted.operatingStart ?? (parsedPrompt.audienceSegment === 'B2B' ? '08:30' : '08:00');
+                    const endH = aiExtracted.operatingEnd ?? (parsedPrompt.audienceSegment === 'B2B' ? '18:00' : '20:00');
 
                     return (
                       <div className="space-y-3 text-xs">
@@ -1453,9 +1600,11 @@ function UnifiedCampaignCreator({
                             <Check className="size-3 stroke-[2.5]" />
                           </div>
                           <div>
-                            <div className="font-bold text-slate-800">Descritivo</div>
+                            <div className="font-bold text-slate-800">Objetivo &amp; Segmento</div>
                             <div className="text-slate-500 text-[11px] leading-tight line-clamp-2">
-                              {hasPrompt ? promptText : 'Descreva o objetivo da campanha'}
+                              {hasPrompt
+                                ? `${OPERATION_PURPOSE_LABEL[parsedPrompt.purposeCode]} · ${parsedPrompt.audienceSegment}`
+                                : 'Descreva o objetivo da campanha no chat'}
                             </div>
                           </div>
                         </div>
@@ -1473,13 +1622,13 @@ function UnifiedCampaignCreator({
                             <Check className="size-3 stroke-[2.5]" />
                           </div>
                           <div>
-                            <div className="font-bold text-slate-800">Canal</div>
+                            <div className="font-bold text-slate-800">Canais</div>
                             <div className="text-slate-500 text-[11px]">
                               {hasChannel ? (
                                 parsedPrompt.recommendedChannels.map((c) => CHANNEL_LABEL[c] ?? c).join(' → ')
                               ) : (
                                 <span className="text-slate-400 italic">
-                                  Aguardando mailing para identificar os melhores canais
+                                  Aguardando definição na conversa
                                 </span>
                               )}
                             </div>
@@ -1499,15 +1648,13 @@ function UnifiedCampaignCreator({
                             <Check className="size-3 stroke-[2.5]" />
                           </div>
                           <div>
-                            <div className="font-bold text-slate-800">Dias</div>
+                            <div className="font-bold text-slate-800">Dias e Janela</div>
                             <div className="text-slate-500 text-[11px]">
                               {hasDays ? (
-                                parsedPrompt.audienceSegment === 'B2B'
-                                  ? 'Segunda a sexta (horário comercial)'
-                                  : 'Todos os dias permitidos'
+                                `${parsedPrompt.audienceSegment === 'B2B' ? 'Segunda a sexta' : 'Seg a Sáb'} (${startH}–${endH})`
                               ) : (
                                 <span className="text-slate-400 italic">
-                                  Aguardando mailing para definir a melhor hora de chamar
+                                  Aguardando definição do público
                                 </span>
                               )}
                             </div>
@@ -1530,7 +1677,7 @@ function UnifiedCampaignCreator({
                             <div className="font-bold text-slate-800">Tentativas</div>
                             <div className="text-slate-500 text-[11px]">
                               {hasAttempts ? (
-                                'Até 3 por contato'
+                                `Até ${maxAtt} por contato`
                               ) : (
                                 <span className="text-slate-400 italic">Definido pelo objetivo</span>
                               )}
@@ -1551,10 +1698,10 @@ function UnifiedCampaignCreator({
                             <Check className="size-3 stroke-[2.5]" />
                           </div>
                           <div>
-                            <div className="font-bold text-slate-800">CSV</div>
+                            <div className="font-bold text-slate-800">Mailing / CSV</div>
                             <div className="text-slate-500 text-[11px]">
                               {hasMailing && activeMailing
-                                ? `${fmtNumber(activeMailing.recordCount)} contatos · campos reconhecidos`
+                                ? `${activeMailing.name} (${fmtNumber(activeMailing.recordCount)} contatos)`
                                 : 'Pendente anexar ou selecionar'}
                             </div>
                           </div>
@@ -1564,7 +1711,7 @@ function UnifiedCampaignCreator({
                   })()}
 
                   <div className="pt-2 border-t border-slate-200/80 text-[10px] text-slate-400 leading-tight">
-                    O checklist acompanha o que já foi definido no prompt e na lista.
+                    O checklist é atualizado automaticamente a cada resposta da IA.
                   </div>
                 </div>
               </div>
@@ -1584,7 +1731,7 @@ function UnifiedCampaignCreator({
                 {/* Coluna Principal da Esquerda: Configurações estruturadas da campanha */}
                 <div className="lg:col-span-8 rounded-2xl border border-slate-200 bg-white p-5 space-y-5 shadow-xs">
                   <div className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3">
-                    Configuração da campanha
+                    Configuração extraída pela IA
                   </div>
 
                   {/* Nome da Campanha */}
@@ -1617,13 +1764,13 @@ function UnifiedCampaignCreator({
                   {/* Prioridade */}
                   <div className="space-y-1 border-t border-slate-100 pt-3">
                     <div className="text-xs font-semibold text-slate-600">
-                      Prioridade
+                      Prioridade e Ordenação
                     </div>
                     <div className="font-bold text-sm text-slate-900">
-                      Maior chance de falar com a pessoa certa
+                      {parsedPrompt.extractedSort.label}
                     </div>
                     <div className="text-xs text-slate-500">
-                      Exclusões e ordem ficam visíveis na lista processada
+                      Segmento {parsedPrompt.audienceSegment} · {OPERATION_PURPOSE_LABEL[parsedPrompt.purposeCode]}
                     </div>
                   </div>
 
@@ -1633,17 +1780,23 @@ function UnifiedCampaignCreator({
                       Canais e tentativas
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <div className="flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50/80 px-3 py-1.5 text-xs font-bold text-brand-900">
-                        <span>1</span>
-                        <span>WhatsApp</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700">
-                        <span>2</span>
-                        <span>Telefonia</span>
-                      </div>
+                      {parsedPrompt.recommendedChannels.map((ch, idx) => (
+                        <div
+                          key={ch}
+                          className={clsx(
+                            'flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs',
+                            idx === 0
+                              ? 'border-brand-200 bg-brand-50/80 font-bold text-brand-900'
+                              : 'border-slate-200 bg-white font-medium text-slate-700',
+                          )}
+                        >
+                          <span>{idx + 1}</span>
+                          <span>{CHANNEL_LABEL[ch]}</span>
+                        </div>
+                      ))}
                     </div>
                     <div className="text-xs text-slate-500">
-                      Até 3 tentativas por contato · aguardar feedback entre canais
+                      Até {aiExtracted.maxAttemptsPerContact ?? 3} tentativas por contato · aguardar feedback entre canais
                     </div>
                   </div>
 
@@ -1653,7 +1806,10 @@ function UnifiedCampaignCreator({
                       Horário permitido
                     </div>
                     <div className="flex flex-wrap gap-1.5">
-                      {['Seg', 'Ter', 'Qua', 'Qui', 'Sex'].map((d) => (
+                      {(parsedPrompt.audienceSegment === 'B2B'
+                        ? ['Seg', 'Ter', 'Qua', 'Qui', 'Sex']
+                        : ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+                      ).map((d) => (
                         <span
                           key={d}
                           className="rounded-lg border border-brand-200 bg-brand-50/80 px-2.5 py-1 text-xs font-semibold text-brand-900"
@@ -1663,7 +1819,8 @@ function UnifiedCampaignCreator({
                       ))}
                     </div>
                     <div className="text-xs text-slate-500">
-                      09:00–18:00 · horário local do contato
+                      {aiExtracted.operatingStart ?? (parsedPrompt.audienceSegment === 'B2B' ? '08:30' : '08:00')}–
+                      {aiExtracted.operatingEnd ?? (parsedPrompt.audienceSegment === 'B2B' ? '18:00' : '20:00')} · horário local do contato
                     </div>
                   </div>
                 </div>
@@ -2957,6 +3114,66 @@ function UnifiedCampaignCreator({
       )}
         </div>
       )}
+
+      {/* Modal de Configuração da API da OpenAI */}
+      <Modal
+        open={openAiModalOpen}
+        onOpenChange={setOpenAiModalOpen}
+        title="Conectar API da OpenAI"
+        description="Configure sua chave da OpenAI (ou defina OPENAI_API_KEY no servidor) para habilitar o modelo GPT na criação interativa de campanhas."
+        footer={
+          <>
+            <Button onClick={() => setOpenAiModalOpen(false)}>Cancelar</Button>
+            <Button variant="primary" onClick={handleSaveOpenAiConfig}>
+              Salvar configuração
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Field
+            label="OpenAI API Key (sk-...)"
+            hint="Sua chave é enviada com segurança ao endpoint /api/ai/campaign-chat. Se deixada em branco, o assistente interativo integrado da Voll Connect assume automaticamente."
+          >
+            {(p) => (
+              <Input
+                id={p.id}
+                type="password"
+                value={openAiApiKeyInput}
+                onChange={(e) => setOpenAiApiKeyInput(e.target.value)}
+                placeholder="sk-proj-..."
+              />
+            )}
+          </Field>
+
+          <Field label="Modelo da OpenAI">
+            {(p) => (
+              <Select
+                id={p.id}
+                value={openAiModelInput}
+                onChange={(e) => setOpenAiModelInput(e.target.value)}
+              >
+                <option value="gpt-4o-mini">gpt-4o-mini (Rápido e econômico · Recomendado)</option>
+                <option value="gpt-4o">gpt-4o (Alta precisão analítica)</option>
+                <option value="gpt-4.1-mini">gpt-4.1-mini</option>
+                <option value="gpt-4.1">gpt-4.1</option>
+              </Select>
+            )}
+          </Field>
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-xs text-slate-600 space-y-1">
+            <div className="font-semibold text-slate-800">Status atual do motor:</div>
+            <div>
+              Provedor ativo:{' '}
+              <strong>
+                {isOpenAiConfigured
+                  ? `OpenAI API (${aiStatusQ.data?.model || openAiModelInput})`
+                  : 'Assistente Interativo Voll Connect (Fallback Local)'}
+              </strong>
+            </div>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

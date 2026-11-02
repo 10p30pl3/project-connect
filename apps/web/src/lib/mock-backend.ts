@@ -8,14 +8,20 @@
 import {
   ATTEMPT_STATE_LABEL,
   CAMPAIGN_STATUS_LABEL,
+  CHANNEL_LABEL,
   maskAddress,
   ROLES,
+  type AiCampaignChatRequest,
+  type AiCampaignChatResponse,
+  type AiCampaignExtractedState,
   type AttemptState,
+  type AudienceSegment,
   type CampaignDraft,
   type CampaignStatus,
   type ChannelType,
   type ColumnMapping,
   type ListFilter,
+  type OperationPurpose,
   type ReasonCode,
   type Role,
   type StrategyConfig,
@@ -2315,5 +2321,255 @@ export async function handleMockApi<T = unknown>(
     return res as T;
   }
 
+  // ---------------------------------------------------------------- Assistente de IA OpenAI (/ai/*)
+  if (pathname === '/ai/status' && method === 'GET') {
+    const savedKey = typeof localStorage !== 'undefined' ? localStorage.getItem('vc_openai_api_key') ?? '' : '';
+    const savedModel = typeof localStorage !== 'undefined' ? localStorage.getItem('vc_openai_model') || 'gpt-4o-mini' : 'gpt-4o-mini';
+    const hasKey = savedKey.trim().length > 10;
+    return {
+      configured: hasKey,
+      provider: hasKey ? 'OPENAI' : 'LOCAL_ASSISTANT',
+      model: savedModel,
+    } as T;
+  }
+
+  if (pathname === '/ai/config' && method === 'POST') {
+    const b = (opts.body ?? {}) as { apiKey?: string; model?: string };
+    if (typeof localStorage !== 'undefined') {
+      if (typeof b.apiKey === 'string') localStorage.setItem('vc_openai_api_key', b.apiKey.trim());
+      if (typeof b.model === 'string' && b.model.trim()) localStorage.setItem('vc_openai_model', b.model.trim());
+    }
+    const savedKey = typeof localStorage !== 'undefined' ? localStorage.getItem('vc_openai_api_key') ?? '' : '';
+    const savedModel = typeof localStorage !== 'undefined' ? localStorage.getItem('vc_openai_model') || 'gpt-4o-mini' : 'gpt-4o-mini';
+    const hasKey = savedKey.trim().length > 10;
+    return {
+      ok: true,
+      configured: hasKey,
+      provider: hasKey ? 'OPENAI' : 'LOCAL_ASSISTANT',
+      model: savedModel,
+    } as T;
+  }
+
+  if (pathname === '/ai/campaign-chat' && method === 'POST') {
+    const b = (opts.body ?? {}) as AiCampaignChatRequest;
+    const savedKey = typeof localStorage !== 'undefined' ? localStorage.getItem('vc_openai_api_key') ?? '' : '';
+    const savedModel = typeof localStorage !== 'undefined' ? localStorage.getItem('vc_openai_model') || 'gpt-4o-mini' : 'gpt-4o-mini';
+    const activeKey = (b.apiKey?.trim() || savedKey).trim();
+    const activeModel = (b.model?.trim() || savedModel || 'gpt-4o-mini').trim();
+
+    if (activeKey.length > 10) {
+      try {
+        const sysPrompt = `Você é o Assistente Especialista em Operações Omnichannel e CPC (Contato com a Pessoa Certa) da Voll Connect.
+Sua missão é conduzir uma conversa interativa em português (pt-BR) para estruturar uma campanha passo a passo, extraindo os parâmetros da conversa e fazendo perguntas objetivas sobre o que ainda falta.
+Contexto atual: ${JSON.stringify({
+          currentState: b.currentState ?? {},
+          selectedMailingId: b.selectedMailingId ?? null,
+          selectedMailingName: b.selectedMailingName ?? null,
+          selectedMailingCount: b.selectedMailingCount ?? null,
+        })}
+Responda EXCLUSIVAMENTE em JSON válido com as chaves:
+{
+  "reply": "string",
+  "missingInfo": "PURPOSE" | "MAILING" | "AUDIENCE_SEGMENT" | "CHANNELS" | "SCHEDULE" | null,
+  "readyToReview": boolean,
+  "suggestedReplies": ["string"],
+  "extracted": {
+    "purposeCode": "COBRANCA" | "VENDAS" | "AGENDAMENTOS",
+    "audienceSegment": "B2C" | "B2B" | "MIXED",
+    "campaignName": "string",
+    "description": "string",
+    "recommendedChannels": ["WHATSAPP", "VOICE"],
+    "operatingDays": [1,2,3,4,5],
+    "operatingStart": "08:00",
+    "operatingEnd": "20:00",
+    "maxAttemptsPerContact": 3,
+    "maxAcceptableCpcBrl": 4.5,
+    "extractedFilters": [{ "field": "dias_atraso", "op": "gte", "value": 30, "label": "Atraso superior a 30 dias" }],
+    "extractedSort": { "field": "priority_score", "dir": "desc", "label": "Maior probabilidade de contato (IA Score)" },
+    "cadenceSummary": "string"
+  }
+}`;
+        const r = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${activeKey}`,
+          },
+          body: JSON.stringify({
+            model: activeModel,
+            temperature: 0.3,
+            response_format: { type: 'json_object' },
+            messages: [
+              { role: 'system', content: sysPrompt },
+              ...(b.messages ?? []).map((m) => ({ role: m.role, content: m.content })),
+            ],
+          }),
+        });
+        if (r.ok) {
+          const data: any = await r.json();
+          const content = data?.choices?.[0]?.message?.content;
+          if (content) {
+            const parsed = JSON.parse(content);
+            const fallback = buildMockInteractiveResponse(b);
+            return {
+              reply: parsed.reply || fallback.reply,
+              provider: 'OPENAI',
+              model: data?.model || activeModel,
+              missingInfo: parsed.missingInfo !== undefined ? parsed.missingInfo : fallback.missingInfo,
+              readyToReview: Boolean(parsed.readyToReview ?? fallback.readyToReview),
+              suggestedReplies: Array.isArray(parsed.suggestedReplies) ? parsed.suggestedReplies.slice(0, 4).map(String) : fallback.suggestedReplies,
+              extracted: { ...fallback.extracted, ...(parsed.extracted ?? {}) },
+            } as T;
+          }
+        }
+      } catch {
+        /* fallback para motor local */
+      }
+    }
+
+    return buildMockInteractiveResponse(b) as T;
+  }
+
   return {} as T;
+}
+
+function buildMockInteractiveResponse(body: AiCampaignChatRequest): AiCampaignChatResponse {
+  const prev = body.currentState ?? {};
+  const allUserText = (body.messages ?? [])
+    .filter((m) => m.role === 'user')
+    .map((m) => m.content)
+    .join(' \n ');
+  const lastUserMsg = [...(body.messages ?? [])].reverse().find((m) => m.role === 'user')?.content ?? '';
+  const p = allUserText.toLowerCase();
+  const lastLower = lastUserMsg.toLowerCase();
+  const todayStr = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+
+  let purposeCode: OperationPurpose | null = prev.purposeCode ?? null;
+  if (lastLower.includes('agenda') || lastLower.includes('consulta') || lastLower.includes('exame') || lastLower.includes('visita') || lastLower.includes('lembrete')) {
+    purposeCode = 'AGENDAMENTOS';
+  } else if (lastLower.includes('venda') || lastLower.includes('oferta') || lastLower.includes('plano') || lastLower.includes('upgrade') || lastLower.includes('prospec')) {
+    purposeCode = 'VENDAS';
+  } else if (lastLower.includes('cobran') || lastLower.includes('inadimpl') || lastLower.includes('atraso') || lastLower.includes('dívida') || lastLower.includes('divida') || lastLower.includes('boleto') || lastLower.includes('pix') || lastLower.includes('fatura')) {
+    purposeCode = 'COBRANCA';
+  }
+
+  let audienceSegment: AudienceSegment | null = prev.audienceSegment ?? null;
+  const mailingLower = (body.selectedMailingName ?? '').toLowerCase();
+  if (lastLower.includes('misto') || lastLower.includes('híbrido') || lastLower.includes('ambos')) {
+    audienceSegment = 'MIXED';
+  } else if (lastLower.includes('b2b') || lastLower.includes('pj') || lastLower.includes('cnpj') || lastLower.includes('empresa') || lastLower.includes('corporativ') || mailingLower.includes('b2b')) {
+    audienceSegment = 'B2B';
+  } else if (lastLower.includes('b2c') || lastLower.includes('pf') || lastLower.includes('cpf') || lastLower.includes('pessoa física') || lastLower.includes('pessoa fisica') || lastLower.includes('consumidor')) {
+    audienceSegment = 'B2C';
+  }
+
+  let recommendedChannels: ChannelType[] = prev.recommendedChannels ?? [];
+  const mentionedChannels: ChannelType[] = [];
+  if (lastLower.includes('whatsapp') || lastLower.includes('whats')) mentionedChannels.push('WHATSAPP');
+  if (lastLower.includes('voz') || lastLower.includes('discador') || lastLower.includes('ligar') || lastLower.includes('telefonia')) mentionedChannels.push('VOICE');
+  if (lastLower.includes('sms')) mentionedChannels.push('SMS');
+  if (lastLower.includes('email') || lastLower.includes('e-mail')) mentionedChannels.push('EMAIL');
+
+  if (mentionedChannels.length > 0) {
+    recommendedChannels = mentionedChannels;
+  } else if (recommendedChannels.length === 0) {
+    if (audienceSegment === 'B2B') recommendedChannels = ['EMAIL', 'WHATSAPP', 'VOICE'];
+    else if (purposeCode === 'AGENDAMENTOS') recommendedChannels = ['WHATSAPP', 'SMS'];
+    else recommendedChannels = ['WHATSAPP', 'VOICE'];
+  }
+
+  let maxAttemptsPerContact = prev.maxAttemptsPerContact ?? 3;
+  const attMatch = lastLower.match(/(\d+)\s*tentativa/);
+  if (attMatch) maxAttemptsPerContact = Math.min(10, Math.max(1, parseInt(attMatch[1], 10)));
+
+  const effectiveSegment: AudienceSegment = audienceSegment ?? 'B2C';
+  const effectivePurpose: OperationPurpose = purposeCode ?? 'COBRANCA';
+
+  const operatingDays = prev.operatingDays ?? (effectiveSegment === 'B2B' ? [1, 2, 3, 4, 5] : [1, 2, 3, 4, 5, 6]);
+  let operatingStart = prev.operatingStart ?? (effectiveSegment === 'B2B' ? '08:30' : '08:00');
+  let operatingEnd = prev.operatingEnd ?? (effectiveSegment === 'B2B' ? '18:00' : '20:00');
+  const hoursMatch = lastLower.match(/(\d{1,2})[:h](\d{2})?\s*(?:às|as|a|-|até)\s*(\d{1,2})[:h](\d{2})?/);
+  if (hoursMatch) {
+    operatingStart = `${hoursMatch[1].padStart(2, '0')}:${hoursMatch[2] || '00'}`;
+    operatingEnd = `${hoursMatch[3].padStart(2, '0')}:${hoursMatch[4] || '00'}`;
+  }
+
+  const extractedFilters: NonNullable<AiCampaignExtractedState['extractedFilters']> = [...(prev.extractedFilters ?? [])];
+  const delayMatch = p.match(/(?:atraso|vencid[oa]s?|atrasad[oa]s?|faixa)\s*(?:maior|superior|acima|mais|de|>|\>=)?\s*(?:que|de|a)?\s*(\d+)\s*dias?/);
+  if (delayMatch) {
+    const days = parseInt(delayMatch[1], 10);
+    if (!extractedFilters.some((f) => f.field === 'dias_atraso')) {
+      extractedFilters.push({ field: 'dias_atraso', op: 'gte', value: days, label: `Atraso superior a ${days} dias` });
+    }
+  }
+
+  let extractedSort: NonNullable<AiCampaignExtractedState['extractedSort']> = prev.extractedSort ?? {
+    field: 'priority_score',
+    dir: 'desc',
+    label: 'Maior probabilidade de contato (IA Score)',
+  };
+  if (p.includes('maior valor') || p.includes('maiores dívidas')) {
+    extractedSort = { field: 'valor_divida', dir: 'desc', label: 'Maior valor financeiro primeiro' };
+  }
+
+  const purposeTitle =
+    effectivePurpose === 'AGENDAMENTOS'
+      ? 'Confirmação de Agendamentos'
+      : effectivePurpose === 'VENDAS'
+        ? 'Venda Ativa Comercial'
+        : 'Cobrança e Recuperação';
+
+  const campaignName = `${purposeTitle} · ${effectiveSegment} · ${todayStr}`;
+  const cadenceSummary =
+    effectiveSegment === 'B2B'
+      ? `Horário Comercial (${operatingStart}–${operatingEnd}, Seg–Sex) com até ${maxAttemptsPerContact} tentativas.`
+      : `Janelas otimizadas (${operatingStart}–${operatingEnd}) via ${recommendedChannels.map((c) => CHANNEL_LABEL[c]).join(' → ')} (até ${maxAttemptsPerContact} tentativas).`;
+
+  const hasMailing = Boolean(body.selectedMailingId);
+
+  let missingInfo: AiCampaignChatResponse['missingInfo'] = null;
+  let reply = '';
+  let suggestedReplies: string[] = [];
+
+  if (!purposeCode) {
+    missingInfo = 'PURPOSE';
+    reply = 'Para começarmos a desenhar sua campanha, qual é o objetivo principal da operação? Escolha abaixo ou descreva com suas palavras:';
+    suggestedReplies = ['Cobrança de faturas em atraso', 'Venda ativa de planos e ofertas', 'Confirmação de agendamentos (D-1 e D-0)'];
+  } else if (!audienceSegment) {
+    missingInfo = 'AUDIENCE_SEGMENT';
+    reply = `Perfeito, configurei o objetivo como **${purposeTitle}**. Para calibrar os horários permitidos e a abordagem, o público-alvo é **Pessoa Física (B2C)**, **Pessoa Jurídica / Empresas (B2B)** ou **Base Mista**?`;
+    suggestedReplies = ['Pessoa Física (B2C · CPF)', 'Pessoa Jurídica (B2B · Empresas)', 'Base Mista (CPF e CNPJ)'];
+  } else if (!hasMailing) {
+    missingInfo = 'MAILING';
+    reply = `Ótimo! Campanha de **${purposeTitle} (${audienceSegment})** pré-configurada com canais **${recommendedChannels.map((c) => CHANNEL_LABEL[c]).join(' → ')}** (${operatingStart} às ${operatingEnd}).\n\nAgora só falta vincular a **base de contatos (mailing)**. Selecione um mailing existente abaixo ou anexe um arquivo CSV:`;
+    suggestedReplies = ['Usar WhatsApp + Discador com até 3 tentativas', 'Apenas WhatsApp em horário comercial', 'Priorizar maiores valores primeiro'];
+  } else {
+    missingInfo = null;
+    reply = `Tudo pronto! Estruturei sua campanha **"${campaignName}"** vinculada à base **${body.selectedMailingName}** (${(body.selectedMailingCount ?? 0).toLocaleString('pt-BR')} contatos):\n• **Canais**: ${recommendedChannels.map((c) => CHANNEL_LABEL[c]).join(' → ')}\n• **Janela**: ${operatingStart} às ${operatingEnd} (até ${maxAttemptsPerContact} tentativas/contato)\n• **Ordenação**: ${extractedSort.label}\n\nDeseja ajustar algum filtro/horário ou já podemos avançar para a revisão final?`;
+    suggestedReplies = ['Alterar limite para 5 tentativas por contato', 'Priorizar maiores valores primeiro', 'Usar apenas WhatsApp e SMS'];
+  }
+
+  return {
+    reply,
+    provider: 'LOCAL_ASSISTANT',
+    model: 'voll-interactive-v2',
+    missingInfo,
+    readyToReview: Boolean(purposeCode && hasMailing),
+    suggestedReplies,
+    extracted: {
+      purposeCode: effectivePurpose,
+      audienceSegment: effectiveSegment,
+      campaignName,
+      description: allUserText.trim() || `${purposeTitle} (${effectiveSegment})`,
+      recommendedChannels,
+      operatingDays,
+      operatingStart,
+      operatingEnd,
+      maxAttemptsPerContact,
+      maxAcceptableCpcBrl: prev.maxAcceptableCpcBrl ?? 4.5,
+      extractedFilters,
+      extractedSort,
+      cadenceSummary,
+    },
+  };
 }

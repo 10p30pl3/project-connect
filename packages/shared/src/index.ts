@@ -710,3 +710,67 @@ export const PromoteLabToProductionSchema = z.object({
   reason: z.string().min(3, 'Informe o motivo da promoção para Produção').default('Ganhos estatísticos validados nas ondas do Modo Laboratório'),
 });
 
+// ==================================================================
+// ASSISTENTE DE IA CONVERSACIONAL (OPENAI API INTEGRATION)
+// ==================================================================
+export const AiChatMessageSchema = z.object({
+  role: z.enum(['user', 'assistant', 'system']),
+  content: z.string(),
+});
+export type AiChatMessage = z.infer<typeof AiChatMessageSchema>;
+
+export const AiCampaignExtractedFilterSchema = z.object({
+  field: z.string(),
+  op: z.enum(['gt', 'gte', 'lt', 'lte', 'eq', 'neq']),
+  value: z.union([z.string(), z.number(), z.boolean()]),
+  label: z.string(),
+});
+export type AiCampaignExtractedFilter = z.infer<typeof AiCampaignExtractedFilterSchema>;
+
+export const AiCampaignExtractedSortSchema = z.object({
+  field: z.string(),
+  dir: z.enum(['asc', 'desc']),
+  label: z.string(),
+});
+export type AiCampaignExtractedSort = z.infer<typeof AiCampaignExtractedSortSchema>;
+
+export const AiCampaignExtractedStateSchema = z.object({
+  purposeCode: z.enum(OPERATION_PURPOSES).nullable().optional(),
+  audienceSegment: z.enum(AUDIENCE_SEGMENTS).nullable().optional(),
+  campaignName: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  recommendedChannels: z.array(z.enum(CHANNEL_TYPES)).optional(),
+  operatingDays: z.array(z.number().int().min(0).max(6)).optional(),
+  operatingStart: z.string().optional(),
+  operatingEnd: z.string().optional(),
+  maxAttemptsPerContact: z.number().int().min(1).max(20).optional(),
+  maxAcceptableCpcBrl: z.number().min(0.05).max(100).optional(),
+  extractedFilters: z.array(AiCampaignExtractedFilterSchema).optional(),
+  extractedSort: AiCampaignExtractedSortSchema.optional(),
+  cadenceSummary: z.string().optional(),
+});
+export type AiCampaignExtractedState = z.infer<typeof AiCampaignExtractedStateSchema>;
+
+export const AiCampaignChatRequestSchema = z.object({
+  messages: z.array(AiChatMessageSchema).min(1),
+  currentState: AiCampaignExtractedStateSchema.optional(),
+  selectedMailingId: z.string().nullable().optional(),
+  selectedMailingName: z.string().nullable().optional(),
+  selectedMailingCount: z.number().nullable().optional(),
+  apiKey: z.string().optional(),
+  model: z.string().optional(),
+});
+export type AiCampaignChatRequest = z.infer<typeof AiCampaignChatRequestSchema>;
+
+export const AiCampaignChatResponseSchema = z.object({
+  reply: z.string(),
+  provider: z.enum(['OPENAI', 'LOCAL_ASSISTANT']),
+  model: z.string(),
+  missingInfo: z.enum(['PURPOSE', 'MAILING', 'AUDIENCE_SEGMENT', 'CHANNELS', 'SCHEDULE']).nullable(),
+  readyToReview: z.boolean(),
+  suggestedReplies: z.array(z.string()).default([]),
+  extracted: AiCampaignExtractedStateSchema,
+});
+export type AiCampaignChatResponse = z.infer<typeof AiCampaignChatResponseSchema>;
+
+

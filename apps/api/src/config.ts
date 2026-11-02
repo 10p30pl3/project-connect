@@ -11,4 +11,6 @@ export const config = {
   authDisabled: process.env.AUTH_DISABLED !== 'false' && process.env.NODE_ENV !== 'production',
   seedAdminEmail: process.env.SEED_ADMIN_EMAIL ?? 'admin@voll.local',
   seedAdminPassword: process.env.SEED_ADMIN_PASSWORD ?? 'Voll@2026',
+  openAiApiKey: process.env.OPENAI_API_KEY ?? '',
+  openAiModel: process.env.OPENAI_MODEL ?? 'gpt-4o-mini',
 };
