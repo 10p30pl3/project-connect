@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Archive, ArrowRight, Database, ListFilter, Megaphone, Pause, Play, Plus, Sparkles, Square, Users } from 'lucide-react';
+import { Archive, ArrowRight, Database, ListFilter, Megaphone, Pause, Play, Sparkles, Square, Users } from 'lucide-react';
 import { CAMPAIGN_STATUS, CAMPAIGN_STATUS_LABEL, type CampaignStatus } from '@voll/shared';
 import { errorMessage, get, post, qs } from '../lib/api';
 import type { CampaignSummary } from '../lib/types';
@@ -59,14 +59,6 @@ export function CampaignsPage() {
       <PageHeader
         title="Campanhas"
         tooltip="Gerencie campanhas ativas, pausadas e agendadas com controle em tempo real de réguas e estratégias."
-        actions={
-          can('campaigns.create') && (
-            <Link to="/campanhas/nova" className={btnClass('primary')}>
-              <Plus className="size-4" aria-hidden />
-              Nova campanha
-            </Link>
-          )
-        }
       />
 
       <div className="grid gap-3 sm:grid-cols-3">
