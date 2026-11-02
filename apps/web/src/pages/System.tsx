@@ -21,6 +21,7 @@ import {
   Button,
   Card,
   Field,
+  InfoTooltip,
   Input,
   PageHeader,
   Select,
@@ -176,7 +177,7 @@ export function SystemPage() {
     <div className="space-y-6 pb-12">
       <PageHeader
         title="Sistema"
-        subtitle="Configurações gerais da plataforma, credenciais da OpenAI API e parâmetros operacionais do Voll Connect."
+        tooltip="Configurações gerais da plataforma, credenciais da OpenAI API e parâmetros operacionais do Voll Connect."
       />
 
       {/* Grid Principal */}
@@ -190,6 +191,7 @@ export function SystemPage() {
                 <span>Integração com OpenAI API</span>
               </div>
             }
+            tooltip="Configure a chave de API da OpenAI para habilitar o motor GPT na criação interativa e estruturação inteligente de campanhas omnichannel."
             actions={
               isConfigured ? (
                 <Badge tone="green" icon={<CheckCircle2 className="size-3.5" />}>
@@ -200,18 +202,12 @@ export function SystemPage() {
               )
             }
           >
-            <p className="text-sm text-slate-600">
-              Configure sua chave de API pessoal ou corporativa da <strong>OpenAI</strong> para habilitar o
-              motor GPT avançado na criação interativa e estruturação inteligente de campanhas omnichannel.
-            </p>
-
-            <div className="mt-5 space-y-4">
+            <div className="space-y-4">
               {/* Campo API Key / Token */}
               <Field
-                label="OpenAI API Token (Chave Secreta)"
+                label="OpenAI API Token"
                 required
-                hint="Sua chave inicia com 'sk-...' e é armazenada com segurança no navegador e repassada às rotas de IA."
-                tooltip="Obtenha sua chave diretamente no painel da OpenAI em platform.openai.com"
+                tooltip="Chave secreta iniciada com 'sk-...'. Armazenada com segurança no navegador para acionamento das rotas de inteligência artificial. Obtenha em platform.openai.com."
               >
                 {(ids) => (
                   <div className="relative">
@@ -263,7 +259,7 @@ export function SystemPage() {
                 <Field
                   label="Modelo da OpenAI"
                   required
-                  hint="Modelo padrão utilizado para interpretação de objetivos e regras."
+                  tooltip="Modelo GPT utilizado pelo assistente interativo para interpretar objetivos, canais recomendados e regras de negócio da campanha."
                 >
                   {(ids) => (
                     <Select
@@ -281,8 +277,8 @@ export function SystemPage() {
                 </Field>
 
                 <Field
-                  label="Organization / Project ID (Opcional)"
-                  hint="Necessário apenas para contas corporativas com multi-organizações."
+                  label="Organization / Project ID"
+                  tooltip="Identificador corporativo opcional (org-... ou proj-...) para contas OpenAI com múltiplos projetos ou equipes."
                 >
                   {(ids) => (
                     <Input
@@ -366,33 +362,40 @@ export function SystemPage() {
             </div>
           </Card>
 
-          {/* Card de Informações e Ajuda */}
+          {/* Card de Privacidade e Segurança (100% no padrão tooltip (?)) */}
           <Card
             title={
               <div className="flex items-center gap-2">
                 <ShieldCheck className="size-5 text-emerald-600" />
-                <span>Privacidade, Segurança e Fallback Automático</span>
+                <span>Privacidade & Segurança</span>
               </div>
             }
+            tooltip="Políticas de retenção de credenciais, criptografia de tráfego e conformidade com a LGPD no processamento de inteligência artificial."
           >
-            <div className="space-y-3 text-sm text-slate-600 leading-relaxed">
-              <p>
-                • <strong>Segurança do Token:</strong> Sua chave de API é enviada via TLS criptografada e nunca
-                é compartilhada com outros clientes ou terceiros.
-              </p>
-              <p>
-                • <strong>Fallback Automático Inteligente:</strong> Caso ocorra indisponibilidade temporária na
-                OpenAI, limite de cota de requisições excedido ou falta de saldo, o sistema aciona de forma
-                transparente o <strong>Assistente Interativo Integrado Voll Connect</strong>, garantindo que
-                sua operação nunca pare.
-              </p>
-              <p>
-                • <strong>Criação Interativa em Tempo Real:</strong> Com o token ativo, ao navegar para a tela de{' '}
-                <a href="/campanhas/nova" className="font-medium text-brand-700 underline">
-                  Nova Campanha
-                </a>
-                , o assistente extrai automaticamente regras de canais, filtros de CPC, ordenação de mailing e horários.
-              </p>
+            <div className="divide-y divide-slate-100 text-sm">
+              <div className="py-2.5 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-1.5 text-slate-700 font-medium">
+                  <span>Criptografia de Credenciais</span>
+                  <InfoTooltip content="Sua chave de API é enviada via TLS criptografada e nunca é compartilhada com outros clientes ou terceiros." />
+                </div>
+                <Badge tone="green">TLS Ponta a Ponta</Badge>
+              </div>
+
+              <div className="py-2.5 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-1.5 text-slate-700 font-medium">
+                  <span>Fallback Automático</span>
+                  <InfoTooltip content="Caso ocorra indisponibilidade temporária na OpenAI, limite de cota excedido ou falta de saldo, o Assistente Interativo Integrado Voll Connect assume automaticamente sem interromper a operação." />
+                </div>
+                <Badge tone="blue">Motor Local Integrado</Badge>
+              </div>
+
+              <div className="py-2.5 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-1.5 text-slate-700 font-medium">
+                  <span>Conformidade com a LGPD</span>
+                  <InfoTooltip content="Nenhum dado pessoal sensível dos contatos é gravado ou utilizado para retreinar modelos públicos de terceiros." />
+                </div>
+                <Badge tone="green">LGPD Compliant</Badge>
+              </div>
             </div>
           </Card>
         </div>
@@ -406,22 +409,35 @@ export function SystemPage() {
                 <span>Status da Plataforma</span>
               </div>
             }
+            tooltip="Informações de versão do núcleo Voll Connect, fuso horário operacional e motor de inteligência artificial em execução."
           >
             <ul className="divide-y divide-slate-100 text-sm">
               <li className="py-2.5 flex items-center justify-between">
-                <span className="text-slate-600">Core Connect</span>
+                <div className="flex items-center gap-1 text-slate-600">
+                  <span>Core Connect</span>
+                  <InfoTooltip content="Versão estável do microsserviço de orquestração de campanhas e contatos." />
+                </div>
                 <span className="font-mono text-xs font-semibold text-slate-800">v2.4.0-omnichannel</span>
               </li>
               <li className="py-2.5 flex items-center justify-between">
-                <span className="text-slate-600">Ambiente</span>
+                <div className="flex items-center gap-1 text-slate-600">
+                  <span>Ambiente</span>
+                  <InfoTooltip content="Modo de execução do sistema com conectores operacionais." />
+                </div>
                 <Badge tone="blue">Operacional / Demonstração</Badge>
               </li>
               <li className="py-2.5 flex items-center justify-between">
-                <span className="text-slate-600">Fuso Horário Padrão</span>
+                <div className="flex items-center gap-1 text-slate-600">
+                  <span>Fuso Horário Padrão</span>
+                  <InfoTooltip content="Fuso horário de referência para cálculo das janelas operacionais de disparo." />
+                </div>
                 <span className="text-xs font-medium text-slate-700">America/Sao_Paulo (UTC-3)</span>
               </li>
               <li className="py-2.5 flex items-center justify-between">
-                <span className="text-slate-600">Motor de IA Ativo</span>
+                <div className="flex items-center gap-1 text-slate-600">
+                  <span>Motor de IA Ativo</span>
+                  <InfoTooltip content="Indica se as respostas interativas utilizam OpenAI GPT ou o Assistente Voll Integrado." />
+                </div>
                 <Badge tone={isConfigured ? 'green' : 'gray'}>
                   {isConfigured ? 'OpenAI GPT' : 'Motor Voll Integrado'}
                 </Badge>
@@ -448,22 +464,35 @@ export function SystemPage() {
                 <span>Conectores Operacionais</span>
               </div>
             }
+            tooltip="Status em tempo real das conexões de mensageria, telefonia e entregabilidade multicanal."
           >
             <div className="space-y-2.5 text-sm">
               <div className="flex items-center justify-between">
-                <span className="text-slate-600">WhatsApp Cloud API</span>
+                <div className="flex items-center gap-1 text-slate-600">
+                  <span>WhatsApp Cloud API</span>
+                  <InfoTooltip content="Conector oficial Meta Cloud API para envio de mensagens ativas e templates aprovados." />
+                </div>
                 <Badge tone="green">Ativo</Badge>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-600">Discador Preditivo & SIP</span>
+                <div className="flex items-center gap-1 text-slate-600">
+                  <span>Discador Preditivo & SIP</span>
+                  <InfoTooltip content="Tronco SIP com detecção de secretária eletrônica (AMD) e distribuição automática de chamadas." />
+                </div>
                 <Badge tone="green">Ativo</Badge>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-600">Gateway SMS</span>
+                <div className="flex items-center gap-1 text-slate-600">
+                  <span>Gateway SMS</span>
+                  <InfoTooltip content="Roteamento SMPP de alta vazão para mensagens de texto curtas." />
+                </div>
                 <Badge tone="green">Ativo</Badge>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-600">E-mail Transacional</span>
+                <div className="flex items-center gap-1 text-slate-600">
+                  <span>E-mail Transacional</span>
+                  <InfoTooltip content="Provedor SMTP/API com monitoramento de taxa de abertura e entregabilidade de faturas." />
+                </div>
                 <Badge tone="green">Ativo</Badge>
               </div>
             </div>

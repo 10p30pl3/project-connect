@@ -1276,13 +1276,11 @@ function UnifiedCampaignCreator({
                     <h2 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
                       <Sparkles className="size-4.5 text-brand-600" />
                       <span>Assistente de IA · Criação Interativa</span>
+                      <InfoTooltip content="Converse em linguagem natural. A IA extrai os parâmetros e pergunta apenas o que falta para montar sua campanha." />
                       <Badge tone={isOpenAiConfigured ? 'green' : 'brand'}>
                         {isOpenAiConfigured ? `OpenAI · ${aiStatusQ.data?.model || openAiModelInput}` : 'OpenAI Ready · Assistente Ativo'}
                       </Badge>
                     </h2>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Converse em linguagem natural. A IA extrai os parâmetros e pergunta apenas o que falta para montar sua campanha.
-                    </p>
                   </div>
 
                   <Button
@@ -3120,7 +3118,6 @@ function UnifiedCampaignCreator({
         open={openAiModalOpen}
         onOpenChange={setOpenAiModalOpen}
         title="Conectar API da OpenAI"
-        description="Configure sua chave da OpenAI (ou defina OPENAI_API_KEY no servidor) para habilitar o modelo GPT na criação interativa de campanhas."
         footer={
           <>
             <Button onClick={() => setOpenAiModalOpen(false)}>Cancelar</Button>
@@ -3133,7 +3130,7 @@ function UnifiedCampaignCreator({
         <div className="space-y-4">
           <Field
             label="OpenAI API Key (sk-...)"
-            hint="Sua chave é enviada com segurança ao endpoint /api/ai/campaign-chat. Se deixada em branco, o assistente interativo integrado da Voll Connect assume automaticamente."
+            tooltip="Configure sua chave da OpenAI para habilitar o modelo GPT na criação interativa. Sua chave é enviada com segurança ao endpoint /api/ai/campaign-chat. Se deixada em branco, o assistente interativo integrado assume automaticamente."
           >
             {(p) => (
               <Input
