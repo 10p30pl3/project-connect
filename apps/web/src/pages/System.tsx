@@ -14,6 +14,7 @@ import {
   Trash2,
   XCircle,
   Cpu,
+  Database,
 } from 'lucide-react';
 import { get, post, errorMessage } from '../lib/api';
 import {
@@ -73,6 +74,8 @@ export function SystemPage() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [isSeedingDemo, setIsSeedingDemo] = useState(false);
   const [testResult, setTestResult] = useState<AiTestResponse | null>(null);
 
   // Consulta do status atual do motor
@@ -170,6 +173,35 @@ export function SystemPage() {
       toast('info', 'Token da OpenAI removido. O sistema agora utiliza o assistente local integrado.');
     } catch (err) {
       toast('error', `Falha ao remover chave: ${errorMessage(err)}`);
+    }
+  };
+
+  const handleResetToZero = async () => {
+    if (!window.confirm('Tem certeza que deseja zerar a base de dados? Todos os contatos, mailings, listas, campanhas e tentativas serão removidos para iniciar do zero.')) {
+      return;
+    }
+    setIsResetting(true);
+    try {
+      await post('/system/reset');
+      await qc.invalidateQueries();
+      toast('success', 'Base de dados zerada com sucesso! Você está pronto para começar do zero.');
+    } catch (e) {
+      toast('error', errorMessage(e));
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  const handleSeedDemo = async () => {
+    setIsSeedingDemo(true);
+    try {
+      await post('/system/seed-demo');
+      await qc.invalidateQueries();
+      toast('success', 'Base de demonstração com 1.000 contatos carregada com sucesso.');
+    } catch (e) {
+      toast('error', errorMessage(e));
+    } finally {
+      setIsSeedingDemo(false);
     }
   };
 
@@ -395,6 +427,43 @@ export function SystemPage() {
                   <InfoTooltip content="Nenhum dado pessoal sensível dos contatos é gravado ou utilizado para retreinar modelos públicos de terceiros." />
                 </div>
                 <Badge tone="green">LGPD Compliant</Badge>
+              </div>
+            </div>
+          </Card>
+
+          {/* Gerenciamento da Base de Dados (Zerar ou Seed Demo) */}
+          <Card
+            title={
+              <div className="flex items-center gap-2">
+                <Database className="size-5 text-slate-700" />
+                <span>Gerenciamento da Base de Dados</span>
+              </div>
+            }
+            tooltip="Controle do estado dos dados do workspace: comece com a base zerada para importar seus próprios arquivos ou recarregue a base de demonstração."
+          >
+            <div className="space-y-3 text-sm">
+              <p className="text-slate-600 leading-relaxed">
+                Opere com a base totalmente limpa (0 contatos, 0 mailings, 0 campanhas) para subir seus próprios arquivos e testar a discagem real com o Tronco Direct Call, ou carregue dados de demonstração com 1.000 contatos fictícios para apresentações.
+              </p>
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+                <Button
+                  type="button"
+                  variant="danger"
+                  onClick={handleResetToZero}
+                  loading={isResetting}
+                  icon={<Trash2 className="size-4" />}
+                >
+                  Zerar base de dados (Começar do zero)
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleSeedDemo}
+                  loading={isSeedingDemo}
+                  icon={<RefreshCw className={`size-4 ${isSeedingDemo ? 'animate-spin' : ''}`} />}
+                >
+                  Carregar base demo (1.000 contatos)
+                </Button>
               </div>
             </div>
           </Card>

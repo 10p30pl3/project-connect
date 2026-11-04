@@ -81,8 +81,17 @@ export function ContactsSection() {
                 <tbody>
                   {data.data!.items.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="py-6 text-center text-slate-500">
-                        Nenhum contato encontrado.
+                      <td colSpan={8} className="py-10 text-center text-slate-500">
+                        <div className="mx-auto max-w-sm space-y-2">
+                          <p className="font-semibold text-slate-800">Nenhum contato no Golden Record</p>
+                          <p className="text-xs text-slate-500">
+                            A base de dados está limpa. Importe um arquivo CSV em{' '}
+                            <Link to="/mailings/importar" className="text-brand-700 underline font-medium">
+                              Mailings
+                            </Link>{' '}
+                            ou cadastre um novo contato manualmente.
+                          </p>
+                        </div>
                       </td>
                     </tr>
                   )}

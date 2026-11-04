@@ -305,284 +305,323 @@ const HUBS = [
 
 const AGES = [21, 23, 28, 31, 34, 38, 42, 49, 54, 63, 68, 74];
 
-const CONTACTS: FullContact[] = Array.from({ length: 1000 }, (_, idx) => {
-  const i = idx + 1;
-  const id = uuid(100 + i);
-  const externalId = String(i).padStart(6, '0');
-  const fn = FIRST_NAMES[i % FIRST_NAMES.length];
-  const ln1 = LAST_NAMES[(i * 3) % LAST_NAMES.length];
-  const ln2 = LAST_NAMES[(i * 7 + 1) % LAST_NAMES.length];
-  const name = `${fn} ${ln1} ${ln2}`;
-  const hub = HUBS[i % HUBS.length];
-  const age = AGES[i % AGES.length];
+let CONTACTS: FullContact[] = [];
+const MAILING_ID = uuid(60);
+const MAILING_VER_ID = uuid(61);
+const LIST_ID = uuid(70);
+const LIST_VER_ID = uuid(71);
+const CAMPAIGN_1_ID = uuid(80);
+const CAMPAIGN_2_ID = uuid(81);
+const CAMPAIGN_3_ID = uuid(82);
 
-  let intent = 'P2_HIBRIDO_DIGITAL_VOZ';
-  if (age < 25) intent = i % 3 === 0 ? 'P1_ALTA_PROPENSAO_VOZ' : 'P3_DIGITAL_FIRST';
-  else if (age < 35) intent = i % 2 === 0 ? 'P1_ALTA_PROPENSAO_VOZ' : 'P2_HIBRIDO_DIGITAL_VOZ';
-  else if (age < 60) intent = i % 3 === 0 ? 'P2_HIBRIDO_DIGITAL_VOZ' : 'P1_ALTA_PROPENSAO_VOZ';
-  else intent = 'P1_ALTA_PROPENSAO_VOZ';
+let MAILINGS: { detail: MailingDetail; records: MailingRecord[] }[] = [];
+let LISTS: ListDetail[] = [];
+let CAMPAIGNS: CampaignDetail[] = [];
+const ATTEMPTS: Map<string, AttemptDetail> = new Map();
+let CONTROL: Control = { dailyLimit: null, totalLimit: null, globalSuspension: false };
+let AUDITS: AuditRow[] = [];
+let DRAFT: DraftEnvelope = null;
 
-  const numPart = String(80000000 + ((i * 179) % 19999999)).slice(0, 8);
-  const phoneRaw = `55${hub.ddd}9${numPart}`;
-  const phoneMasked = `(${hub.ddd}) 9${numPart.slice(0, 4)}-${numPart.slice(4)}`;
+export function resetDatabaseToZero() {
+  CONTACTS = [];
+  MAILINGS = [];
+  LISTS = [];
+  CAMPAIGNS = [];
+  ATTEMPTS.clear();
+  AUDITS = [];
+  DRAFT = null;
+}
 
-  const destinations: Destination[] = [
+function generateSampleContacts(): FullContact[] {
+  return Array.from({ length: 1000 }, (_, idx) => {
+    const i = idx + 1;
+    const id = uuid(100 + i);
+    const externalId = String(i).padStart(6, '0');
+    const fn = FIRST_NAMES[i % FIRST_NAMES.length];
+    const ln1 = LAST_NAMES[(i * 3) % LAST_NAMES.length];
+    const ln2 = LAST_NAMES[(i * 7 + 1) % LAST_NAMES.length];
+    const name = `${fn} ${ln1} ${ln2}`;
+    const hub = HUBS[i % HUBS.length];
+    const age = AGES[i % AGES.length];
+
+    let intent = 'P2_HIBRIDO_DIGITAL_VOZ';
+    if (age < 25) intent = i % 3 === 0 ? 'P1_ALTA_PROPENSAO_VOZ' : 'P3_DIGITAL_FIRST';
+    else if (age < 35) intent = i % 2 === 0 ? 'P1_ALTA_PROPENSAO_VOZ' : 'P2_HIBRIDO_DIGITAL_VOZ';
+    else if (age < 60) intent = i % 3 === 0 ? 'P2_HIBRIDO_DIGITAL_VOZ' : 'P1_ALTA_PROPENSAO_VOZ';
+    else intent = 'P1_ALTA_PROPENSAO_VOZ';
+
+    const numPart = String(80000000 + ((i * 179) % 19999999)).slice(0, 8);
+    const phoneRaw = `55${hub.ddd}9${numPart}`;
+    const phoneMasked = `(${hub.ddd}) 9${numPart.slice(0, 4)}-${numPart.slice(4)}`;
+
+    const destinations: Destination[] = [
+      {
+        id: uuid(2000 + i * 4 + 1),
+        channelType: 'VOICE',
+        address: phoneRaw,
+        addressMasked: phoneMasked,
+        label: 'Telefone Principal',
+        priority: 1,
+        valid: true,
+        blocked: false,
+      },
+    ];
+
+    if (age >= 60 && i % 2 === 0) {
+      const fixedNum = String(2000000 + ((i * 83) % 799999)).slice(0, 3) + String(i * 10).slice(0, 4).padStart(4, '0');
+      const fixedRaw = `55${hub.ddd}3${fixedNum}`;
+      const fixedMasked = `(${hub.ddd}) 3${fixedNum.slice(0, 3)}-${fixedNum.slice(3)}`;
+      destinations.push({
+        id: uuid(2000 + i * 4 + 2),
+        channelType: 'VOICE',
+        address: fixedRaw,
+        addressMasked: fixedMasked,
+        label: 'Telefone Fixo Residencial',
+        priority: 2,
+        valid: true,
+        blocked: false,
+      });
+    }
+
+    if (age < 60 || i % 3 !== 0) {
+      destinations.push({
+        id: uuid(2000 + i * 4 + 3),
+        channelType: 'WHATSAPP',
+        address: phoneRaw,
+        addressMasked: phoneMasked,
+        label: 'WhatsApp Verificado',
+        priority: 1,
+        valid: true,
+        blocked: false,
+      });
+    }
+
+    if (i % 4 !== 0) {
+      const email = `${fn.toLowerCase()}.${ln1.toLowerCase()}${i}@exemplo.com.br`;
+      destinations.push({
+        id: uuid(2000 + i * 4 + 4),
+        channelType: 'EMAIL',
+        address: email,
+        addressMasked: email.replace(/(.{2})(.*)(@.*)/, '$1***$3'),
+        label: 'E-mail Titular',
+        priority: 3,
+        valid: true,
+        blocked: false,
+      });
+    }
+
+    const isDnc = i === 11 || i % 59 === 0;
+    const blocks: Block[] = isDnc
+      ? [
+          {
+            id: uuid(5000 + i),
+            scope: 'CONTACT',
+            destinationId: null,
+            reason: 'Bloqueio Procon / Não Me Perturbe (DNC Nacional)',
+            origin: 'MANUAL',
+            createdAt: '2026-10-18T14:20:00Z',
+            revokedAt: null,
+          },
+        ]
+      : [];
+
+    const debt = Number((180 + ((i * 233) % 7800)).toFixed(2));
+    const overdue = 15 + ((i * 13) % 165);
+    const score = 320 + ((i * 37) % 580);
+
+    return {
+      id,
+      externalId,
+      name,
+      attributes: {
+        cidade: hub.city,
+        uf: hub.uf,
+        idade: age,
+        valor_divida: debt,
+        dias_atraso: overdue,
+        ddd: hub.ddd,
+        score,
+        phone_intent: intent,
+      },
+      historyTotal: i % 5 === 0 ? null : (i * 2) % 6,
+      historyReferenceDate: i % 5 === 0 ? null : '2026-10-20',
+      destinations,
+      blocks,
+    };
+  });
+}
+
+export function seedSampleDemoData() {
+  resetDatabaseToZero();
+  CONTACTS = generateSampleContacts();
+
+  MAILINGS = [
     {
-      id: uuid(2000 + i * 4 + 1),
-      channelType: 'VOICE',
-      address: phoneRaw,
-      addressMasked: phoneMasked,
-      label: 'Telefone Principal',
-      priority: 1,
-      valid: true,
-      blocked: false,
+      detail: {
+        id: MAILING_ID,
+        name: 'Mailing Piloto 1.000 Contatos (Inteligência de CPC)',
+        createdAt: '2026-10-18T12:00:00Z',
+        recordCount: CONTACTS.length,
+        columns: ['cidade', 'uf', 'idade', 'valor_divida', 'dias_atraso', 'score', 'phone_intent'],
+        versions: [
+          {
+            id: MAILING_VER_ID,
+            version: 1,
+            totalRows: CONTACTS.length + 5,
+            validRows: CONTACTS.length,
+            rejectedRows: 5,
+            createdAt: '2026-10-18T12:00:00Z',
+          },
+        ],
+      },
+      records: CONTACTS.map((c, idx) => ({
+        id: uuid(350 + idx),
+        rowNumber: idx + 2,
+        contactId: c.id,
+        externalId: c.externalId,
+        name: c.name,
+        fields: c.attributes,
+        blocked: c.blocks.some((b) => !b.revokedAt && b.scope === 'CONTACT'),
+      })),
     },
   ];
 
-  if (age >= 60 && i % 2 === 0) {
-    const fixedNum = String(2000000 + ((i * 83) % 799999)).slice(0, 3) + String(i * 10).slice(0, 4).padStart(4, '0');
-    const fixedRaw = `55${hub.ddd}3${fixedNum}`;
-    const fixedMasked = `(${hub.ddd}) 3${fixedNum.slice(0, 3)}-${fixedNum.slice(3)}`;
-    destinations.push({
-      id: uuid(2000 + i * 4 + 2),
-      channelType: 'VOICE',
-      address: fixedRaw,
-      addressMasked: fixedMasked,
-      label: 'Telefone Fixo Residencial',
-      priority: 2,
-      valid: true,
-      blocked: false,
-    });
-  }
-
-  if (age < 60 || i % 3 !== 0) {
-    destinations.push({
-      id: uuid(2000 + i * 4 + 3),
-      channelType: 'WHATSAPP',
-      address: phoneRaw,
-      addressMasked: phoneMasked,
-      label: 'WhatsApp Verificado',
-      priority: 1,
-      valid: true,
-      blocked: false,
-    });
-  }
-
-  if (i % 4 !== 0) {
-    const email = `${fn.toLowerCase()}.${ln1.toLowerCase()}${i}@exemplo.com.br`;
-    destinations.push({
-      id: uuid(2000 + i * 4 + 4),
-      channelType: 'EMAIL',
-      address: email,
-      addressMasked: email.replace(/(.{2})(.*)(@.*)/, '$1***$3'),
-      label: 'E-mail Titular',
-      priority: 3,
-      valid: true,
-      blocked: false,
-    });
-  }
-
-  const isDnc = i === 11 || i % 59 === 0;
-  const blocks: Block[] = isDnc
-    ? [
-        {
-          id: uuid(5000 + i),
-          scope: 'CONTACT',
-          destinationId: null,
-          reason: 'Bloqueio Procon / Não Me Perturbe (DNC Nacional)',
-          origin: 'MANUAL',
-          createdAt: '2026-10-18T14:20:00Z',
-          revokedAt: null,
-        },
-      ]
-    : [];
-
-  const debt = Number((180 + ((i * 233) % 7800)).toFixed(2));
-  const overdue = 15 + ((i * 13) % 165);
-  const score = 320 + ((i * 37) % 580);
-
-  return {
-    id,
-    externalId,
-    name,
-    attributes: {
-      cidade: hub.city,
-      uf: hub.uf,
-      idade: age,
-      valor_divida: debt,
-      dias_atraso: overdue,
-      ddd: hub.ddd,
-      score,
-      phone_intent: intent,
-    },
-    historyTotal: i % 5 === 0 ? null : (i * 2) % 6,
-    historyReferenceDate: i % 5 === 0 ? null : '2026-10-20',
-    destinations,
-    blocks,
-  };
-});
-
-const MAILING_ID = uuid(60);
-const MAILING_VER_ID = uuid(61);
-
-const MAILINGS: { detail: MailingDetail; records: MailingRecord[] }[] = [
-  {
-    detail: {
-      id: MAILING_ID,
-      name: 'Mailing Piloto 1.000 Contatos (Inteligência de CPC)',
-      createdAt: '2026-10-18T12:00:00Z',
-      recordCount: CONTACTS.length,
-      columns: ['cidade', 'uf', 'idade', 'valor_divida', 'dias_atraso', 'score', 'phone_intent'],
-      versions: [
-        {
-          id: MAILING_VER_ID,
-          version: 1,
-          totalRows: CONTACTS.length + 5,
-          validRows: CONTACTS.length,
-          rejectedRows: 5,
-          createdAt: '2026-10-18T12:00:00Z',
-        },
-      ],
-    },
-    records: CONTACTS.map((c, idx) => ({
-      id: uuid(350 + idx),
-      rowNumber: idx + 2,
-      contactId: c.id,
-      externalId: c.externalId,
-      name: c.name,
-      fields: c.attributes,
-      blocked: c.blocks.some((b) => !b.revokedAt && b.scope === 'CONTACT'),
-    })),
-  },
-];
-
-const LIST_ID = uuid(70);
-const LIST_VER_ID = uuid(71);
-
-const LISTS: ListDetail[] = [
-  {
-    id: LIST_ID,
-    name: 'Atraso > 30 dias (Faixa Prioritária 680 Contatos)',
-    mailing: { id: MAILING_ID, name: 'Mailing Piloto 1.000 Contatos (Inteligência de CPC)' },
-    latestVersion: {
-      id: LIST_VER_ID,
-      version: 1,
-      membershipMode: 'SNAPSHOT',
-      memberCount: 680,
-      publishedAt: '2026-10-19T09:30:00Z',
-    },
-    versions: [
-      {
+  LISTS = [
+    {
+      id: LIST_ID,
+      name: 'Atraso > 30 dias (Faixa Prioritária 680 Contatos)',
+      mailing: { id: MAILING_ID, name: 'Mailing Piloto 1.000 Contatos (Inteligência de CPC)' },
+      latestVersion: {
         id: LIST_VER_ID,
         version: 1,
         membershipMode: 'SNAPSHOT',
         memberCount: 680,
         publishedAt: '2026-10-19T09:30:00Z',
-        filters: [{ field: 'dias_atraso', op: 'gt', value: 30 }],
-        sort: [{ field: 'valor_divida', dir: 'desc' }],
       },
-    ],
-  },
-];
+      versions: [
+        {
+          id: LIST_VER_ID,
+          version: 1,
+          membershipMode: 'SNAPSHOT',
+          memberCount: 680,
+          publishedAt: '2026-10-19T09:30:00Z',
+          filters: [{ field: 'dias_atraso', op: 'gt', value: 30 }],
+          sort: [{ field: 'valor_divida', dir: 'desc' }],
+        },
+      ],
+    },
+  ];
 
-const CAMPAIGN_1_ID = uuid(80);
-const CAMPAIGN_2_ID = uuid(81);
-const CAMPAIGN_3_ID = uuid(82);
+  CAMPAIGNS = [
+    {
+      id: CAMPAIGN_1_ID,
+      name: 'Cobrança Outubro — Faixa 30+ dias (1.000 Contatos)',
+      purposeCode: 'COBRANCA',
+      description: 'Acionamento multicanal inteligente (WhatsApp + Discador) com foco em recuperação amigável e PIX.',
+      status: 'RUNNING',
+      statusLabel: CAMPAIGN_STATUS_LABEL.RUNNING,
+      operationalState: 'PROCESSING',
+      operationalExplanation: 'Processando: ondas automáticas e distribuição inteligente dentro da janela operacional.',
+      audience: { type: 'MAILING', name: 'Mailing Piloto 1.000 Contatos (Inteligência de CPC)' },
+      journeyName: 'WhatsApp → Discador',
+      strategyName: 'Demonstração 24x7',
+      strategyVersion: 1,
+      createdAt: '2026-10-20T10:00:00Z',
+      startedAt: '2026-10-20T10:05:00Z',
+      scheduledAt: null,
+      progress: { members: 1000, finished: 180, active: 820 },
+      mailing: { id: MAILING_ID, name: 'Mailing Piloto 1.000 Contatos (Inteligência de CPC)' },
+      listVersion: null,
+      journey: {
+        id: JOURNEYS[1].id,
+        version: 1,
+        steps: JOURNEYS[1].latestVersion!.steps,
+      },
+      strategy: {
+        id: STRATEGIES[2].id,
+        version: 1,
+        config: STRATEGIES[2].latestVersion!.config,
+      },
+    },
+    {
+      id: CAMPAIGN_2_ID,
+      name: 'Venda Ativa — Oferta Fibra & Celular (800 Contatos)',
+      purposeCode: 'VENDAS',
+      description: 'Campanha de expansão comercial e upgrade de velocidade com WhatsApp interativo e discagem consultiva.',
+      status: 'RUNNING',
+      statusLabel: CAMPAIGN_STATUS_LABEL.RUNNING,
+      operationalState: 'PROCESSING',
+      operationalExplanation: 'Processando: acionamentos prioritários em janelas de receptividade (almoço e fim de tarde).',
+      audience: { type: 'MAILING', name: 'Mailing Piloto 1.000 Contatos (Inteligência de CPC)' },
+      journeyName: 'WhatsApp → Discador',
+      strategyName: 'Demonstração 24x7',
+      strategyVersion: 1,
+      createdAt: '2026-10-21T09:00:00Z',
+      startedAt: '2026-10-21T09:15:00Z',
+      scheduledAt: null,
+      progress: { members: 800, finished: 240, active: 560 },
+      mailing: { id: MAILING_ID, name: 'Mailing Piloto 1.000 Contatos (Inteligência de CPC)' },
+      listVersion: null,
+      journey: {
+        id: JOURNEYS[1].id,
+        version: 1,
+        steps: JOURNEYS[1].latestVersion!.steps,
+      },
+      strategy: {
+        id: STRATEGIES[2].id,
+        version: 1,
+        config: STRATEGIES[2].latestVersion!.config,
+      },
+    },
+    {
+      id: CAMPAIGN_3_ID,
+      name: 'Confirmação de Agendamentos — Lembretes D-1 e D-0 (600 Contatos)',
+      purposeCode: 'AGENDAMENTOS',
+      description: 'Redução de no-show: Lembrete 1 dia antes (D-1 com botões de confirmação) e no dia (D-0 informativo 2h antes).',
+      status: 'RUNNING',
+      statusLabel: CAMPAIGN_STATUS_LABEL.RUNNING,
+      operationalState: 'PROCESSING',
+      operationalExplanation: 'Cadência ativa: lembretes de véspera (D-1) e do dia (D-0) sincronizados com as datas de agendamento.',
+      audience: { type: 'MAILING', name: 'Mailing Piloto 1.000 Contatos (Inteligência de CPC)' },
+      journeyName: 'WhatsApp Prioritário',
+      strategyName: 'Demonstração 24x7',
+      strategyVersion: 1,
+      createdAt: '2026-10-22T08:00:00Z',
+      startedAt: '2026-10-22T08:10:00Z',
+      scheduledAt: null,
+      progress: { members: 600, finished: 390, active: 210 },
+      mailing: { id: MAILING_ID, name: 'Mailing Piloto 1.000 Contatos (Inteligência de CPC)' },
+      listVersion: null,
+      journey: {
+        id: JOURNEYS[1].id,
+        version: 1,
+        steps: JOURNEYS[1].latestVersion!.steps,
+      },
+      strategy: {
+        id: STRATEGIES[2].id,
+        version: 1,
+        config: STRATEGIES[2].latestVersion!.config,
+      },
+    },
+  ];
 
-const CAMPAIGNS: CampaignDetail[] = [
-  {
-    id: CAMPAIGN_1_ID,
-    name: 'Cobrança Outubro — Faixa 30+ dias (1.000 Contatos)',
-    purposeCode: 'COBRANCA',
-    description: 'Acionamento multicanal inteligente (WhatsApp + Discador) com foco em recuperação amigável e PIX.',
-    status: 'RUNNING',
-    statusLabel: CAMPAIGN_STATUS_LABEL.RUNNING,
-    operationalState: 'PROCESSING',
-    operationalExplanation: 'Processando: ondas automáticas e distribuição inteligente dentro da janela operacional.',
-    audience: { type: 'MAILING', name: 'Mailing Piloto 1.000 Contatos (Inteligência de CPC)' },
-    journeyName: 'WhatsApp → Discador',
-    strategyName: 'Demonstração 24x7',
-    strategyVersion: 1,
-    createdAt: '2026-10-20T10:00:00Z',
-    startedAt: '2026-10-20T10:05:00Z',
-    scheduledAt: null,
-    progress: { members: 1000, finished: 180, active: 820 },
-    mailing: { id: MAILING_ID, name: 'Mailing Piloto 1.000 Contatos (Inteligência de CPC)' },
-    listVersion: null,
-    journey: {
-      id: JOURNEYS[1].id,
-      version: 1,
-      steps: JOURNEYS[1].latestVersion!.steps,
-    },
-    strategy: {
-      id: STRATEGIES[2].id,
-      version: 1,
-      config: STRATEGIES[2].latestVersion!.config,
-    },
-  },
-  {
-    id: CAMPAIGN_2_ID,
-    name: 'Venda Ativa — Oferta Fibra & Celular (800 Contatos)',
-    purposeCode: 'VENDAS',
-    description: 'Campanha de expansão comercial e upgrade de velocidade com WhatsApp interativo e discagem consultiva.',
-    status: 'RUNNING',
-    statusLabel: CAMPAIGN_STATUS_LABEL.RUNNING,
-    operationalState: 'PROCESSING',
-    operationalExplanation: 'Processando: acionamentos prioritários em janelas de receptividade (almoço e fim de tarde).',
-    audience: { type: 'MAILING', name: 'Mailing Piloto 1.000 Contatos (Inteligência de CPC)' },
-    journeyName: 'WhatsApp → Discador',
-    strategyName: 'Demonstração 24x7',
-    strategyVersion: 1,
-    createdAt: '2026-10-21T09:00:00Z',
-    startedAt: '2026-10-21T09:15:00Z',
-    scheduledAt: null,
-    progress: { members: 800, finished: 240, active: 560 },
-    mailing: { id: MAILING_ID, name: 'Mailing Piloto 1.000 Contatos (Inteligência de CPC)' },
-    listVersion: null,
-    journey: {
-      id: JOURNEYS[1].id,
-      version: 1,
-      steps: JOURNEYS[1].latestVersion!.steps,
-    },
-    strategy: {
-      id: STRATEGIES[2].id,
-      version: 1,
-      config: STRATEGIES[2].latestVersion!.config,
-    },
-  },
-  {
-    id: CAMPAIGN_3_ID,
-    name: 'Confirmação de Agendamentos — Lembretes D-1 e D-0 (600 Contatos)',
-    purposeCode: 'AGENDAMENTOS',
-    description: 'Redução de no-show: Lembrete 1 dia antes (D-1 com botões de confirmação) e no dia (D-0 informativo 2h antes).',
-    status: 'RUNNING',
-    statusLabel: CAMPAIGN_STATUS_LABEL.RUNNING,
-    operationalState: 'PROCESSING',
-    operationalExplanation: 'Cadência ativa: lembretes de véspera (D-1) e do dia (D-0) sincronizados com as datas de agendamento.',
-    audience: { type: 'MAILING', name: 'Mailing Piloto 1.000 Contatos (Inteligência de CPC)' },
-    journeyName: 'WhatsApp Prioritário',
-    strategyName: 'Demonstração 24x7',
-    strategyVersion: 1,
-    createdAt: '2026-10-22T08:00:00Z',
-    startedAt: '2026-10-22T08:10:00Z',
-    scheduledAt: null,
-    progress: { members: 600, finished: 390, active: 210 },
-    mailing: { id: MAILING_ID, name: 'Mailing Piloto 1.000 Contatos (Inteligência de CPC)' },
-    listVersion: null,
-    journey: {
-      id: JOURNEYS[1].id,
-      version: 1,
-      steps: JOURNEYS[1].latestVersion!.steps,
-    },
-    strategy: {
-      id: STRATEGIES[2].id,
-      version: 1,
-      config: STRATEGIES[2].latestVersion!.config,
-    },
-  },
-];
+  seedAttempts();
 
-const ATTEMPTS: Map<string, AttemptDetail> = new Map();
+  AUDITS = [
+    {
+      id: 1,
+      at: '2026-10-20T10:05:00Z',
+      user: { name: 'Ricardo (Voll Solutions)' },
+      action: 'campaign.start',
+      entity: 'campaign',
+      entityId: CAMPAIGN_1_ID,
+      reason: 'Início imediato na criação',
+      before: { status: 'READY' },
+      after: { status: 'RUNNING' },
+    },
+  ];
+}
+
 function seedAttempts() {
   const specs: {
     id: string;
@@ -608,6 +647,7 @@ function seedAttempts() {
 
   for (const s of specs) {
     const c = CONTACTS[s.contactIdx];
+    if (!c) continue;
     const dest = c.destinations[0];
     const tab = s.tabCode ? TABULATIONS.find((t) => t.code === s.tabCode) ?? null : null;
     const now = new Date(Date.now() - (410 - Number(s.id.slice(-3))) * 600_000).toISOString();
@@ -676,7 +716,7 @@ function seedAttempts() {
         contact: { id: c.id, externalId: c.externalId, name: c.name },
         channelType: s.channel,
         connectionName: s.connName,
-        destinationMasked: dest.addressMasked,
+        destinationMasked: dest ? dest.addressMasked : '—',
         stage: 0,
         state: s.state,
         stateLabel: ATTEMPT_STATE_LABEL[s.state],
@@ -712,24 +752,6 @@ function seedAttempts() {
     });
   }
 }
-seedAttempts();
-
-let CONTROL: Control = { dailyLimit: null, totalLimit: null, globalSuspension: false };
-const AUDITS: AuditRow[] = [
-  {
-    id: 1,
-    at: '2026-10-20T10:05:00Z',
-    user: { name: 'Ricardo (Voll Solutions)' },
-    action: 'campaign.start',
-    entity: 'campaign',
-    entityId: CAMPAIGN_1_ID,
-    reason: 'Início imediato na criação',
-    before: { status: 'READY' },
-    after: { status: 'RUNNING' },
-  },
-];
-
-let DRAFT: DraftEnvelope = null;
 
 function currentRole(headers: Record<string, string>): Role {
   const h = (headers['X-Demo-Role'] || headers['x-demo-role'] || '').toUpperCase();
@@ -869,36 +891,38 @@ export async function handleMockApi<T = unknown>(
     const workingRecords = attempts.filter((a) => ['RESERVED', 'SENT', 'AWAITING_FEEDBACK', 'RECONCILIATION'].includes(a.state));
     const workingContactIds = new Set(workingRecords.map((a) => a.contact.id));
     const activeCamp = CAMPAIGNS.find((c) => c.status === 'RUNNING') ?? CAMPAIGNS[0];
-    const queueCandidates = CONTACTS.filter(
-      (c) => !workingContactIds.has(c.id) && !c.blocks.some((b) => !b.revokedAt),
-    ).slice(0, 8);
+    const queueCandidates = activeCamp
+      ? CONTACTS.filter((c) => !workingContactIds.has(c.id) && !c.blocks.some((b) => !b.revokedAt)).slice(0, 8)
+      : [];
 
-    const nextInQueue = queueCandidates.map((c, idx) => {
-      const hasWa = c.destinations.some((d) => d.channelType === 'WHATSAPP');
-      const channelType: ChannelType = idx % 2 === 0 && hasWa ? 'WHATSAPP' : 'VOICE';
-      const dest = c.destinations.find((d) => d.channelType === channelType) ?? c.destinations[0];
-      const eligibleNow = idx < 5 && !CONTROL.globalSuspension;
-      return {
-        enrollmentId: uuid(650 + idx),
-        position: idx + 1,
-        contact: { id: c.id, externalId: c.externalId, name: c.name },
-        campaign: { id: activeCamp.id, name: activeCamp.name },
-        audienceName: activeCamp.audience.name,
-        stage: idx < 4 ? 0 : 1,
-        channelType,
-        destinationMasked: dest?.addressMasked ?? '—',
-        counters: {
-          total: c.historyTotal !== null ? c.historyTotal + (idx % 2) : null,
-          today: idx % 2,
-          totalLimit: activeCamp.strategy.config.limits.total,
-          dailyLimit: activeCamp.strategy.config.limits.daily,
-        },
-        nextEligibleAt: eligibleNow
-          ? new Date().toISOString()
-          : new Date(Date.now() + (idx + 1) * 420_000).toISOString(),
-        eligibleNow,
-      };
-    });
+    const nextInQueue = activeCamp
+      ? queueCandidates.map((c, idx) => {
+          const hasWa = c.destinations.some((d) => d.channelType === 'WHATSAPP');
+          const channelType: ChannelType = idx % 2 === 0 && hasWa ? 'WHATSAPP' : 'VOICE';
+          const dest = c.destinations.find((d) => d.channelType === channelType) ?? c.destinations[0];
+          const eligibleNow = idx < 5 && !CONTROL.globalSuspension;
+          return {
+            enrollmentId: uuid(650 + idx),
+            position: idx + 1,
+            contact: { id: c.id, externalId: c.externalId, name: c.name },
+            campaign: { id: activeCamp.id, name: activeCamp.name },
+            audienceName: activeCamp.audience?.name ?? 'Mailing',
+            stage: idx < 4 ? 0 : 1,
+            channelType,
+            destinationMasked: dest?.addressMasked ?? '—',
+            counters: {
+              total: c.historyTotal !== null ? c.historyTotal + (idx % 2) : null,
+              today: idx % 2,
+              totalLimit: activeCamp.strategy.config.limits.total,
+              dailyLimit: activeCamp.strategy.config.limits.daily,
+            },
+            nextEligibleAt: eligibleNow
+              ? new Date().toISOString()
+              : new Date(Date.now() + (idx + 1) * 420_000).toISOString(),
+            eligibleNow,
+          };
+        })
+      : [];
 
     const ov: Overview = {
       campaigns: {
@@ -1073,12 +1097,14 @@ export async function handleMockApi<T = unknown>(
   }
   const mailingMatch = pathname.match(/^\/mailings\/([^/]+)$/);
   if (mailingMatch && method === 'GET') {
-    const found = MAILINGS.find((m) => m.detail.id === mailingMatch[1]) ?? MAILINGS[0];
+    const found = MAILINGS.find((m) => m.detail.id === mailingMatch[1]);
+    if (!found) throw new ApiError({ type: 'not_found', title: 'Mailing não encontrado', status: 404 });
     return found.detail as T;
   }
   const mailingRecsMatch = pathname.match(/^\/mailings\/([^/]+)\/records$/);
   if (mailingRecsMatch && method === 'GET') {
-    const found = MAILINGS.find((m) => m.detail.id === mailingRecsMatch[1]) ?? MAILINGS[0];
+    const found = MAILINGS.find((m) => m.detail.id === mailingRecsMatch[1]);
+    if (!found) return { items: [], nextCursor: null, total: 0 } as T;
     const q = (searchParams.get('q') ?? '').toLowerCase();
     const items = found.records.filter(
       (r) => !q || r.externalId.toLowerCase().includes(q) || (r.name ?? '').toLowerCase().includes(q),
@@ -1097,15 +1123,122 @@ export async function handleMockApi<T = unknown>(
     const verId = nextUuid();
     const now = new Date().toISOString();
     const validRows = prev.rows.filter((r) => r.errors.length === 0);
-    const records: MailingRecord[] = validRows.map((r, idx) => ({
-      id: nextUuid(),
-      rowNumber: r.rowNumber,
-      contactId: CONTACTS[idx % CONTACTS.length].id,
-      externalId: Object.values(r.values)[0] || String(idx + 1).padStart(4, '0'),
-      name: Object.values(r.values)[1] || `Cliente ${idx + 1}`,
-      fields: r.values,
-      blocked: false,
-    }));
+    const records: MailingRecord[] = validRows.map((r, idx) => {
+      const extId =
+        r.values['id'] ||
+        r.values['external_id'] ||
+        r.values['externalId'] ||
+        r.values['cpf'] ||
+        r.values['contrato'] ||
+        Object.values(r.values)[0] ||
+        String(idx + 1).padStart(4, '0');
+
+      const name =
+        r.values['nome'] ||
+        r.values['name'] ||
+        r.values['cliente'] ||
+        Object.values(r.values)[1] ||
+        `Contato ${extId}`;
+
+      const rawPhone =
+        r.values['telefone'] ||
+        r.values['telefone1'] ||
+        r.values['phone'] ||
+        r.values['phone1'] ||
+        r.values['celular'] ||
+        r.values['fone'] ||
+        Object.values(r.values).find((v) => String(v).replace(/\D/g, '').length >= 10);
+
+      const rawWa =
+        r.values['whatsapp'] ||
+        r.values['whatsapp1'] ||
+        r.values['whats'] ||
+        r.values['zap'] ||
+        rawPhone;
+
+      const rawEmail =
+        r.values['email'] ||
+        r.values['e-mail'] ||
+        Object.values(r.values).find((v) => String(v).includes('@'));
+
+      const destinations: Destination[] = [];
+      if (rawPhone) {
+        const digits = String(rawPhone).replace(/\D/g, '');
+        const masked = digits.length >= 11
+          ? `(${digits.slice(-11, -9)}) ${digits.slice(-9, -4)}-${digits.slice(-4)}`
+          : digits.length >= 10
+            ? `(${digits.slice(-10, -8)}) ${digits.slice(-8, -4)}-${digits.slice(-4)}`
+            : String(rawPhone);
+        const fullAddr = digits.startsWith('55') ? digits : `55${digits}`;
+        destinations.push({
+          id: nextUuid(),
+          channelType: 'VOICE',
+          address: fullAddr,
+          addressMasked: masked,
+          label: 'Telefone Principal',
+          priority: 1,
+          valid: true,
+          blocked: false,
+        });
+      }
+      if (rawWa) {
+        const digits = String(rawWa).replace(/\D/g, '');
+        const masked = digits.length >= 11
+          ? `(${digits.slice(-11, -9)}) ${digits.slice(-9, -4)}-${digits.slice(-4)}`
+          : String(rawWa);
+        const fullAddr = digits.startsWith('55') ? digits : `55${digits}`;
+        destinations.push({
+          id: nextUuid(),
+          channelType: 'WHATSAPP',
+          address: fullAddr,
+          addressMasked: masked,
+          label: 'WhatsApp Verificado',
+          priority: 1,
+          valid: true,
+          blocked: false,
+        });
+      }
+      if (rawEmail) {
+        destinations.push({
+          id: nextUuid(),
+          channelType: 'EMAIL',
+          address: String(rawEmail),
+          addressMasked: String(rawEmail).replace(/(.{2})(.*)(@.*)/, '$1***$3'),
+          label: 'E-mail Principal',
+          priority: 2,
+          valid: true,
+          blocked: false,
+        });
+      }
+
+      let contact = CONTACTS.find((c) => c.externalId.toLowerCase() === String(extId).toLowerCase());
+      if (!contact) {
+        contact = {
+          id: nextUuid(),
+          externalId: String(extId),
+          name: String(name),
+          attributes: { ...r.values },
+          historyTotal: 0,
+          historyReferenceDate: null,
+          destinations,
+          blocks: [],
+        };
+        CONTACTS.push(contact);
+      } else {
+        contact.attributes = { ...contact.attributes, ...r.values };
+      }
+
+      return {
+        id: nextUuid(),
+        rowNumber: r.rowNumber,
+        contactId: contact.id,
+        externalId: contact.externalId,
+        name: contact.name,
+        fields: r.values,
+        blocked: contact.blocks.some((b) => !b.revokedAt && b.scope === 'CONTACT'),
+      };
+    });
+
     MAILINGS.unshift({
       detail: {
         id: newId,
@@ -1131,7 +1264,8 @@ export async function handleMockApi<T = unknown>(
     return { items } as T;
   }
   if (pathname === '/lists/preview' && method === 'POST') {
-    const m = MAILINGS.find((x) => x.detail.id === body.mailingId) ?? MAILINGS[0];
+    const m = MAILINGS.find((x) => x.detail.id === body.mailingId);
+    if (!m) return { selected: 0, excluded: [], sample: [], fields: [] } as T;
     const filters: ListFilter[] = body.filters ?? [];
     const sorts: { field: string; dir: 'asc' | 'desc' }[] = body.sort ?? [];
     const activeRecords = m.records.filter((r) => !r.blocked);
@@ -1156,7 +1290,7 @@ export async function handleMockApi<T = unknown>(
 
     const prev: ListPreview = {
       selected: filtered.length,
-      excluded: [{ reason: 'DNC', count: m.records.filter((r) => r.blocked).length || 1 }],
+      excluded: [{ reason: 'DNC', count: m.records.filter((r) => r.blocked).length || 0 }],
       sample: filtered.slice(0, 15).map((r) => ({
         contactId: r.contactId,
         externalId: r.externalId,
@@ -1173,7 +1307,8 @@ export async function handleMockApi<T = unknown>(
     return prev as T;
   }
   if (pathname === '/lists' && method === 'POST') {
-    const m = MAILINGS.find((x) => x.detail.id === body.mailingId) ?? MAILINGS[0];
+    const m = MAILINGS.find((x) => x.detail.id === body.mailingId);
+    if (!m) throw new ApiError({ type: 'not_found', title: 'Mailing não encontrado', status: 404 });
     const existing = body.listId ? LISTS.find((l) => l.id === body.listId) : undefined;
     const listId = existing?.id ?? nextUuid();
     const listVersionId = nextUuid();
@@ -1205,12 +1340,15 @@ export async function handleMockApi<T = unknown>(
   }
   const listMatch = pathname.match(/^\/lists\/([^/]+)$/);
   if (listMatch && method === 'GET') {
-    const found = LISTS.find((l) => l.id === listMatch[1]) ?? LISTS[0];
+    const found = LISTS.find((l) => l.id === listMatch[1]);
+    if (!found) throw new ApiError({ type: 'not_found', title: 'Lista não encontrada', status: 404 });
     return found as T;
   }
   const listMembersMatch = pathname.match(/^\/lists\/versions\/([^/]+)\/members$/);
   if (listMembersMatch && method === 'GET') {
-    const items: ListMember[] = MAILINGS[0].records.slice(0, 16).map((r) => ({
+    const foundList = LISTS.find((l) => l.versions.some((v) => v.id === listMembersMatch[1]));
+    const m = foundList ? MAILINGS.find((x) => x.detail.id === foundList.mailing.id) : MAILINGS[0];
+    const items: ListMember[] = (m?.records ?? []).slice(0, 16).map((r) => ({
       contactId: r.contactId,
       externalId: r.externalId,
       name: r.name,
@@ -1400,25 +1538,28 @@ export async function handleMockApi<T = unknown>(
     }
   }
   if (pathname === '/campaigns/preflight' && method === 'POST') {
-    const m = MAILINGS.find((x) => x.detail.id === body.mailingId) ?? MAILINGS[0];
+    const m = MAILINGS.find((x) => x.detail.id === body.mailingId);
+    if (!m) {
+      throw new ApiError({ type: 'validation', title: 'Mailing obrigatório', status: 422, fieldErrors: { mailingId: 'Mailing não encontrado' } });
+    }
     const l = body.listVersionId ? LISTS.find((x) => x.versions.some((v) => v.id === body.listVersionId)) : null;
     const j = JOURNEYS.find((x) => x.latestVersion?.id === body.journeyVersionId) ?? JOURNEYS[0];
     const s = STRATEGIES.find((x) => x.versions.some((v) => v.id === body.strategyVersionId)) ?? STRATEGIES[0];
-    const sv = s.versions.find((v) => v.id === body.strategyVersionId) ?? s.latestVersion!;
+    const sv = s?.versions.find((v) => v.id === body.strategyVersionId) ?? s?.latestVersion;
     const count = l ? (l.latestVersion?.memberCount ?? 16) : m.detail.recordCount;
-    const firstConn = CONNECTIONS.find((c) => c.id === j.latestVersion?.steps[0]?.connectionId);
+    const firstConn = CONNECTIONS.find((c) => c.id === j?.latestVersion?.steps[0]?.connectionId);
     const tariff = firstConn?.tariff ?? null;
     const pf: Preflight = {
       audience: { type: l ? 'LIST' : 'MAILING', name: l ? l.name : m.detail.name, count },
-      journey: { name: j.name, steps: j.latestVersion?.steps ?? [] },
+      journey: { name: j?.name ?? 'Jornada', steps: j?.latestVersion?.steps ?? [] },
       strategy: {
-        name: s.name,
-        version: sv.version,
-        summary: [
+        name: s?.name ?? 'Estratégia',
+        version: sv?.version ?? 1,
+        summary: sv ? [
           `Até ${sv.config.limits.total} tentativas no total e ${sv.config.limits.daily} por dia`,
           `Janela ${sv.config.calendar.start}–${sv.config.calendar.end} (${sv.config.calendar.timezone})`,
           `Retentativa após ${sv.config.retry.intervalMinutes} min (até ${sv.config.retry.maxPerDestination} por destino)`,
-        ],
+        ] : [],
       },
       nextWindow: new Date(Date.now() + 60_000).toISOString(),
       costEstimate: {
@@ -1438,8 +1579,8 @@ export async function handleMockApi<T = unknown>(
       (s: any) => s.connectionId === uuid(33) || (s.connectionName ?? '').includes('Direct Call') || s.channelType === 'VOICE',
     );
     if (usesVoiceApp && typeof fetch !== 'undefined') {
-      const mailing = MAILINGS.find((m) => m.detail.id === c.mailing?.id) ?? MAILINGS[0];
-      const contactsToDial = (mailing?.records ?? []).slice(0, 5);
+      const mailing = MAILINGS.find((m) => m.detail.id === c.mailing?.id);
+      const contactsToDial = (mailing?.records ?? []).slice(0, 10);
       for (const r of contactsToDial) {
         const attemptId = nextUuid();
         const rawPhone =
@@ -1452,6 +1593,49 @@ export async function handleMockApi<T = unknown>(
           '11987654321';
         const digits = String(rawPhone).replace(/\D/g, '');
         const phone = digits.startsWith('55') ? `+${digits}` : `+55${digits}`;
+        const maskedPhone = digits.length >= 11
+          ? `(${digits.slice(-11, -9)}) ${digits.slice(-9, -4)}-${digits.slice(-4)}`
+          : digits.length >= 10
+            ? `(${digits.slice(-10, -8)}) ${digits.slice(-8, -4)}-${digits.slice(-4)}`
+            : phone;
+        const now = new Date().toISOString();
+
+        ATTEMPTS.set(attemptId, {
+          attempt: {
+            id: attemptId,
+            contact: { id: r.contactId, externalId: r.externalId, name: r.name },
+            channelType: 'VOICE',
+            connectionName: 'Discador IA · Tronco Direct Call',
+            destinationMasked: maskedPhone,
+            stage: 0,
+            state: 'SENT',
+            stateLabel: ATTEMPT_STATE_LABEL['SENT'],
+            tabulation: null,
+            createdAt: now,
+            sentAt: now,
+            finalizedAt: null,
+            nextAction: 'Aguardar retorno do canal',
+            campaign: { id: c.id, name: c.name },
+            traceId: nextUuid(),
+            strategyVersionId: c.strategy?.id,
+            journeyVersionId: c.journey?.id,
+            tariffSnapshot: 0.08,
+            costConfirmed: null,
+            leaseUntil: null,
+            feedbackDeadline: new Date(Date.now() + 300_000).toISOString(),
+            providerAttemptId: `directcall-${attemptId.slice(-4)}`,
+          },
+          explanation: {
+            whatHappened: 'Chamada despachada via Tronco Direct Call (Voice-App).',
+            why: 'Campanha em execução acionando contatos da base.',
+            nextAction: 'Aguardar retorno do canal.',
+          },
+          timeline: [
+            { id: 1, eventType: 'RESERVED', label: 'Contato reservado', fromState: null, toState: 'RESERVED', reasonCode: null, duplicate: false, occurredAt: now, receivedAt: now, data: {} },
+            { id: 2, eventType: 'DISPATCH_ACCEPTED', label: 'Enviado ao Tronco Direct Call', fromState: 'RESERVED', toState: 'SENT', reasonCode: null, duplicate: false, occurredAt: now, receivedAt: now, data: { to: phone, trunk: 'Direct Call (SIP Trunk)' } },
+          ],
+        });
+
         void fetch('http://127.0.0.1:5050/v1/calls', {
           method: 'POST',
           headers: {
@@ -1469,6 +1653,14 @@ export async function handleMockApi<T = unknown>(
             },
             campaign: { id: c.id, name: c.name },
           }),
+        }).then(async (res) => {
+          if (res.ok) {
+            const data = await res.json().catch(() => ({}));
+            const att = ATTEMPTS.get(attemptId);
+            if (att) {
+              att.attempt.providerAttemptId = data.providerAttemptId || att.attempt.providerAttemptId;
+            }
+          }
         }).catch(() => {});
       }
     }
@@ -1484,11 +1676,14 @@ export async function handleMockApi<T = unknown>(
     if (!body.name?.trim()) {
       throw new ApiError({ type: 'validation', title: 'Verifique os campos', status: 422, fieldErrors: { name: 'Informe o nome da campanha' } });
     }
-    const m = MAILINGS.find((x) => x.detail.id === body.mailingId) ?? MAILINGS[0];
+    const m = MAILINGS.find((x) => x.detail.id === body.mailingId);
+    if (!m) {
+      throw new ApiError({ type: 'validation', title: 'Mailing obrigatório', status: 422, fieldErrors: { mailingId: 'Mailing não encontrado' } });
+    }
     const l = body.listVersionId ? LISTS.find((x) => x.versions.some((v) => v.id === body.listVersionId)) : null;
     const j = JOURNEYS.find((x) => x.latestVersion?.id === body.journeyVersionId) ?? JOURNEYS[0];
     const s = STRATEGIES.find((x) => x.versions.some((v) => v.id === body.strategyVersionId)) ?? STRATEGIES[0];
-    const sv = s.versions.find((v) => v.id === body.strategyVersionId) ?? s.latestVersion!;
+    const sv = s?.versions.find((v) => v.id === body.strategyVersionId) ?? s?.latestVersion!;
     const status: CampaignStatus = body.startMode === 'NOW' ? 'RUNNING' : body.startMode === 'SCHEDULE' ? 'SCHEDULED' : 'READY';
     const members = l ? (l.latestVersion?.memberCount ?? 16) : m.detail.recordCount;
     const now = new Date().toISOString();
@@ -1507,17 +1702,17 @@ export async function handleMockApi<T = unknown>(
             ? 'Aguardando horário agendado para iniciar.'
             : 'Campanha pronta para início.',
       audience: { type: l ? 'LIST' : 'MAILING', name: l ? l.name : m.detail.name },
-      journeyName: j.name,
-      strategyName: s.name,
-      strategyVersion: sv.version,
+      journeyName: j?.name ?? 'Jornada',
+      strategyName: s?.name ?? 'Estratégia',
+      strategyVersion: sv?.version ?? 1,
       createdAt: now,
       startedAt: status === 'RUNNING' ? now : null,
       scheduledAt: body.scheduledAt ?? null,
       progress: { members, finished: 0, active: members },
       mailing: { id: m.detail.id, name: m.detail.name },
       listVersion: l?.latestVersion ? { id: l.latestVersion.id, version: l.latestVersion.version, membershipMode: l.latestVersion.membershipMode } : null,
-      journey: { id: j.id, version: j.latestVersion?.version ?? 1, steps: j.latestVersion?.steps ?? [] },
-      strategy: { id: s.id, version: sv.version, config: sv.config },
+      journey: { id: j?.id ?? uuid(40), version: j?.latestVersion?.version ?? 1, steps: j?.latestVersion?.steps ?? [] },
+      strategy: { id: s?.id ?? uuid(50), version: sv?.version ?? 1, config: sv?.config ?? ({} as any) },
     };
     CAMPAIGNS.unshift(camp);
     DRAFT = null;
@@ -1528,7 +1723,8 @@ export async function handleMockApi<T = unknown>(
   }
   const campActionMatch = pathname.match(/^\/campaigns\/([^/]+)\/(start|pause|resume|close|archive)$/);
   if (campActionMatch && method === 'POST') {
-    const c = CAMPAIGNS.find((x) => x.id === campActionMatch[1]) ?? CAMPAIGNS[0];
+    const c = CAMPAIGNS.find((x) => x.id === campActionMatch[1]);
+    if (!c) throw new ApiError({ type: 'not_found', title: 'Campanha não encontrada', status: 404 });
     const act = campActionMatch[2];
     const beforeStatus = c.status;
     if (act === 'start' || act === 'resume') {
@@ -1570,7 +1766,9 @@ export async function handleMockApi<T = unknown>(
   }
   const campMatch = pathname.match(/^\/campaigns\/([^/]+)$/);
   if (campMatch && method === 'GET') {
-    return (CAMPAIGNS.find((c) => c.id === campMatch[1]) ?? CAMPAIGNS[0]) as T;
+    const c = CAMPAIGNS.find((c) => c.id === campMatch[1]);
+    if (!c) throw new ApiError({ type: 'not_found', title: 'Campanha não encontrada', status: 404 });
+    return c as T;
   }
   const campAttemptsMatch = pathname.match(/^\/campaigns\/([^/]+)\/attempts$/);
   if (campAttemptsMatch && method === 'GET') {
@@ -1578,7 +1776,7 @@ export async function handleMockApi<T = unknown>(
     const state = searchParams.get('state') ?? '';
     const all = Array.from(ATTEMPTS.values())
       .map((a) => a.attempt)
-      .filter((a) => (!a.campaign || a.campaign.id === cid || cid === CAMPAIGNS[0]?.id) && (!state || a.state === state));
+      .filter((a) => (!a.campaign || a.campaign.id === cid) && (!state || a.state === state));
     return { items: all, nextCursor: null, total: all.length } as T;
   }
   const campEligMatch = pathname.match(/^\/campaigns\/([^/]+)\/eligibility$/);
@@ -1790,15 +1988,75 @@ export async function handleMockApi<T = unknown>(
         destinations: Array.from(byChan.entries()).map(([channelType, count]) => ({ channelType, count })),
         attempts: { total: c.historyTotal, new: idx < 6 ? 1 : 0 },
         lastTabulation: idx === 1 ? { code: 'CONVERSION', name: 'Acordo fechado', at: '2026-10-20T10:15:00Z' } : null,
-        campaigns: 1,
+        campaigns: CAMPAIGNS.length,
         intelligence: buildContactIntelligenceRationale(c),
       };
     });
     return { items, nextCursor, total: filtered.length } as T;
   }
+  if (pathname === '/contacts' && method === 'POST') {
+    const newId = nextUuid();
+    const phoneRaw = String(body.phone ?? '').trim();
+    const emailRaw = String(body.email ?? '').trim();
+    const destinations: Destination[] = [];
+    if (phoneRaw) {
+      const digits = phoneRaw.replace(/\D/g, '');
+      const masked = digits.length >= 11
+        ? `(${digits.slice(-11, -9)}) ${digits.slice(-9, -4)}-${digits.slice(-4)}`
+        : digits.length >= 10
+          ? `(${digits.slice(-10, -8)}) ${digits.slice(-8, -4)}-${digits.slice(-4)}`
+          : phoneRaw;
+      const fullPhone = digits.startsWith('55') ? digits : `55${digits}`;
+      destinations.push({
+        id: nextUuid(),
+        channelType: 'VOICE',
+        address: fullPhone,
+        addressMasked: masked,
+        label: 'Telefone Principal',
+        priority: 1,
+        valid: true,
+        blocked: false,
+      });
+      destinations.push({
+        id: nextUuid(),
+        channelType: 'WHATSAPP',
+        address: fullPhone,
+        addressMasked: masked,
+        label: 'WhatsApp Verificado',
+        priority: 1,
+        valid: true,
+        blocked: false,
+      });
+    }
+    if (emailRaw) {
+      destinations.push({
+        id: nextUuid(),
+        channelType: 'EMAIL',
+        address: emailRaw,
+        addressMasked: emailRaw.replace(/(.{2})(.*)(@.*)/, '$1***$3'),
+        label: 'E-mail Principal',
+        priority: 2,
+        valid: true,
+        blocked: false,
+      });
+    }
+    const c: FullContact = {
+      id: newId,
+      externalId: String(body.externalId || '').trim(),
+      name: String(body.name || '').trim(),
+      attributes: { ...body.attributes },
+      historyTotal: 0,
+      historyReferenceDate: null,
+      destinations,
+      blocks: [],
+    };
+    CONTACTS.unshift(c);
+    return { id: newId, contact: c } as T;
+  }
   const contactMatch = pathname.match(/^\/contacts\/([^/]+)$/);
   if (contactMatch && method === 'GET') {
-    const c = CONTACTS.find((x) => x.id === contactMatch[1]) ?? CONTACTS[0];
+    const c = CONTACTS.find((x) => x.id === contactMatch[1]);
+    if (!c) throw new ApiError({ type: 'not_found', title: 'Contato não encontrado', status: 404 });
     const contactAttempts = Array.from(ATTEMPTS.values())
       .map((a) => a.attempt)
       .filter((a) => a.contact.id === c.id);
@@ -1819,7 +2077,7 @@ export async function handleMockApi<T = unknown>(
         today: contactAttempts.length,
         byChannel: [{ channelType: 'VOICE', count: contactAttempts.length }],
       },
-      enrollments: [{ campaign: { id: CAMPAIGNS[0].id, name: CAMPAIGNS[0].name }, state: 'ACTIVE', stage: 0 }],
+      enrollments: CAMPAIGNS.length > 0 ? [{ campaign: { id: CAMPAIGNS[0].id, name: CAMPAIGNS[0].name }, state: 'ACTIVE', stage: 0 }] : [],
       attempts: contactAttempts,
       intelligence: buildContactIntelligenceRationale(c),
     };
@@ -1827,7 +2085,8 @@ export async function handleMockApi<T = unknown>(
   }
   const addDestMatch = pathname.match(/^\/contacts\/([^/]+)\/destinations$/);
   if (addDestMatch && method === 'POST') {
-    const c = CONTACTS.find((x) => x.id === addDestMatch[1]) ?? CONTACTS[0];
+    const c = CONTACTS.find((x) => x.id === addDestMatch[1]);
+    if (!c) throw new ApiError({ type: 'not_found', title: 'Contato não encontrado', status: 404 });
     const d: Destination = {
       id: nextUuid(),
       channelType: body.channelType,
@@ -1843,7 +2102,8 @@ export async function handleMockApi<T = unknown>(
   }
   const patchDestMatch = pathname.match(/^\/contacts\/([^/]+)\/destinations\/([^/]+)$/);
   if (patchDestMatch && method === 'PATCH') {
-    const c = CONTACTS.find((x) => x.id === patchDestMatch[1]) ?? CONTACTS[0];
+    const c = CONTACTS.find((x) => x.id === patchDestMatch[1]);
+    if (!c) throw new ApiError({ type: 'not_found', title: 'Contato não encontrado', status: 404 });
     const d = c.destinations.find((x) => x.id === patchDestMatch[2]);
     if (d) {
       if (body.valid !== undefined) d.valid = body.valid;
@@ -1875,7 +2135,8 @@ export async function handleMockApi<T = unknown>(
     return CONTROL as T;
   }
   if (pathname === '/blocks' && method === 'POST') {
-    const c = CONTACTS.find((x) => x.id === body.contactId) ?? CONTACTS[0];
+    const c = CONTACTS.find((x) => x.id === body.contactId);
+    if (!c) throw new ApiError({ type: 'not_found', title: 'Contato não encontrado', status: 404 });
     const b: Block = {
       id: nextUuid(),
       scope: body.scope,
@@ -1957,6 +2218,19 @@ export async function handleMockApi<T = unknown>(
   if (pathname === '/optimization' && method === 'GET') {
     const cid = searchParams.get('campaignId');
     const camp = CAMPAIGNS.find((c) => c.id === cid) ?? CAMPAIGNS[0];
+    if (!camp) {
+      return {
+        enabled: true,
+        policyCode: 'LOWEST_COST_PER_CPC',
+        minEvidences: 3,
+        strategyId: '',
+        strategyName: 'Padrão',
+        strategyVersion: 1,
+        items: [],
+        policy: 'Menor custo estimado por CPC / sucesso',
+        notes: ['Nenhuma campanha ativa no momento.'],
+      } as T;
+    }
     const optCfg = camp.strategy.config.optimization ?? { enabled: true, policy: 'LOWEST_COST_PER_CPC' as const, minEvidences: 3 };
     const recs = CONTACTS.slice(0, 10).map((c, idx) => ({
       contactId: c.id,
@@ -1994,6 +2268,7 @@ export async function handleMockApi<T = unknown>(
   }
   if (pathname === '/optimization/configure' && method === 'POST') {
     const camp = CAMPAIGNS.find((c) => c.id === body.campaignId) ?? CAMPAIGNS[0];
+    if (!camp) throw new ApiError({ type: 'not_found', title: 'Campanha não encontrada', status: 404 });
     const strat = STRATEGIES.find((s) => s.id === camp.strategy.id) ?? STRATEGIES[0];
     const nextConfig: StrategyConfig = {
       ...camp.strategy.config,
@@ -2022,7 +2297,7 @@ export async function handleMockApi<T = unknown>(
       user: { name: me.name },
       action: 'optimization.apply_recommendation',
       entity: 'campaign',
-      entityId: body.campaignId ?? CAMPAIGNS[0].id,
+      entityId: body.campaignId ?? CAMPAIGNS[0]?.id ?? 'none',
       reason: body.contactId ? `Recomendação aplicada ao contato ${body.contactId.slice(-4)}` : 'Recomendações consultivas aplicadas ao lote da fila',
       before: { mode: 'CONSULTIVE_PENDING' },
       after: { mode: 'APPLIED_BY_MANAGER', appliedCount: body.count ?? 1 },
@@ -2034,7 +2309,7 @@ export async function handleMockApi<T = unknown>(
   if (pathname === '/costs' && method === 'GET') {
     const list = Array.from(ATTEMPTS.values()).map((a, idx) => ({
       attemptId: a.attempt.id,
-      campaignName: a.attempt.campaign?.name ?? CAMPAIGNS[0].name,
+      campaignName: a.attempt.campaign?.name ?? CAMPAIGNS[0]?.name ?? 'Campanha',
       contactName: a.attempt.contact.name ?? 'Cliente',
       channel: a.attempt.channelType === 'VOICE' ? 'Discador' : 'WhatsApp',
       connectionName: a.attempt.connectionName,
@@ -2048,10 +2323,10 @@ export async function handleMockApi<T = unknown>(
     return {
       items: list,
       summary: {
-        totalConfirmed: 0.163,
-        totalEstimated: 0.36,
-        coverageCount: 2,
-        pendingCount: list.length - 2,
+        totalConfirmed: list.length > 0 ? 0.163 : 0,
+        totalEstimated: list.length > 0 ? 0.36 : 0,
+        coverageCount: Math.min(2, list.length),
+        pendingCount: Math.max(0, list.length - 2),
       },
     } as T;
   }
@@ -2189,11 +2464,22 @@ export async function handleMockApi<T = unknown>(
     } as T;
   }
 
+  if (pathname === '/system/reset' && method === 'POST') {
+    resetDatabaseToZero();
+    return { ok: true, message: 'Base de dados zerada com sucesso.' } as T;
+  }
+  if (pathname === '/system/seed-demo' && method === 'POST') {
+    seedSampleDemoData();
+    return { ok: true, message: 'Dados de demonstração (1.000 contatos) carregados com sucesso.' } as T;
+  }
+
   if (pathname === '/intelligence/runs' && (method === 'GET' || method === 'POST')) {
+    const sampleMailing = MAILINGS[0];
+    if (!sampleMailing) return [] as T;
     const sampleRun = {
       id: uuid(880),
-      mailingId: MAILINGS[0].detail.id,
-      mailingName: MAILINGS[0].detail.name,
+      mailingId: sampleMailing.detail.id,
+      mailingName: sampleMailing.detail.name,
       mode: 'PARALLEL_BOTH',
       purposeCode: 'COBRANCA',
       purposePrompt: 'Renegociação amigável priorizando menor custo por CPC confirmado por tabulação.',

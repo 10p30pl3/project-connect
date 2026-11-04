@@ -78,36 +78,68 @@ export function OverviewPage() {
       ) : (
         <div className="space-y-5">
           {/* KPIs Centrais de Desempenho e Inteligência de CPC */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Stat
-              label="Taxa Média de CPC"
-              value="38,4%"
-              tone="good"
-              tooltip="Percentual de contatos com a Pessoa Certa confirmada por tabulação auditável."
-            />
-            <Stat
-              label="Custo por CPC Otimizado"
-              value="R$ 3,18"
-              tone="good"
-              hint="vs. R$ 5,60 tradicional"
-              tooltip="Custo médio para alcançar um CPC efetivo através da inteligência, comparado a R$ 5,60 sem otimização."
-            />
-            <Stat
-              label="Economia Conquistada"
-              value="43,2%"
-              tone="good"
-              tooltip="Redução percentual de gastos obtida pela supressão de tentativas improdutivas."
-            />
-            <Stat
-              label="Contatos no Golden Record"
-              value={fmtNumber(q.data!.contacts)}
-              tone="good"
-              tooltip="Base unificada de pessoas físicas e jurídicas com telefones ranqueados e DNC higienizado."
-            />
-          </div>
+          {(() => {
+            const hasData = (q.data?.contacts ?? 0) > 0 || (q.data?.attempts.sentToday ?? 0) > 0;
+            return (
+              <>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <Stat
+                    label="Taxa Média de CPC"
+                    value={hasData ? '38,4%' : '—'}
+                    tone={hasData ? 'good' : undefined}
+                    hint={hasData ? undefined : 'aguardando acionamentos'}
+                    tooltip="Percentual de contatos com a Pessoa Certa confirmada por tabulação auditável."
+                  />
+                  <Stat
+                    label="Custo por CPC Otimizado"
+                    value={hasData ? 'R$ 3,18' : '—'}
+                    tone={hasData ? 'good' : undefined}
+                    hint={hasData ? 'vs. R$ 5,60 tradicional' : 'sem histórico inicial'}
+                    tooltip="Custo médio para alcançar um CPC efetivo através da inteligência, comparado a R$ 5,60 sem otimização."
+                  />
+                  <Stat
+                    label="Economia Conquistada"
+                    value={hasData ? '43,2%' : '—'}
+                    tone={hasData ? 'good' : undefined}
+                    hint={hasData ? undefined : 'inicia com as campanhas'}
+                    tooltip="Redução percentual de gastos obtida pela supressão de tentativas improdutivas."
+                  />
+                  <Stat
+                    label="Contatos no Golden Record"
+                    value={fmtNumber(q.data!.contacts)}
+                    tone={q.data!.contacts > 0 ? 'good' : undefined}
+                    hint={q.data!.contacts === 0 ? 'base zerada' : undefined}
+                    tooltip="Base unificada de pessoas físicas e jurídicas com telefones ranqueados e DNC higienizado."
+                  />
+                </div>
 
-          {/* Gráficos de Inteligência de CPC e Assertividade BTTC */}
-          <DashboardChartsGrid />
+                {/* Gráficos de Inteligência de CPC ou Banner de Base Limpa */}
+                {!hasData ? (
+                  <Card className="border-dashed border-slate-300 bg-slate-50/70 py-10 text-center">
+                    <div className="mx-auto max-w-md space-y-3">
+                      <div className="mx-auto grid size-12 place-items-center rounded-xl bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-200">
+                        <Sparkles className="size-6 text-brand-600" />
+                      </div>
+                      <h3 className="text-base font-semibold text-slate-900">Base limpa pronta para operação</h3>
+                      <p className="text-sm text-slate-600 leading-relaxed">
+                        Nenhum contato ou campanha cadastrado ainda. Comece importando seu primeiro mailing CSV ou crie sua primeira campanha inteligente com auxílio do assistente de IA.
+                      </p>
+                      <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                        <Link to="/mailings/importar" className={btnClass('primary')}>
+                          Importar primeiro mailing
+                        </Link>
+                        <Link to="/campanhas/nova" className={btnClass('secondary')}>
+                          Criar campanha com IA
+                        </Link>
+                      </div>
+                    </div>
+                  </Card>
+                ) : (
+                  <DashboardChartsGrid />
+                )}
+              </>
+            );
+          })()}
 
           {/* Tabela 1: Ao vivo */}
           <Card
