@@ -101,13 +101,13 @@ export function suggestMapping(headers: string[], sample: ParsedRow[]): ColumnMa
       target = `digital${++digitalN}` as MappingTarget;
       digitalType = d[1] === 'sms' ? 'SMS' : d[1] === 'digital' ? undefined : 'WHATSAPP';
     } else if (['historico', 'tentativashistorico', 'historicototal', 'historytotal'].includes(k)) target = 'history_total';
-    else if (['melhorhorarioinicio', 'horarioinicio', 'horariode', 'horade', 'bestcontactstart', 'btcstart', 'dehorario'].includes(k) && !used.has('best_contact_start'))
+    else if (['melhorhorarioinicio', 'horarioinicio', 'horariode', 'horade', 'bestcontactstart', 'btcstart', 'bttcstart', 'bttcinicio', 'dehorario', 'bttc', 'btc', 'melhorhorario'].includes(k) && !used.has('best_contact_start'))
       target = 'best_contact_start';
-    else if (['melhorhorariofim', 'horariofim', 'horarioate', 'horaate', 'bestcontactend', 'btcend', 'atehorario'].includes(k) && !used.has('best_contact_end'))
+    else if (['melhorhorariofim', 'horariofim', 'horarioate', 'horaate', 'bestcontactend', 'btcend', 'bttcend', 'bttcfim', 'atehorario'].includes(k) && !used.has('best_contact_end'))
       target = 'best_contact_end';
-    else if (['duracao', 'duracaojanela', 'janelaminutos', 'btcduration', 'duracaojanelaminutos'].includes(k) && !used.has('best_contact_duration'))
+    else if (['duracao', 'duracaojanela', 'janelaminutos', 'btcduration', 'bttcduration', 'bttcduracao', 'duracaojanelaminutos'].includes(k) && !used.has('best_contact_duration'))
       target = 'best_contact_duration';
-    else if (['fuso', 'fusohorario', 'timezone', 'btctimezone', 'iana'].includes(k) && !used.has('best_contact_timezone'))
+    else if (['fuso', 'fusohorario', 'timezone', 'btctimezone', 'bttctimezone', 'iana'].includes(k) && !used.has('best_contact_timezone'))
       target = 'best_contact_timezone';
     used.add(target);
     let type: ColumnMapping['type'] = 'text';
@@ -281,7 +281,14 @@ export function validateRow(row: ParsedRow, mapping: ColumnMapping[], options?: 
     let tz = defaultTz;
 
     if (btcStartVal !== null) {
-      startMin = parseTime(btcStartVal);
+      // Suporte a coluna única contendo intervalo, ex: "14:00 - 16:00" ou "14:00 às 16:00"
+      const rangeParts = btcStartVal.split(/\s*[-–/|aAàÀ][sS]?\s*|\s+ate\s+|\s+to\s+/i);
+      if (rangeParts.length === 2 && btcEndVal === null) {
+        startMin = parseTime(rangeParts[0]);
+        endMin = parseTime(rangeParts[1]);
+      } else {
+        startMin = parseTime(btcStartVal);
+      }
       if (startMin === null) out.errors.push(`Horário de início inválido "${btcStartVal}" (use HH:mm)`);
     }
 

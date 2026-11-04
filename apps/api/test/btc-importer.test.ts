@@ -133,4 +133,28 @@ describe('Best Time to Call (BTC) Importer', () => {
     expect(preview.response.validRows).toBe(0);
     expect(preview.response.rows[0].errors[0]).toContain('Conflito de preferências de horário (BTC)');
   });
+
+  it('parses single column range format (e.g. "14:00 - 16:30" or "14:00 às 18:00")', () => {
+    const mapping: ColumnMapping[] = [
+      { column: 'id', target: 'external_id', type: 'text', required: true },
+      { column: 'bttc', target: 'best_contact_start', type: 'text', required: false },
+    ];
+    const rowDash: ParsedRow = {
+      rowNumber: 2,
+      values: { id: 'cli_single_1', bttc: '14:00 - 16:30' },
+    };
+    const resDash = validateRow(rowDash, mapping);
+    expect(resDash.errors).toHaveLength(0);
+    expect(resDash.typed.btc_start_minute).toBe(840);
+    expect(resDash.typed.btc_end_minute).toBe(990);
+
+    const rowAs: ParsedRow = {
+      rowNumber: 3,
+      values: { id: 'cli_single_2', bttc: '09:00 às 12:00' },
+    };
+    const resAs = validateRow(rowAs, mapping);
+    expect(resAs.errors).toHaveLength(0);
+    expect(resAs.typed.btc_start_minute).toBe(540);
+    expect(resAs.typed.btc_end_minute).toBe(720);
+  });
 });

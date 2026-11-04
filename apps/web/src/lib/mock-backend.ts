@@ -758,6 +758,14 @@ function buildImportPreview(body: any): ImportPreview {
         return { column: h, target: 'digital1', digitalType: 'WHATSAPP', type: 'text', required: false };
       if (lower.includes('email'))
         return { column: h, target: 'email', type: 'text', required: false };
+      if (lower.includes('inicio') || lower.includes('start') || lower.includes('bttc') || lower.includes('btc') || lower.includes('melhor_horario'))
+        return { column: h, target: 'best_contact_start', type: 'text', required: false };
+      if (lower.includes('fim') || lower.includes('end') || lower.includes('ate'))
+        return { column: h, target: 'best_contact_end', type: 'text', required: false };
+      if (lower.includes('duracao') || lower.includes('duration') || lower.includes('janela'))
+        return { column: h, target: 'best_contact_duration', type: 'text', required: false };
+      if (lower.includes('fuso') || lower.includes('timezone') || lower.includes('tz') || lower.includes('iana'))
+        return { column: h, target: 'best_contact_timezone', type: 'text', required: false };
       return { column: h, target: 'attribute', attributeName: h, type: 'text', required: false };
     });
 

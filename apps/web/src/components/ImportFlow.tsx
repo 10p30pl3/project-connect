@@ -21,9 +21,9 @@ const TARGET_LABEL: Record<MappingTarget, string> = {
   digital3: 'Digital 3 (WhatsApp/SMS)',
   email: 'E-mail',
   history_total: 'Histórico de tentativas (acumulado)',
-  best_contact_start: 'Horário de início (BTC - HH:mm)',
-  best_contact_end: 'Horário de término (BTC - HH:mm)',
-  best_contact_duration: 'Duração da janela (minutos)',
+  best_contact_start: 'Horário de início (BTTC - HH:mm)',
+  best_contact_end: 'Horário de término (BTTC - HH:mm)',
+  best_contact_duration: 'Duração da janela BTTC (minutos)',
   best_contact_timezone: 'Fuso horário IANA (ex: America/Sao_Paulo)',
   attribute: 'Campo adicional',
   ignore: 'Ignorar coluna',
@@ -42,6 +42,8 @@ export function ImportFlow({ onImported, initialName = '' }: { onImported: (r: I
   const [mapping, setMapping] = useState<ColumnMapping[]>([]);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [defaultTimezone, setDefaultTimezone] = useState('America/Sao_Paulo');
+  const [defaultDurationMinutes, setDefaultDurationMinutes] = useState('');
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [onlyErrors, setOnlyErrors] = useState(true);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -49,10 +51,27 @@ export function ImportFlow({ onImported, initialName = '' }: { onImported: (r: I
 
   const previewM = useMutation({
     mutationFn: (withMapping: boolean) =>
-      post<ImportPreview>('/imports/preview', { content, delimiter, hasHeader, mapping: withMapping ? mapping : undefined }),
+      post<ImportPreview>('/imports/preview', {
+        content,
+        delimiter,
+        hasHeader,
+        mapping: withMapping ? mapping : undefined,
+        defaultTimezone,
+        defaultWindowDurationMinutes: defaultDurationMinutes ? Number(defaultDurationMinutes) : undefined,
+      }),
   });
   const commitM = useMutation({
-    mutationFn: (acceptPartial: boolean) => post<ImportResult>('/imports', { name, content, delimiter, hasHeader, mapping, acceptPartial }),
+    mutationFn: (acceptPartial: boolean) =>
+      post<ImportResult>('/imports', {
+        name,
+        content,
+        delimiter,
+        hasHeader,
+        mapping,
+        acceptPartial,
+        defaultTimezone,
+        defaultWindowDurationMinutes: defaultDurationMinutes ? Number(defaultDurationMinutes) : undefined,
+      }),
   });
 
   async function readFile(f: File) {
@@ -178,15 +197,19 @@ export function ImportFlow({ onImported, initialName = '' }: { onImported: (r: I
               label="Conteúdo (CSV ou colado da planilha)"
               required
               error={errors.content}
-              hint="Até 2 MB e 2.000 registros neste MVP. Identificadores e telefones são preservados como texto."
+              tooltip="Suporta colunas opcionais de melhor horário de contato (BTTC) e fuso horário por linha."
             >
               {(p) => (
                 <Textarea
                   id={p.id}
                   ref={contentRef}
-                  rows={8}
+                  rows={9}
                   value={content}
-                  placeholder={'id;nome;telefone1;whatsapp1;email\n00123;Maria Silva;11999990000;11999990000;maria@ex.com'}
+                  placeholder={
+                    'id;nome;telefone1;whatsapp1;email;bttc_inicio;bttc_fim\n' +
+                    '00123;Maria Silva;11999990000;11999990000;maria@ex.com;14:00;18:00\n' +
+                    '00124;João Souza;11999991111;11999991111;joao@ex.com;09:30;12:00'
+                  }
                   onChange={(e) => {
                     setContent(e.target.value);
                     setFileName(null);
@@ -197,8 +220,8 @@ export function ImportFlow({ onImported, initialName = '' }: { onImported: (r: I
                 />
               )}
             </Field>
-            <div className="flex flex-col gap-3 md:w-56">
-              <label className="flex cursor-pointer flex-col items-center gap-1 rounded-lg border border-dashed border-slate-300 bg-white p-4 text-center text-sm hover:border-brand-400">
+            <div className="flex flex-col gap-3 md:w-64">
+              <label className="flex cursor-pointer flex-col items-center gap-1 rounded-lg border border-dashed border-slate-300 bg-white p-3.5 text-center text-sm hover:border-brand-400">
                 <FileUp className="size-5 text-brand-700" aria-hidden />
                 <span className="font-medium">Escolher arquivo CSV</span>
                 <span className="text-xs text-slate-500">{fileName ?? 'nenhum arquivo'}</span>
@@ -222,6 +245,47 @@ export function ImportFlow({ onImported, initialName = '' }: { onImported: (r: I
                 )}
               </Field>
               <Checkbox label="A primeira linha contém os nomes" checked={hasHeader} onChange={(e) => setHasHeader(e.target.checked)} />
+
+              <div className="pt-2 border-t border-slate-200/80 space-y-2.5">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">
+                  Preferência Horária (BTTC)
+                </span>
+                <Field
+                  label="Fuso horário padrão"
+                  tooltip="Fuso civil de referência para interpretar as janelas BTTC caso o arquivo não especifique fuso por linha."
+                >
+                  {(p) => (
+                    <Select id={p.id} value={defaultTimezone} onChange={(e) => setDefaultTimezone(e.target.value)} className="text-xs">
+                      <option value="America/Sao_Paulo">America/Sao_Paulo (Brasília · Padrão)</option>
+                      <option value="America/Manaus">America/Manaus (Amazonas)</option>
+                      <option value="America/Cuiaba">America/Cuiaba (Mato Grosso)</option>
+                      <option value="America/Belem">America/Belem (Pará)</option>
+                      <option value="America/Fortaleza">America/Fortaleza (Nordeste)</option>
+                      <option value="America/Recife">America/Recife (Pernambuco)</option>
+                      <option value="America/Rio_Branco">America/Rio_Branco (Acre)</option>
+                      <option value="America/Noronha">America/Noronha (Fernando de Noronha)</option>
+                      <option value="UTC">UTC (Universal)</option>
+                    </Select>
+                  )}
+                </Field>
+                <Field
+                  label="Duração da janela (minutos)"
+                  tooltip="Duração padrão aplicada quando a base trouxer apenas horário de início (ex: 14:00 + 120min = término 16:00)."
+                >
+                  {(p) => (
+                    <Input
+                      id={p.id}
+                      type="number"
+                      min={15}
+                      max={720}
+                      placeholder="Opcional (ex: 120)"
+                      value={defaultDurationMinutes}
+                      onChange={(e) => setDefaultDurationMinutes(e.target.value)}
+                      className="text-xs font-mono"
+                    />
+                  )}
+                </Field>
+              </div>
             </div>
           </div>
           <div className="flex justify-end">
