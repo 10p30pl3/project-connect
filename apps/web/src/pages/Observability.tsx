@@ -27,7 +27,6 @@ import {
   Loading,
   PageHeader,
   Pager,
-  Stat,
   TableWrap,
 } from '../components/ui';
 
@@ -63,33 +62,6 @@ export function ObservabilityPage() {
           </Link>
         }
       />
-
-      {/* Indicadores de Conformidade */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat
-          label="Status da Trilha"
-          value="Ativa · Imutável"
-          tone="good"
-          tooltip="Gravação atômica em log imutável de todas as mutações e ações de campanha."
-        />
-        <Stat
-          label="Conformidade LGPD"
-          value="Art. 20 Pleno"
-          tone="good"
-          tooltip="Garantia legal de auditabilidade sobre todas as decisões automatizadas e critérios de inteligência artificial."
-        />
-        <Stat
-          label="Registros nesta página"
-          value={String(filteredItems.length)}
-          tooltip="Total de eventos na página atual do log de auditoria operacional."
-        />
-        <Stat
-          label="Revisão Humana"
-          value="Disponível"
-          tone="good"
-          tooltip="Possibilidade de auditoria e intervenção manual com justificativa formal registrada."
-        />
-      </div>
 
       <Card title="Trilha de Eventos e Auditoria Governamental" padded={false}>
         <div className="p-4 border-b border-slate-200/80 bg-slate-50/50 flex flex-wrap items-center justify-between gap-3">
