@@ -22,8 +22,12 @@
 html, body, #root { height: 100%; }
 body { @apply bg-slate-50 text-slate-900 antialiased; font-size: 14px; }
 
-:focus-visible { outline: 2px solid var(--color-brand-600); outline-offset: 2px; }
-input:focus-visible, textarea:focus-visible, select:focus-visible { outline: none; }
+:focus-visible { outline: 2px solid #94a3b8; outline-offset: 2px; }
+input:focus, textarea:focus, select:focus, form:focus,
+input:focus-visible, textarea:focus-visible, select:focus-visible, form:focus-visible,
+input:focus-within, textarea:focus-within, select:focus-within, form:focus-within {
+  outline: none !important;
+}
 
 .tabular { font-variant-numeric: tabular-nums; }
 

@@ -143,6 +143,29 @@ export async function seed(opts: { withSampleMailing?: boolean } = {}) {
     const voice = await conn('Discador simulado', 'VOICE', 0.12, {
       NO_ANSWER: 4, BUSY: 1, CPC_NO_DEAL: 2, CONVERSION: 1.2, WRONG_PERSON: 0.8, INVALID_NUMBER: 0.5, OPT_OUT: 0.2, RESULT_UNKNOWN: 0.4,
     });
+    const directCallVoice = await (async () => {
+      const ex = await one(c, `SELECT id FROM connections WHERE workspace_id=$1 AND name='Discador IA · Tronco Direct Call'`, [wsId]);
+      if (ex) return ex.id as string;
+      return (await one(
+        c,
+        `INSERT INTO connections (workspace_id, name, channel_type, provider, config, webhook_secret, tariff, tariff_updated_at)
+         VALUES ($1, 'Discador IA · Tronco Direct Call', 'VOICE', 'VOICE_APP', $2, $3, 0.08, now()) RETURNING id`,
+        [
+          wsId,
+          JSON.stringify({
+            voiceAppBaseUrl: 'http://127.0.0.1:5050',
+            voiceAppToken: 'voll-token-prod',
+            trunkName: 'Direct Call (SIP Trunk)',
+            sipServer: 'sip.directcall.com.br',
+            sipPort: 5060,
+            sipTransport: 'UDP',
+            defaultCallerId: '+551140030000',
+          }),
+          randomBytes(24).toString('hex'),
+        ],
+      ))!.id as string;
+    })();
+
     const whatsapp = await conn('WhatsApp simulado', 'WHATSAPP', 0.05, {
       READ_NO_REPLY: 4, REPLIED: 2, CONVERSION: 1, OPT_OUT: 0.3, RESULT_UNKNOWN: 0.3,
     });
@@ -155,6 +178,7 @@ export async function seed(opts: { withSampleMailing?: boolean } = {}) {
       await c.query(`INSERT INTO journey_versions (journey_id, version, steps) VALUES ($1,1,$2)`, [j!.id, JSON.stringify(steps)]);
     };
     await journey('Discador', [{ channelType: 'VOICE', connectionId: voice, feedbackTimeoutMinutes: 2 }]);
+    await journey('Voz IA · Tronco Direct Call', [{ channelType: 'VOICE', connectionId: directCallVoice, feedbackTimeoutMinutes: 3 }]);
     await journey('WhatsApp → Discador', [
       { channelType: 'WHATSAPP', connectionId: whatsapp, feedbackTimeoutMinutes: 5 },
       { channelType: 'VOICE', connectionId: voice, feedbackTimeoutMinutes: 2 },

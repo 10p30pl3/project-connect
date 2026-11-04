@@ -152,9 +152,28 @@ const CONNECTIONS: Connection[] = [
       noReturnRate: 0.05,
     },
   },
+  {
+    id: uuid(33),
+    name: 'Discador IA · Tronco Direct Call',
+    channelType: 'VOICE',
+    provider: 'VOICE_APP',
+    tariff: 0.08,
+    tariffUpdatedAt: '2026-11-04T12:00:00Z',
+    active: true,
+    simulation: null,
+  },
 ];
 
 const JOURNEYS: Journey[] = [
+  {
+    id: uuid(44),
+    name: 'Voz IA · Tronco Direct Call',
+    latestVersion: {
+      id: uuid(45),
+      version: 1,
+      steps: [{ channelType: 'VOICE', connectionId: uuid(33), connectionName: 'Discador IA · Tronco Direct Call', feedbackTimeoutMinutes: 3 }],
+    },
+  },
   {
     id: uuid(40),
     name: 'Discador',
@@ -758,10 +777,10 @@ function buildImportPreview(body: any): ImportPreview {
         return { column: h, target: 'digital1', digitalType: 'WHATSAPP', type: 'text', required: false };
       if (lower.includes('email'))
         return { column: h, target: 'email', type: 'text', required: false };
-      if (lower.includes('inicio') || lower.includes('start') || lower.includes('bttc') || lower.includes('btc') || lower.includes('melhor_horario'))
-        return { column: h, target: 'best_contact_start', type: 'text', required: false };
       if (lower.includes('fim') || lower.includes('end') || lower.includes('ate'))
         return { column: h, target: 'best_contact_end', type: 'text', required: false };
+      if (lower.includes('inicio') || lower.includes('start') || lower.includes('bttc') || lower.includes('btc') || lower.includes('melhor_horario'))
+        return { column: h, target: 'best_contact_start', type: 'text', required: false };
       if (lower.includes('duracao') || lower.includes('duration') || lower.includes('janela'))
         return { column: h, target: 'best_contact_duration', type: 'text', required: false };
       if (lower.includes('fuso') || lower.includes('timezone') || lower.includes('tz') || lower.includes('iana'))
@@ -1414,6 +1433,47 @@ export async function handleMockApi<T = unknown>(
     return pf as T;
   }
 
+  function triggerVoiceAppCalls(c: CampaignDetail) {
+    const usesVoiceApp = c.journey?.steps?.some(
+      (s: any) => s.connectionId === uuid(33) || (s.connectionName ?? '').includes('Direct Call') || s.channelType === 'VOICE',
+    );
+    if (usesVoiceApp && typeof fetch !== 'undefined') {
+      const mailing = MAILINGS.find((m) => m.detail.id === c.mailing?.id) ?? MAILINGS[0];
+      const contactsToDial = (mailing?.records ?? []).slice(0, 5);
+      for (const r of contactsToDial) {
+        const attemptId = nextUuid();
+        const rawPhone =
+          r.fields?.telefone ||
+          r.fields?.telefone1 ||
+          r.fields?.phone ||
+          r.fields?.phone_1 ||
+          r.fields?.primary_phone ||
+          Object.values(r.fields || {}).find((v) => String(v).replace(/\D/g, '').length >= 10) ||
+          '11987654321';
+        const digits = String(rawPhone).replace(/\D/g, '');
+        const phone = digits.startsWith('55') ? `+${digits}` : `+55${digits}`;
+        void fetch('http://127.0.0.1:5050/v1/calls', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Idempotency-Key': attemptId,
+          },
+          body: JSON.stringify({
+            attemptId,
+            to: phone,
+            callerId: '+551140030000',
+            trunkName: 'Direct Call (SIP Trunk)',
+            contact: {
+              externalId: r.externalId,
+              name: r.name,
+            },
+            campaign: { id: c.id, name: c.name },
+          }),
+        }).catch(() => {});
+      }
+    }
+  }
+
   // Campaigns
   if (pathname === '/campaigns' && method === 'GET') {
     const status = searchParams.get('status') ?? '';
@@ -1461,6 +1521,9 @@ export async function handleMockApi<T = unknown>(
     };
     CAMPAIGNS.unshift(camp);
     DRAFT = null;
+    if (status === 'RUNNING') {
+      triggerVoiceAppCalls(camp);
+    }
     return camp as T;
   }
   const campActionMatch = pathname.match(/^\/campaigns\/([^/]+)\/(start|pause|resume|close|archive)$/);
@@ -1474,6 +1537,8 @@ export async function handleMockApi<T = unknown>(
       c.startedAt ??= new Date().toISOString();
       c.operationalState = 'PROCESSING';
       c.operationalExplanation = 'Processando: reservas e envios em andamento.';
+
+      triggerVoiceAppCalls(c);
     } else if (act === 'pause') {
       c.status = 'PAUSED';
       c.statusLabel = CAMPAIGN_STATUS_LABEL.PAUSED;

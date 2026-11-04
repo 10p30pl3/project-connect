@@ -1923,7 +1923,7 @@ function UnifiedCampaignCreator({
                         id="save-as-template-check"
                         checked={saveAsTemplate}
                         onChange={(e) => setSaveAsTemplate(e.target.checked)}
-                        className="size-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
+                        className="size-4 rounded border-slate-300 accent-slate-900 focus:ring-slate-300 cursor-pointer"
                       />
                       <label htmlFor="save-as-template-check" className="text-xs font-medium text-slate-700 cursor-pointer">
                         Salvar campanha como template

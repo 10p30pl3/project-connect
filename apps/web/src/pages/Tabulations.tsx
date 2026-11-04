@@ -240,7 +240,7 @@ export function TabulationsSection({
                             if (e.key === 'Enter' || e.key === 'Escape') setEditingNameId(null);
                           }}
                           onBlur={() => setEditingNameId(null)}
-                          className="w-full max-w-xs rounded-lg border border-brand-300 bg-white px-2.5 py-1 text-xs font-bold text-slate-900 shadow-2xs focus:outline-hidden focus:ring-2 focus:ring-brand-500"
+                          className="w-full max-w-xs rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-bold text-slate-900 shadow-2xs focus:outline-hidden focus:ring-2 focus:ring-slate-200"
                           placeholder="Nome da tabulação"
                         />
                         <Badge tone="gray">{t.code}</Badge>
@@ -396,7 +396,7 @@ export function TabulationsSection({
                                 if (e.key === 'Enter' || e.key === 'Escape') setEditingNameId(null);
                               }}
                               onBlur={() => setEditingNameId(null)}
-                              className="w-full max-w-xs rounded-lg border border-brand-300 bg-white px-2 py-1 text-xs font-medium text-slate-800 shadow-2xs focus:outline-hidden focus:ring-2 focus:ring-brand-500"
+                              className="w-full max-w-xs rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-medium text-slate-800 shadow-2xs focus:outline-hidden focus:ring-2 focus:ring-slate-200"
                               placeholder="Nome da tabulação"
                             />
                           </div>

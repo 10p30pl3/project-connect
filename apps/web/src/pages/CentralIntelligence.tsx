@@ -481,7 +481,7 @@ export function CentralIntelligencePage() {
                       type="time"
                       value={dispatchTime}
                       onChange={(e) => setDispatchTime(e.target.value || '08:00')}
-                      className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-800 shadow-2xs focus:border-brand-500 focus:outline-none"
+                      className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-800 shadow-2xs focus:border-slate-400 focus:outline-none"
                     />
                     <InfoTooltip content="Horário diário em que cada onda do teste será despachada automaticamente. Padrão: 08:00." />
                   </div>
@@ -611,7 +611,7 @@ export function CentralIntelligencePage() {
                       type="time"
                       value={dispatchTime}
                       onChange={(e) => setDispatchTime(e.target.value || '08:00')}
-                      className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-800 shadow-2xs focus:border-brand-500 focus:outline-none"
+                      className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-800 shadow-2xs focus:border-slate-400 focus:outline-none"
                     />
                   )}
                 </Field>
