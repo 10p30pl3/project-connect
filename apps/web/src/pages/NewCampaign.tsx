@@ -1548,13 +1548,14 @@ function UnifiedCampaignCreator({
                         e.preventDefault();
                         void handleSendChatMessage();
                       }}
-                      className="rounded-xl border border-slate-300 bg-white p-2 shadow-xs focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 transition flex flex-col gap-1.5"
+                      className="rounded-xl border border-slate-300 bg-white p-2 shadow-xs focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-slate-100 transition flex flex-col gap-1.5"
                     >
-                      <Textarea
+                      <textarea
                         id="ai-prompt-input"
                         rows={2}
                         disabled={isAiTyping}
-                        className="w-full border-0 p-1 text-xs text-slate-800 placeholder-slate-400 focus:ring-0 resize-none leading-relaxed"
+                        style={{ outline: 'none', boxShadow: 'none' }}
+                        className="w-full border-0 border-none bg-transparent p-1 text-xs text-slate-800 placeholder-slate-400 outline-none focus:outline-none focus:border-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 resize-none leading-relaxed shadow-none"
                         placeholder="Escreva sua mensagem ou responda ao assistente (ex: Cobrança B2B acima de R$ 1.000 via WhatsApp e Voz)..."
                         value={chatInput}
                         onChange={(e) => setChatInput(e.target.value)}
@@ -2702,7 +2703,7 @@ function UnifiedCampaignCreator({
                 <Textarea
                   id="campaign-prompt"
                   rows={3}
-                  className="font-sans text-sm p-3.5 rounded-xl border-slate-200 focus:border-brand-500"
+                  className="font-sans text-sm p-3.5 rounded-xl border-slate-200 focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
                   placeholder="Ex: Cobrança preventiva recente 15 a 30 dias com foco em WhatsApp e menor custo por CPC..."
                   value={promptText}
                   onChange={(e) => setPromptText(e.target.value)}

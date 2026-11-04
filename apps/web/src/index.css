@@ -23,6 +23,7 @@ html, body, #root { height: 100%; }
 body { @apply bg-slate-50 text-slate-900 antialiased; font-size: 14px; }
 
 :focus-visible { outline: 2px solid var(--color-brand-600); outline-offset: 2px; }
+input:focus-visible, textarea:focus-visible, select:focus-visible { outline: none; }
 
 .tabular { font-variant-numeric: tabular-nums; }
 
