@@ -18,6 +18,33 @@ export type ValidatedRow = ParsedRow & {
   destinations: { channelType: 'VOICE' | 'WHATSAPP' | 'SMS' | 'EMAIL'; address: string; priority: number; label: string }[];
 };
 
+export type ImporterOptions = {
+  defaultTimezone?: string;
+  defaultDurationMinutes?: number;
+  idempotencyKey?: string;
+};
+
+export function parseTime(v: string): number | null {
+  const s = v.trim();
+  if (!s) return null;
+  const m = s.match(/^(\d{1,2}):(\d{2})(:(\d{2}))?$/);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h < 0 || h > 23 || min < 0 || min > 59) return null;
+  return h * 60 + min;
+}
+
+export function isValidTimezone(tz: string): boolean {
+  if (!tz || typeof tz !== 'string') return false;
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone: tz.trim() });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const strip = (s: string) =>
   s
     .normalize('NFD')
@@ -74,6 +101,14 @@ export function suggestMapping(headers: string[], sample: ParsedRow[]): ColumnMa
       target = `digital${++digitalN}` as MappingTarget;
       digitalType = d[1] === 'sms' ? 'SMS' : d[1] === 'digital' ? undefined : 'WHATSAPP';
     } else if (['historico', 'tentativashistorico', 'historicototal', 'historytotal'].includes(k)) target = 'history_total';
+    else if (['melhorhorarioinicio', 'horarioinicio', 'horariode', 'horade', 'bestcontactstart', 'btcstart', 'dehorario'].includes(k) && !used.has('best_contact_start'))
+      target = 'best_contact_start';
+    else if (['melhorhorariofim', 'horariofim', 'horarioate', 'horaate', 'bestcontactend', 'btcend', 'atehorario'].includes(k) && !used.has('best_contact_end'))
+      target = 'best_contact_end';
+    else if (['duracao', 'duracaojanela', 'janelaminutos', 'btcduration', 'duracaojanelaminutos'].includes(k) && !used.has('best_contact_duration'))
+      target = 'best_contact_duration';
+    else if (['fuso', 'fusohorario', 'timezone', 'btctimezone', 'iana'].includes(k) && !used.has('best_contact_timezone'))
+      target = 'best_contact_timezone';
     used.add(target);
     let type: ColumnMapping['type'] = 'text';
     if (target === 'attribute') {
@@ -145,13 +180,35 @@ export function schemaErrors(mapping: ColumnMapping[], headers: string[], totalR
   return errs;
 }
 
-export function validateRow(row: ParsedRow, mapping: ColumnMapping[]): ValidatedRow {
+export function validateRow(row: ParsedRow, mapping: ColumnMapping[], options?: ImporterOptions): ValidatedRow {
   const out: ValidatedRow = { ...row, errors: [], typed: {}, destinations: [] };
   const seenAddr = new Set<string>();
+
+  let btcStartVal: string | null = null;
+  let btcEndVal: string | null = null;
+  let btcDurationVal: string | null = null;
+  let btcTzVal: string | null = null;
+
   for (const m of mapping) {
     const v = row.values[m.column] ?? '';
     if (m.required && !v) out.errors.push(`${m.column}: obrigatório`);
     if (m.target === 'ignore') continue;
+    if (m.target === 'best_contact_start') {
+      if (v) btcStartVal = v;
+      continue;
+    }
+    if (m.target === 'best_contact_end') {
+      if (v) btcEndVal = v;
+      continue;
+    }
+    if (m.target === 'best_contact_duration') {
+      if (v) btcDurationVal = v;
+      continue;
+    }
+    if (m.target === 'best_contact_timezone') {
+      if (v) btcTzVal = v;
+      continue;
+    }
     if (m.target === 'external_id') {
       if (!v) out.errors.push(`${m.column}: identificador obrigatório`);
       else if (/^\d+([.,]\d+)?e[+-]?\d+$/i.test(v)) out.errors.push(`${m.column}: identificador em notação científica`);
@@ -211,15 +268,82 @@ export function validateRow(row: ParsedRow, mapping: ColumnMapping[]): Validated
     seenAddr.add(key);
     out.destinations.push({ channelType: channel, address: p.value, priority: Number(m.target.slice(-1)) || 1, label: m.column });
   }
+
+  // Validação de Best Time to Call (BTC)
+  const defaultTz = options?.defaultTimezone || 'America/Sao_Paulo';
+  const defaultDur = options?.defaultDurationMinutes;
+
+  const hasAnyBtc = btcStartVal !== null || btcEndVal !== null || btcDurationVal !== null || btcTzVal !== null;
+  if (hasAnyBtc) {
+    let startMin: number | null = null;
+    let endMin: number | null = null;
+    let durMin: number | null = defaultDur ?? null;
+    let tz = defaultTz;
+
+    if (btcStartVal !== null) {
+      startMin = parseTime(btcStartVal);
+      if (startMin === null) out.errors.push(`Horário de início inválido "${btcStartVal}" (use HH:mm)`);
+    }
+
+    if (btcEndVal !== null) {
+      endMin = parseTime(btcEndVal);
+      if (endMin === null) out.errors.push(`Horário de término inválido "${btcEndVal}" (use HH:mm)`);
+    }
+
+    if (btcDurationVal !== null) {
+      const d = Number(btcDurationVal);
+      if (Number.isFinite(d) && d > 0 && d <= 720) {
+        durMin = d;
+      } else {
+        out.errors.push(`Duração da janela inválida "${btcDurationVal}" (use de 1 a 720 minutos)`);
+      }
+    }
+
+    if (btcTzVal !== null) {
+      if (isValidTimezone(btcTzVal)) {
+        tz = btcTzVal.trim();
+      } else {
+        out.errors.push(`Fuso horário IANA desconhecido "${btcTzVal}"`);
+      }
+    } else if (!isValidTimezone(tz)) {
+      out.errors.push(`Fuso horário padrão inválido "${tz}"`);
+    }
+
+    if (startMin !== null && endMin === null && durMin !== null) {
+      endMin = startMin + durMin;
+    }
+
+    if (startMin !== null && endMin !== null) {
+      if (startMin >= endMin) {
+        out.errors.push('Janela de contato inválida: início deve ser anterior ao término no mesmo dia');
+      } else if (endMin > 1440) {
+        out.errors.push('Janela de contato inválida: término ultrapassa meia-noite (24:00)');
+      } else {
+        out.typed.btc_start_minute = startMin;
+        out.typed.btc_end_minute = endMin;
+        out.typed.btc_timezone = tz;
+        out.typed.btc_source = 'IMPORT';
+      }
+    } else if (startMin !== null || endMin !== null) {
+      out.errors.push('Horário preferencial incompleto: informe início e término ou início com duração');
+    }
+  }
+
   return out;
 }
 
-export function buildPreview(content: string, delimiter: string, hasHeader: boolean, mapping?: ColumnMapping[]) {
+export function buildPreview(
+  content: string,
+  delimiter: string,
+  hasHeader: boolean,
+  mapping?: ColumnMapping[],
+  options?: ImporterOptions,
+) {
   const parsed = parseContent(content, delimiter, hasHeader);
   const suggested = suggestMapping(parsed.headers, parsed.rows.slice(0, 100));
   const effective = mapping && mapping.length ? mapping : suggested;
   const sErr = schemaErrors(effective, parsed.headers, parsed.rows.length);
-  const validated = parsed.rows.slice(0, MAX_ROWS).map((r) => validateRow(r, effective));
+  const validated = parsed.rows.slice(0, MAX_ROWS).map((r) => validateRow(r, effective, options));
   const rejected = validated.filter((r) => r.errors.length);
   // destaca primeiro os rejeitados na amostra
   const sample = [...rejected.slice(0, 50), ...validated.filter((r) => !r.errors.length)].slice(0, PREVIEW_ROWS);
@@ -248,12 +372,36 @@ export async function commitImport(
   userId: string | null,
   name: string,
   preview: ReturnType<typeof buildPreview>,
+  options?: ImporterOptions,
 ) {
   const { parsed, effective, validated } = preview;
   const valid = validated.filter((r) => !r.errors.length);
   const rejected = validated.filter((r) => r.errors.length);
+
+  if (options?.idempotencyKey) {
+    const existing = await c.query<{ id: string; version_id: string }>(
+      `SELECT m.id, mv.id AS version_id 
+         FROM mailings m 
+         JOIN mailing_versions mv ON mv.mailing_id = m.id AND mv.version = 1
+        WHERE m.workspace_id = $1 AND m.idempotency_key = $2`,
+      [ws.id, options.idempotencyKey],
+    );
+    if (existing.rows.length > 0) {
+      return {
+        mailingId: existing.rows[0].id,
+        versionId: existing.rows[0].version_id,
+        validRows: valid.length,
+        rejectedRows: rejected.length,
+        idempotentReplay: true,
+      };
+    }
+  }
+
   const [mailing] = (
-    await c.query(`INSERT INTO mailings (workspace_id, name, created_by) VALUES ($1,$2,$3) RETURNING id`, [ws.id, name, userId])
+    await c.query(
+      `INSERT INTO mailings (workspace_id, name, created_by, idempotency_key) VALUES ($1,$2,$3,$4) RETURNING id`,
+      [ws.id, name, userId, options?.idempotencyKey ?? null],
+    )
   ).rows;
   const report = rejected.slice(0, 5000).map((r) => ({ rowNumber: r.rowNumber, values: r.values, errors: r.errors }));
   const [version] = (

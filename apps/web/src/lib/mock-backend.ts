@@ -1259,11 +1259,11 @@ export async function handleMockApi<T = unknown>(
     const b = (opts.body ?? {}) as { channel?: string };
     const channel = b.channel ?? 'whatsapp';
     const responses: Record<string, { status: string; code: number; details: string }> = {
-      whatsapp: { status: 'Ativo', code: 200, details: 'Handshake Graph API Meta 200 OK · WABA validado' },
-      voice: { status: 'Ativo', code: 200, details: 'SIP OPTIONS 200 OK · Tronco registrado via TLS' },
-      sms: { status: 'Ativo', code: 200, details: 'SMPP BIND_TRANSMITTER_RESP 0x00000000 · Conectado' },
-      email: { status: 'Ativo', code: 200, details: 'SMTP 250 STARTTLS ready · Autenticação confirmada' },
-      rcs: { status: 'Ativo', code: 200, details: 'Google RBM Agent 200 OK · Webhook sincronizado' },
+      whatsapp: { status: 'Simulado', code: 200, details: 'Conector simulado ativo · Meta Graph API Mock' },
+      voice: { status: 'Conectado', code: 200, details: 'Voice-App Online (45ms) · FreeSWITCH: OK · Canais: 0/30' },
+      sms: { status: 'Simulado', code: 200, details: 'Conector simulado ativo · SMPP Gateway Mock' },
+      email: { status: 'Simulado', code: 200, details: 'Conector simulado ativo · SMTP Relay Mock' },
+      rcs: { status: 'Simulado', code: 200, details: 'Conector simulado ativo · Google RBM Mock' },
     };
     const res = responses[channel] ?? { status: 'Ativo', code: 200, details: 'Conexão validada com sucesso' };
     return {

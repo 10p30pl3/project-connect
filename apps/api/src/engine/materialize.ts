@@ -32,9 +32,14 @@ export async function materializeEnrollments(db: Db, campaignId: string): Promis
   let inserted = 0;
   if (rows.length) {
     const r = await db.query(
-      `INSERT INTO enrollments (campaign_id, contact_id, mailing_record_id, order_key)
-       SELECT $1, x.contact_id, x.record_id, x.order_key
+      `INSERT INTO enrollments (campaign_id, contact_id, mailing_record_id, order_key, btc_start_minute, btc_end_minute, btc_timezone, btc_source)
+       SELECT $1, x.contact_id, x.record_id, x.order_key,
+              (mr.typed_fields->>'btc_start_minute')::smallint,
+              (mr.typed_fields->>'btc_end_minute')::smallint,
+              mr.typed_fields->>'btc_timezone',
+              mr.typed_fields->>'btc_source'
          FROM unnest($2::uuid[], $3::uuid[], $4::int[]) AS x(contact_id, record_id, order_key)
+         LEFT JOIN mailing_records mr ON mr.id = x.record_id
        ON CONFLICT (campaign_id, contact_id, cycle) DO NOTHING`,
       [campaignId, rows.map((r) => r.contactId), rows.map((r) => r.recordId), rows.map((r) => r.orderKey)],
     );

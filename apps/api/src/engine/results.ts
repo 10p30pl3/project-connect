@@ -21,11 +21,22 @@ export async function processConnectorEvent(
        VALUES ($1,$2,$3,$4,$5) ON CONFLICT (connection_id, external_event_id) DO NOTHING RETURNING id`,
       [connection.workspace_id, connection.id, ev.eventId, ev.type, JSON.stringify(raw)],
     );
-    const attempt = await one(
+    let attempt = await one(
       c,
       `SELECT * FROM attempts WHERE connection_id=$1 AND provider_attempt_id=$2 FOR UPDATE`,
       [connection.id, ev.providerAttemptId],
     );
+    if (!attempt && ev.attemptId) {
+      attempt = await one(
+        c,
+        `SELECT * FROM attempts WHERE id=$1 AND connection_id=$2 FOR UPDATE`,
+        [ev.attemptId, connection.id],
+      );
+      if (attempt && !attempt.provider_attempt_id) {
+        await c.query(`UPDATE attempts SET provider_attempt_id=$2 WHERE id=$1`, [attempt.id, ev.providerAttemptId]);
+        attempt.provider_attempt_id = ev.providerAttemptId;
+      }
+    }
     if (!ins.rowCount) {
       await c.query(
         `UPDATE connector_inbox SET duplicate_count = duplicate_count + 1 WHERE connection_id=$1 AND external_event_id=$2`,

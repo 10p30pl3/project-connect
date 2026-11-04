@@ -21,6 +21,10 @@ const TARGET_LABEL: Record<MappingTarget, string> = {
   digital3: 'Digital 3 (WhatsApp/SMS)',
   email: 'E-mail',
   history_total: 'Histórico de tentativas (acumulado)',
+  best_contact_start: 'Horário de início (BTC - HH:mm)',
+  best_contact_end: 'Horário de término (BTC - HH:mm)',
+  best_contact_duration: 'Duração da janela (minutos)',
+  best_contact_timezone: 'Fuso horário IANA (ex: America/Sao_Paulo)',
   attribute: 'Campo adicional',
   ignore: 'Ignorar coluna',
 };

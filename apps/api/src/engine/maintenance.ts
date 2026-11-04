@@ -12,8 +12,10 @@ export async function expireLeases(now: Date = new Date()) {
   return tx(async (c) => {
     const rows = await q(
       c,
-      `SELECT id, workspace_id, campaign_id, contact_id, state FROM attempts
-        WHERE state='RESERVED' AND lease_until < $1 FOR UPDATE SKIP LOCKED`,
+      `SELECT id, workspace_id, campaign_id, contact_id, state FROM attempts a
+        WHERE a.state='RESERVED' AND a.lease_until < $1
+          AND NOT EXISTS (SELECT 1 FROM outbox o WHERE o.attempt_id = a.id AND o.claim_lease_until > $1)
+        FOR UPDATE SKIP LOCKED`,
       [now],
     );
     for (const a of rows) {

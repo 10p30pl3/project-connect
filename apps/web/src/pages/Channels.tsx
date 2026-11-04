@@ -625,6 +625,99 @@ function TechnicalEndpointsTab({ canEdit }: { canEdit: boolean }) {
                 />
               )}
             </Field>
+
+            <div className="pt-2 border-t border-slate-100">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                Integração Discador de Voz IA (Voice-App)
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field
+                label="URL da API do Voice-App"
+                required
+                tooltip="Endpoint HTTP onde o servidor Fastify/Node do discador de IA escuta ordens de originação de chamadas (ex: http://127.0.0.1:5050)."
+              >
+                {(ids) => (
+                  <Input
+                    id={ids.id}
+                    value={form.voice.voiceAppBaseUrl}
+                    disabled={!canEdit}
+                    onChange={(e) =>
+                      setForm({ ...form, voice: { ...form.voice, voiceAppBaseUrl: e.target.value } })
+                    }
+                    className="font-mono text-xs"
+                  />
+                )}
+              </Field>
+
+              <Field
+                label="Bearer Token do Voice-App"
+                tooltip="Token secreto para autenticação mútua de chamadas entre o Voll Connect e o voice-app."
+              >
+                {(ids) => (
+                  <Input
+                    id={ids.id}
+                    type="password"
+                    placeholder="••••••••••••••••••••••••"
+                    value={form.voice.voiceAppToken}
+                    disabled={!canEdit}
+                    onChange={(e) =>
+                      setForm({ ...form, voice: { ...form.voice, voiceAppToken: e.target.value } })
+                    }
+                    className="font-mono text-xs"
+                  />
+                )}
+              </Field>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field
+                label="Cota Simultânea por Workspace"
+                required
+                tooltip="Limite de chamadas ativas simultâneas alocadas para este cliente/workspace (fair-sharing)."
+              >
+                {(ids) => (
+                  <Input
+                    id={ids.id}
+                    type="number"
+                    min={1}
+                    value={form.voice.maxConcurrentPerWorkspace}
+                    disabled={!canEdit}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        voice: { ...form.voice, maxConcurrentPerWorkspace: Math.max(1, Number(e.target.value)) },
+                      })
+                    }
+                    className="font-mono text-xs"
+                  />
+                )}
+              </Field>
+
+              <Field
+                label="Capacidade Global do Pool"
+                required
+                tooltip="Capacidade física máxima de canais do tronco SIP/FreeSWITCH em operação."
+              >
+                {(ids) => (
+                  <Input
+                    id={ids.id}
+                    type="number"
+                    min={1}
+                    value={form.voice.maxConcurrent}
+                    disabled={!canEdit}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        voice: { ...form.voice, maxConcurrent: Math.max(1, Number(e.target.value)) },
+                      })
+                    }
+                    className="font-mono text-xs"
+                  />
+                )}
+              </Field>
+            </div>
           </div>
         </Card>
 

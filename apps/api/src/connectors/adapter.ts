@@ -4,8 +4,9 @@
  * devolver INCONCLUSIVE quando não souber se o envio foi aceito — nunca reenviar por conta própria.
  */
 import type { ChannelType } from '@voll/shared';
-import type { Client } from '../db/pool.js';
+import type { Client, Db } from '../db/pool.js';
 import { simulatedAdapter } from './simulated.js';
+import { voiceAppAdapter } from './voice-app.js';
 
 export type SendInput = {
   attempt: { id: string; destination_address: string; channel_type: ChannelType; trace_id: string };
@@ -22,11 +23,14 @@ export class TransientConnectorError extends Error {}
 
 export type ConnectorAdapter = {
   capabilities: { statusQuery: boolean; cancel: boolean; asyncResults: boolean; maxBatch: number };
-  send(c: Client, input: SendInput): Promise<SendResult>;
+  send(c: Client | Db, input: SendInput): Promise<SendResult>;
+  queryStatus?(attemptId: string, connection: any): Promise<{ status: string; result?: any }>;
+  cancel?(attemptId: string, connection: any): Promise<boolean>;
 };
 
 const registry: Record<string, ConnectorAdapter> = {
   SIMULATED: simulatedAdapter,
+  VOICE_APP: voiceAppAdapter,
 };
 
 export function getAdapter(provider: string): ConnectorAdapter {

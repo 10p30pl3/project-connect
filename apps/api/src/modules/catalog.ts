@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import {
   ChannelEndpointConfigSchema,
+  type ChannelEndpointConfig,
   ConnectionCreateSchema,
   ConnectionUpdateSchema,
   DEFAULT_CHANNEL_ENDPOINTS,
@@ -183,16 +184,27 @@ export async function catalogRoutes(app: FastifyInstance) {
     });
   });
 
-  let technicalEndpoints = { ...DEFAULT_CHANNEL_ENDPOINTS };
-
-  app.get('/channels/technical-endpoints', async () => {
-    return { data: technicalEndpoints };
+  app.get('/channels/technical-endpoints', async (req) => {
+    const a = actor(req);
+    const row = await one<{ config: ChannelEndpointConfig }>(
+      getPool(),
+      `SELECT config FROM workspace_channel_endpoints WHERE workspace_id=$1`,
+      [a.workspaceId],
+    );
+    return { data: row?.config ?? DEFAULT_CHANNEL_ENDPOINTS };
   });
 
   app.post('/channels/technical-endpoints', { preHandler: requireRoles(...CAN.admin) }, async (req) => {
+    const a = actor(req);
     const body = parse(ChannelEndpointConfigSchema, req.body);
-    technicalEndpoints = body;
-    return { ok: true, data: technicalEndpoints };
+    await getPool().query(
+      `INSERT INTO workspace_channel_endpoints (workspace_id, config, updated_at)
+       VALUES ($1, $2, now())
+       ON CONFLICT (workspace_id) DO UPDATE SET config=$2, updated_at=now()`,
+      [a.workspaceId, JSON.stringify(body)],
+    );
+    await audit(getPool(), a, 'channels.endpoints_update', 'workspace_channel_endpoints', a.workspaceId, { after: body });
+    return { ok: true, data: body };
   });
 
   app.post<{ Body: { channel: 'whatsapp' | 'voice' | 'sms' | 'email' | 'rcs' } }>(
@@ -200,19 +212,71 @@ export async function catalogRoutes(app: FastifyInstance) {
     { preHandler: requireRoles(...CAN.admin) },
     async (req) => {
       const channel = req.body?.channel ?? 'whatsapp';
+      const a = actor(req);
+      const row = await one<{ config: ChannelEndpointConfig }>(
+        getPool(),
+        `SELECT config FROM workspace_channel_endpoints WHERE workspace_id=$1`,
+        [a.workspaceId],
+      );
+      const cfg = row?.config ?? DEFAULT_CHANNEL_ENDPOINTS;
+
+      if (channel === 'voice') {
+        const voiceCfg = cfg.voice;
+        const targetUrl = voiceCfg.voiceAppBaseUrl || 'http://127.0.0.1:5050';
+        const t0 = Date.now();
+        try {
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 2500);
+          const res = await fetch(`${targetUrl.replace(/\/+$/, '')}/v1/health`, {
+            signal: controller.signal,
+            headers: voiceCfg.voiceAppToken ? { Authorization: `Bearer ${voiceCfg.voiceAppToken}` } : {},
+          });
+          clearTimeout(timeout);
+          const latencyMs = Date.now() - t0;
+          if (!res.ok) {
+            return {
+              ok: false,
+              channel: 'voice',
+              latencyMs,
+              status: 'Erro HTTP',
+              code: res.status,
+              details: `Voice-App em ${targetUrl} respondeu HTTP ${res.status}`,
+            };
+          }
+          const data: any = await res.json().catch(() => ({}));
+          return {
+            ok: true,
+            channel: 'voice',
+            latencyMs,
+            status: 'Conectado',
+            code: 200,
+            details: `Voice-App Online (${latencyMs}ms) · FreeSWITCH: ${data.freeswitch ?? 'OK'} · Canais: ${data.channelsBusy ?? 0}/${data.channelsTotal ?? voiceCfg.maxConcurrent}`,
+          };
+        } catch (err: any) {
+          const latencyMs = Date.now() - t0;
+          return {
+            ok: false,
+            channel: 'voice',
+            latencyMs,
+            status: 'Inacessível',
+            code: 503,
+            details: `Falha ao conectar em ${targetUrl}/v1/health: ${err.message ?? 'Timeout/Recusado'}`,
+          };
+        }
+      }
+
       const t0 = Date.now();
-      await new Promise((r) => setTimeout(r, 120));
+      await new Promise((r) => setTimeout(r, 60));
       const latencyMs = Date.now() - t0;
 
       const responses: Record<string, { status: string; code: number; details: string }> = {
-        whatsapp: { status: 'Ativo', code: 200, details: 'Handshake Graph API Meta 200 OK · WABA validado' },
-        voice: { status: 'Ativo', code: 200, details: 'SIP OPTIONS 200 OK · Tronco registrado via TLS' },
-        sms: { status: 'Ativo', code: 200, details: 'SMPP BIND_TRANSMITTER_RESP 0x00000000 · Conectado' },
-        email: { status: 'Ativo', code: 200, details: 'SMTP 250 STARTTLS ready · Autenticação confirmada' },
-        rcs: { status: 'Ativo', code: 200, details: 'Google RBM Agent 200 OK · Webhook sincronizado' },
+        whatsapp: { status: 'Simulado', code: 200, details: 'Conector simulado ativo · Meta Graph API Mock' },
+        sms: { status: 'Simulado', code: 200, details: 'Conector simulado ativo · SMPP Gateway Mock' },
+        email: { status: 'Simulado', code: 200, details: 'Conector simulado ativo · SMTP Relay Mock' },
+        rcs: { status: 'Simulado', code: 200, details: 'Conector simulado ativo · Google RBM Mock' },
       };
 
-      const res = responses[channel] ?? { status: 'Ativo', code: 200, details: 'Conexão validada com sucesso' };
+      const res = responses[channel] ?? { status: 'Simulado', code: 200, details: 'Canal simulado ativo' };
       return {
         ok: true,
         channel,

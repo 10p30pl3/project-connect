@@ -206,6 +206,10 @@ export const MAPPING_TARGETS = [
   'digital1', 'digital2', 'digital3',
   'email',
   'history_total',
+  'best_contact_start',
+  'best_contact_end',
+  'best_contact_duration',
+  'best_contact_timezone',
   'attribute', // campo adicional preservado em attributes
   'ignore',
 ] as const;
@@ -230,6 +234,8 @@ export const ImportPreviewSchema = z.object({
   delimiter: z.enum(['auto', ',', ';', '\t', '|']).default('auto'),
   hasHeader: z.boolean().default(true),
   mapping: z.array(ColumnMappingSchema).optional(),
+  defaultTimezone: z.string().default('America/Sao_Paulo'),
+  defaultWindowDurationMinutes: z.number().int().positive().max(720).optional(),
 });
 
 export const ImportCommitSchema = ImportPreviewSchema.extend({
@@ -237,6 +243,7 @@ export const ImportCommitSchema = ImportPreviewSchema.extend({
   mapping: z.array(ColumnMappingSchema).min(1),
   /** obrigatório quando há rejeitados (§26.5): confirma importação parcial */
   acceptPartial: z.boolean().default(false),
+  idempotencyKey: z.string().optional(),
 });
 
 export const FILTER_OPS = ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'contains', 'empty', 'not_empty'] as const;
@@ -436,10 +443,14 @@ export const CONNECTOR_EVENT_TYPES = [
 export const ConnectorEventSchema = z.object({
   eventId: z.string().min(1),
   providerAttemptId: z.string().min(1),
+  attemptId: z.string().uuid().optional(),
   type: z.enum(CONNECTOR_EVENT_TYPES),
   occurredAt: z.string().datetime({ offset: true }),
   tabulationCode: z.string().optional(),
   cost: z.number().min(0).optional(),
+  summary: z.string().optional(),
+  durationSeconds: z.number().int().min(0).optional(),
+  recordingUrl: z.string().url().optional(),
 });
 export type ConnectorEvent = z.infer<typeof ConnectorEventSchema>;
 
@@ -791,6 +802,10 @@ export const ChannelEndpointConfigSchema = z.object({
     cdrWebhookUrl: z.string().default('https://api.vollconnect.com.br/webhooks/cdr'),
     defaultCallerId: z.string().default('+551140030000'),
     outboundProxy: z.string().default('proxy.voip.vollconnect.com.br:5061'),
+    voiceAppBaseUrl: z.string().default('http://127.0.0.1:5050'),
+    voiceAppToken: z.string().default(''),
+    maxConcurrent: z.number().int().min(1).default(30),
+    maxConcurrentPerWorkspace: z.number().int().min(1).default(10),
   }),
   sms: z.object({
     smppHost: z.string().default('smpp.zenvia.vollconnect.com.br'),
@@ -833,6 +848,10 @@ export const DEFAULT_CHANNEL_ENDPOINTS: ChannelEndpointConfig = {
     cdrWebhookUrl: 'https://api.vollconnect.com.br/webhooks/cdr',
     defaultCallerId: '+551140030000',
     outboundProxy: 'proxy.voip.vollconnect.com.br:5061',
+    voiceAppBaseUrl: 'http://127.0.0.1:5050',
+    voiceAppToken: '',
+    maxConcurrent: 30,
+    maxConcurrentPerWorkspace: 10,
   },
   sms: {
     smppHost: 'smpp.zenvia.vollconnect.com.br',

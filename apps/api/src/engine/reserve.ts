@@ -127,18 +127,34 @@ export async function runReservations(campaignId: string, now: Date = new Date()
   const budget = Math.min(rt.strategy.distribution.batchSize, rt.strategy.distribution.maxPending - pending);
   if (budget <= 0) return { reserved: 0, evaluated: 0 };
 
+  const defaultTz = rt.timezone || 'America/Sao_Paulo';
+
   const cands = await q<EnrollmentRow>(
     pool,
-    `SELECT e.id, e.contact_id, e.state, e.stage, e.destination_cursor, e.next_eligible_at, e.order_key
-       FROM enrollments e
-      WHERE e.campaign_id=$1 AND e.state='ACTIVE' AND e.next_eligible_at <= $2
-        AND NOT EXISTS (SELECT 1 FROM attempts a WHERE a.workspace_id=$3 AND a.contact_id=e.contact_id
-                          AND a.state IN ('RESERVED','SENT','AWAITING_FEEDBACK','RECONCILIATION'))
-        AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.workspace_id=$3 AND b.contact_id=e.contact_id
-                          AND b.scope='CONTACT' AND b.revoked_at IS NULL)
-      ORDER BY e.last_evaluated_at NULLS FIRST, e.order_key
+    `WITH evaluated_cands AS (
+       SELECT e.id, e.contact_id, e.state, e.stage, e.destination_cursor, e.next_eligible_at, e.order_key, e.last_evaluated_at,
+              e.btc_start_minute, e.btc_end_minute, e.btc_timezone,
+              EXTRACT(HOUR FROM $2 AT TIME ZONE COALESCE(e.btc_timezone, $5)) * 60 +
+              EXTRACT(MINUTE FROM $2 AT TIME ZONE COALESCE(e.btc_timezone, $5)) AS cur_min
+         FROM enrollments e
+        WHERE e.campaign_id=$1 AND e.state='ACTIVE' AND e.next_eligible_at <= $2
+          AND NOT EXISTS (SELECT 1 FROM attempts a WHERE a.workspace_id=$3 AND a.contact_id=e.contact_id
+                            AND a.state IN ('RESERVED','SENT','AWAITING_FEEDBACK','RECONCILIATION'))
+          AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.workspace_id=$3 AND b.contact_id=e.contact_id
+                            AND b.scope='CONTACT' AND b.revoked_at IS NULL)
+     )
+     SELECT id, contact_id, state, stage, destination_cursor, next_eligible_at, order_key
+       FROM evaluated_cands
+      ORDER BY 
+        CASE
+          WHEN btc_start_minute IS NOT NULL AND btc_start_minute <= cur_min AND btc_end_minute > cur_min THEN 0
+          WHEN btc_start_minute IS NULL THEN 1
+          ELSE 2
+        END ASC,
+        last_evaluated_at NULLS FIRST,
+        order_key ASC
       LIMIT $4`,
-    [campaignId, now, rt.workspaceId, budget * 4],
+    [campaignId, now, rt.workspaceId, budget * 4, defaultTz],
   );
   if (!cands.length) return { reserved: 0, evaluated: 0 };
   const ctxs = await buildContexts(pool, rt, cands, now);

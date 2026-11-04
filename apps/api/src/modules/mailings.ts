@@ -119,13 +119,23 @@ export async function mailingRoutes(app: FastifyInstance) {
 
   app.post('/imports/preview', { preHandler: requireRoles(...CAN.manageData) }, async (req) => {
     const body = parse(ImportPreviewSchema, req.body);
-    return buildPreview(body.content, body.delimiter, body.hasHeader, body.mapping).response;
+    const opts = {
+      defaultTimezone: body.defaultTimezone,
+      defaultDurationMinutes: body.defaultWindowDurationMinutes,
+    };
+    return buildPreview(body.content, body.delimiter, body.hasHeader, body.mapping, opts).response;
   });
 
   app.post('/imports', { preHandler: requireRoles(...CAN.manageData) }, async (req, reply) => {
     const body = parse(ImportCommitSchema, req.body);
     const a = actor(req);
-    const preview = buildPreview(body.content, body.delimiter, body.hasHeader, body.mapping);
+    const key = (req.headers['idempotency-key'] as string | undefined) || body.idempotencyKey;
+    const opts = {
+      defaultTimezone: body.defaultTimezone,
+      defaultDurationMinutes: body.defaultWindowDurationMinutes,
+      idempotencyKey: key,
+    };
+    const preview = buildPreview(body.content, body.delimiter, body.hasHeader, body.mapping, opts);
     const r = preview.response;
     if (r.schemaErrors.length) throw unprocessable(r.schemaErrors.join('; '), { mapping: r.schemaErrors[0] });
     if (r.validRows === 0) throw unprocessable('Nenhum registro válido para importar');
@@ -135,9 +145,9 @@ export async function mailingRoutes(app: FastifyInstance) {
         { acceptPartial: 'Confirme a importação parcial' },
       );
     const result = await tx(async (c) => {
-      const res = await commitImport(c, { id: a.workspaceId }, a.userId, body.name, preview);
+      const res = await commitImport(c, { id: a.workspaceId }, a.userId, body.name, preview, opts);
       await audit(c, a, 'mailing.import', 'mailing', res.mailingId, {
-        after: { name: body.name, validRows: res.validRows, rejectedRows: res.rejectedRows },
+        after: { name: body.name, validRows: res.validRows, rejectedRows: res.rejectedRows, idempotent: (res as any).idempotentReplay ?? false },
       });
       return res;
     });
