@@ -9,11 +9,9 @@ import {
   KeyRound,
   RefreshCw,
   Server,
-  ShieldCheck,
   Sparkles,
   Trash2,
   XCircle,
-  Cpu,
   Database,
 } from 'lucide-react';
 import { get, post, errorMessage } from '../lib/api';
@@ -394,43 +392,6 @@ export function SystemPage() {
             </div>
           </Card>
 
-          {/* Card de Privacidade e Segurança (100% no padrão tooltip (?)) */}
-          <Card
-            title={
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="size-5 text-emerald-600" />
-                <span>Privacidade & Segurança</span>
-              </div>
-            }
-            tooltip="Políticas de retenção de credenciais, criptografia de tráfego e conformidade com a LGPD no processamento de inteligência artificial."
-          >
-            <div className="divide-y divide-slate-100 text-sm">
-              <div className="py-2.5 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-1.5 text-slate-700 font-medium">
-                  <span>Criptografia de Credenciais</span>
-                  <InfoTooltip content="Sua chave de API é enviada via TLS criptografada e nunca é compartilhada com outros clientes ou terceiros." />
-                </div>
-                <Badge tone="green">TLS Ponta a Ponta</Badge>
-              </div>
-
-              <div className="py-2.5 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-1.5 text-slate-700 font-medium">
-                  <span>Fallback Automático</span>
-                  <InfoTooltip content="Caso ocorra indisponibilidade temporária na OpenAI, limite de cota excedido ou falta de saldo, o Assistente Interativo Integrado Voll Connect assume automaticamente sem interromper a operação." />
-                </div>
-                <Badge tone="blue">Motor Local Integrado</Badge>
-              </div>
-
-              <div className="py-2.5 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-1.5 text-slate-700 font-medium">
-                  <span>Conformidade com a LGPD</span>
-                  <InfoTooltip content="Nenhum dado pessoal sensível dos contatos é gravado ou utilizado para retreinar modelos públicos de terceiros." />
-                </div>
-                <Badge tone="green">LGPD Compliant</Badge>
-              </div>
-            </div>
-          </Card>
-
           {/* Gerenciamento da Base de Dados (Zerar ou Seed Demo) */}
           <Card
             title={
@@ -523,47 +484,6 @@ export function SystemPage() {
                 Gerenciar chaves na OpenAI
                 <ExternalLink className="size-3" />
               </a>
-            </div>
-          </Card>
-
-          <Card
-            title={
-              <div className="flex items-center gap-2">
-                <Cpu className="size-5 text-slate-700" />
-                <span>Conectores Operacionais</span>
-              </div>
-            }
-            tooltip="Status em tempo real das conexões de mensageria, telefonia e entregabilidade multicanal."
-          >
-            <div className="space-y-2.5 text-sm">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1 text-slate-600">
-                  <span>WhatsApp Cloud API</span>
-                  <InfoTooltip content="Conector oficial Meta Cloud API para envio de mensagens ativas e templates aprovados." />
-                </div>
-                <Badge tone="green">Ativo</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1 text-slate-600">
-                  <span>Discador Preditivo & SIP</span>
-                  <InfoTooltip content="Tronco SIP com detecção de secretária eletrônica (AMD) e distribuição automática de chamadas." />
-                </div>
-                <Badge tone="green">Ativo</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1 text-slate-600">
-                  <span>Gateway SMS</span>
-                  <InfoTooltip content="Roteamento SMPP de alta vazão para mensagens de texto curtas." />
-                </div>
-                <Badge tone="green">Ativo</Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1 text-slate-600">
-                  <span>E-mail Transacional</span>
-                  <InfoTooltip content="Provedor SMTP/API com monitoramento de taxa de abertura e entregabilidade de faturas." />
-                </div>
-                <Badge tone="green">Ativo</Badge>
-              </div>
             </div>
           </Card>
         </div>
