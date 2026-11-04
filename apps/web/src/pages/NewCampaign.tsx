@@ -1054,6 +1054,27 @@ function UnifiedCampaignCreator({
     handleSendChatMessage(tmpl.prompt);
   };
 
+  const handleResetChat = () => {
+    setChatMessages([
+      {
+        id: 'welcome',
+        sender: 'assistant',
+        text: 'Olá! Sou o assistente de IA da Voll Connect. Qual campanha vamos criar hoje? Você pode descrever o objetivo com suas palavras ou escolher uma das opções abaixo para começarmos:',
+        missingInfo: 'PURPOSE',
+        suggestedReplies: [
+          'Cobrança de faturas em atraso',
+          'Venda ativa de planos e ofertas',
+          'Confirmação de agendamentos (D-1 e D-0)',
+        ],
+        timestamp: new Date(),
+      },
+    ]);
+    setChatInput('');
+    setAiExtracted({});
+    setSelectedMailingId('');
+    toast('info', 'Conversa reiniciada.');
+  };
+
   const handleSelectPurpose = (purp: 'COBRANCA' | 'VENDAS' | 'AGENDAMENTOS') => {
     setPurposeCode(purp);
     const tmpl = PROMPT_TEMPLATES.find((t) => t.purposeCode === purp) ?? PROMPT_TEMPLATES[0];
@@ -1269,296 +1290,316 @@ function UnifiedCampaignCreator({
           {/* PASSO 1 DA IA: OBJETIVO E MAILING (CHAT CONVERSACIONAL COM OPENAI API) */}
           {aiStep === 1 && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-              {/* Coluna Principal da Esquerda: Chat Conversacional com IA */}
-              <div className="lg:col-span-8 space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <h2 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                      <Sparkles className="size-4.5 text-brand-600" />
-                      <span>Assistente de IA · Criação Interativa</span>
-                      <InfoTooltip content="Converse em linguagem natural. A IA extrai os parâmetros e pergunta apenas o que falta para montar sua campanha." />
-                      <Badge tone={isOpenAiConfigured ? 'green' : 'brand'}>
-                        {isOpenAiConfigured ? `OpenAI · ${aiStatusQ.data?.model || openAiModelInput}` : 'OpenAI Ready · Assistente Ativo'}
-                      </Badge>
-                    </h2>
-                  </div>
-
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    icon={<KeyRound className="size-3.5 text-brand-700" />}
-                    onClick={() => setOpenAiModalOpen(true)}
-                  >
-                    {isOpenAiConfigured ? 'Configurar OpenAI' : 'Conectar OpenAI API'}
-                  </Button>
-                </div>
-
-                {/* Janela de Histórico do Chat */}
-                <div
-                  ref={chatScrollRef}
-                  className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50/60 to-white p-4 h-[360px] overflow-y-auto space-y-3.5 shadow-2xs"
-                >
-                  {chatMessages.map((msg, idx) => {
-                    const isLastAssistant = msg.sender === 'assistant' && idx === chatMessages.length - 1;
-                    return (
-                      <div
-                        key={msg.id}
-                        className={clsx(
-                          'flex gap-2.5 max-w-[88%] text-xs leading-relaxed',
-                          msg.sender === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto',
-                        )}
-                      >
-                        {msg.sender === 'assistant' ? (
-                          <div className="grid size-7 place-items-center rounded-full bg-brand-700 text-white shrink-0 mt-0.5 shadow-2xs">
-                            <Sparkles className="size-3.5" />
-                          </div>
-                        ) : (
-                          <div className="grid size-7 place-items-center rounded-full bg-slate-800 text-white shrink-0 mt-0.5 shadow-2xs">
-                            <User className="size-3.5" />
-                          </div>
-                        )}
-
-                        <div
-                          className={clsx(
-                            'p-3 rounded-2xl shadow-2xs space-y-2',
-                            msg.sender === 'user'
-                              ? 'bg-brand-600 text-white rounded-tr-xs'
-                              : 'bg-white border border-slate-200/90 text-slate-800 rounded-tl-xs',
-                          )}
-                        >
-                          <p className="whitespace-pre-wrap">{msg.text}</p>
-
-                          {/* Respostas rápidas sugeridas pela IA para conversa em 1 clique */}
-                          {isLastAssistant && msg.suggestedReplies && msg.suggestedReplies.length > 0 && !isAiTyping && (
-                            <div className="pt-1.5 border-t border-slate-100 flex flex-wrap gap-1.5">
-                              {msg.suggestedReplies.map((replyOpt) => (
-                                <button
-                                  key={replyOpt}
-                                  type="button"
-                                  onClick={() => handleSendChatMessage(replyOpt)}
-                                  className="inline-flex items-center gap-1 rounded-lg border border-brand-200 bg-brand-50/70 px-2.5 py-1 text-[11px] font-semibold text-brand-900 hover:bg-brand-100 transition cursor-pointer"
-                                >
-                                  <span>{replyOpt}</span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Ações contextuais disparadas pela pergunta da IA sobre o mailing */}
-                          {msg.missingInfo === 'MAILING' && !selectedMailingId && (
-                            <div className="pt-2 border-t border-slate-100 flex flex-wrap gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setShowImportInPrompt(true)}
-                                className="inline-flex items-center gap-1 rounded-lg border border-brand-300 bg-brand-50 px-2.5 py-1 text-[11px] font-semibold text-brand-900 hover:bg-brand-100 transition cursor-pointer"
-                              >
-                                <Paperclip className="size-3 text-brand-600" />
-                                <span>Anexar CSV agora</span>
-                              </button>
-                              <span className="text-[11px] text-slate-400 self-center">ou selecione um mailing abaixo</span>
-                            </div>
-                          )}
+              {/* Coluna Principal da Esquerda: Janela Única do Chat estilo ChatGPT */}
+              <div className="lg:col-span-8">
+                <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden flex flex-col h-[620px]">
+                  {/* Header Integrado da Janela do Chat */}
+                  <div className="bg-slate-50/90 border-b border-slate-200/80 px-4 py-3 flex items-center justify-between gap-3 shrink-0">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="grid size-8 place-items-center rounded-xl bg-brand-700 text-white shadow-2xs shrink-0">
+                        <Sparkles className="size-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-sm text-slate-900 tracking-tight">
+                            Assistente de IA · Criação Interativa
+                          </span>
+                          <InfoTooltip content="Converse em linguagem natural. A IA extrai os parâmetros, recomenda canais e monta a campanha passo a passo." />
+                          <Badge tone={isOpenAiConfigured ? 'green' : 'brand'}>
+                            {isOpenAiConfigured ? `OpenAI · ${aiStatusQ.data?.model || openAiModelInput}` : 'OpenAI Ready · Assistente Ativo'}
+                          </Badge>
                         </div>
                       </div>
-                    );
-                  })}
-
-                  {isAiTyping && (
-                    <div className="flex gap-2.5 max-w-[80%] text-xs mr-auto items-center">
-                      <div className="grid size-7 place-items-center rounded-full bg-brand-700 text-white shrink-0 shadow-2xs">
-                        <Loader2 className="size-3.5 animate-spin" />
-                      </div>
-                      <div className="rounded-2xl rounded-tl-xs border border-slate-200 bg-white px-3.5 py-2.5 text-slate-500 shadow-2xs flex items-center gap-2">
-                        <span>Analisando parâmetros da campanha...</span>
-                      </div>
                     </div>
-                  )}
-                </div>
 
-                {/* Input do Chat (onde a pessoa escreve) com botão circular de envio */}
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void handleSendChatMessage();
-                  }}
-                  className="relative rounded-2xl border border-slate-200 bg-white p-2.5 shadow-xs focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 transition"
-                >
-                  <Textarea
-                    id="ai-prompt-input"
-                    rows={2}
-                    disabled={isAiTyping}
-                    className="w-full border-0 p-1 text-sm text-slate-800 placeholder-slate-400 focus:ring-0 resize-none leading-relaxed"
-                    placeholder="Escreva sua mensagem ou responda ao assistente (ex: Cobrança B2B acima de R$ 1.000 via WhatsApp e Voz)..."
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        void handleSendChatMessage();
-                      }
-                    }}
-                  />
-
-                  <div className="flex items-center justify-between pt-1.5 border-t border-slate-100/80">
-                    <span className="text-[11px] text-slate-400">
-                      Pressione Enter para enviar · Shift+Enter para quebrar linha
-                    </span>
-
-                    <button
-                      type="submit"
-                      disabled={!chatInput.trim() || isAiTyping}
-                      className="grid size-8 place-items-center rounded-full bg-brand-600 text-white shadow-sm hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
-                      title="Enviar mensagem"
-                    >
-                      {isAiTyping ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
-                    </button>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        icon={<RefreshCw className="size-3.5 text-slate-500" />}
+                        onClick={handleResetChat}
+                        title="Reiniciar conversa"
+                      >
+                        <span className="hidden sm:inline">Reiniciar</span>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        icon={<KeyRound className="size-3.5 text-brand-700" />}
+                        onClick={() => setOpenAiModalOpen(true)}
+                      >
+                        {isOpenAiConfigured ? 'Configurar OpenAI' : 'Conectar OpenAI'}
+                      </Button>
+                    </div>
                   </div>
-                </form>
 
-                {/* Templates de Prompt */}
-                <div className="space-y-1.5">
-                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                    Exemplos rápidos para iniciar
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleApplyTemplate(PROMPT_TEMPLATES[0]);
-                      }}
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
-                    >
-                      Cobrança B2B
-                    </button>
+                  {/* Corpo da Conversa com Scroll Integrado */}
+                  <div
+                    ref={chatScrollRef}
+                    className="flex-1 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-slate-50/40 via-white to-white"
+                  >
+                    {chatMessages.map((msg, idx) => {
+                      const isLastAssistant = msg.sender === 'assistant' && idx === chatMessages.length - 1;
+                      const isWelcome = msg.id === 'welcome';
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleApplyTemplate(PROMPT_TEMPLATES[1]);
-                      }}
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
-                    >
-                      Cobrança Preventiva PIX
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleApplyTemplate(PROMPT_TEMPLATES[4]);
-                      }}
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
-                    >
-                      Vendas de Planos
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleApplyTemplate(PROMPT_TEMPLATES[9]);
-                      }}
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
-                    >
-                      Confirmação de Consultas
-                    </button>
-                  </div>
-                </div>
-
-                {/* Conexão de Mailing */}
-                <div className="space-y-2 pt-1 border-t border-slate-100">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowImportInPrompt((v) => !v)}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs transition cursor-pointer"
-                    >
-                      <Paperclip className="size-3.5 text-brand-600" />
-                      <span>{showImportInPrompt ? 'Selecionar existente' : 'Anexar CSV'}</span>
-                    </button>
-
-                    {!showImportInPrompt && (
-                      <div className="flex-1 min-w-[240px]">
-                        <Select
-                          id="ai-mailing-select"
-                          value={selectedMailingId}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            const found = mailings?.find((m) => m.id === val);
-                            if (found) {
-                              handleMailingAttached(found.id, found.name, found.recordCount);
-                            } else {
-                              setSelectedMailingId('');
-                            }
-                          }}
-                          className="text-xs rounded-xl"
+                      return (
+                        <div
+                          key={msg.id}
+                          className={clsx(
+                            'flex gap-2.5 max-w-[90%] text-xs leading-relaxed',
+                            msg.sender === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto',
+                          )}
                         >
-                          <option value="">Ou selecionar mailing ou lista existente...</option>
-                          {mailings?.map((m) => (
-                            <option key={m.id} value={m.id}>
-                              {m.name} ({fmtNumber(m.recordCount)} contatos)
-                            </option>
-                          ))}
-                        </Select>
+                          {msg.sender === 'assistant' ? (
+                            <div className="grid size-7 place-items-center rounded-full bg-brand-700 text-white shrink-0 mt-0.5 shadow-2xs">
+                              <Sparkles className="size-3.5" />
+                            </div>
+                          ) : (
+                            <div className="grid size-7 place-items-center rounded-full bg-slate-800 text-white shrink-0 mt-0.5 shadow-2xs">
+                              <User className="size-3.5" />
+                            </div>
+                          )}
+
+                          <div
+                            className={clsx(
+                              'p-3.5 rounded-2xl shadow-2xs space-y-2.5',
+                              msg.sender === 'user'
+                                ? 'bg-brand-600 text-white rounded-tr-xs'
+                                : 'bg-white border border-slate-200/90 text-slate-800 rounded-tl-xs',
+                            )}
+                          >
+                            <p className="whitespace-pre-wrap">{msg.text}</p>
+
+                            {/* Respostas sugeridas pela IA (chips clicáveis dentro da conversa) */}
+                            {isLastAssistant && msg.suggestedReplies && msg.suggestedReplies.length > 0 && !isAiTyping && (
+                              <div className="pt-2 border-t border-slate-100 flex flex-wrap gap-1.5">
+                                {msg.suggestedReplies.map((replyOpt) => (
+                                  <button
+                                    key={replyOpt}
+                                    type="button"
+                                    onClick={() => handleSendChatMessage(replyOpt)}
+                                    className="inline-flex items-center gap-1 rounded-lg border border-brand-200 bg-brand-50/80 px-2.5 py-1 text-[11px] font-semibold text-brand-900 hover:bg-brand-100 transition cursor-pointer"
+                                  >
+                                    <span>{replyOpt}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Exemplos Rápidos incorporados diretamente na conversa inicial */}
+                            {isWelcome && isLastAssistant && !isAiTyping && (
+                              <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                  Exemplos rápidos prontos para iniciar:
+                                </span>
+                                <div className="flex flex-wrap gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleApplyTemplate(PROMPT_TEMPLATES[0])}
+                                    className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-brand-50 hover:border-brand-200 hover:text-brand-900 transition cursor-pointer"
+                                  >
+                                    Cobrança B2B
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleApplyTemplate(PROMPT_TEMPLATES[1])}
+                                    className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-brand-50 hover:border-brand-200 hover:text-brand-900 transition cursor-pointer"
+                                  >
+                                    Cobrança Preventiva PIX
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleApplyTemplate(PROMPT_TEMPLATES[4])}
+                                    className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-brand-50 hover:border-brand-200 hover:text-brand-900 transition cursor-pointer"
+                                  >
+                                    Vendas de Planos
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleApplyTemplate(PROMPT_TEMPLATES[9])}
+                                    className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-brand-50 hover:border-brand-200 hover:text-brand-900 transition cursor-pointer"
+                                  >
+                                    Confirmação de Consultas
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Vinculação de Mailing incorporada na conversa */}
+                            {msg.missingInfo === 'MAILING' && !selectedMailingId && (
+                              <div className="pt-2 border-t border-slate-100 space-y-2">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowImportInPrompt(true)}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-brand-300 bg-brand-50 px-2.5 py-1 text-[11px] font-semibold text-brand-900 hover:bg-brand-100 transition cursor-pointer"
+                                  >
+                                    <Paperclip className="size-3 text-brand-600" />
+                                    <span>Anexar CSV agora</span>
+                                  </button>
+
+                                  <div className="flex-1 min-w-[200px]">
+                                    <Select
+                                      id="ai-inline-mailing-select"
+                                      value={selectedMailingId}
+                                      onChange={(e) => {
+                                        const val = e.target.value;
+                                        const found = mailings?.find((m) => m.id === val);
+                                        if (found) {
+                                          handleMailingAttached(found.id, found.name, found.recordCount);
+                                        }
+                                      }}
+                                      className="text-xs rounded-lg py-1"
+                                    >
+                                      <option value="">Ou selecione um mailing existente...</option>
+                                      {mailings?.map((m) => (
+                                        <option key={m.id} value={m.id}>
+                                          {m.name} ({fmtNumber(m.recordCount)} contatos)
+                                        </option>
+                                      ))}
+                                    </Select>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Tag de Mailing Conectado na Mensagem */}
+                            {activeMailing && idx === chatMessages.length - 1 && (
+                              <div className="mt-2 flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50/80 px-2.5 py-1.5 text-[11px] text-emerald-900 font-medium">
+                                <span className="flex items-center gap-1.5">
+                                  <FileSpreadsheet className="size-3.5 text-emerald-700" />
+                                  Mailing vinculado: <strong>{activeMailing.name}</strong> ({fmtNumber(activeMailing.recordCount)} contatos)
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedMailingId('');
+                                    toast('info', 'Mailing desvinculado.');
+                                  }}
+                                  className="text-emerald-700 hover:text-emerald-900 text-xs ml-2 cursor-pointer"
+                                  title="Desvincular mailing"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Botão de Avançar quando a IA finaliza os parâmetros */}
+                            {aiExtracted.purposeCode && selectedMailingId && isLastAssistant && (
+                              <div className="pt-2 border-t border-slate-100">
+                                <Button
+                                  size="sm"
+                                  variant="primary"
+                                  onClick={() => setAiStep(2)}
+                                  icon={<ArrowRight className="size-3.5" />}
+                                >
+                                  Continuar para revisão e início →
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Indicador de Digitando */}
+                    {isAiTyping && (
+                      <div className="flex gap-2.5 max-w-[80%] text-xs mr-auto items-center">
+                        <div className="grid size-7 place-items-center rounded-full bg-brand-700 text-white shrink-0 shadow-2xs">
+                          <Loader2 className="size-3.5 animate-spin" />
+                        </div>
+                        <div className="rounded-2xl rounded-tl-xs border border-slate-200 bg-white px-3.5 py-2.5 text-slate-500 shadow-2xs flex items-center gap-2">
+                          <span>Analisando parâmetros da campanha...</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Modal/Gaveta Inline de Importação de Arquivo */}
+                    {showImportInPrompt && (
+                      <div className="rounded-xl border border-brand-200 bg-white p-3 space-y-2 shadow-xs">
+                        <div className="flex items-center justify-between text-xs font-semibold text-brand-900 border-b border-slate-100 pb-2">
+                          <span className="flex items-center gap-1.5">
+                            <Paperclip className="size-3.5 text-brand-600" /> Anexar arquivo de contatos (CSV / Planilha)
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setShowImportInPrompt(false)}
+                            className="text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
+                          >
+                            ✕ Fechar importação
+                          </button>
+                        </div>
+                        <ImportFlow
+                          onImported={(r) => {
+                            qc.invalidateQueries({ queryKey: ['mailings'] });
+                            handleMailingAttached(r.mailingId, r.name, r.validRows ?? 0);
+                            setShowImportInPrompt(false);
+                            toast('success', `Arquivo "${r.name}" importado e selecionado!`);
+                          }}
+                        />
                       </div>
                     )}
                   </div>
 
-                  {showImportInPrompt && (
-                    <div className="rounded-xl border border-brand-200 bg-white p-3 space-y-2">
-                      <div className="flex items-center justify-between text-xs font-semibold text-brand-900 border-b border-slate-100 pb-2">
-                        <span className="flex items-center gap-1.5">
-                          <Paperclip className="size-3.5 text-brand-600" /> Anexar arquivo de contatos (CSV / Planilha)
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setShowImportInPrompt(false)}
-                          className="text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
-                        >
-                          ✕ Fechar importação
-                        </button>
-                      </div>
-                      <ImportFlow
-                        onImported={(r) => {
-                          qc.invalidateQueries({ queryKey: ['mailings'] });
-                          handleMailingAttached(r.mailingId, r.name, r.validRows ?? 0);
-                          setShowImportInPrompt(false);
-                          toast('success', `Arquivo "${r.name}" importado e selecionado!`);
+                  {/* Rodapé Integrado: Campo de Input Estilo ChatGPT */}
+                  <div className="border-t border-slate-200 bg-slate-50/70 p-3 shrink-0">
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void handleSendChatMessage();
+                      }}
+                      className="rounded-xl border border-slate-300 bg-white p-2 shadow-xs focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20 transition flex flex-col gap-1.5"
+                    >
+                      <Textarea
+                        id="ai-prompt-input"
+                        rows={2}
+                        disabled={isAiTyping}
+                        className="w-full border-0 p-1 text-xs text-slate-800 placeholder-slate-400 focus:ring-0 resize-none leading-relaxed"
+                        placeholder="Escreva sua mensagem ou responda ao assistente (ex: Cobrança B2B acima de R$ 1.000 via WhatsApp e Voz)..."
+                        value={chatInput}
+                        onChange={(e) => setChatInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            void handleSendChatMessage();
+                          }
                         }}
                       />
-                    </div>
-                  )}
 
-                  {/* Tag do Mailing Selecionado */}
-                  {activeMailing && (
-                    <div className="flex items-center justify-between rounded-xl border border-emerald-200/90 bg-emerald-50/60 px-3.5 py-2.5 text-xs text-emerald-900">
-                      <div className="flex items-center gap-2 truncate">
-                        <FileSpreadsheet className="size-4 text-emerald-700 shrink-0" />
-                        <span className="font-semibold truncate">{activeMailing.name}</span>
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowImportInPrompt((v) => !v)}
+                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-slate-500 hover:text-brand-800 hover:bg-slate-100 transition cursor-pointer"
+                            title="Anexar arquivo CSV de contatos"
+                          >
+                            <Paperclip className="size-3.5" />
+                            <span className="hidden sm:inline text-[11px] font-medium">Anexar mailing</span>
+                          </button>
+
+                          {activeMailing ? (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 border border-emerald-200">
+                              📎 {activeMailing.name.slice(0, 20)}...
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-slate-400 hidden sm:inline">
+                              Pressione Enter para enviar · Shift+Enter para nova linha
+                            </span>
+                          )}
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={!chatInput.trim() || isAiTyping}
+                          className="grid size-7 place-items-center rounded-full bg-brand-700 text-white shadow-xs hover:bg-brand-800 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+                          title="Enviar mensagem"
+                        >
+                          {isAiTyping ? <Loader2 className="size-3.5 animate-spin" /> : <ArrowRight className="size-3.5" />}
+                        </button>
                       </div>
-                      <span className="text-emerald-700 text-[11px] shrink-0 font-medium">
-                        {fmtNumber(activeMailing.recordCount)} linhas · campos reconhecidos
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Botão de Ação: Continuar para revisão */}
-                <div className="pt-2">
-                  <Button
-                    variant="primary"
-                    size="md"
-                    onClick={() => {
-                      if (!selectedMailingId && !activeMailing?.id) {
-                        setFormError('Selecione ou anexe uma base de contatos (mailing) para continuar.');
-                        return;
-                      }
-                      setFormError(null);
-                      setAiStep(2);
-                    }}
-                    className="w-full sm:w-auto"
-                    icon={<ArrowRight className="size-4" />}
-                  >
-                    Continuar para revisão →
-                  </Button>
+                    </form>
+                  </div>
                 </div>
               </div>
 
