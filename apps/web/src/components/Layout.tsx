@@ -181,7 +181,7 @@ const MOBILE: NavItem[] = [
   { to: '/mais', label: 'Mais', icon: <Menu className="size-5" aria-hidden /> },
 ];
 
-function UserMenu() {
+function UserMenu({ sidebar = false }: { sidebar?: boolean } = {}) {
   const { me, logout } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -191,10 +191,15 @@ function UserMenu() {
       <DropdownMenu.Trigger asChild>
         <button
           type="button"
-          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-slate-100"
+          className={clsx(
+            'flex items-center gap-2.5 rounded-lg text-left transition-colors cursor-pointer',
+            sidebar
+              ? 'w-full p-2 bg-slate-50/70 border border-slate-200/80 hover:bg-slate-100 hover:border-slate-300 shadow-2xs'
+              : 'px-2 py-1.5 text-sm hover:bg-slate-100'
+          )}
           aria-label={`Menu do usuário ${me.name}`}
         >
-          <span className="grid size-7 place-items-center rounded-full bg-brand-100 text-xs font-semibold text-brand-800" aria-hidden>
+          <span className="grid size-8 shrink-0 place-items-center rounded-full bg-brand-100 text-xs font-semibold text-brand-800" aria-hidden>
             {me.name
               .split(' ')
               .map((p) => p[0])
@@ -202,17 +207,22 @@ function UserMenu() {
               .join('')
               .toUpperCase()}
           </span>
-          <span className="hidden min-w-0 sm:block">
-            <span className="block truncate font-medium leading-tight">{me.name}</span>
-            <span className="block text-xs leading-tight text-slate-500">{ROLE_LABEL[me.role]}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-xs font-semibold text-slate-900 leading-tight">{me.name}</span>
+            <span className="block truncate text-[11px] text-slate-500 leading-tight">{ROLE_LABEL[me.role]}</span>
           </span>
-          <ChevronDown className="size-4 text-slate-500" aria-hidden />
+          <ChevronDown className="size-4 shrink-0 text-slate-400" aria-hidden />
         </button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content align="end" sideOffset={6} className="z-50 min-w-56 rounded-md border border-slate-200 bg-white p-1 text-sm shadow-lg">
-          <div className="px-2 py-1.5">
-            <div className="font-medium">{me.name}</div>
+        <DropdownMenu.Content
+          align={sidebar ? 'start' : 'end'}
+          side={sidebar ? 'right' : 'bottom'}
+          sideOffset={8}
+          className="z-50 min-w-56 rounded-xl border border-slate-200 bg-white p-1 text-sm shadow-lg"
+        >
+          <div className="px-2.5 py-2">
+            <div className="font-semibold text-slate-900">{me.name}</div>
             <div className="text-xs text-slate-500">{me.email}</div>
             <div className="mt-1 text-xs text-slate-600">
               Perfil: <strong>{ROLE_LABEL[me.role]}</strong>
@@ -278,6 +288,9 @@ export function Layout() {
       <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-slate-200/90 bg-white md:flex">
         <div className="flex h-15 items-center border-b border-slate-100 px-4">
           <BrandLogo showTagline />
+        </div>
+        <div className="border-b border-slate-100 p-3">
+          <UserMenu sidebar />
         </div>
         <nav aria-label="Navegação principal" className="flex-1 overflow-y-auto px-3 py-3.5">
           {NAV_GROUPS.map((g) => (
@@ -351,18 +364,10 @@ export function Layout() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 border-b border-slate-200/90 bg-white/95 backdrop-blur">
-          <div className="flex h-15 w-full items-center justify-between gap-3 px-4 sm:px-6 md:px-8">
-            <div className="flex items-center gap-2 md:hidden">
-              <BrandLogo size="sm" />
-            </div>
-            <div className="hidden items-center gap-2 text-xs font-medium text-slate-500 md:flex">
-              <span className="inline-flex size-2 rounded-full bg-emerald-500" aria-hidden />
-              <BookMarked className="size-3.5 text-brand-700" aria-hidden />
-              <span>Campanhas inteligentes, do mailing ao contato</span>
-            </div>
-            <UserMenu />
-          </div>
+        {/* Cabeçalho compacto visível apenas em telas móveis */}
+        <header className="sticky top-0 z-30 flex h-14 w-full items-center justify-between border-b border-slate-200/90 bg-white/95 px-4 backdrop-blur md:hidden">
+          <BrandLogo size="sm" />
+          <UserMenu />
         </header>
         <main
           id="conteudo"
