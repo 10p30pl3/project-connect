@@ -125,6 +125,9 @@ export type Connection = {
   tariff: number | null;
   tariffUpdatedAt: string | null;
   active: boolean;
+  endpointUrl?: string | null;
+  callerId?: string | null;
+  authToken?: string | null;
   simulation?: Simulation | null;
 };
 export type JourneyStepView = JourneyStep & { connectionName?: string };

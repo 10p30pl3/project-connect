@@ -105,6 +105,42 @@ const TABULATIONS: Tabulation[] = [
 
 const CONNECTIONS: Connection[] = [
   {
+    id: uuid(33),
+    name: 'Discador IA · Tronco Direct Call',
+    channelType: 'VOICE',
+    provider: 'VOICE_APP',
+    endpointUrl: 'http://127.0.0.1:5050/v1/calls',
+    callerId: '+551140030000',
+    tariff: 0.08,
+    tariffUpdatedAt: '2026-11-04T12:00:00Z',
+    active: true,
+    simulation: null,
+  },
+  {
+    id: uuid(34),
+    name: 'API de Gatilhos & Disparos · Voll Connect',
+    channelType: 'VOICE',
+    provider: 'API_TRIGGER',
+    endpointUrl: 'https://api.voll.solutions/v1/campaigns/trigger',
+    callerId: null,
+    tariff: 0.0,
+    tariffUpdatedAt: '2026-11-04T12:00:00Z',
+    active: true,
+    simulation: null,
+  },
+  {
+    id: uuid(35),
+    name: 'WhatsApp Oficial · Meta Cloud API',
+    channelType: 'WHATSAPP',
+    provider: 'META_CLOUD',
+    endpointUrl: 'https://graph.facebook.com/v21.0/messages',
+    callerId: '+5511980000000',
+    tariff: 0.05,
+    tariffUpdatedAt: '2026-11-04T12:00:00Z',
+    active: true,
+    simulation: null,
+  },
+  {
     id: uuid(30),
     name: 'Discador simulado',
     channelType: 'VOICE',
@@ -151,16 +187,6 @@ const CONNECTIONS: Connection[] = [
       duplicateRate: 0.15,
       noReturnRate: 0.05,
     },
-  },
-  {
-    id: uuid(33),
-    name: 'Discador IA · Tronco Direct Call',
-    channelType: 'VOICE',
-    provider: 'VOICE_APP',
-    tariff: 0.08,
-    tariffUpdatedAt: '2026-11-04T12:00:00Z',
-    active: true,
-    simulation: null,
   },
 ];
 
@@ -1383,6 +1409,45 @@ export async function handleMockApi<T = unknown>(
     return tab as T;
   }
   if (pathname === '/connections' && method === 'GET') return { items: CONNECTIONS } as T;
+  if (pathname === '/connections' && method === 'POST') {
+    const b = (opts.body ?? {}) as any;
+    const isSimulated = b.provider === 'SIMULATED';
+    const newConn: Connection = {
+      id: nextUuid(),
+      name: b.name?.trim() || 'Nova Conexão',
+      channelType: b.channelType || 'VOICE',
+      provider: b.provider || 'SIMULATED',
+      tariff: b.tariff !== undefined && b.tariff !== null ? Number(b.tariff) : null,
+      tariffUpdatedAt: b.tariff !== null && b.tariff !== undefined ? new Date().toISOString() : null,
+      active: b.active !== undefined ? Boolean(b.active) : true,
+      endpointUrl: b.endpointUrl?.trim() || null,
+      callerId: b.callerId?.trim() || null,
+      authToken: b.authToken?.trim() || null,
+      simulation: isSimulated
+        ? (b.simulation ?? {
+            outcomes: { NO_ANSWER: 3, BUSY: 1, CPC_NO_DEAL: 2, CONVERSION: 1.5, OPT_OUT: 0.3, RESULT_UNKNOWN: 0.2 },
+            minDelaySeconds: 2,
+            maxDelaySeconds: 8,
+            duplicateRate: 0.1,
+            noReturnRate: 0.05,
+          })
+        : (b.simulation ?? null),
+    };
+
+    if (isSimulated) {
+      CONNECTIONS.push(newConn);
+    } else {
+      // Priorizar canais operacionais / API no topo
+      const firstSimIdx = CONNECTIONS.findIndex((c) => c.provider === 'SIMULATED');
+      if (firstSimIdx >= 0) {
+        CONNECTIONS.splice(firstSimIdx, 0, newConn);
+      } else {
+        CONNECTIONS.unshift(newConn);
+      }
+    }
+    return newConn as T;
+  }
+
   const connMatch = pathname.match(/^\/connections\/([^/]+)$/);
   if (connMatch && method === 'PATCH') {
     const c = CONNECTIONS.find((x) => x.id === connMatch[1]);
@@ -1393,6 +1458,10 @@ export async function handleMockApi<T = unknown>(
         c.tariffUpdatedAt = body.tariff === null ? null : new Date().toISOString();
       }
       if (body.active !== undefined) c.active = body.active;
+      if (body.provider !== undefined) c.provider = body.provider;
+      if (body.endpointUrl !== undefined) c.endpointUrl = body.endpointUrl;
+      if (body.callerId !== undefined) c.callerId = body.callerId;
+      if (body.authToken !== undefined) c.authToken = body.authToken;
       if (body.simulation !== undefined) c.simulation = body.simulation;
     }
     return (c ?? CONNECTIONS[0]) as T;

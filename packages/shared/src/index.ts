@@ -291,6 +291,10 @@ export const ConnectionUpdateSchema = z.object({
   name: z.string().min(1).optional(),
   tariff: z.number().min(0).nullable().optional(),
   active: z.boolean().optional(),
+  provider: z.string().optional(),
+  endpointUrl: z.string().nullable().optional(),
+  callerId: z.string().nullable().optional(),
+  authToken: z.string().nullable().optional(),
   simulation: z
     .object({
       /** pesos por resultado simulado */
@@ -302,6 +306,7 @@ export const ConnectionUpdateSchema = z.object({
       /** probabilidade (0-1) de nunca devolver retorno (gera reconciliação) */
       noReturnRate: z.number().min(0).max(1),
     })
+    .nullable()
     .optional(),
 });
 
@@ -310,6 +315,19 @@ export const ConnectionCreateSchema = z.object({
   channelType: z.enum(['VOICE', 'WHATSAPP', 'SMS', 'EMAIL']),
   provider: z.string().min(1).default('SIMULATED'),
   tariff: z.number().min(0, 'A tarifa deve ser maior ou igual a zero').nullable().optional(),
+  endpointUrl: z.string().nullable().optional(),
+  callerId: z.string().nullable().optional(),
+  authToken: z.string().nullable().optional(),
+  simulation: z
+    .object({
+      outcomes: z.record(z.string(), z.number().min(0)),
+      minDelaySeconds: z.number().int().min(0),
+      maxDelaySeconds: z.number().int().min(0),
+      duplicateRate: z.number().min(0).max(1),
+      noReturnRate: z.number().min(0).max(1),
+    })
+    .nullable()
+    .optional(),
 });
 export type ConnectionCreate = z.infer<typeof ConnectionCreateSchema>;
 
