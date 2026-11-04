@@ -40,11 +40,12 @@ export async function claimOne(outboxId: number, now: Date = new Date()) {
 
     // Lease de claim de 15 segundos
     const claimLeaseUntil = new Date(now.getTime() + 15_000);
-    await c.query(`UPDATE outbox SET claimed_at=$2, claim_lease_until=$3 WHERE id=$1`, [ob.id, now, claimLeaseUntil]);
+    const claimedBy = `worker-${process.pid}`;
+    await c.query(`UPDATE outbox SET claimed_at=$2, claim_lease_until=$3, claimed_by=$4 WHERE id=$1`, [ob.id, now, claimLeaseUntil, claimedBy]);
 
     const a = await one(c, `SELECT * FROM attempts WHERE id=$1 FOR UPDATE`, [ob.attempt_id]);
     const finish = (status: 'DONE' | 'FAILED', err?: string) =>
-      c.query(`UPDATE outbox SET status=$2, last_error=$3, tries=tries+1, claim_lease_until=NULL WHERE id=$1`, [ob.id, status, err ?? null]);
+      c.query(`UPDATE outbox SET status=$2, last_error=$3, tries=tries+1, claim_lease_until=NULL, claimed_by=NULL WHERE id=$1`, [ob.id, status, err ?? null]);
 
     if (!a || a.state !== 'RESERVED') {
       await finish('FAILED', 'tentativa não está reservada');

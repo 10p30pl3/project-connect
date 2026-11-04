@@ -18,9 +18,9 @@ export const voiceAppAdapter: ConnectorAdapter = {
 
   async send(db: Db, { attempt, connection }: SendInput): Promise<SendResult> {
     const cfg = connection.config ?? {};
-    const baseUrl = (cfg.voiceAppBaseUrl || cfg.endpointUrl || 'http://127.0.0.1:5050').replace(/\/+$/, '');
-    const token = cfg.voiceAppToken || '';
-    const callerId = cfg.defaultCallerId || '+551140030000';
+    let baseUrl = (cfg.voiceAppBaseUrl || cfg.endpointUrl || '').replace(/\/+$/, '');
+    let token = cfg.voiceAppToken || '';
+    let callerId = cfg.defaultCallerId || '';
 
     const row = await one<{
       id: string;
@@ -40,6 +40,27 @@ export const voiceAppAdapter: ConnectorAdapter = {
         WHERE a.id = $1`,
       [attempt.id],
     );
+
+    // Se a conexão não especificar URL/Token próprios, herda dos Endereços Técnicos do Workspace
+    if ((!baseUrl || !token) && row?.workspace_id) {
+      try {
+        const epRow = await one<{ config: any }>(
+          db,
+          `SELECT config FROM workspace_channel_endpoints WHERE workspace_id = $1`,
+          [row.workspace_id],
+        );
+        if (epRow?.config?.voice) {
+          if (!baseUrl) baseUrl = (epRow.config.voice.voiceAppBaseUrl || '').replace(/\/+$/, '');
+          if (!token) token = epRow.config.voice.voiceAppToken || '';
+          if (!callerId) callerId = epRow.config.voice.defaultCallerId || '';
+        }
+      } catch {
+        /* fallback default */
+      }
+    }
+
+    if (!baseUrl) baseUrl = 'http://127.0.0.1:5050';
+    if (!callerId) callerId = '+551140030000';
 
     const payload = {
       attemptId: attempt.id,

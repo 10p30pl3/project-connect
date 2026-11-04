@@ -4,6 +4,7 @@ import {
   isValidTimezone,
   validateRow,
   suggestMapping,
+  buildPreview,
   type ParsedRow,
 } from '../src/services/importer.js';
 import type { ColumnMapping } from '@voll/shared';
@@ -103,5 +104,33 @@ describe('Best Time to Call (BTC) Importer', () => {
     };
     const resMidnight = validateRow(rowMidnight, mapping, { defaultDurationMinutes: 60 });
     expect(resMidnight.errors.some((e) => e.includes('meia-noite'))).toBe(true);
+  });
+
+  it('accepts duplicate contacts with identical normalized BTC preferences in buildPreview', () => {
+    const csv = `external_id,telefone,inicio,fim\ncli_dup,11988881111,14:00,16:00\ncli_dup,11988882222,14:00,16:00`;
+    const mapping: ColumnMapping[] = [
+      { column: 'external_id', target: 'external_id', type: 'text', required: true },
+      { column: 'telefone', target: 'phone1', type: 'text', required: false },
+      { column: 'inicio', target: 'best_contact_start', type: 'text', required: false },
+      { column: 'fim', target: 'best_contact_end', type: 'text', required: false },
+    ];
+    const preview = buildPreview(csv, ',', true, mapping);
+    expect(preview.response.schemaErrors).toHaveLength(0);
+    expect(preview.response.rejectedRows).toBe(0);
+    expect(preview.response.validRows).toBe(2);
+  });
+
+  it('flags conflict error when duplicate contacts have conflicting BTC preferences in buildPreview', () => {
+    const csv = `external_id,telefone,inicio,fim\ncli_conf,11988881111,10:00,12:00\ncli_conf,11988882222,14:00,18:00`;
+    const mapping: ColumnMapping[] = [
+      { column: 'external_id', target: 'external_id', type: 'text', required: true },
+      { column: 'telefone', target: 'phone1', type: 'text', required: false },
+      { column: 'inicio', target: 'best_contact_start', type: 'text', required: false },
+      { column: 'fim', target: 'best_contact_end', type: 'text', required: false },
+    ];
+    const preview = buildPreview(csv, ',', true, mapping);
+    expect(preview.response.rejectedRows).toBe(2);
+    expect(preview.response.validRows).toBe(0);
+    expect(preview.response.rows[0].errors[0]).toContain('Conflito de preferências de horário (BTC)');
   });
 });

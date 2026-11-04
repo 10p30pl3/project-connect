@@ -344,6 +344,34 @@ export function buildPreview(
   const effective = mapping && mapping.length ? mapping : suggested;
   const sErr = schemaErrors(effective, parsed.headers, parsed.rows.length);
   const validated = parsed.rows.slice(0, MAX_ROWS).map((r) => validateRow(r, effective, options));
+
+  // Validação cruzada de contatos repetidos no mesmo mailing (§Plano v3):
+  // Se o mesmo externalId tiver janelas BTC conflitantes, marca erro em todas as ocorrências.
+  const btcByExt = new Map<string, { sigs: Set<string>; rows: ValidatedRow[] }>();
+  for (const r of validated) {
+    if (!r.externalId) continue;
+    const start = (r.typed.btc_start_minute as number | undefined) ?? '';
+    const end = (r.typed.btc_end_minute as number | undefined) ?? '';
+    const tz = (r.typed.btc_timezone as string | undefined) ?? '';
+    const sig = `${start}|${end}|${tz}`;
+    const group = btcByExt.get(r.externalId);
+    if (!group) {
+      btcByExt.set(r.externalId, { sigs: new Set([sig]), rows: [r] });
+    } else {
+      group.sigs.add(sig);
+      group.rows.push(r);
+    }
+  }
+
+  for (const [, group] of btcByExt.entries()) {
+    if (group.sigs.size > 1) {
+      const rowNums = group.rows.map((x) => x.rowNumber).join(', ');
+      for (const r of group.rows) {
+        r.errors.push(`Conflito de preferências de horário (BTC) para o mesmo cliente (linhas ${rowNums})`);
+      }
+    }
+  }
+
   const rejected = validated.filter((r) => r.errors.length);
   // destaca primeiro os rejeitados na amostra
   const sample = [...rejected.slice(0, 50), ...validated.filter((r) => !r.errors.length)].slice(0, PREVIEW_ROWS);
