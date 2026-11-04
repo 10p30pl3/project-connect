@@ -4,10 +4,10 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Archive, ArrowRight, Database, ListFilter, Megaphone, Pause, Play, Sparkles, Square, Users } from 'lucide-react';
 import { CAMPAIGN_STATUS, CAMPAIGN_STATUS_LABEL, type CampaignStatus } from '@voll/shared';
 import { errorMessage, get, post, qs } from '../lib/api';
-import type { CampaignSummary } from '../lib/types';
+import type { CampaignSummary, Overview } from '../lib/types';
 import { fmtDateTime, fmtNumber } from '../lib/format';
 import { useAuth } from '../lib/auth';
-import { Button, btnClass, CampaignStatusBadge, Card, Empty, ErrorState, Field, Input, Loading, Modal, PageHeader, TableWrap, useToast } from '../components/ui';
+import { Button, btnClass, CampaignStatusBadge, Card, Empty, ErrorState, Field, Input, Loading, Modal, PageHeader, Stat, TableWrap, useToast } from '../components/ui';
 
 export function CampaignsPage() {
   const { can } = useAuth();
@@ -22,6 +22,12 @@ export function CampaignsPage() {
   const q = useQuery({
     queryKey: ['campaigns', status],
     queryFn: () => get<{ items: CampaignSummary[] }>(`/campaigns${qs({ status })}`),
+    refetchInterval: 5000,
+  });
+
+  const ovQ = useQuery({
+    queryKey: ['overview'],
+    queryFn: () => get<Overview>('/overview'),
     refetchInterval: 5000,
   });
 
@@ -82,6 +88,79 @@ export function CampaignsPage() {
             </Link>
           ) : null,
         )}
+      </div>
+
+      {/* Métricas Consolidadas de Campanhas e Tentativas */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card
+          title="Campanhas"
+          tooltip="Status operacional das campanhas. Clique em um card para filtrar a listagem abaixo."
+        >
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
+            <button
+              type="button"
+              onClick={() => setSp(status === 'RUNNING' ? {} : { status: 'RUNNING' })}
+              className={`text-left transition rounded-xl focus:outline-hidden ${status === 'RUNNING' ? 'ring-2 ring-brand-600' : 'hover:opacity-90'}`}
+              title="Filtrar por Em execução"
+            >
+              <Stat label="Em execução" value={fmtNumber(ovQ.data?.campaigns.running ?? 0)} tone="good" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setSp(status === 'PAUSED' ? {} : { status: 'PAUSED' })}
+              className={`text-left transition rounded-xl focus:outline-hidden ${status === 'PAUSED' ? 'ring-2 ring-brand-600' : 'hover:opacity-90'}`}
+              title="Filtrar por Pausadas"
+            >
+              <Stat label="Pausadas" value={fmtNumber(ovQ.data?.campaigns.paused ?? 0)} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setSp(status === 'READY' ? {} : { status: 'READY' })}
+              className={`text-left transition rounded-xl focus:outline-hidden ${status === 'READY' ? 'ring-2 ring-brand-600' : 'hover:opacity-90'}`}
+              title="Filtrar por Prontas"
+            >
+              <Stat label="Prontas" value={fmtNumber(ovQ.data?.campaigns.ready ?? 0)} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setSp(status === 'SCHEDULED' ? {} : { status: 'SCHEDULED' })}
+              className={`text-left transition rounded-xl focus:outline-hidden ${status === 'SCHEDULED' ? 'ring-2 ring-brand-600' : 'hover:opacity-90'}`}
+              title="Filtrar por Agendadas"
+            >
+              <Stat label="Agendadas" value={fmtNumber(ovQ.data?.campaigns.scheduled ?? 0)} />
+            </button>
+            <button
+              type="button"
+              onClick={() => setSp(status === 'COMPLETED' ? {} : { status: 'COMPLETED' })}
+              className={`text-left transition rounded-xl focus:outline-hidden ${status === 'COMPLETED' ? 'ring-2 ring-brand-600' : 'hover:opacity-90'}`}
+              title="Filtrar por Concluídas"
+            >
+              <Stat label="Concluídas" value={fmtNumber(ovQ.data?.campaigns.completed ?? 0)} />
+            </button>
+          </div>
+        </Card>
+
+        <Card
+          title="Tentativas e base de dados"
+          tooltip="Métricas em tempo real de tentativas operacionais e cobertura de dados das campanhas."
+          actions={
+            <Link to="/tentativas" className="text-xs font-medium text-brand-700 hover:underline">
+              Monitor de tentativas →
+            </Link>
+          }
+        >
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
+            <Stat label="Ao vivo" value={fmtNumber(ovQ.data?.attempts.active ?? 0)} tone="good" />
+            <Stat
+              label="Reconciliação"
+              value={fmtNumber(ovQ.data?.attempts.reconciliation ?? 0)}
+              tone={(ovQ.data?.attempts.reconciliation ?? 0) > 0 ? 'warn' : undefined}
+            />
+            <Stat label="Enviadas hoje" value={fmtNumber(ovQ.data?.attempts.sentToday ?? 0)} />
+            <Stat label="Contatos" value={fmtNumber(ovQ.data?.contacts ?? 0)} />
+            <Stat label="Mailings" value={fmtNumber(ovQ.data?.mailings ?? 0)} />
+          </div>
+        </Card>
       </div>
 
       <div className="mb-3 flex flex-wrap gap-1.5" role="group" aria-label="Filtrar por status">

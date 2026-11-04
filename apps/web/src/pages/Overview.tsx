@@ -109,45 +109,6 @@ export function OverviewPage() {
           {/* Gráficos de Inteligência de CPC e Assertividade BTTC */}
           <DashboardChartsGrid />
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Card
-              title="Campanhas"
-              actions={
-                <Link to="/campanhas" className="text-xs font-medium text-brand-700 hover:underline">
-                  Ver campanhas →
-                </Link>
-              }
-            >
-              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
-                <Stat label="Em execução" value={fmtNumber(q.data!.campaigns.running)} tone="good" />
-                <Stat label="Pausadas" value={fmtNumber(q.data!.campaigns.paused)} />
-                <Stat label="Prontas" value={fmtNumber(q.data!.campaigns.ready)} />
-                <Stat label="Agendadas" value={fmtNumber(q.data!.campaigns.scheduled)} />
-                <Stat label="Concluídas" value={fmtNumber(q.data!.campaigns.completed)} />
-              </div>
-            </Card>
-            <Card
-              title="Tentativas e base de dados"
-              actions={
-                <Link to="/tentativas" className="text-xs font-medium text-brand-700 hover:underline">
-                  Monitor de tentativas →
-                </Link>
-              }
-            >
-              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-5">
-                <Stat label="Ao vivo" value={fmtNumber(q.data!.attempts.active)} tone="good" />
-                <Stat
-                  label="Reconciliação"
-                  value={fmtNumber(q.data!.attempts.reconciliation)}
-                  tone={q.data!.attempts.reconciliation > 0 ? 'warn' : undefined}
-                />
-                <Stat label="Enviadas hoje" value={fmtNumber(q.data!.attempts.sentToday)} />
-                <Stat label="Contatos" value={fmtNumber(q.data!.contacts)} />
-                <Stat label="Mailings" value={fmtNumber(q.data!.mailings)} />
-              </div>
-            </Card>
-          </div>
-
           {/* Tabela 1: Ao vivo */}
           <Card
             padded={false}
