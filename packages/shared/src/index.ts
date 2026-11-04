@@ -773,4 +773,87 @@ export const AiCampaignChatResponseSchema = z.object({
 });
 export type AiCampaignChatResponse = z.infer<typeof AiCampaignChatResponseSchema>;
 
+// ---------------------------------------------------------------- Configuração Técnica de Endereços dos Canais
+export const ChannelEndpointConfigSchema = z.object({
+  whatsapp: z.object({
+    apiBaseUrl: z.string().default('https://graph.facebook.com/v19.0'),
+    phoneNumberId: z.string().default('108293847561029'),
+    wabaId: z.string().default('992817264510293'),
+    webhookUrl: z.string().default('https://api.vollconnect.com.br/webhooks/whatsapp'),
+    verifyToken: z.string().default('voll_wa_verify_token_prod'),
+    apiVersion: z.string().default('v19.0'),
+  }),
+  voice: z.object({
+    sipServer: z.string().default('sip.voip.vollconnect.com.br'),
+    sipPort: z.number().int().default(5060),
+    sipTransport: z.enum(['UDP', 'TCP', 'TLS']).default('TLS'),
+    webrtcGatewayUrl: z.string().default('wss://webrtc.vollconnect.com.br/ws'),
+    cdrWebhookUrl: z.string().default('https://api.vollconnect.com.br/webhooks/cdr'),
+    defaultCallerId: z.string().default('+551140030000'),
+    outboundProxy: z.string().default('proxy.voip.vollconnect.com.br:5061'),
+  }),
+  sms: z.object({
+    smppHost: z.string().default('smpp.zenvia.vollconnect.com.br'),
+    smppPort: z.number().int().default(2775),
+    systemType: z.string().default('SMPP'),
+    dlrWebhookUrl: z.string().default('https://api.vollconnect.com.br/webhooks/sms/dlr'),
+    defaultSenderId: z.string().default('28080'),
+  }),
+  email: z.object({
+    smtpHost: z.string().default('smtp.sendgrid.net'),
+    smtpPort: z.number().int().default(587),
+    smtpSecurity: z.enum(['STARTTLS', 'SSL', 'TLS']).default('STARTTLS'),
+    fromAddress: z.string().default('notificacoes@vollconnect.com.br'),
+    fromName: z.string().default('Voll Connect Operações'),
+    eventsWebhookUrl: z.string().default('https://api.vollconnect.com.br/webhooks/email/events'),
+  }),
+  rcs: z.object({
+    rbmApiUrl: z.string().default('https://rcsbusinessmessaging.googleapis.com/v1'),
+    agentId: z.string().default('voll-connect-assistant@rbm.goog'),
+    webhookUrl: z.string().default('https://api.vollconnect.com.br/webhooks/rcs'),
+  }),
+});
+
+export type ChannelEndpointConfig = z.infer<typeof ChannelEndpointConfigSchema>;
+
+export const DEFAULT_CHANNEL_ENDPOINTS: ChannelEndpointConfig = {
+  whatsapp: {
+    apiBaseUrl: 'https://graph.facebook.com/v19.0',
+    phoneNumberId: '108293847561029',
+    wabaId: '992817264510293',
+    webhookUrl: 'https://api.vollconnect.com.br/webhooks/whatsapp',
+    verifyToken: 'voll_wa_verify_token_prod',
+    apiVersion: 'v19.0',
+  },
+  voice: {
+    sipServer: 'sip.voip.vollconnect.com.br',
+    sipPort: 5060,
+    sipTransport: 'TLS',
+    webrtcGatewayUrl: 'wss://webrtc.vollconnect.com.br/ws',
+    cdrWebhookUrl: 'https://api.vollconnect.com.br/webhooks/cdr',
+    defaultCallerId: '+551140030000',
+    outboundProxy: 'proxy.voip.vollconnect.com.br:5061',
+  },
+  sms: {
+    smppHost: 'smpp.zenvia.vollconnect.com.br',
+    smppPort: 2775,
+    systemType: 'SMPP',
+    dlrWebhookUrl: 'https://api.vollconnect.com.br/webhooks/sms/dlr',
+    defaultSenderId: '28080',
+  },
+  email: {
+    smtpHost: 'smtp.sendgrid.net',
+    smtpPort: 587,
+    smtpSecurity: 'STARTTLS',
+    fromAddress: 'notificacoes@vollconnect.com.br',
+    fromName: 'Voll Connect Operações',
+    eventsWebhookUrl: 'https://api.vollconnect.com.br/webhooks/email/events',
+  },
+  rcs: {
+    rbmApiUrl: 'https://rcsbusinessmessaging.googleapis.com/v1',
+    agentId: 'voll-connect-assistant@rbm.goog',
+    webhookUrl: 'https://api.vollconnect.com.br/webhooks/rcs',
+  },
+};
+
 

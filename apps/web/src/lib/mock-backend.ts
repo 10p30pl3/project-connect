@@ -9,6 +9,7 @@ import {
   ATTEMPT_STATE_LABEL,
   CAMPAIGN_STATUS_LABEL,
   CHANNEL_LABEL,
+  DEFAULT_CHANNEL_ENDPOINTS,
   maskAddress,
   ROLES,
   type AiCampaignChatRequest,
@@ -18,6 +19,7 @@ import {
   type AudienceSegment,
   type CampaignDraft,
   type CampaignStatus,
+  type ChannelEndpointConfig,
   type ChannelType,
   type ColumnMapping,
   type ListFilter,
@@ -1229,6 +1231,47 @@ export async function handleMockApi<T = unknown>(
       if (body.simulation !== undefined) c.simulation = body.simulation;
     }
     return (c ?? CONNECTIONS[0]) as T;
+  }
+
+  // ---------------------------------------------------------------- Endereços Técnicos dos Canais
+  if (pathname === '/channels/technical-endpoints' && method === 'GET') {
+    let endpoints = DEFAULT_CHANNEL_ENDPOINTS;
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('vc_channel_endpoints');
+        if (raw) endpoints = JSON.parse(raw);
+      } catch {
+        /* fallback default */
+      }
+    }
+    return { data: endpoints } as T;
+  }
+
+  if (pathname === '/channels/technical-endpoints' && method === 'POST') {
+    const b = (opts.body ?? {}) as ChannelEndpointConfig;
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('vc_channel_endpoints', JSON.stringify(b));
+    }
+    return { ok: true, data: b } as T;
+  }
+
+  if (pathname === '/channels/technical-endpoints/test' && method === 'POST') {
+    const b = (opts.body ?? {}) as { channel?: string };
+    const channel = b.channel ?? 'whatsapp';
+    const responses: Record<string, { status: string; code: number; details: string }> = {
+      whatsapp: { status: 'Ativo', code: 200, details: 'Handshake Graph API Meta 200 OK · WABA validado' },
+      voice: { status: 'Ativo', code: 200, details: 'SIP OPTIONS 200 OK · Tronco registrado via TLS' },
+      sms: { status: 'Ativo', code: 200, details: 'SMPP BIND_TRANSMITTER_RESP 0x00000000 · Conectado' },
+      email: { status: 'Ativo', code: 200, details: 'SMTP 250 STARTTLS ready · Autenticação confirmada' },
+      rcs: { status: 'Ativo', code: 200, details: 'Google RBM Agent 200 OK · Webhook sincronizado' },
+    };
+    const res = responses[channel] ?? { status: 'Ativo', code: 200, details: 'Conexão validada com sucesso' };
+    return {
+      ok: true,
+      channel,
+      latencyMs: 85,
+      ...res,
+    } as T;
   }
   if (pathname === '/journeys' && method === 'GET') return { items: JOURNEYS } as T;
   if (pathname === '/journeys' && method === 'POST') {
