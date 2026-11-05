@@ -13,6 +13,7 @@ import {
   Card,
   Checkbox,
   Field,
+  InfoTooltip,
   Input,
   Loading,
   PageHeader,
@@ -132,7 +133,10 @@ export function OptimizationPage() {
       />
 
       <Alert tone="info">
-        <strong>Como funciona o Modo Consultivo (§22):</strong> Você pode ativar a política de otimização na <strong>Estratégia</strong> ou diretamente no painel abaixo. As recomendações classificam melhor canal, destino e janela horária para cada contato, permitindo que o gestor aplique individualmente ou em lote sem jamais violar DNC, bloqueios ou limites institucionais.
+        <div className="flex items-center gap-1.5">
+          <span>O Modo Consultivo (§22) classifica canal, destino e janela para aplicação individual ou em lote.</span>
+          <InfoTooltip content="Você pode ativar a política de otimização na Estratégia ou diretamente no painel abaixo, sem violar DNC, bloqueios ou limites institucionais." />
+        </div>
       </Alert>
 
       <div className="grid gap-4 lg:grid-cols-12">

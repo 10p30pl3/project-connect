@@ -386,7 +386,7 @@ function BlocksTable({ blocks, destinations, contactId }: { blocks: ContactDetai
         open={!!revoke}
         onOpenChange={(o) => !o && setRevoke(null)}
         title="Revogar bloqueio"
-        description="Revise a origem da restrição antes de revogar. A ação é auditada."
+        description="Revise a origem da restrição antes de confirmar a revogação auditada."
         footer={
           <>
             <Button onClick={() => setRevoke(null)}>Cancelar</Button>
@@ -432,7 +432,7 @@ function AddDestinationDialog({ contactId, open, onOpenChange }: { contactId: st
       open={open}
       onOpenChange={onOpenChange}
       title="Adicionar destino"
-      description="Telefones com DDI e DDD (10 a 15 dígitos). O mesmo número não pode se repetir no mesmo canal."
+      description="Informe telefones únicos com DDI e DDD de 10 a 15 dígitos."
       footer={
         <>
           <Button onClick={() => onOpenChange(false)}>Cancelar</Button>
@@ -499,7 +499,7 @@ function BlockDialog({
       open={!!state}
       onOpenChange={(o) => !o && onClose()}
       title={state?.scope === 'CONTACT' ? 'Bloquear cliente em todos os canais' : `Bloquear destino ${state?.destination?.addressMasked ?? ''}`}
-      description="Impede novos envios no escopo definido e cancela reservas e retornos ainda não enviados. Tentativas já enviadas permanecem no histórico."
+      description="Impede novos envios no escopo selecionado e cancela reservas pendentes."
       footer={
         <>
           <Button onClick={onClose}>Cancelar</Button>

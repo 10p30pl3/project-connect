@@ -14,6 +14,7 @@ import {
   Checkbox,
   ErrorState,
   Field,
+  InfoTooltip,
   Input,
   Loading,
   PageHeader,
@@ -167,15 +168,15 @@ export function LimitsPage() {
                     disabled={readOnly}
                     onChange={(e) => setSusp(e.target.checked)}
                   />
-                  <p className="mt-1 text-xs text-amber-800 ml-6">
-                    Quando ativado, novas reservas e envios de todas as campanhas são congelados imediatamente.
-                    Retornos de tentativas já enviadas continuam sendo processados normalmente.
-                  </p>
+                  <div className="mt-1 flex items-center gap-1.5 text-xs text-amber-800 ml-6">
+                    <span>Congela imediatamente novas reservas e envios em todas as campanhas.</span>
+                    <InfoTooltip content="Retornos de tentativas já enviadas continuam sendo processados normalmente." />
+                  </div>
                 </div>
 
                 {susp && (
                   <Alert tone="warn">
-                    <strong>ATENÇÃO:</strong> A suspensão global está ATIVA. Nenhuma campanha em andamento disparará novas tentativas até o desbloqueio.
+                    <strong>ATENÇÃO:</strong> A suspensão global está ATIVA, impedindo novos disparos em todas as campanhas até o desbloqueio.
                   </Alert>
                 )}
 

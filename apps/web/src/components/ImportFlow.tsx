@@ -6,7 +6,7 @@ import { FIELD_TYPES, MAPPING_TARGETS, type ColumnMapping, type MappingTarget } 
 import { ApiError, errorMessage, post } from '../lib/api';
 import type { ImportPreview, ImportResult } from '../lib/types';
 import { downloadText, fmtNumber } from '../lib/format';
-import { Alert, Badge, Button, Checkbox, ConfirmDialog, Field, Input, Select, Stat, TableWrap, Textarea } from './ui';
+import { Alert, Badge, Button, Checkbox, ConfirmDialog, Field, InfoTooltip, Input, Select, Stat, TableWrap, Textarea } from './ui';
 
 const TARGET_LABEL: Record<MappingTarget, string> = {
   external_id: 'Identificador do cliente',
@@ -298,10 +298,10 @@ export function ImportFlow({ onImported, initialName = '' }: { onImported: (r: I
 
       {sub === 'FIELDS' && preview && (
         <div className="space-y-3">
-          <p className="text-sm text-slate-600">
-            {fmtNumber(preview.totalRows)} registros · separador detectado: <code>{preview.delimiter === '\t' ? 'tab' : preview.delimiter}</code>. Revise
-            para onde cada coluna vai no cadastro.
-          </p>
+          <div className="flex items-center gap-1.5 text-sm text-slate-600">
+            <span>{fmtNumber(preview.totalRows)} registros identificados (separador: <code>{preview.delimiter === '\t' ? 'tab' : preview.delimiter}</code>).</span>
+            <InfoTooltip content="Revise o mapeamento das colunas de origem para os campos de destino no cadastro." />
+          </div>
           {errors.mapping && <Alert tone="error">{errors.mapping}</Alert>}
           <TableWrap label="Definição dos campos">
             <table className="data">
@@ -472,7 +472,7 @@ export function ImportFlow({ onImported, initialName = '' }: { onImported: (r: I
               {preview.rejectedRows > 0 ? `Importar ${fmtNumber(preview.validRows)} válidos` : `Importar ${fmtNumber(preview.validRows)} registros`}
             </Button>
           </div>
-          {preview.validRows === 0 && <Alert tone="warn">Nenhum registro válido. Ajuste os campos ou a origem para importar.</Alert>}
+          {preview.validRows === 0 && <Alert tone="warn">Nenhum registro válido encontrado; ajuste os campos ou a origem para importar.</Alert>}
         </div>
       )}
 
@@ -484,11 +484,13 @@ export function ImportFlow({ onImported, initialName = '' }: { onImported: (r: I
         loading={commitM.isPending}
         onConfirm={() => commit(true)}
       >
-        <p className="text-sm">
-          Serão incluídos <strong>{fmtNumber(preview?.validRows ?? 0)}</strong> registros e excluídos{' '}
-          <strong>{fmtNumber(preview?.rejectedRows ?? 0)}</strong> inconsistentes. O relatório dos rejeitados (linha original, valores e motivos)
-          fica associado ao mailing para download. Linhas rejeitadas não entram no cadastro.
-        </p>
+        <div className="flex items-center gap-1.5 text-sm text-slate-800">
+          <span>
+            Serão incluídos <strong>{fmtNumber(preview?.validRows ?? 0)}</strong> registros válidos e excluídos{' '}
+            <strong>{fmtNumber(preview?.rejectedRows ?? 0)}</strong> inconsistentes.
+          </span>
+          <InfoTooltip content="O relatório dos rejeitados com linha original e motivos fica disponível para download no mailing. Linhas rejeitadas não entram no cadastro." />
+        </div>
       </ConfirmDialog>
     </div>
   );

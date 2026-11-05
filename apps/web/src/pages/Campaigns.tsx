@@ -316,7 +316,7 @@ export function CampaignsPage() {
         open={!!stopTarget}
         onOpenChange={(o) => !o && setStopTarget(null)}
         title={`Parar (Stop) campanha "${stopTarget?.name ?? ''}"?`}
-        description="Impede novas reservas e cancela o que ainda não foi enviado. Tentativas já aceitas pelo canal continuam rastreadas."
+        description="Impede novas reservas e cancela tentativas pendentes."
         footer={
           <>
             <Button onClick={() => setStopTarget(null)}>Cancelar</Button>

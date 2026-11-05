@@ -166,7 +166,7 @@ export function ListEditor({
             checked={mode === 'SNAPSHOT'}
             onChange={() => setMode('SNAPSHOT')}
             title="Fotografia da base"
-            description="Congela os membros no momento da publicação. Novos registros do mailing não entram."
+            description="Congela os membros no momento da publicação sem incluir novos registros."
           />
           <RadioCard
             name="mode"
@@ -174,7 +174,7 @@ export function ListEditor({
             checked={mode === 'DYNAMIC'}
             onChange={() => setMode('DYNAMIC')}
             title="Dinâmica"
-            description="Reavalia os filtros publicados contra os dados atuais do mailing. Quem passar a atender entra; quem já foi acionado mantém o histórico."
+            description="Reavalia os filtros periodicamente contra os dados atuais do mailing."
           />
         </div>
         <p className="mt-1 text-xs text-slate-500">DNC, limites e calendário continuam sendo revalidados a cada tentativa em ambas as modalidades.</p>

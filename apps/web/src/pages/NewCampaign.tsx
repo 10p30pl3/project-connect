@@ -477,7 +477,7 @@ export function NewCampaignPage() {
           </>
         }
       >
-        <p className="text-sm text-slate-700">Descartar remove apenas o rascunho. Mailings importados e listas publicadas continuam disponíveis.</p>
+        <p className="text-sm text-slate-700">Descartar remove apenas o rascunho sem afetar mailings ou listas.</p>
       </Modal>
       <Modal
         open={discardConfirm}
@@ -492,7 +492,7 @@ export function NewCampaignPage() {
           </>
         }
       >
-        <p className="text-sm">O rascunho atual será substituído. Mailings e listas já salvos não são removidos.</p>
+        <p className="text-sm">O rascunho atual será substituído sem remover mailings ou listas já salvos.</p>
       </Modal>
     </div>
   );
@@ -660,7 +660,7 @@ const PROMPT_TEMPLATES = [
   {
     label: 'Cobrança Preventiva (1–30 dias)',
     prompt:
-      'Cobrança preventiva e amigável para atrasos recentes de até 30 dias. Priorizar canais digitais de baixo custo (WhatsApp e RCS) no primeiro toque e direcionar voz inteligente nas janelas de maior probabilidade de atendimento residencial.',
+      'Cobrança preventiva e amigável para atrasos recentes de até 30 dias, priorizando canais digitais de baixo custo no primeiro toque e direcionando voz inteligente nas melhores janelas.',
     defaultName: 'Cobrança Preventiva · Faixa 1-30d',
     purposeCode: 'COBRANCA' as OperationPurpose,
     audienceSegment: 'B2C' as AudienceSegment,
@@ -668,7 +668,7 @@ const PROMPT_TEMPLATES = [
   {
     label: 'Recuperação Crítica (> 60 dias)',
     prompt:
-      'Recuperação de crédito para dívidas vencidas há mais de 60 dias. Acionamento multicanal intensivo com voz inteligente e BINA local na janela de almoço e noite, respeitando limites e DNC.',
+      'Recuperação de crédito para dívidas vencidas há mais de 60 dias com acionamento multicanal intensivo, voz inteligente e BINA local nas melhores janelas.',
     defaultName: 'Recuperação Crítica · Atraso 60d+',
     purposeCode: 'COBRANCA' as OperationPurpose,
     audienceSegment: 'B2C' as AudienceSegment,
@@ -686,7 +686,7 @@ const PROMPT_TEMPLATES = [
   {
     label: 'Venda Ativa Corporativa B2B (PME)',
     prompt:
-      'Prospecção ativa e venda corporativa de novos planos e serviços para empresas e PMEs (B2B). Abordagem consultiva por e-mail institucional e WhatsApp Business em horário comercial.',
+      'Prospecção ativa e venda corporativa de novos planos e serviços para empresas e PMEs (B2B) com abordagem consultiva em horário comercial.',
     defaultName: 'Venda Corporativa · Planos PME',
     purposeCode: 'VENDAS' as OperationPurpose,
     audienceSegment: 'B2B' as AudienceSegment,
@@ -694,7 +694,7 @@ const PROMPT_TEMPLATES = [
   {
     label: 'Venda Ativa de Novos Planos',
     prompt:
-      'Campanha de venda ativa comercial e oferta de planos e serviços. Disparo inicial via WhatsApp interativo com catálogo de ofertas e encaminhamento imediato para consultor de vendas.',
+      'Campanha de venda ativa comercial com disparo inicial via WhatsApp interativo e encaminhamento imediato para consultor de vendas.',
     defaultName: 'Venda Ativa · Novos Planos',
     purposeCode: 'VENDAS' as OperationPurpose,
     audienceSegment: 'B2C' as AudienceSegment,
@@ -2195,7 +2195,7 @@ function UnifiedCampaignCreator({
                       {audienceSegment === 'B2C' && <span className="size-2 rounded-full bg-brand-600" />}
                     </div>
                     <p className="text-[11px] text-slate-600">
-                      Consumidor final (CPF). Janelas residenciais, PIX instantâneo e BINA local.
+                      Consumidor final (CPF) com janelas residenciais, PIX instantâneo e BINA local.
                     </p>
                     <div className="pt-1 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100">
                       <span>Janelas</span>
@@ -2223,7 +2223,7 @@ function UnifiedCampaignCreator({
                       {audienceSegment === 'B2B' && <span className="size-2 rounded-full bg-indigo-600" />}
                     </div>
                     <p className="text-[11px] text-slate-600">
-                      Empresas e PMEs (CNPJ). Foco no contas a pagar com boleto e e-mail corporativo.
+                      Empresas e PMEs (CNPJ) com foco em contas a pagar via boleto e e-mail corporativo.
                     </p>
                     <div className="pt-1 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100">
                       <span>Horários</span>
@@ -2251,7 +2251,7 @@ function UnifiedCampaignCreator({
                       {audienceSegment === 'MIXED' && <span className="size-2 rounded-full bg-purple-600" />}
                     </div>
                     <p className="text-[11px] text-slate-600">
-                      Base mista. Roteamento dinâmico de horário e canal por CPF ou CNPJ.
+                      Base mista com roteamento dinâmico de horário e canal por CPF ou CNPJ.
                     </p>
                     <div className="pt-1 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100">
                       <span>Roteamento</span>
@@ -3109,9 +3109,10 @@ function UnifiedCampaignCreator({
                 {audienceSegment === 'B2B' && (
                   <div className="rounded-xl border border-indigo-200 bg-indigo-50/70 p-3 text-xs text-indigo-950 flex items-center gap-2.5">
                     <Building2 className="size-4 text-indigo-700 shrink-0" />
-                    <span>
-                      <strong>Compliance B2B Ativo:</strong> Disparos restritos ao horário comercial corporativo (Segunda a Sexta, 08h30 às 18h00). Finais de semana e noites são bloqueados automaticamente.
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span><strong>Compliance B2B Ativo:</strong> Disparos restritos ao horário comercial corporativo (Segunda a Sexta, 08h30 às 18h00).</span>
+                      <InfoTooltip content="Finais de semana e noites são bloqueados automaticamente." />
+                    </div>
                   </div>
                 )}
               </div>
@@ -3457,7 +3458,7 @@ function AudienceStep({
             checked={mode === 'ALL'}
             onChange={() => update({ audienceMode: 'ALL', listVersionId: null }, { audienceCount: mailing?.recordCount ?? null })}
             title="Usar todos os contatos"
-            description="Referência direta ao mailing, sem criar lista. Validação e DNC continuam obrigatórios."
+            description="Referência direta ao mailing com validação e DNC obrigatórios."
           />
           <RadioCard
             name="aud"
@@ -3470,7 +3471,7 @@ function AudienceStep({
               )
             }
             title={draft.sourceListVersionId ? 'Usar a lista escolhida ou filtrar' : 'Filtrar e criar lista'}
-            description="Filtros, ordenação e modalidade de atualização. Continuar salva a lista publicada."
+            description="Filtros e ordenação para salvar uma lista publicada."
           />
         </div>
       </fieldset>
@@ -3494,7 +3495,7 @@ function AudienceStep({
       {mode === 'LIST' && !fromExistingList && draft.mailingId && (
         <Card>
           <Alert tone="info" className="mb-4">
-            Continuar salva a lista publicada (com identificador e versão). A campanha ainda não será criada.
+            Continuar salva a versão da lista sem criar a campanha imediatamente.
           </Alert>
           <ListEditor
             mailingId={draft.mailingId}
@@ -3564,7 +3565,7 @@ function ActivationStep({
   const [purposeCode, setPurposeCode] = useState<OperationPurpose>(extra.purposeCode ?? 'COBRANCA');
   const [purposePrompt, setPurposePrompt] = useState<string>(
     extra.purposePrompt ??
-      'Cobrança preventiva e amigável. Priorizar canais digitais (WhatsApp e RCS) no primeiro toque e direcionar voz inteligente nas janelas ótimas da TIC Domicílios.',
+      'Cobrança preventiva e amigável, priorizando canais digitais (WhatsApp e RCS) no primeiro toque e voz inteligente nas melhores janelas.',
   );
   const [maxAcceptableCpcBrl, setMaxAcceptableCpcBrl] = useState<number>(extra.maxAcceptableCpcBrl ?? 4.5);
   const [labSamplePct, setLabSamplePct] = useState<number>(extra.labSamplePct ?? 10);
@@ -3704,7 +3705,7 @@ function ActivationStep({
               Otimização Autônoma de Custo por CPC Confirmado
             </h3>
             <p className="mt-1 text-xs text-slate-600">
-              Classificação em <strong>8 Blocos Padronizados</strong> (TIC Domicílios 2025, DDD, Faixa Etária, Matriz Phone-Intent P1..P4). Consulta contínua à base cumulativa histórica.
+              Classificação em <strong>8 Blocos Padronizados</strong> com consulta contínua à base cumulativa histórica.
             </p>
           </div>
           <div className="mt-3 flex items-center gap-2">
@@ -3931,8 +3932,9 @@ function ActivationStep({
           {/* Card Base Cumulativa Histórica */}
           <div className="flex items-start gap-3 rounded-lg border border-brand-200 bg-brand-50/50 p-3.5 text-xs text-brand-950">
             <Database className="mt-0.5 size-4 shrink-0 text-brand-700" aria-hidden />
-            <div>
-              <strong>Base Cumulativa de Inteligência (Golden Record):</strong> Cada mailing carregado enriquece o histórico de contatos da operação. Telefones confirmados anteriormente recebem prioridade <strong>P1</strong> nesta campanha, enquanto números inválidos ou bloqueados no DNC/Procon são descartados antes do acionamento.
+            <div className="flex items-center gap-1.5">
+              <span><strong>Base Cumulativa (Golden Record):</strong> Cada mailing enriquece a priorização com prioridade P1 para telefones confirmados.</span>
+              <InfoTooltip content="Números inválidos ou restritos no DNC/Procon são descartados automaticamente antes do acionamento." />
             </div>
           </div>
 
@@ -4028,7 +4030,7 @@ function ActivationStep({
             <h3 id="journey-title" className="mb-2 text-sm font-semibold">
               Jornada Manual
             </h3>
-            {journeyMissing && <Alert tone="warn" className="mb-2">A jornada do rascunho não está mais disponível. Escolha outra.</Alert>}
+            {journeyMissing && <Alert tone="warn" className="mb-2">A jornada do rascunho não está mais disponível; selecione outra jornada.</Alert>}
             {!journeys ? (
               <Loading />
             ) : (
@@ -4065,7 +4067,7 @@ function ActivationStep({
             </h3>
             {strategyMissing && (
               <Alert tone="warn" className="mb-2">
-                A versão de estratégia do rascunho não é mais a publicada mais recente. Selecione novamente.
+                A estratégia do rascunho foi atualizada; selecione a versão publicada mais recente.
               </Alert>
             )}
             {!strategies ? (
@@ -4119,9 +4121,10 @@ function ActivationStep({
               }
             >
               <StrategySummary config={selectedStrategy.latestVersion.config} version={selectedStrategy.latestVersion.version} tabulations={tabulations} />
-              <p className="mt-3 text-xs text-slate-500">
-                Os parâmetros não são editados na campanha. Bloqueios e limites globais (Controle central) prevalecem sobre o template.
-              </p>
+              <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-500">
+                <span>Os parâmetros de estratégia são definidos pelo template selecionado.</span>
+                <InfoTooltip content="Bloqueios e limites globais do Controle central prevalecem sobre o template." />
+              </div>
             </Card>
           )}
         </div>

@@ -481,8 +481,7 @@ export function IntelligencePage() {
                 <Badge tone="gray">Clássico</Badge>
               </div>
               <p className="mt-0.5 text-xs text-slate-600">
-                Prefere configurar filtros de lista, jornadas de canal fixas e regras de calendário manualmente? Acesse a
-                bancada clássica.
+                Configure filtros de lista, jornadas fixas e regras de calendário na bancada clássica.
               </p>
             </div>
           </div>

@@ -1577,7 +1577,7 @@ function EditConnection({ c, onClose }: { c: Connection; onClose: () => void }) 
               )}
             </Field>
           </div>
-          <Field label="Token / Chave de Autenticação (Bearer / Header)" hint="Opcional. Se vazio, utiliza a credencial técnica global do workspace.">
+          <Field label="Token / Chave de Autenticação (Bearer / Header)" hint="Se não informado, utiliza a credencial técnica global do workspace.">
             {(p) => (
               <Input
                 id={p.id}

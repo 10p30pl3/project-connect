@@ -5,7 +5,7 @@ import { CHANNEL_LABEL } from '@voll/shared';
 import { get } from '../lib/api';
 import type { AttemptRow, CampaignSummary, Eligibility, Overview, OverviewQueueItem, Paginated } from '../lib/types';
 import { fmtDateTime, fmtNumber } from '../lib/format';
-import { Alert, Badge, btnClass, Card, Empty, ErrorState, Loading, PageHeader, Stat, TableWrap } from '../components/ui';
+import { Alert, Badge, btnClass, Card, Empty, ErrorState, InfoTooltip, Loading, PageHeader, Stat, TableWrap } from '../components/ui';
 import { AttemptsTable } from '../components/AttemptsTable';
 import { DashboardChartsGrid } from '../components/DashboardCharts';
 import { useAuth } from '../lib/auth';
@@ -68,7 +68,7 @@ export function OverviewPage() {
       />
       {q.data?.globalSuspension && (
         <Alert tone="warn" title="Suspensão global ativa">
-          Nenhuma nova reserva ou envio acontece até a liberação no Controle central. Retornos em andamento continuam sendo processados.
+          Novas reservas e envios estão congelados até a liberação no Controle central.
         </Alert>
       )}
       {q.isLoading ? (
@@ -120,9 +120,12 @@ export function OverviewPage() {
                       <div className="mx-auto grid size-12 place-items-center rounded-xl bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-200">
                         <Sparkles className="size-6 text-brand-600" />
                       </div>
-                      <h3 className="text-base font-semibold text-slate-900">Base limpa pronta para operação</h3>
-                      <p className="text-sm text-slate-600 leading-relaxed">
-                        Nenhum contato ou campanha cadastrado ainda. Comece importando seu primeiro mailing CSV ou crie sua primeira campanha inteligente com auxílio do assistente de IA.
+                      <div className="flex items-center justify-center gap-1.5">
+                        <h3 className="text-base font-semibold text-slate-900">Base limpa pronta para operação</h3>
+                        <InfoTooltip content="Importe seu primeiro mailing CSV ou crie sua primeira campanha inteligente com auxílio do assistente de IA." />
+                      </div>
+                      <p className="text-sm text-slate-600">
+                        Nenhum contato ou campanha cadastrado ainda.
                       </p>
                       <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
                         <Link to="/mailings/importar" className={btnClass('primary')}>
@@ -163,7 +166,7 @@ export function OverviewPage() {
             <AttemptsTable
               items={workingRecords}
               showCampaign
-              emptyText="Nenhum registro ao vivo no momento. As reservas e envios ativos aparecerão aqui automaticamente."
+              emptyText="Nenhum registro ao vivo no momento."
             />
           </Card>
 

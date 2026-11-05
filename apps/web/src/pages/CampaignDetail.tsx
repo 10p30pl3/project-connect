@@ -24,6 +24,7 @@ import {
   Card,
   ErrorState,
   Field,
+  InfoTooltip,
   Input,
   KeyValue,
   Loading,
@@ -119,7 +120,7 @@ function CampaignActions({ c }: { c: CampaignDetail }) {
   const s = c.status;
   const texts = {
     start: ['Iniciar campanha (Start)?', 'As reservas e envios começam na próxima janela permitida pelo calendário da estratégia.', 'Start'],
-    pause: ['Pausar campanha (Pause)?', 'Novas reservas e envios param. Retornos de tentativas já enviadas continuam sendo processados.', 'Pause'],
+    pause: ['Pausar campanha (Pause)?', 'Interrompe novas reservas e envios, mantendo o processamento dos retornos já enviados.', 'Pause'],
     resume: ['Retomar campanha (Start)?', 'Novas reservas voltam a ser feitas, sujeitas a elegibilidade e calendário.', 'Start'],
     archive: ['Arquivar campanha?', 'A campanha sairá da listagem principal e ficará disponível no filtro "Arquivada", preservando todo o histórico e indicadores.', 'Arquivar'],
   } as const;
@@ -169,7 +170,7 @@ function CampaignActions({ c }: { c: CampaignDetail }) {
         open={closeOpen}
         onOpenChange={setCloseOpen}
         title="Encerrar campanha?"
-        description="Impede novas entregas e cancela o que ainda não foi enviado. Tentativas já aceitas pelo canal continuam rastreadas. Não pode ser desfeito."
+        description="Impede novas entregas e cancela de forma definitiva as tentativas pendentes."
         footer={
           <>
             <Button onClick={() => setCloseOpen(false)}>Cancelar</Button>
@@ -458,7 +459,12 @@ function IndicatorsTab({ id }: { id: string }) {
         />
       </div>
       {partial && (
-        <Alert tone="warn">Há envios sem tarifa conhecida. O custo exibido é parcial e os custos unitários ficam omitidos.</Alert>
+        <Alert tone="warn">
+          <div className="flex items-center gap-1.5">
+            <span>Há envios sem tarifa conhecida com exibição parcial de custo.</span>
+            <InfoTooltip content="Os custos unitários consolidados ficam omitidos até a definição de todas as tarifas dos canais." />
+          </div>
+        </Alert>
       )}
       <div className="grid gap-4 lg:grid-cols-3">
         <Card title="Pendências">
@@ -526,9 +532,10 @@ function IndicatorsTab({ id }: { id: string }) {
           </table>
         </Card>
       </div>
-      <p className="text-xs text-slate-500">
-        CPC e conversões são deduplicados por cliente nesta campanha. Entrega técnica não conta como CPC. Valores ausentes aparecem como “—”, nunca como zero.
-      </p>
+      <div className="flex items-center gap-1.5 text-xs text-slate-500">
+        <span>CPC e conversões são deduplicados por cliente nesta campanha.</span>
+        <InfoTooltip content="Entrega técnica não conta como CPC. Valores ausentes aparecem como '—', nunca como zero." />
+      </div>
     </div>
   );
 }

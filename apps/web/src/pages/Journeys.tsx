@@ -515,7 +515,7 @@ function NewJourneyDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
       onOpenChange={onOpenChange}
       wide
       title="Nova jornada"
-      description="Cada etapa referencia uma conexão compatível com o canal. Retentativas ficam na estratégia."
+      description="Cada etapa da jornada referencia uma conexão compatível com o canal."
       footer={
         <>
           <Button onClick={() => onOpenChange(false)}>Cancelar</Button>

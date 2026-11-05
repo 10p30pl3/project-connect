@@ -121,8 +121,7 @@ function AttemptBody({ id }: { id: string }) {
 
       {a.state === 'RECONCILIATION' && (
         <Alert tone="warn" title="Novo envio bloqueado">
-          O envio foi aceito pelo canal, mas o resultado não chegou de forma confiável. Nenhuma nova tentativa é feita para este cliente até a
-          reconciliação.
+          O envio aguarda confirmação confiável do canal antes de liberar novas tentativas.
         </Alert>
       )}
 
@@ -267,7 +266,7 @@ function ReconcileDialog({ id, open, onOpenChange }: { id: string; open: boolean
       open={open}
       onOpenChange={onOpenChange}
       title="Resolver reconciliação"
-      description="Registre o que foi confirmado com o canal. A ação é auditada."
+      description="Registre o que foi confirmado com o canal para conciliação auditada."
       footer={
         <>
           <Button onClick={() => onOpenChange(false)}>Cancelar</Button>
@@ -327,7 +326,7 @@ function ForceResultDialog({ id, open, onOpenChange }: { id: string; open: boole
       open={open}
       onOpenChange={onOpenChange}
       title="Forçar resultado (simulador)"
-      description="Envia um webhook do conector simulado com a tabulação escolhida. Disponível só em ambiente de demonstração."
+      description="Envia um webhook do conector simulado com a tabulação escolhida em ambiente de demonstração."
       footer={
         <>
           <Button onClick={() => onOpenChange(false)}>Cancelar</Button>

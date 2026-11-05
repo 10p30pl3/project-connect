@@ -403,8 +403,8 @@ export function SystemPage() {
             tooltip="Controle do estado dos dados do workspace: comece com a base zerada para importar seus próprios arquivos ou recarregue a base de demonstração."
           >
             <div className="space-y-3 text-sm">
-              <p className="text-slate-600 leading-relaxed">
-                Opere com a base totalmente limpa (0 contatos, 0 mailings, 0 campanhas) para subir seus próprios arquivos e testar a discagem real com o Tronco Direct Call, ou carregue dados de demonstração com 1.000 contatos fictícios para apresentações.
+              <p className="text-slate-600">
+                Gerencie o estado da base entre ambiente limpo para produção e dados de demonstração.
               </p>
               <div className="flex flex-wrap items-center gap-3 pt-1">
                 <Button

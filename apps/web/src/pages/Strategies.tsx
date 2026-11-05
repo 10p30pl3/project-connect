@@ -385,7 +385,10 @@ export function StrategyDetailPage() {
       />
       {s.protected && can('strategies.write') && (
         <Alert tone="info" className="mb-4">
-          Templates predefinidos são protegidos. Para personalizar, crie uma cópia — o original e as campanhas que o usam permanecem inalterados.
+          <div className="flex items-center gap-1.5">
+            <span>Templates predefinidos são protegidos e exigem uma cópia para personalização.</span>
+            <InfoTooltip content="O original e as campanhas associadas permanecem inalterados." />
+          </div>
         </Alert>
       )}
       {justPublished && (

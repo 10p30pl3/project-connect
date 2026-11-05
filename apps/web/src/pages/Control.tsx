@@ -6,7 +6,7 @@ import type { AuditRow, Control, Paginated } from '../lib/types';
 import { fmtDateTimeSec } from '../lib/format';
 import { useCursorPager } from '../lib/hooks';
 import { useAuth } from '../lib/auth';
-import { Alert, Button, Card, Checkbox, ErrorState, Field, Input, Loading, PageHeader, Pager, TableWrap, useToast } from '../components/ui';
+import { Alert, Button, Card, Checkbox, ErrorState, Field, InfoTooltip, Input, Loading, PageHeader, Pager, TableWrap, useToast } from '../components/ui';
 
 export function ControlPage() {
   const { can } = useAuth();
@@ -67,7 +67,10 @@ export function ControlPage() {
           ) : (
             <div className="space-y-3">
               {errors.form && <Alert tone="error">{errors.form}</Alert>}
-              <p className="text-xs text-slate-600">Vazio = usa o limite do template. Um limite preenchido pode restringir, nunca ampliar, a estratégia.</p>
+              <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                <span>Vazio utiliza o limite padrão do template.</span>
+                <InfoTooltip content="Um limite preenchido pode restringir, nunca ampliar, a estratégia." />
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Máximo diário" error={errors.dailyLimit}>
                   {(p) => (

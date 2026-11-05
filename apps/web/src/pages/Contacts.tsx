@@ -82,14 +82,13 @@ export function ContactsSection() {
                   {data.data!.items.length === 0 && (
                     <tr>
                       <td colSpan={8} className="py-10 text-center text-slate-500">
-                        <div className="mx-auto max-w-sm space-y-2">
-                          <p className="font-semibold text-slate-800">Nenhum contato no Golden Record</p>
+                        <div className="mx-auto max-w-sm space-y-1.5">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <p className="font-semibold text-slate-800">Nenhum contato no Golden Record</p>
+                            <InfoTooltip content="Importe um arquivo CSV na seção Mailings ou cadastre novos contatos manualmente." />
+                          </div>
                           <p className="text-xs text-slate-500">
-                            A base de dados está limpa. Importe um arquivo CSV em{' '}
-                            <Link to="/mailings/importar" className="text-brand-700 underline font-medium">
-                              Mailings
-                            </Link>{' '}
-                            ou cadastre um novo contato manualmente.
+                            A base de dados do workspace está limpa.
                           </p>
                         </div>
                       </td>
