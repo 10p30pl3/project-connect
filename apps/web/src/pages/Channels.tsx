@@ -78,7 +78,19 @@ export function ChannelsPage() {
   const q = useQuery({ queryKey: ['connections'], queryFn: () => get<{ items: Connection[] }>('/connections') });
   const [edit, setEdit] = useState<Connection | null>(null);
   const [openNew, setOpenNew] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('cards');
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    try {
+      const saved = localStorage.getItem('channels_view_mode');
+      if (saved === 'cards' || saved === 'list') return saved;
+    } catch {}
+    return 'list';
+  });
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode);
+    try {
+      localStorage.setItem('channels_view_mode', mode);
+    } catch {}
+  };
   const [activeTab, setActiveTab] = useState<'conexoes' | 'enderecos'>('conexoes');
   const canEdit = can('connections.write');
 
@@ -90,7 +102,7 @@ export function ChannelsPage() {
         actions={
           activeTab === 'conexoes' ? (
             <div className="flex items-center gap-2.5">
-              <ViewModeToggle value={viewMode} onChange={setViewMode} />
+              <ViewModeToggle value={viewMode} onChange={handleViewModeChange} />
               {canEdit && (
                 <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setOpenNew(true)}>
                   Novo canal

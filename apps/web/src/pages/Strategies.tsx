@@ -27,9 +27,20 @@ export function StrategiesSection({
 } = {}) {
   const nav = useNavigate();
   const q = useQuery({ queryKey: ['strategies'], queryFn: () => get<{ items: Strategy[] }>('/strategies') });
-  const [localViewMode, setLocalViewMode] = useState<ViewMode>('cards');
+  const [localViewMode, setLocalViewMode] = useState<ViewMode>(() => {
+    try {
+      const saved = localStorage.getItem('strategies_view_mode');
+      if (saved === 'cards' || saved === 'list') return saved;
+    } catch {}
+    return 'list';
+  });
   const viewMode = extViewMode !== undefined ? extViewMode : localViewMode;
-  const setViewMode = extOnViewModeChange !== undefined ? extOnViewModeChange : setLocalViewMode;
+  const setViewMode = extOnViewModeChange !== undefined ? extOnViewModeChange : (mode: ViewMode) => {
+    setLocalViewMode(mode);
+    try {
+      localStorage.setItem('strategies_view_mode', mode);
+    } catch {}
+  };
 
   return (
     <div className="space-y-3">
@@ -290,7 +301,20 @@ function NewStrategyDialog({
 export function StrategiesPage() {
   const { can } = useAuth();
   const [openNew, setOpenNew] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('cards');
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    try {
+      const saved = localStorage.getItem('strategies_view_mode');
+      if (saved === 'cards' || saved === 'list') return saved;
+    } catch {}
+    return 'list';
+  });
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode);
+    try {
+      localStorage.setItem('strategies_view_mode', mode);
+    } catch {}
+  };
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -298,7 +322,7 @@ export function StrategiesPage() {
         tooltip="Calendário operacional, limites de esforço diário/total, cadência de retentativas e regras por tabulação."
         actions={
           <div className="flex items-center gap-2.5">
-            <ViewModeToggle value={viewMode} onChange={setViewMode} />
+            <ViewModeToggle value={viewMode} onChange={handleViewModeChange} />
             {can('strategies.write') && (
               <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setOpenNew(true)}>
                 Nova estratégia
@@ -307,7 +331,7 @@ export function StrategiesPage() {
           </div>
         }
       />
-      <StrategiesSection viewMode={viewMode} onViewModeChange={setViewMode} />
+      <StrategiesSection viewMode={viewMode} onViewModeChange={handleViewModeChange} />
       <NewStrategyDialog open={openNew} onOpenChange={setOpenNew} />
     </div>
   );

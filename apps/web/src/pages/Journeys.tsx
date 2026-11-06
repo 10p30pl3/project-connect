@@ -345,9 +345,20 @@ export function JourneysSection({
   const open = extOpen !== undefined ? extOpen : localOpen;
   const setOpen = extOnOpenChange !== undefined ? extOnOpenChange : setLocalOpen;
 
-  const [localViewMode, setLocalViewMode] = useState<ViewMode>('cards');
+  const [localViewMode, setLocalViewMode] = useState<ViewMode>(() => {
+    try {
+      const saved = localStorage.getItem('journeys_view_mode');
+      if (saved === 'cards' || saved === 'list') return saved;
+    } catch {}
+    return 'list';
+  });
   const viewMode = extViewMode !== undefined ? extViewMode : localViewMode;
-  const setViewMode = extOnViewModeChange !== undefined ? extOnViewModeChange : setLocalViewMode;
+  const setViewMode = extOnViewModeChange !== undefined ? extOnViewModeChange : (mode: ViewMode) => {
+    setLocalViewMode(mode);
+    try {
+      localStorage.setItem('journeys_view_mode', mode);
+    } catch {}
+  };
 
   const [editJourneyInModal, setEditJourneyInModal] = useState<Journey | null>(null);
 
@@ -458,7 +469,20 @@ export function JourneysSection({
 export function JourneysPage() {
   const { can } = useAuth();
   const [open, setOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('cards');
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    try {
+      const saved = localStorage.getItem('journeys_view_mode');
+      if (saved === 'cards' || saved === 'list') return saved;
+    } catch {}
+    return 'list';
+  });
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode);
+    try {
+      localStorage.setItem('journeys_view_mode', mode);
+    } catch {}
+  };
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -466,7 +490,7 @@ export function JourneysPage() {
         tooltip="Sequência e ordem dos canais, conexões e prazos de feedback para acionamento multicanal."
         actions={
           <div className="flex items-center gap-2.5">
-            <ViewModeToggle value={viewMode} onChange={setViewMode} />
+            <ViewModeToggle value={viewMode} onChange={handleViewModeChange} />
             {can('journeys.write') && (
               <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setOpen(true)}>
                 Nova jornada
@@ -475,7 +499,7 @@ export function JourneysPage() {
           </div>
         }
       />
-      <JourneysSection open={open} onOpenChange={setOpen} viewMode={viewMode} onViewModeChange={setViewMode} />
+      <JourneysSection open={open} onOpenChange={setOpen} viewMode={viewMode} onViewModeChange={handleViewModeChange} />
     </div>
   );
 }
