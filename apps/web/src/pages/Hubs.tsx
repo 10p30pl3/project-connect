@@ -199,7 +199,7 @@ export function PlaybookHubPage() {
             label: (
               <span className="inline-flex items-center gap-1.5">
                 <Tags className="size-4 text-brand-700" aria-hidden />
-                <span>Tabulações</span>
+                <span>Tabulação</span>
               </span>
             ),
             content: <TabulationsSection />,

@@ -120,7 +120,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       },
       {
         to: '/tabulacoes',
-        label: 'Tabulações',
+        label: 'Tabulação',
         icon: <BookMarked className={ico} aria-hidden />,
         matchPrefixes: ['/tabulacoes'],
       },

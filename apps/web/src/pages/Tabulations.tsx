@@ -65,9 +65,20 @@ export function TabulationsSection({
   const toast = useToast();
   const q = useQuery({ queryKey: ['tabulations'], queryFn: () => get<{ items: Tabulation[] }>('/tabulations') });
 
-  const [localViewMode, setLocalViewMode] = useState<ViewMode>('cards');
+  const [localViewMode, setLocalViewMode] = useState<ViewMode>(() => {
+    try {
+      const saved = localStorage.getItem('tabulations_view_mode');
+      if (saved === 'cards' || saved === 'list') return saved;
+    } catch {}
+    return 'list';
+  });
   const viewMode = extViewMode !== undefined ? extViewMode : localViewMode;
-  const setViewMode = extOnViewModeChange !== undefined ? extOnViewModeChange : setLocalViewMode;
+  const setViewMode = extOnViewModeChange !== undefined ? extOnViewModeChange : (mode: ViewMode) => {
+    setLocalViewMode(mode);
+    try {
+      localStorage.setItem('tabulations_view_mode', mode);
+    } catch {}
+  };
 
   const [edits, setEdits] = useState<Record<string, Partial<Tabulation>>>({});
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
@@ -179,9 +190,13 @@ export function TabulationsSection({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-1.5">
-          <h2 className="text-sm font-semibold text-slate-800">Catálogo de Tabulações</h2>
-          <InfoTooltip content="Resultados normalizados de máquina ou humano. A ação de cada tabulação é definida no template de estratégia." />
-          <span className="text-xs text-slate-400 italic ml-2">
+          {extViewMode === undefined && (
+            <>
+              <h2 className="text-sm font-semibold text-slate-800">Tabulação</h2>
+              <InfoTooltip content="Resultados normalizados de máquina ou humano. A ação de cada tabulação é definida no template de estratégia." />
+            </>
+          )}
+          <span className={clsx('text-xs text-slate-400 italic', extViewMode === undefined && 'ml-2')}>
             {!isDirty ? 'Clique em cima de qualquer opção (nome, indicadores ou canais) para editar' : '● Alterações pendentes'}
           </span>
         </div>
@@ -585,15 +600,29 @@ function NewTabulationDialog({ open, onOpenChange }: { open: boolean; onOpenChan
 export function TabulationsPage() {
   const { can } = useAuth();
   const [openNew, setOpenNew] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('cards');
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    try {
+      const saved = localStorage.getItem('tabulations_view_mode');
+      if (saved === 'cards' || saved === 'list') return saved;
+    } catch {}
+    return 'list';
+  });
+
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode);
+    try {
+      localStorage.setItem('tabulations_view_mode', mode);
+    } catch {}
+  };
+
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Dicionário de Tabulações"
+        title="Tabulação"
         tooltip="Resultados normalizados de máquina ou humano e parametrização de CPC, conversão e DNC."
         actions={
           <div className="flex items-center gap-2.5">
-            <ViewModeToggle value={viewMode} onChange={setViewMode} />
+            <ViewModeToggle value={viewMode} onChange={handleViewModeChange} />
             {can('strategies.write') && (
               <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setOpenNew(true)}>
                 Nova tabulação
@@ -602,7 +631,7 @@ export function TabulationsPage() {
           </div>
         }
       />
-      <TabulationsSection viewMode={viewMode} onViewModeChange={setViewMode} />
+      <TabulationsSection viewMode={viewMode} onViewModeChange={handleViewModeChange} />
       <NewTabulationDialog open={openNew} onOpenChange={setOpenNew} />
     </div>
   );
