@@ -1,5 +1,5 @@
 /**
- * Contratos compartilhados entre API e Web (Voll Connect MVP).
+ * Contratos compartilhados entre API e Web (Voll Plan MVP).
  * Fonte única para enums, schemas de entrada (Zod) e formatos de resposta.
  * Referências entre parênteses apontam para o Plano funcional v2.2.
  */
@@ -837,7 +837,7 @@ export const ChannelEndpointConfigSchema = z.object({
     smtpPort: z.number().int().default(587),
     smtpSecurity: z.enum(['STARTTLS', 'SSL', 'TLS']).default('STARTTLS'),
     fromAddress: z.string().default('notificacoes@vollconnect.com.br'),
-    fromName: z.string().default('Voll Connect Operações'),
+    fromName: z.string().default('Voll Plan Operações'),
     eventsWebhookUrl: z.string().default('https://api.vollconnect.com.br/webhooks/email/events'),
   }),
   rcs: z.object({
@@ -883,7 +883,7 @@ export const DEFAULT_CHANNEL_ENDPOINTS: ChannelEndpointConfig = {
     smtpPort: 587,
     smtpSecurity: 'STARTTLS',
     fromAddress: 'notificacoes@vollconnect.com.br',
-    fromName: 'Voll Connect Operações',
+    fromName: 'Voll Plan Operações',
     eventsWebhookUrl: 'https://api.vollconnect.com.br/webhooks/email/events',
   },
   rcs: {

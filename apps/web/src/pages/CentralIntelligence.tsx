@@ -422,7 +422,7 @@ export function CentralIntelligencePage() {
                   <div className="flex items-center gap-2">
                     <Sparkles className="size-4 text-brand-700" />
                     <span className="text-sm font-bold text-slate-900">
-                      Otimização Autônoma Voll Connect
+                      Otimização Autônoma Voll Plan
                     </span>
                     <Badge tone="green">TIC Domicílios 2025</Badge>
                   </div>

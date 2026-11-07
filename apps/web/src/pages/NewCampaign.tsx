@@ -822,7 +822,7 @@ function UnifiedCampaignCreator({
     {
       id: 'welcome',
       sender: 'assistant',
-      text: 'Olá! Sou o assistente de IA da Voll Connect. Qual campanha vamos criar hoje? Você pode descrever o objetivo com suas palavras ou escolher uma das opções abaixo para começarmos:',
+      text: 'Olá! Sou o assistente de IA da Voll Plan. Qual campanha vamos criar hoje? Você pode descrever o objetivo com suas palavras ou escolher uma das opções abaixo para começarmos:',
       missingInfo: 'PURPOSE',
       suggestedReplies: [
         'Cobrança de faturas em atraso',
@@ -1059,7 +1059,7 @@ function UnifiedCampaignCreator({
       {
         id: 'welcome',
         sender: 'assistant',
-        text: 'Olá! Sou o assistente de IA da Voll Connect. Qual campanha vamos criar hoje? Você pode descrever o objetivo com suas palavras ou escolher uma das opções abaixo para começarmos:',
+        text: 'Olá! Sou o assistente de IA da Voll Plan. Qual campanha vamos criar hoje? Você pode descrever o objetivo com suas palavras ou escolher uma das opções abaixo para começarmos:',
         missingInfo: 'PURPOSE',
         suggestedReplies: [
           'Cobrança de faturas em atraso',
@@ -3208,7 +3208,7 @@ function UnifiedCampaignCreator({
               <strong>
                 {isOpenAiConfigured
                   ? `OpenAI API (${aiStatusQ.data?.model || openAiModelInput})`
-                  : 'Assistente Interativo Voll Connect (Fallback Local)'}
+                  : 'Assistente Interativo Voll Plan (Fallback Local)'}
               </strong>
             </div>
           </div>
@@ -3673,7 +3673,7 @@ function ActivationStep({
 
   return (
     <div className="space-y-5">
-      {/* Seletor de Modo: Inteligência Voll Connect vs Modo Manual */}
+      {/* Seletor de Modo: Inteligência Voll Plan vs Modo Manual */}
       <div className="grid gap-3 md:grid-cols-2">
         <div
           role="button"
@@ -3699,7 +3699,7 @@ function ActivationStep({
             <div className="flex items-center gap-2">
               <BrainCircuit className="size-4 text-brand-700" aria-hidden />
               <span className="text-xs font-bold uppercase tracking-wider text-brand-800">Recomendado</span>
-              <Badge tone="brand">Esteira de Inteligência Voll Connect</Badge>
+              <Badge tone="brand">Esteira de Inteligência Voll Plan</Badge>
             </div>
             <h3 className="mt-1.5 text-sm font-semibold text-slate-900">
               Otimização Autônoma de Custo por CPC Confirmado
@@ -4280,7 +4280,7 @@ function CampaignStep({
               {extra.intelligenceMode !== 'MANUAL' && (
                 <div className="mb-3 rounded-lg border border-brand-200 bg-brand-50/60 p-3.5">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge tone="brand">Inteligência Voll Connect</Badge>
+                    <Badge tone="brand">Inteligência Voll Plan</Badge>
                     <Badge tone="green">Produção Otimizada</Badge>
                     <span className="text-xs font-semibold text-slate-800">
                       {OPERATION_PURPOSE_LABEL[extra.purposeCode ?? 'COBRANCA']}

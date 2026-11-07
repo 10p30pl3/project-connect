@@ -354,7 +354,7 @@ export function buildContactIntelligenceRationale(contact: {
     goldenRecordStatus: {
       historyMerged: hasGolden,
       confirmedCpcEvents: confirmedCpcs,
-      lastEvidenceSource: hasGolden ? 'Base Histórica Unificada Voll Connect (Golden Record)' : 'Inclusão Direta na Base',
+      lastEvidenceSource: hasGolden ? 'Base Histórica Unificada Voll Plan (Golden Record)' : 'Inclusão Direta na Base',
     },
   };
 }

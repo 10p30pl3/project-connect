@@ -86,7 +86,7 @@ export function CpcChannelComparisonChart() {
   return (
     <Card
       title="Eficiência de Custo por CPC por Canal"
-      tooltip="Comparação auditável: Custo por CPC com Inteligência Voll Connect vs. Disparo Cego (Força Bruta)."
+      tooltip="Comparação auditável: Custo por CPC com Inteligência Voll Plan vs. Disparo Cego (Força Bruta)."
       actions={
         <Badge tone="green">
           <span className="font-bold">-43,2%</span> economia média

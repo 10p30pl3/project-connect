@@ -15,7 +15,7 @@ import { parse } from '../lib/problem.js';
 let runtimeOpenAiKey = config.openAiApiKey;
 let runtimeOpenAiModel = config.openAiModel || 'gpt-4o-mini';
 
-const SYSTEM_PROMPT = `Você é o Assistente Especialista em Operações Omnichannel e CPC (Contato com a Pessoa Certa) da plataforma Voll Connect.
+const SYSTEM_PROMPT = `Você é o Assistente Especialista em Operações Omnichannel e CPC (Contato com a Pessoa Certa) da plataforma Voll Plan.
 Sua missão é conduzir uma conversa interativa em português (pt-BR) para ajudar o usuário a estruturar uma campanha de acionamento passo a passo, extraindo os parâmetros da conversa e fazendo perguntas objetivas apenas sobre as informações que ainda faltam.
 
 Regras da conversa:

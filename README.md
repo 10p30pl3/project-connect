@@ -1,4 +1,4 @@
-# Voll Connect — MVP
+# Voll Plan — MVP
 
 Gestão de listas e acionamentos para discador, WhatsApp, SMS e e-mail. Esta é a **fatia vertical P0** do [Plano funcional v2.2](docs/): importar mailing → público (todos ou lista filtrada) → jornada e estratégia → campanha → motor de execução com conector simulado → operação, elegibilidade, tentativas e indicadores.
 

@@ -418,7 +418,7 @@ export function IntelligencePage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Voll Connect · Inteligência de Contato & Otimização de CPC"
+        title="Voll Plan · Inteligência de Contato & Otimização de CPC"
         subtitle="Encontre a Pessoa Certa (CPC confirmado por tabulação) com o menor custo possível: filtrar, priorizar, escolher canais, planejar tentativas e evoluir entre Modo Produção e Modo Laboratório."
         actions={
           <div className="flex flex-wrap items-center gap-2">
@@ -493,7 +493,7 @@ export function IntelligencePage() {
           <div className="space-y-4">
             <Alert tone="info" title="Modo Manual Clássico Ativo">
               Nesta jornada opcional, você controla manualmente cada peça da campanha como nas ferramentas tradicionais,
-              mantendo toda a proteção de DNC, bloqueios e limites institucionais do Voll Connect.
+              mantendo toda a proteção de DNC, bloqueios e limites institucionais do Voll Plan.
             </Alert>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div className="rounded-lg border border-slate-200 p-4">
@@ -1263,7 +1263,7 @@ export function IntelligencePage() {
                             <th>Plataforma Global / Categoria</th>
                             <th>Conceitos de Engenharia Absorvidos</th>
                             <th>Limitação do Modelo Tradicional</th>
-                            <th>Como o Voll Connect Evolui para o Futuro</th>
+                            <th>Como o Voll Plan Evolui para o Futuro</th>
                           </tr>
                         </thead>
                         <tbody>

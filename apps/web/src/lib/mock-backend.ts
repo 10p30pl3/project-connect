@@ -118,7 +118,7 @@ const CONNECTIONS: Connection[] = [
   },
   {
     id: uuid(34),
-    name: 'API de Gatilhos & Disparos · Voll Connect',
+    name: 'API de Gatilhos & Disparos · Voll Plan',
     channelType: 'VOICE',
     provider: 'API_TRIGGER',
     endpointUrl: 'https://api.voll.solutions/v1/campaigns/trigger',
@@ -2891,7 +2891,7 @@ export async function handleMockApi<T = unknown>(
 
     if (activeKey.length > 10) {
       try {
-        const sysPrompt = `Você é o Assistente Especialista em Operações Omnichannel e CPC (Contato com a Pessoa Certa) da Voll Connect.
+        const sysPrompt = `Você é o Assistente Especialista em Operações Omnichannel e CPC (Contato com a Pessoa Certa) do Voll Plan.
 Sua missão é conduzir uma conversa interativa em português (pt-BR) para estruturar uma campanha passo a passo, extraindo os parâmetros da conversa e fazendo perguntas objetivas sobre o que ainda falta.
 Contexto atual: ${JSON.stringify({
           currentState: b.currentState ?? {},

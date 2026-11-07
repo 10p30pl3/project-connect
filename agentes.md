@@ -1,6 +1,6 @@
-# Diretrizes de Desenvolvimento e Padrões para Agentes — Voll Connect
+# Diretrizes de Desenvolvimento e Padrões para Agentes — Voll Plan
 
-Este documento estabelece as diretrizes de engenharia, arquitetura e, especialmente, os **padrões de experiência do usuário (UI/UX)** obrigatórios para qualquer agente de IA ou desenvolvedor atuando no repositório do **Voll Connect**.
+Este documento estabelece as diretrizes de engenharia, arquitetura e, especialmente, os **padrões de experiência do usuário (UI/UX)** obrigatórios para qualquer agente de IA ou desenvolvedor atuando no repositório do **Voll Plan**.
 
 ---
 

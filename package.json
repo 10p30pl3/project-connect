@@ -1,8 +1,8 @@
 {
-  "name": "voll-connect",
+  "name": "voll-plan",
   "private": true,
   "version": "0.1.0",
-  "description": "Voll Connect — gestão de listas e acionamentos (MVP, fatia vertical P0)",
+  "description": "Voll Plan — gestão de listas e acionamentos (MVP, fatia vertical P0)",
   "workspaces": [
     "packages/*",
     "apps/*"

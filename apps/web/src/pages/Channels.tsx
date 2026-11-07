@@ -55,7 +55,7 @@ import {
 
 export const PROVIDER_LABEL: Record<string, string> = {
   VOICE_APP: 'Voice-App IA (FreeSWITCH + Tronco Direct Call)',
-  API_TRIGGER: 'API de Gatilhos & Webhooks Voll Connect',
+  API_TRIGGER: 'API de Gatilhos & Webhooks Voll Plan',
   META_CLOUD: 'Meta Cloud API Oficial (WhatsApp)',
   SIP_TRUNK: 'Tronco SIP Direto (PABX / IP)',
   TWILIO: 'Twilio (Voice / SMS)',
@@ -134,7 +134,7 @@ export function ChannelsPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
                     <h2 className="text-sm font-semibold text-slate-800">Conexões Operacionais & Canais Prioritários</h2>
-                    <InfoTooltip content="Conexões ativas de discagem (Voice-App / Direct Call), APIs de gatilho Voll Connect e conectores." />
+                    <InfoTooltip content="Conexões ativas de discagem (Voice-App / Direct Call), APIs de gatilho Voll Plan e conectores." />
                   </div>
                   <span className="text-xs text-slate-400 italic">
                     Parâmetros avançados de simulação e resiliência acessíveis por canal
@@ -772,7 +772,7 @@ function TechnicalEndpointsTab({ canEdit }: { canEdit: boolean }) {
 
               <Field
                 label="Bearer Token do Voice-App"
-                tooltip="Token secreto para autenticação mútua de chamadas entre o Voll Connect e o voice-app."
+                tooltip="Token secreto para autenticação mútua de chamadas entre o Voll Plan e o voice-app."
               >
                 {(ids) => (
                   <Input
@@ -1216,7 +1216,7 @@ function NewConnectionDialog({ open, onOpenChange }: { open: boolean; onOpenChan
       setCallerId('+551140030000');
       setTariff('0.08');
     } else if (newProv === 'API_TRIGGER') {
-      setName('API de Gatilhos & Disparos Voll Connect');
+      setName('API de Gatilhos & Disparos Voll Plan');
       setChannelType('VOICE');
       setEndpointUrl('https://api.voll.solutions/v1/campaigns/trigger');
       setCallerId('');
@@ -1281,7 +1281,7 @@ function NewConnectionDialog({ open, onOpenChange }: { open: boolean; onOpenChan
       onOpenChange={onOpenChange}
       wide
       title="Nova Conexão ou Canal de API"
-      description="Cadastre um canal de voz integrado ao voice-app, API de gatilhos do Voll Connect ou conector oficial."
+      description="Cadastre um canal de voz integrado ao voice-app, API de gatilhos do Voll Plan ou conector oficial."
       footer={
         <>
           <Button onClick={() => onOpenChange(false)}>Cancelar</Button>
@@ -1311,7 +1311,7 @@ function NewConnectionDialog({ open, onOpenChange }: { open: boolean; onOpenChan
               {(p) => (
                 <Select id={p.id} value={provider} onChange={(e) => handleProviderChange(e.target.value)}>
                   <option value="VOICE_APP">Voice-App IA (FreeSWITCH + Tronco Direct Call)</option>
-                  <option value="API_TRIGGER">API de Gatilhos &amp; Webhooks Voll Connect</option>
+                  <option value="API_TRIGGER">API de Gatilhos &amp; Webhooks Voll Plan</option>
                   <option value="META_CLOUD">Meta Cloud API Oficial (WhatsApp)</option>
                   <option value="SIP_TRUNK">Tronco SIP Direto (PABX / IP)</option>
                   <option value="SIMULATED">Simulado (Ambiente Sandbox de Demonstração)</option>
@@ -1530,7 +1530,7 @@ function EditConnection({ c, onClose }: { c: Connection; onClose: () => void }) 
               {(p) => (
                 <Select id={p.id} value={provider} onChange={(e) => setProvider(e.target.value)}>
                   <option value="VOICE_APP">Voice-App IA (Tronco Direct Call / FreeSWITCH)</option>
-                  <option value="API_TRIGGER">API de Gatilhos &amp; Webhooks Voll Connect</option>
+                  <option value="API_TRIGGER">API de Gatilhos &amp; Webhooks Voll Plan</option>
                   <option value="META_CLOUD">Meta Cloud API Oficial (WhatsApp)</option>
                   <option value="SIP_TRUNK">Tronco SIP Direto (PABX / IP)</option>
                   <option value="SIMULATED">Simulado (Ambiente Sandbox de Demonstração)</option>

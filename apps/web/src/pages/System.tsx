@@ -207,7 +207,7 @@ export function SystemPage() {
     <div className="space-y-6 pb-12">
       <PageHeader
         title="Sistema"
-        tooltip="Configurações gerais da plataforma, credenciais da OpenAI API e parâmetros operacionais do Voll Connect."
+        tooltip="Configurações gerais da plataforma, credenciais da OpenAI API e parâmetros operacionais do Voll Plan."
       />
 
       {/* Grid Principal */}
@@ -439,12 +439,12 @@ export function SystemPage() {
                 <span>Status da Plataforma</span>
               </div>
             }
-            tooltip="Informações de versão do núcleo Voll Connect, fuso horário operacional e motor de inteligência artificial em execução."
+            tooltip="Informações de versão do núcleo Voll Plan, fuso horário operacional e motor de inteligência artificial em execução."
           >
             <ul className="divide-y divide-slate-100 text-sm">
               <li className="py-2.5 flex items-center justify-between">
                 <div className="flex items-center gap-1 text-slate-600">
-                  <span>Core Connect</span>
+                  <span>Core Plan</span>
                   <InfoTooltip content="Versão estável do microsserviço de orquestração de campanhas e contatos." />
                 </div>
                 <span className="font-mono text-xs font-semibold text-slate-800">v2.4.0-omnichannel</span>

@@ -52,7 +52,7 @@ export function BrandLogo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg'; showTagl
       />
       <div className="flex items-center gap-1.5 border-l border-slate-200 pl-2">
         <span className={clsx('font-bold tracking-tight text-slate-800', textCls)}>
-          Connect
+          Plan
         </span>
       </div>
     </div>

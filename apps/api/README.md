@@ -1,4 +1,4 @@
-# @voll/api — API e motor do Voll Connect (MVP)
+# @voll/api — API e motor do Voll Plan (MVP)
 
 Fastify 5 + Zod + PostgreSQL 16 (SQL explícito via `pg`). Contrato HTTP em [`docs/API.md`](../../docs/API.md); tipos e schemas em `packages/shared`.
 
