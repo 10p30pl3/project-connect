@@ -13,21 +13,20 @@ import { ContactDetailPage } from './pages/ContactDetail';
 import { MailingsPage, MailingDetailPage, MailingImportPage } from './pages/Mailings';
 import { ListsPage, ListDetailPage, NewListPage } from './pages/Lists';
 import { JourneysPage } from './pages/Journeys';
-import { StrategiesPage, StrategyDetailPage } from './pages/Strategies';
 import { TabulationsPage } from './pages/Tabulations';
 import { ChannelsPage } from './pages/Channels';
-import { ControlPage } from './pages/Control';
 import { LimitsPage } from './pages/Limits';
 import { ObservabilityPage } from './pages/Observability';
 import { CentralIntelligencePage } from './pages/CentralIntelligence';
 import { ReportsPage } from './pages/Reports';
 import { ExperimentsPage } from './pages/Experiments';
-import { OptimizationPage } from './pages/Optimization';
 import { CostsPage } from './pages/Costs';
 import { SystemPage } from './pages/System';
 import { MorePage } from './pages/More';
 import { NotFoundPage } from './pages/NotFound';
-import { IntelligencePage } from './pages/Intelligence';
+import { CalendarsPage } from './pages/Calendars';
+import { ModelsPage } from './pages/Models';
+import { OtherSettingsPage } from './pages/OtherSettings';
 
 function RequireAuth() {
   const { me, loading } = useAuth();
@@ -70,6 +69,7 @@ export const router = createBrowserRouter([
           { path: '/campanhas/nova', element: <NewCampaignPage /> },
           { path: '/campanhas/:id', element: <CampaignDetailPage /> },
           { path: '/tentativas', element: <AttemptsPage /> },
+          { path: '/modelos', element: <ModelsPage /> },
           { path: '/contatos', element: <ContactsPage /> },
           { path: '/contatos/:id', element: <ContactDetailPage /> },
           { path: '/mailings', element: <MailingsPage /> },
@@ -79,10 +79,12 @@ export const router = createBrowserRouter([
           { path: '/listas/nova', element: <NewListPage /> },
           { path: '/listas/:id', element: <ListDetailPage /> },
           { path: '/jornadas', element: <JourneysPage /> },
-          { path: '/estrategias', element: <StrategiesPage /> },
-          { path: '/estrategias/:id', element: <StrategyDetailPage /> },
+          { path: '/calendarios', element: <CalendarsPage /> },
           { path: '/tabulacoes', element: <TabulationsPage /> },
           { path: '/canais', element: <ChannelsPage /> },
+          { path: '/outras', element: <OtherSettingsPage /> },
+          { path: '/estrategias', element: <Navigate to="/outras" replace /> },
+          { path: '/estrategias/:id', element: <Navigate to="/outras" replace /> },
           { path: '/relatorios', element: <ReportsPage /> },
           { path: '/inteligencia', element: <CentralIntelligencePage /> },
           { path: '/limites', element: <LimitsPage /> },
