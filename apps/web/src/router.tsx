@@ -14,7 +14,6 @@ import { MailingsPage, MailingDetailPage, MailingImportPage } from './pages/Mail
 import { ListsPage, ListDetailPage, NewListPage } from './pages/Lists';
 import { JourneysPage } from './pages/Journeys';
 import { TabulationsPage } from './pages/Tabulations';
-import { ChannelsPage } from './pages/Channels';
 import { LimitsPage } from './pages/Limits';
 import { ObservabilityPage } from './pages/Observability';
 import { CentralIntelligencePage } from './pages/CentralIntelligence';
@@ -27,6 +26,7 @@ import { NotFoundPage } from './pages/NotFound';
 import { CalendarsPage } from './pages/Calendars';
 import { ModelsPage } from './pages/Models';
 import { OtherSettingsPage } from './pages/OtherSettings';
+import { ConnectionsCostsPage } from './pages/ConnectionsCosts';
 
 function RequireAuth() {
   const { me, loading } = useAuth();
@@ -81,7 +81,7 @@ export const router = createBrowserRouter([
           { path: '/jornadas', element: <JourneysPage /> },
           { path: '/calendarios', element: <CalendarsPage /> },
           { path: '/tabulacoes', element: <TabulationsPage /> },
-          { path: '/canais', element: <ChannelsPage /> },
+          { path: '/canais', element: <ConnectionsCostsPage /> },
           { path: '/outras', element: <OtherSettingsPage /> },
           { path: '/estrategias', element: <Navigate to="/outras" replace /> },
           { path: '/estrategias/:id', element: <Navigate to="/outras" replace /> },
