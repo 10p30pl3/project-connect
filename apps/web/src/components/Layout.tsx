@@ -62,7 +62,6 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     items: [
       { to: '/', label: 'Visão geral', icon: <Home className={ico} aria-hidden />, end: true },
       { to: '/campanhas', label: 'Campanhas', icon: <Megaphone className={ico} aria-hidden />, matchPrefixes: ['/campanhas'] },
-      { to: '/modelos', label: 'Modelos de campanha', icon: <LayoutTemplate className={ico} aria-hidden />, matchPrefixes: ['/modelos'] },
       { to: '/inteligencia', label: 'Central de inteligência', icon: <BrainCircuit className={ico} aria-hidden />, matchPrefixes: ['/inteligencia'] },
     ],
   },
@@ -77,6 +76,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
   {
     title: 'Configuração',
     items: [
+      { to: '/modelos', label: 'Modelos de campanha', icon: <LayoutTemplate className={ico} aria-hidden />, matchPrefixes: ['/modelos'] },
       { to: '/jornadas', label: 'Jornadas', icon: <Compass className={ico} aria-hidden />, matchPrefixes: ['/jornadas'] },
       { to: '/calendarios', label: 'Calendários', icon: <CalendarDays className={ico} aria-hidden />, matchPrefixes: ['/calendarios'] },
       { to: '/tabulacoes', label: 'Tabulações', icon: <BookMarked className={ico} aria-hidden />, matchPrefixes: ['/tabulacoes'] },
@@ -104,7 +104,6 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
 const MOBILE: NavItem[] = [
   { to: '/', label: 'Início', icon: <Home className="size-5" aria-hidden />, end: true },
   { to: '/campanhas', label: 'Campanhas', icon: <Megaphone className="size-5" aria-hidden /> },
-  { to: '/modelos', label: 'Modelos', icon: <LayoutTemplate className="size-5" aria-hidden /> },
   { to: '/contatos', label: 'Contatos', icon: <Users className="size-5" aria-hidden /> },
   { to: '/mais', label: 'Mais', icon: <Menu className="size-5" aria-hidden /> },
 ];
