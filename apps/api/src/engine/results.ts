@@ -340,10 +340,10 @@ export async function updateCumulativeIntelligenceProfile(
               best_time_window = $3,
               best_hour_utc = $4,
               best_day_of_week = $5,
-              preferred_channel = $6,
+              preferred_channel = $6::channel_type,
               locator_score = LEAST(99, locator_score + 10),
               phone_intent_tier = CASE
-                WHEN $6 = 'VOICE' THEN 'P1_ALTA_PROPENSAO_VOZ'
+                WHEN $6::channel_type = 'VOICE' THEN 'P1_ALTA_PROPENSAO_VOZ'
                 ELSE 'P3_DIGITAL_FIRST'
               END,
               tags = array_append(array_remove(tags, 'HISTORIC_CPC_CONFIRMED'), 'HISTORIC_CPC_CONFIRMED'),

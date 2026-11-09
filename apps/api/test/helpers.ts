@@ -13,7 +13,8 @@ export async function resetDb() {
   const s = await seed({ withSampleMailing: false });
   // simulação determinística nos testes: sem retornos automáticos nem duplicatas
   await pool.query(
-    `UPDATE connections SET config = jsonb_set(config, '{simulation}', (config->'simulation') || '{"noReturnRate":1,"duplicateRate":0}'::jsonb)`,
+    `UPDATE connections SET config = jsonb_set(config, '{simulation}', (config->'simulation') || '{"noReturnRate":1,"duplicateRate":0}'::jsonb)
+      WHERE provider = 'SIMULATED' AND config ? 'simulation'`,
   );
   return s;
 }
@@ -64,11 +65,26 @@ export async function catalog() {
   const pool = getPool();
   const journeys = await q(pool, `SELECT j.name, v.id FROM journeys j JOIN journey_versions v ON v.journey_id=j.id`);
   const strategies = await q(pool, `SELECT s.id AS strategy_id, s.name, v.id FROM strategies s JOIN strategy_versions v ON v.strategy_id=s.id`);
-  const conns = await q(pool, `SELECT id, name, channel_type, webhook_secret, workspace_id FROM connections`);
+  const conns = await q(
+    pool,
+    `SELECT id, name, channel_type, webhook_secret, workspace_id FROM connections WHERE provider = 'SIMULATED' ORDER BY created_at`,
+  );
+  // nomes usados pelos testes -> nomes atuais do seed (o catálogo foi renomeado no redesenho do Voll Plan)
+  const alias: Record<string, string> = {
+    Discador: 'Voz (Discador Padrão)',
+    'WhatsApp → Discador': 'WhatsApp → Voz',
+    'Demonstração 24x7': 'Simples · 24x7 (Disparo Imediato)',
+    'Padrão cobrança': 'Padrão Cobrança',
+  };
+  const named = <T extends { name: string }>(list: T[], n: string) => {
+    const hit = list.find((x) => x.name === (alias[n] ?? n));
+    if (!hit) throw new Error(`item de catálogo não encontrado no seed: ${n}`);
+    return hit as T & Record<string, any>;
+  };
   return {
-    journey: (n: string) => journeys.find((j) => j.name === n)!.id as string,
-    strategy: (n: string) => strategies.find((s) => s.name === n)!.id as string,
-    strategyId: (n: string) => strategies.find((s) => s.name === n)!.strategy_id as string,
+    journey: (n: string) => named(journeys, n).id as string,
+    strategy: (n: string) => named(strategies, n).id as string,
+    strategyId: (n: string) => named(strategies, n).strategy_id as string,
     connection: (ch: string) => conns.find((c) => c.channel_type === ch)!,
   };
 }
