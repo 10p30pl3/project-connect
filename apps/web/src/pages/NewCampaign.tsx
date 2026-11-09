@@ -711,7 +711,7 @@ function PrototypeCampaignCreator({
               <Field label="Lista de filtros e ordenações" hint="Opcional">
                 {(field) => (
                   <Select id={field.id} value={draft.audienceMode === 'LIST' ? (extra.listId ?? '') : ''} onChange={(event) => chooseList(event.target.value)} disabled={!draft.mailingId}>
-                    <option value="">Todos os contatos elegíveis</option>
+                    <option value="">Mailing completo</option>
                     {matchingLists.map((item) => <option key={item.id} value={item.id}>{item.name} · v{item.latestVersion?.version}</option>)}
                   </Select>
                 )}
@@ -722,6 +722,12 @@ function PrototypeCampaignCreator({
               <Link to="/listas" className="font-medium text-brand-700 hover:underline">Criar lista com IA</Link>
               {audienceCount !== null && <span className="text-slate-500">{fmtNumber(audienceCount)} contatos na base selecionada</span>}
             </div>
+            {draft.mailingId && (
+              <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-3 text-xs text-slate-600">
+                O mailing será acionado normalmente. A otimização por perfil fica na{' '}
+                <Link to="/inteligencia" className="font-semibold text-brand-700 hover:underline">Central de Inteligência</Link>.
+              </div>
+            )}
             {showImport && (
               <div className="mt-4 rounded-xl border border-brand-200 bg-brand-50/30 p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
