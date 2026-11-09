@@ -267,7 +267,7 @@ export function NewCampaignPage() {
   if (!isManualWizard) {
     return (
       <div className="w-full space-y-6 py-2">
-        <UnifiedCampaignCreator
+        <PrototypeCampaignCreator
           mailings={mailingsQ.data?.items}
           lists={listsQ.data?.items}
           journeys={journeysQ.data?.items}
@@ -494,6 +494,342 @@ export function NewCampaignPage() {
       >
         <p className="text-sm">O rascunho atual será substituído sem remover mailings ou listas já salvos.</p>
       </Modal>
+    </div>
+  );
+}
+
+
+function PrototypeCampaignCreator({
+  mailings,
+  lists,
+  journeys,
+  strategies,
+  draft,
+  extra,
+  update,
+  onCreated,
+}: {
+  mailings?: MailingSummary[];
+  lists?: ListSummary[];
+  journeys?: Journey[];
+  strategies?: Strategy[];
+  draft: CampaignDraft;
+  extra: Extra;
+  update: UpdateFn;
+  onCreated: (c: Campaign) => void | Promise<void>;
+}) {
+  const toast = useToast();
+  const [step, setStep] = useState<1 | 2>(1);
+  const [scheduleChoice, setScheduleChoice] = useState<'NOW' | 'SCHEDULED'>('NOW');
+  const [scheduledAt, setScheduledAt] = useState(() => nowSaoPauloLocal(60));
+  const [formError, setFormError] = useState<string | null>(null);
+  const idempotencyKey = useRef<string | null>(null);
+
+  const purpose = extra.purposeCode ?? 'COBRANCA';
+  const activationMode = extra.activationMode ?? 'CHANNEL';
+  const channelType = extra.channelType ?? 'WHATSAPP';
+  const mailing = mailings?.find((item) => item.id === draft.mailingId);
+  const strategy = strategies?.find((item) => item.latestVersion?.id === draft.strategyVersionId)
+    ?? strategies?.find((item) => item.latestVersion);
+  const publishedJourneys = journeys?.filter((item) => item.latestVersion) ?? [];
+  const selectedJourney = publishedJourneys.find((item) => item.latestVersion?.id === draft.journeyVersionId);
+  const singleChannelJourney = publishedJourneys.find(
+    (item) => item.latestVersion?.steps.length === 1 && item.latestVersion.steps[0]?.channelType === channelType,
+  );
+  const journey = activationMode === 'CHANNEL' ? singleChannelJourney : selectedJourney;
+  const strategyVersion = strategy?.latestVersion;
+  const list = lists?.find((item) => item.id === extra.listId);
+  const listVersionId = draft.audienceMode === 'LIST' ? (list?.latestVersion?.id ?? draft.listVersionId ?? null) : null;
+  const matchingLists = lists?.filter((item) => item.mailing.id === draft.mailingId && item.latestVersion) ?? [];
+  const selectedPurposeLabel = OPERATION_PURPOSE_LABEL[purpose] ?? OPERATION_PURPOSE_LABEL.COBRANCA;
+  const goals: { code: OperationPurpose; label: string }[] = [
+    { code: 'COBRANCA', label: 'Cobrança' },
+    { code: 'VENDAS', label: 'Vendas' },
+    { code: 'CONFIRMACAO_SERVICO', label: 'Confirmação' },
+    { code: 'PESQUISA_RELACIONAMENTO', label: 'Localização' },
+  ];
+  const channels: { code: ChannelType; label: string }[] = [
+    { code: 'WHATSAPP', label: CHANNEL_LABEL.WHATSAPP },
+    { code: 'VOICE', label: CHANNEL_LABEL.VOICE },
+    { code: 'EMAIL', label: CHANNEL_LABEL.EMAIL },
+    { code: 'SMS', label: CHANNEL_LABEL.SMS },
+  ];
+  const dayLabels = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const calendar = strategyVersion?.config.calendar;
+  const calendarSummary = calendar
+    ? dayLabels.filter((_, day) => calendar.days.includes(day)).join(', ') + ' · ' + calendar.start + '–' + calendar.end
+    : 'Calendário definido pela estratégia selecionada';
+  const audienceCount = draft.audienceMode === 'LIST'
+    ? (list?.latestVersion?.memberCount ?? extra.audienceCount ?? null)
+    : (mailing?.recordCount ?? null);
+
+  const canReview = Boolean(
+    draft.mailingId && draft.name?.trim() && journey?.latestVersion?.id && strategyVersion?.id && listVersionId !== undefined,
+  );
+  const preflightQuery = useQuery({
+    queryKey: ['prototype-campaign-preflight', draft.mailingId, listVersionId, journey?.latestVersion?.id, strategyVersion?.id],
+    queryFn: () => post<Preflight>('/campaigns/preflight', {
+      mailingId: draft.mailingId,
+      listVersionId,
+      journeyVersionId: journey?.latestVersion?.id,
+      strategyVersionId: strategyVersion?.id,
+      name: draft.name || 'rascunho',
+      startMode: scheduleChoice === 'SCHEDULED' ? 'SCHEDULE' : 'NOW',
+    }),
+    enabled: step === 2 && canReview,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (startMode: 'NOW' | 'SCHEDULE' | 'READY') => {
+      idempotencyKey.current ??= newIdempotencyKey();
+      return post<Campaign>('/campaigns', {
+        name: draft.name?.trim() ?? '',
+        description: draft.description || undefined,
+        mailingId: draft.mailingId,
+        listVersionId,
+        journeyVersionId: journey?.latestVersion?.id,
+        strategyVersionId: strategyVersion?.id,
+        purposeCode: purpose,
+        startMode,
+        scheduledAt: startMode === 'SCHEDULE' ? saoPauloLocalToIso(scheduledAt) : null,
+      }, { 'Idempotency-Key': idempotencyKey.current });
+    },
+    onSuccess: async (campaign) => {
+      idempotencyKey.current = null;
+      await onCreated(campaign);
+    },
+    onError: (error) => {
+      toast('error', errorMessage(error));
+      if (error instanceof ApiError && error.status === 422) idempotencyKey.current = null;
+    },
+  });
+
+  function selectChannel(code: ChannelType) {
+    const target = publishedJourneys.find(
+      (item) => item.latestVersion?.steps.length === 1 && item.latestVersion.steps[0]?.channelType === code,
+    );
+    update(
+      { journeyVersionId: target?.latestVersion?.id ?? null },
+      { activationMode: 'CHANNEL', channelType: code },
+    );
+  }
+
+  function chooseMailing(id: string) {
+    const selected = mailings?.find((item) => item.id === id);
+    update(
+      { mailingId: id || null, audienceMode: 'ALL', listVersionId: null, sourceListVersionId: null },
+      { mailingName: selected?.name, listId: undefined, listName: undefined, listVersion: undefined, audienceCount: null },
+    );
+  }
+
+  function chooseList(id: string) {
+    const selected = lists?.find((item) => item.id === id);
+    if (!selected) {
+      update({ audienceMode: 'ALL', listVersionId: null }, { listId: undefined, listName: undefined, listVersion: undefined, audienceCount: null });
+      return;
+    }
+    update(
+      { mailingId: selected.mailing.id, audienceMode: 'LIST', listVersionId: selected.latestVersion?.id ?? null },
+      { listId: selected.id, listName: selected.name, listVersion: selected.latestVersion?.version, audienceCount: selected.latestVersion?.memberCount ?? null },
+    );
+  }
+
+  function review() {
+    setFormError(null);
+    if (!draft.mailingId) return setFormError('Selecione um mailing para continuar.');
+    if (!journey?.latestVersion?.id) return setFormError('Escolha um canal com jornada publicada ou selecione uma jornada pronta.');
+    if (!strategyVersion?.id) return setFormError('Não há uma estratégia publicada disponível para esta campanha.');
+    if (!draft.name?.trim()) return setFormError('Informe o nome da campanha.');
+    setStep(2);
+  }
+
+  function submit(mode: 'NOW' | 'SCHEDULE' | 'READY') {
+    setFormError(null);
+    if (!canReview) {
+      setStep(1);
+      return setFormError('Complete o público e o acionamento antes de iniciar.');
+    }
+    if (mode === 'SCHEDULE') {
+      const iso = saoPauloLocalToIso(scheduledAt);
+      if (!iso || new Date(iso).getTime() <= Date.now()) return setFormError('Escolha uma data e hora futuras.');
+    }
+    createMutation.mutate(mode);
+  }
+
+  return (
+    <div className="space-y-5 py-2">
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-brand-700">Campanhas / Criar</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Nova campanha</h1>
+          <p className="mt-1 max-w-2xl text-sm text-slate-600">A campanha executa as versões do mailing, da lista e da jornada revisadas aqui.</p>
+        </div>
+        <span className="text-xs text-emerald-700" role="status">Rascunho salvo automaticamente</span>
+      </div>
+
+      <nav aria-label="Etapas da campanha" className="grid max-w-2xl grid-cols-2 gap-2">
+        <button type="button" aria-current={step === 1 ? 'step' : undefined} onClick={() => setStep(1)}
+          className={clsx('flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm', step === 1 ? 'border-brand-600 bg-brand-50 font-semibold text-brand-900' : 'border-slate-200 bg-white text-slate-500')}>
+          <span className={clsx('grid size-6 place-items-center rounded-full text-xs', step === 1 ? 'bg-brand-700 text-white' : 'bg-slate-100')}>{step === 1 ? '1' : <Check className="size-3.5" />}</span>
+          Público e acionamento
+        </button>
+        <button type="button" disabled={!canReview} aria-current={step === 2 ? 'step' : undefined} onClick={() => canReview && setStep(2)}
+          className={clsx('flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm', step === 2 ? 'border-brand-600 bg-brand-50 font-semibold text-brand-900' : canReview ? 'border-slate-200 bg-white text-slate-700' : 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400')}>
+          <span className={clsx('grid size-6 place-items-center rounded-full text-xs', step === 2 ? 'bg-brand-700 text-white' : canReview ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100')}>{step === 2 ? '2' : canReview ? <Check className="size-3.5" /> : '2'}</span>
+          Revisar e iniciar
+        </button>
+      </nav>
+
+      {step === 1 ? (
+        <div className="space-y-4">
+          <Card title="O que você quer alcançar?">
+            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+              {goals.map((goal) => (
+                <button key={goal.code} type="button" aria-pressed={purpose === goal.code}
+                  onClick={() => update({}, { purposeCode: goal.code })}
+                  className={clsx('flex items-center justify-between rounded-lg border px-3.5 py-3 text-left text-sm', purpose === goal.code ? 'border-brand-500 bg-brand-50/60 font-semibold text-brand-900' : 'border-slate-200 bg-white hover:border-brand-300')}>
+                  <span>{goal.label}</span>{purpose === goal.code && <Check className="size-4" aria-hidden />}
+                </button>
+              ))}
+            </div>
+          </Card>
+
+          <Card title="1. Público">
+            <div className="grid gap-3 md:grid-cols-2">
+              <Field label="Mailing" required>
+                {(field) => (
+                  <Select id={field.id} value={draft.mailingId ?? ''} onChange={(event) => chooseMailing(event.target.value)}>
+                    <option value="">Selecione um mailing</option>
+                    {mailings?.map((item) => <option key={item.id} value={item.id}>{item.name} · {fmtNumber(item.recordCount)} contatos</option>)}
+                  </Select>
+                )}
+              </Field>
+              <Field label="Lista de filtros e ordenações" hint="Opcional">
+                {(field) => (
+                  <Select id={field.id} value={draft.audienceMode === 'LIST' ? (extra.listId ?? '') : ''} onChange={(event) => chooseList(event.target.value)} disabled={!draft.mailingId}>
+                    <option value="">Todos os contatos elegíveis</option>
+                    {matchingLists.map((item) => <option key={item.id} value={item.id}>{item.name} · v{item.latestVersion?.version}</option>)}
+                  </Select>
+                )}
+              </Field>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-3 text-xs">
+              <Link to="/mailings" className="font-medium text-brand-700 hover:underline">Importar mailing</Link>
+              <Link to="/listas" className="font-medium text-brand-700 hover:underline">Criar lista com IA</Link>
+              {audienceCount !== null && <span className="text-slate-500">{fmtNumber(audienceCount)} contatos na base selecionada</span>}
+            </div>
+          </Card>
+
+          <Card title="2. Como acionar?">
+            <div className="mb-3 flex flex-wrap gap-2">
+              <Button variant={activationMode === 'CHANNEL' ? 'primary' : 'secondary'} onClick={() => update({}, { activationMode: 'CHANNEL' })}>Canal simples</Button>
+              <Button variant={activationMode === 'JOURNEY' ? 'primary' : 'secondary'} onClick={() => update({}, { activationMode: 'JOURNEY' })}>Jornada pronta</Button>
+            </div>
+            {activationMode === 'CHANNEL' ? (
+              <>
+                <div className="flex flex-wrap gap-2">
+                  {channels.map((channel) => (
+                    <button key={channel.code} type="button" aria-pressed={channelType === channel.code}
+                      onClick={() => selectChannel(channel.code)}
+                      className={clsx('rounded-lg border px-3 py-2 text-sm', channelType === channel.code ? 'border-brand-500 bg-brand-50/60 font-medium text-brand-900' : 'border-slate-200 bg-white hover:border-brand-300')}>
+                      {channel.label}
+                    </button>
+                  ))}
+                </div>
+                {journey?.latestVersion && (
+                  <p className="mt-2 text-xs text-slate-600">Jornada: <strong>{journey.name} · v{journey.latestVersion.version}</strong></p>
+                )}
+                {!singleChannelJourney && (
+                  <Alert tone="warn" className="mt-3">
+                    Não há uma jornada publicada para este canal. Escolha outro canal ou publique uma jornada em Configurações → Jornadas.
+                  </Alert>
+                )}
+              </>
+            ) : (
+              <Field label="Jornada pronta" required>
+                {(field) => (
+                  <Select id={field.id} value={selectedJourney?.latestVersion?.id ?? ''} onChange={(event) => update({ journeyVersionId: event.target.value || null })}>
+                    <option value="">Selecione uma jornada publicada</option>
+                    {publishedJourneys.map((item) => <option key={item.id} value={item.latestVersion!.id}>{item.name} · v{item.latestVersion!.version} · {item.latestVersion!.steps.map((s) => CHANNEL_LABEL[s.channelType]).join(' → ')}</option>)}
+                  </Select>
+                )}
+              </Field>
+            )}
+            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3.5">
+              <p className="text-xs font-medium text-slate-500">Calendário aplicado pela estratégia padrão</p>
+              <p className="mt-1 text-sm font-semibold text-slate-800">{calendarSummary}</p>
+              <p className="mt-1 text-xs text-slate-500">Horários e limites avançados podem ser ajustados em Configurações → Jornadas.</p>
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3.5">
+              <div>
+                <p className="text-xs font-medium text-slate-500">Estratégia padrão</p>
+                <p className="mt-1 text-sm font-semibold">{strategy?.name ?? 'Carregando estratégia publicada…'}</p>
+              </div>
+              <Link to="/jornadas" className="shrink-0 text-xs font-semibold text-brand-700 hover:underline">Personalizar em Configurações</Link>
+            </div>
+          </Card>
+
+          <Card title="Nome da campanha">
+            <Field label="Nome" required>
+              {(field) => <Input id={field.id} maxLength={120} value={draft.name ?? ''} onChange={(event) => update({ name: event.target.value })} placeholder={selectedPurposeLabel + ' · ' + new Date().toLocaleDateString('pt-BR')} />}
+            </Field>
+          </Card>
+
+          {formError && <Alert tone="error">{formError}</Alert>}
+          <div className="flex justify-end border-t border-slate-200 pt-4">
+            <Button variant="primary" disabled={!canReview} onClick={review}>Revisar plano <ArrowRight className="ml-1 size-4" aria-hidden /></Button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div><h2 className="text-lg font-semibold">Revisar e iniciar</h2><p className="text-sm text-slate-600">Confirme o público, a jornada e quando a campanha deve começar.</p></div>
+            <Button variant="secondary" icon={<Pencil className="size-4" aria-hidden />} onClick={() => setStep(1)}>Editar plano</Button>
+          </div>
+          {preflightQuery.isLoading ? <Loading rows={4} /> : preflightQuery.error ? (
+            <Alert tone="error" title="Não foi possível revisar o plano">{errorMessage(preflightQuery.error)}</Alert>
+          ) : preflightQuery.data ? (
+            <>
+              {preflightQuery.data.warnings.length > 0 && <Alert tone="warn" title="Revise antes de iniciar"><ul className="list-disc pl-4">{preflightQuery.data.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></Alert>}
+              <Card title="Plano da campanha">
+                <dl className="grid gap-4 sm:grid-cols-2">
+                  <div><dt className="text-xs text-slate-500">Objetivo</dt><dd className="font-medium">{selectedPurposeLabel}</dd></div>
+                  <div><dt className="text-xs text-slate-500">Mailing</dt><dd className="font-medium">{preflightQuery.data.audience.name} · {fmtNumber(preflightQuery.data.audience.count)} contatos</dd></div>
+                  <div><dt className="text-xs text-slate-500">Acionamento</dt><dd className="font-medium">{preflightQuery.data.journey.name} · {preflightQuery.data.journey.steps.map((item) => CHANNEL_LABEL[item.channelType]).join(' → ')}</dd></div>
+                  <div><dt className="text-xs text-slate-500">Estratégia</dt><dd className="font-medium">{preflightQuery.data.strategy.name}</dd></div>
+                  <div><dt className="text-xs text-slate-500">Calendário</dt><dd className="font-medium">{calendarSummary}</dd></div>
+                  <div><dt className="text-xs text-slate-500">Primeiro acionamento</dt><dd className="font-medium">{preflightQuery.data.nextWindow ? fmtDateTime(preflightQuery.data.nextWindow) : 'Sem janela calculada'}</dd></div>
+                </dl>
+                <p className="mt-3 text-xs text-slate-500">A disponibilidade final depende de janela, limites, elegibilidade e capacidade do canal.</p>
+              </Card>
+            </>
+          ) : null}
+
+          <Card title="Quando iniciar?">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <RadioCard name="start-mode" value="NOW" checked={scheduleChoice === 'NOW'} onChange={() => setScheduleChoice('NOW')} title="Iniciar após confirmar" description="A campanha começa na próxima janela permitida." />
+              <RadioCard name="start-mode" value="SCHEDULED" checked={scheduleChoice === 'SCHEDULED'} onChange={() => setScheduleChoice('SCHEDULED')} title="Agendar início" description="Escolha a data e o horário." />
+            </div>
+            {scheduleChoice === 'SCHEDULED' && (
+              <Field className="mt-3 max-w-xs" label="Data e hora (São Paulo)" required>
+                {(field) => <Input id={field.id} type="datetime-local" min={nowSaoPauloLocal(1)} value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} />}
+              </Field>
+            )}
+          </Card>
+
+          {formError && <Alert tone="error">{formError}</Alert>}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-4">
+            <Button onClick={() => setStep(1)}>Voltar</Button>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button disabled={createMutation.isPending} onClick={() => submit('READY')}>Salvar como pronta</Button>
+              <Button variant="primary" disabled={createMutation.isPending || !preflightQuery.data} loading={createMutation.isPending}
+                onClick={() => submit(scheduleChoice === 'SCHEDULED' ? 'SCHEDULE' : 'NOW')}>
+                {scheduleChoice === 'SCHEDULED' ? 'Agendar campanha' : 'Iniciar campanha'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
