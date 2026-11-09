@@ -119,6 +119,8 @@ type Extra = {
   intelligenceMode?: 'INTELLIGENT' | 'MANUAL';
   operatingMode?: OperatingMode;
   purposeCode?: OperationPurpose;
+  activationMode?: 'CHANNEL' | 'JOURNEY';
+  channelType?: ChannelType;
   purposePrompt?: string;
   maxAcceptableCpcBrl?: number;
   labSamplePct?: number;
