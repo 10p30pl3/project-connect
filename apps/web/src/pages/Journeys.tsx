@@ -12,14 +12,16 @@ function EditableJourneyCard({
   journey,
   canEdit,
   connections,
+  startEditing = false,
 }: {
   journey: Journey;
   canEdit: boolean;
   connections: Connection[];
+  startEditing?: boolean;
 }) {
   const qc = useQueryClient();
   const toast = useToast();
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(startEditing);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -457,6 +459,7 @@ export function JourneysSection({
             journey={q.data?.items.find((x) => x.id === editJourneyInModal.id) ?? editJourneyInModal}
             canEdit={canEdit}
             connections={conns.data?.items ?? []}
+            startEditing
           />
         </Modal>
       )}
