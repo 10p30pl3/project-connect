@@ -39,6 +39,7 @@ export function ImportFlow({ onImported, initialName = '' }: { onImported: (r: I
   const [fileName, setFileName] = useState<string | null>(null);
   const [delimiter, setDelimiter] = useState<'auto' | ',' | ';' | '\t' | '|'>('auto');
   const [hasHeader, setHasHeader] = useState(true);
+  const [userChangedHeader, setUserChangedHeader] = useState(false);
   const [mapping, setMapping] = useState<ColumnMapping[]>([]);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -48,6 +49,27 @@ export function ImportFlow({ onImported, initialName = '' }: { onImported: (r: I
   const [onlyErrors, setOnlyErrors] = useState(true);
   const nameRef = useRef<HTMLInputElement>(null);
   const contentRef = useRef<HTMLTextAreaElement>(null);
+
+  function autoDetectHeader(text: string) {
+    if (userChangedHeader) return;
+    const lines = text.trim().split(/\r?\n/).filter((l) => l.trim().length > 0);
+    if (!lines.length) return;
+    const first = lines[0];
+    const delim = first.includes(';') ? ';' : first.includes('\t') ? '\t' : first.includes('|') ? '|' : ',';
+    const cols = first.split(delim).map((s) => s.trim());
+    let dataScore = 0;
+    for (const c of cols) {
+      if (c.includes('@')) dataScore += 3;
+      const digits = c.replace(/\D/g, '');
+      if (digits.length >= 8 && digits.length <= 15) dataScore += 2;
+      if (/^\d+$/.test(c)) dataScore += 1;
+    }
+    if (dataScore >= 2 || (lines.length === 1 && dataScore >= 1)) {
+      setHasHeader(false);
+    } else {
+      setHasHeader(true);
+    }
+  }
 
   const previewM = useMutation({
     mutationFn: (withMapping: boolean) =>
@@ -81,6 +103,7 @@ export function ImportFlow({ onImported, initialName = '' }: { onImported: (r: I
     }
     const text = await f.text();
     setContent(text);
+    autoDetectHeader(text);
     setFileName(f.name);
     if (!name) setName(f.name.replace(/\.(csv|txt)$/i, ''));
     setErrors({});
@@ -211,7 +234,9 @@ export function ImportFlow({ onImported, initialName = '' }: { onImported: (r: I
                     '00124;João Souza;11999991111;11999991111;joao@ex.com;09:30;12:00'
                   }
                   onChange={(e) => {
-                    setContent(e.target.value);
+                    const val = e.target.value;
+                    setContent(val);
+                    autoDetectHeader(val);
                     setFileName(null);
                   }}
                   aria-describedby={p.describedBy}
@@ -244,7 +269,14 @@ export function ImportFlow({ onImported, initialName = '' }: { onImported: (r: I
                   </Select>
                 )}
               </Field>
-              <Checkbox label="A primeira linha contém os nomes" checked={hasHeader} onChange={(e) => setHasHeader(e.target.checked)} />
+              <Checkbox
+                label="A primeira linha contém os nomes"
+                checked={hasHeader}
+                onChange={(e) => {
+                  setUserChangedHeader(true);
+                  setHasHeader(e.target.checked);
+                }}
+              />
 
               <div className="pt-2 border-t border-slate-200/80 space-y-2.5">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">

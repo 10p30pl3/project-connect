@@ -105,6 +105,7 @@ export const REASON_LABEL: Record<ReasonCode, string> = {
 /** Ação da estratégia para cada tabulação (§4.2 passo 8, §6.2 passo 12). */
 export const TABULATION_ACTIONS = [
   'RETRY',            // retentar o mesmo destino após o intervalo
+  'SCHEDULE_CALLBACK', // agendar retorno em data/hora combinada com titular
   'NEXT_DESTINATION', // alternar para o próximo destino do mesmo canal
   'NEXT_STEP',        // avançar para a próxima etapa da jornada
   'FINISH_SUCCESS',   // encerrar inscrição com sucesso
@@ -113,6 +114,7 @@ export const TABULATION_ACTIONS = [
 export type TabulationAction = (typeof TABULATION_ACTIONS)[number];
 export const TABULATION_ACTION_LABEL: Record<TabulationAction, string> = {
   RETRY: 'Retentar',
+  SCHEDULE_CALLBACK: 'Agendar retorno',
   NEXT_DESTINATION: 'Alternar destino',
   NEXT_STEP: 'Avançar etapa',
   FINISH_SUCCESS: 'Encerrar com sucesso',
@@ -418,6 +420,39 @@ export const CreateCampaignSchema = z
     }
   });
 
+export const CampaignTemplateCreateSchema = z.object({
+  name: z.string().min(1, 'Informe o nome do modelo'),
+  description: z.string().optional().nullable(),
+  journeyVersionId: z.string().optional().nullable(),
+  journeyId: z.string().optional().nullable(),
+  strategyVersionId: z.string().optional().nullable(),
+  strategyId: z.string().optional().nullable(),
+  purposeCode: z.enum(OPERATION_PURPOSES).optional().nullable(),
+  startMode: z.enum(['NOW', 'SCHEDULE', 'READY']).optional().nullable(),
+  sourceCampaignId: z.string().optional().nullable(),
+});
+export type CampaignTemplateCreate = z.infer<typeof CampaignTemplateCreateSchema>;
+
+export interface CampaignTemplate {
+  id: string;
+  name: string;
+  description?: string | null;
+  purposeCode?: OperationPurpose | null;
+  journeyId: string;
+  journeyName: string;
+  journeyVersionId?: string;
+  strategyId: string;
+  strategyName: string;
+  strategyVersionId?: string;
+  strategyVersion?: number;
+  startMode?: 'NOW' | 'SCHEDULE' | 'READY';
+  sourceCampaignId?: string | null;
+  sourceCampaignName?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  usageCount: number;
+}
+
 export const BlockCreateSchema = z.object({
   scope: z.enum(['CONTACT', 'DESTINATION']),
   contactId: z.string().uuid(),
@@ -465,6 +500,7 @@ export const ConnectorEventSchema = z.object({
   type: z.enum(CONNECTOR_EVENT_TYPES),
   occurredAt: z.string().datetime({ offset: true }),
   tabulationCode: z.string().optional(),
+  scheduledAt: z.string().datetime({ offset: true }).optional(),
   cost: z.number().min(0).optional(),
   summary: z.string().optional(),
   durationSeconds: z.number().int().min(0).optional(),
@@ -818,9 +854,9 @@ export const ChannelEndpointConfigSchema = z.object({
     sipTransport: z.enum(['UDP', 'TCP', 'TLS']).default('TLS'),
     webrtcGatewayUrl: z.string().default('wss://webrtc.vollconnect.com.br/ws'),
     cdrWebhookUrl: z.string().default('https://api.vollconnect.com.br/webhooks/cdr'),
-    defaultCallerId: z.string().default('+551140030000'),
+    defaultCallerId: z.string().default('+5511989785888'),
     outboundProxy: z.string().default('proxy.voip.vollconnect.com.br:5061'),
-    voiceAppBaseUrl: z.string().default('http://127.0.0.1:5050'),
+    voiceAppBaseUrl: z.string().default('http://192.168.15.36:8090'),
     voiceAppToken: z.string().default(''),
     maxConcurrent: z.number().int().min(1).default(30),
     maxConcurrentPerWorkspace: z.number().int().min(1).default(10),
@@ -864,9 +900,9 @@ export const DEFAULT_CHANNEL_ENDPOINTS: ChannelEndpointConfig = {
     sipTransport: 'TLS',
     webrtcGatewayUrl: 'wss://webrtc.vollconnect.com.br/ws',
     cdrWebhookUrl: 'https://api.vollconnect.com.br/webhooks/cdr',
-    defaultCallerId: '+551140030000',
+    defaultCallerId: '+5511989785888',
     outboundProxy: 'proxy.voip.vollconnect.com.br:5061',
-    voiceAppBaseUrl: 'http://127.0.0.1:5050',
+    voiceAppBaseUrl: 'http://192.168.15.36:8090',
     voiceAppToken: '',
     maxConcurrent: 30,
     maxConcurrentPerWorkspace: 10,

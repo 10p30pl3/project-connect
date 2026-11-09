@@ -7,6 +7,7 @@ import { OverviewPage } from './pages/Overview';
 import { CampaignsPage } from './pages/Campaigns';
 import { CampaignDetailPage } from './pages/CampaignDetail';
 import { NewCampaignPage } from './pages/NewCampaign';
+import { CampaignTemplatesPage } from './pages/CampaignTemplates';
 import { AttemptsPage } from './pages/Attempts';
 import { ContactsPage } from './pages/Contacts';
 import { ContactDetailPage } from './pages/ContactDetail';
@@ -16,18 +17,13 @@ import { JourneysPage } from './pages/Journeys';
 import { StrategiesPage, StrategyDetailPage } from './pages/Strategies';
 import { TabulationsPage } from './pages/Tabulations';
 import { ChannelsPage } from './pages/Channels';
-import { ControlPage } from './pages/Control';
 import { LimitsPage } from './pages/Limits';
 import { ObservabilityPage } from './pages/Observability';
 import { CentralIntelligencePage } from './pages/CentralIntelligence';
 import { ReportsPage } from './pages/Reports';
-import { ExperimentsPage } from './pages/Experiments';
-import { OptimizationPage } from './pages/Optimization';
-import { CostsPage } from './pages/Costs';
 import { SystemPage } from './pages/System';
 import { MorePage } from './pages/More';
 import { NotFoundPage } from './pages/NotFound';
-import { IntelligencePage } from './pages/Intelligence';
 
 function RequireAuth() {
   const { me, loading } = useAuth();
@@ -68,7 +64,9 @@ export const router = createBrowserRouter([
           { path: '/', element: <OverviewPage /> },
           { path: '/campanhas', element: <CampaignsPage /> },
           { path: '/campanhas/nova', element: <NewCampaignPage /> },
+          { path: '/campanhas/modelos', element: <CampaignTemplatesPage /> },
           { path: '/campanhas/:id', element: <CampaignDetailPage /> },
+          { path: '/modelos', element: <Navigate to="/campanhas/modelos" replace /> },
           { path: '/tentativas', element: <AttemptsPage /> },
           { path: '/contatos', element: <ContactsPage /> },
           { path: '/contatos/:id', element: <ContactDetailPage /> },
@@ -90,8 +88,8 @@ export const router = createBrowserRouter([
           { path: '/sistema', element: <SystemPage /> },
           { path: '/controle', element: <Navigate to="/limites" replace /> },
           { path: '/otimizacao', element: <Navigate to="/inteligencia" replace /> },
-          { path: '/experimentos', element: <ExperimentsPage /> },
-          { path: '/custos', element: <CostsPage /> },
+          { path: '/experimentos', element: <Navigate to="/inteligencia" replace /> },
+          { path: '/custos', element: <Navigate to="/relatorios" replace /> },
           { path: '/mais', element: <MorePage /> },
           { path: '*', element: <NotFoundPage /> },
         ],

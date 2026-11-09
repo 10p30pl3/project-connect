@@ -6,6 +6,21 @@
     <meta name="theme-color" content="#6941c6" />
     <meta name="description" content="Voll Plan — campanhas inteligentes, do mailing ao contato." />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+      (function() {
+        try {
+          var saved = localStorage.getItem('voll-plan-theme') || localStorage.getItem('voll-voice-theme');
+          if (saved) {
+            document.documentElement.setAttribute('data-theme', saved);
+          } else {
+            document.documentElement.setAttribute('data-theme', 'light');
+          }
+        } catch (e) {}
+      })();
+    </script>
     <title>Voll Plan</title>
   </head>
   <body>

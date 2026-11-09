@@ -4,6 +4,7 @@ import { one, q, tx, type Client } from '../db/pool.js';
 import { cancelUnsent, logEvent, transition } from './events.js';
 import { advanceStage } from './reserve.js';
 import { orderedStepDestinations } from './eligibility.js';
+import { inCalendar, nextWindowStart } from './calendar.js';
 
 type Tab = { code: string; name: string; is_cpc: boolean; is_conversion: boolean; is_opt_out: boolean; invalidates_destination: boolean };
 
@@ -71,7 +72,12 @@ export async function processConnectorEvent(
 }
 
 async function applyEvent(c: Client, a: any, ev: ConnectorEvent): Promise<'OK' | 'ERROR'> {
-  const meta = { externalEventId: ev.eventId, occurredAt: ev.occurredAt };
+  const meta = {
+    externalEventId: ev.eventId,
+    occurredAt: ev.occurredAt,
+    scheduledAt: ev.scheduledAt ?? null,
+    summary: ev.summary ?? null,
+  };
   const open = ['SENT', 'AWAITING_FEEDBACK', 'RECONCILIATION'].includes(a.state);
   if (ev.cost !== undefined && open) {
     await c.query(`UPDATE attempts SET cost_confirmed=$2 WHERE id=$1`, [a.id, ev.cost]);
@@ -129,7 +135,12 @@ async function applyEvent(c: Client, a: any, ev: ConnectorEvent): Promise<'OK' |
   return 'OK';
 }
 
-export async function finalizeWithTabulation(c: Client, a: any, tab: Tab, meta: { externalEventId?: string | null; occurredAt?: string | null; reason?: string }) {
+export async function finalizeWithTabulation(
+  c: Client,
+  a: any,
+  tab: Tab,
+  meta: { externalEventId?: string | null; occurredAt?: string | null; reason?: string; scheduledAt?: string | null; summary?: string | null },
+) {
   const wasReconciliation = a.state === 'RECONCILIATION';
   await transition(c, a, 'FINALIZED', wasReconciliation ? 'RECONCILED' : 'RESULT', {
     externalEventId: meta.externalEventId,
@@ -137,7 +148,14 @@ export async function finalizeWithTabulation(c: Client, a: any, tab: Tab, meta: 
     reason: meta.reason ?? null,
     extraSql: `finalized_at=now(), tabulation_code=$4`,
     extraParams: [tab.code],
-    data: { tabulationCode: tab.code, tabulation: tab.name, cpc: tab.is_cpc, conversion: tab.is_conversion },
+    data: {
+      tabulationCode: tab.code,
+      tabulation: tab.name,
+      cpc: tab.is_cpc,
+      conversion: tab.is_conversion,
+      scheduledAt: meta.scheduledAt ?? null,
+      summary: meta.summary ?? null,
+    },
   });
   if (tab.invalidates_destination) {
     await c.query(`UPDATE contact_destinations SET valid=false WHERE id=$1`, [a.destination_id]);
@@ -148,17 +166,24 @@ export async function finalizeWithTabulation(c: Client, a: any, tab: Tab, meta: 
     await applyOptOut(c, a.workspace_id, a.contact_id, 'OPT_OUT', `Tabulação ${tab.name}`, null);
     return;
   }
-  await applyStrategyRule(c, a, tab);
+  await applyStrategyRule(c, a, tab, undefined, meta);
 }
 
 export function defaultAction(tab: Tab): TabulationAction {
+  if (tab.code === 'CALLBACK_SCHEDULED') return 'SCHEDULE_CALLBACK';
   if (tab.is_conversion) return 'FINISH_SUCCESS';
   if (tab.invalidates_destination) return 'NEXT_DESTINATION';
   return 'RETRY';
 }
 
 /** Aplica a regra da versão de estratégia DA TENTATIVA (AC25). */
-export async function applyStrategyRule(c: Client, a: any, tab: Tab | null, forcedAction?: TabulationAction) {
+export async function applyStrategyRule(
+  c: Client,
+  a: any,
+  tab: Tab | null,
+  forcedAction?: TabulationAction,
+  meta?: { externalEventId?: string | null; occurredAt?: string | null; scheduledAt?: string | null; summary?: string | null },
+) {
   const e = await one(c, `SELECT * FROM enrollments WHERE id=$1 FOR UPDATE`, [a.enrollment_id]);
   if (!e || e.state !== 'ACTIVE' || e.stage !== a.stage) return;
   const sv = await one<{ config: StrategyConfig; version: number }>(c, `SELECT config, version FROM strategy_versions WHERE id=$1`, [a.strategy_version_id]);
@@ -182,7 +207,7 @@ export async function applyStrategyRule(c: Client, a: any, tab: Tab | null, forc
     return;
   }
 
-  // RETRY / NEXT_DESTINATION: calcula destino seguinte e se a etapa se esgotou
+  // RETRY / SCHEDULE_CALLBACK / NEXT_DESTINATION: calcula destino seguinte e se a etapa se esgotou
   const step = steps[e.stage];
   const dests = await q(
     c,
@@ -192,6 +217,42 @@ export async function applyStrategyRule(c: Client, a: any, tab: Tab | null, forc
     [a.contact_id],
   );
   const ordered = orderedStepDestinations({ destinations: dests as any }, step.channelType);
+
+  if (action === 'SCHEDULE_CALLBACK' || tab?.code === 'CALLBACK_SCHEDULED') {
+    const parsedScheduledAt = meta?.scheduledAt ? new Date(meta.scheduledAt) : null;
+    const isValidScheduledAt = parsedScheduledAt && !isNaN(parsedScheduledAt.getTime()) && parsedScheduledAt.getTime() > now.getTime();
+    let nextAt = isValidScheduledAt ? parsedScheduledAt! : new Date(now.getTime() + (cfg.retry?.intervalMinutes ?? 60) * 60_000);
+
+    // Ajusta para a próxima abertura válida do calendário caso o horário solicitado esteja fora
+    if (!inCalendar(cfg.calendar, nextAt)) {
+      const adjusted = nextWindowStart(cfg.calendar, nextAt);
+      if (adjusted) nextAt = adjusted;
+    }
+
+    // Libera a contagem provisória da tentativa atual em counter_consumptions para que
+    // a ligação de retorno prometida ao titular não seja bloqueada por limite do destino.
+    await c.query(
+      `UPDATE counter_consumptions SET kind='RELEASED' WHERE attempt_id=$1 AND destination_id=$2`,
+      [a.id, a.destination_id],
+    );
+
+    const idx = ordered.findIndex((d) => d.id === a.destination_id);
+    const cursor = idx >= 0 ? idx : e.destination_cursor;
+
+    await c.query(
+      `UPDATE enrollments
+          SET destination_cursor=$2, next_eligible_at=$3, scheduled_callback_at=$3, updated_at=now()
+        WHERE id=$1`,
+      [e.id, cursor, nextAt],
+    );
+    await log('RULE_APPLIED', {
+      action: 'SCHEDULE_CALLBACK',
+      scheduledCallbackAt: nextAt.toISOString(),
+      destinationCursor: cursor,
+      summary: meta?.summary ?? null,
+    });
+    return;
+  }
   const counts = Object.fromEntries(
     (
       await q(

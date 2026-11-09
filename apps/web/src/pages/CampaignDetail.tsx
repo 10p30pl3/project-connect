@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useState } from 'react';
-import { ArrowLeft, Archive, Download, Pause, Play, Square } from 'lucide-react';
+import { ArrowLeft, Archive, Bookmark, Download, Pause, Play, Square } from 'lucide-react';
 import {
   ATTEMPT_STATES,
   ATTEMPT_STATE_LABEL,
@@ -41,6 +41,7 @@ import {
 import { AttemptsTable } from '../components/AttemptsTable';
 import { JourneySteps, StrategySummary } from '../components/Summaries';
 import { Progress } from './Campaigns';
+import { SaveAsTemplateModal } from '../components/SaveAsTemplateModal';
 
 export function CampaignDetailPage() {
   const { id = '' } = useParams();
@@ -95,6 +96,7 @@ function CampaignActions({ c }: { c: CampaignDetail }) {
   const qc = useQueryClient();
   const toast = useToast();
   const [closeOpen, setCloseOpen] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
   const [confirm, setConfirm] = useState<null | 'start' | 'pause' | 'resume' | 'archive'>(null);
   const [reason, setReason] = useState('');
   const [reasonErr, setReasonErr] = useState<string | null>(null);
@@ -150,6 +152,22 @@ function CampaignActions({ c }: { c: CampaignDetail }) {
         <Button variant="secondary" icon={<Archive className="size-4" aria-hidden />} onClick={() => setConfirm('archive')}>
           Arquivar
         </Button>
+      )}
+      <Button
+        variant="secondary"
+        icon={<Bookmark className="size-4 text-brand-700" aria-hidden />}
+        onClick={() => setTemplateOpen(true)}
+        title="Salvar configurações desta campanha como modelo reutilizável"
+      >
+        Salvar como modelo
+      </Button>
+      {templateOpen && (
+        <SaveAsTemplateModal
+          open={templateOpen}
+          onClose={() => setTemplateOpen(false)}
+          campaignId={c.id}
+          campaignName={c.name}
+        />
       )}
       <Modal
         open={!!confirm}

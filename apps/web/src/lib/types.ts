@@ -3,6 +3,8 @@ import type {
   AttemptState,
   CampaignDraft,
   CampaignStatus,
+  CampaignTemplate,
+  CampaignTemplateCreate,
   ChannelType,
   ColumnMapping,
   EnrollmentState,
@@ -15,7 +17,7 @@ import type {
 } from '@voll/shared';
 import type { ContactIntelligenceRationale } from './intelligence-rationale';
 
-export type { ContactIntelligenceRationale };
+export type { ContactIntelligenceRationale, CampaignTemplate, CampaignTemplateCreate };
 
 export type Me = {
   id: string;

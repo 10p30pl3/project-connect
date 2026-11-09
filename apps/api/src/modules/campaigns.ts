@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   CAMPAIGN_STATUS_LABEL,
   CHANNEL_LABEL,
+  CampaignTemplateCreateSchema,
   CreateCampaignSchema,
   REASON_CODES,
   SaveDraftSchema,
@@ -491,5 +492,166 @@ export async function campaignRoutes(app: FastifyInstance) {
     reply.header('content-type', 'text/csv; charset=utf-8');
     reply.header('content-disposition', `attachment; filename="indicadores-${row.id.slice(0, 8)}.csv"`);
     return toCsv(['indicador', 'valor'], lines);
+  });
+
+  // ---------------------------------------------------------------- modelos de campanha (templates)
+  app.post<{ Params: { id: string }; Body: { name?: string; description?: string } }>(
+    '/campaigns/:id/save-as-template',
+    { preHandler: requireRoles(...CAN.operate) },
+    async (req) => {
+      const a = actor(req);
+      const row = await loadCampaignRow(getPool(), req.params.id, a.workspaceId);
+      const name = req.body?.name?.trim() || `Modelo - ${row.name}`;
+      const description = req.body?.description ?? row.description ?? `Modelo gerado a partir da campanha ${row.name}`;
+
+      const t = await one(
+        getPool(),
+        `INSERT INTO campaign_templates (
+          workspace_id, name, description, purpose_code,
+          journey_id, journey_version_id, strategy_id, strategy_version_id,
+          start_mode, source_campaign_id, source_campaign_name
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        RETURNING *`,
+        [
+          a.workspaceId,
+          name,
+          description,
+          row.purpose_code ?? 'COBRANCA',
+          row.journey_id,
+          row.journey_version_id,
+          row.strategy_id,
+          row.strategy_version_id,
+          row.scheduled_at ? 'SCHEDULE' : 'NOW',
+          row.id,
+          row.name,
+        ],
+      );
+
+      await audit(getPool(), a, 'template.create_from_campaign', 'campaign_template', t.id, {
+        after: { name, sourceCampaignId: row.id },
+      });
+
+      return {
+        id: t.id,
+        name: t.name,
+        description: t.description,
+        purposeCode: t.purpose_code,
+        journeyId: t.journey_id,
+        journeyName: row.journey_name,
+        journeyVersionId: t.journey_version_id,
+        strategyId: t.strategy_id,
+        strategyName: row.strategy_name,
+        strategyVersionId: t.strategy_version_id,
+        strategyVersion: row.strategy_version,
+        startMode: t.start_mode,
+        sourceCampaignId: t.source_campaign_id,
+        sourceCampaignName: t.source_campaign_name,
+        createdAt: t.created_at,
+        updatedAt: t.updated_at,
+        usageCount: t.usage_count,
+      };
+    },
+  );
+
+  app.get('/campaign-templates', async (req) => {
+    const a = actor(req);
+    const rows = await q(
+      getPool(),
+      `SELECT t.*, j.name AS journey_name, s.name AS strategy_name, sv.version AS strategy_version
+         FROM campaign_templates t
+         LEFT JOIN journeys j ON j.id = t.journey_id
+         LEFT JOIN strategies s ON s.id = t.strategy_id
+         LEFT JOIN strategy_versions sv ON sv.id = t.strategy_version_id
+        WHERE t.workspace_id = $1
+        ORDER BY t.created_at DESC`,
+      [a.workspaceId],
+    );
+    const items = rows.map((r: any) => ({
+      id: r.id,
+      name: r.name,
+      description: r.description,
+      purposeCode: r.purpose_code,
+      journeyId: r.journey_id,
+      journeyName: r.journey_name ?? 'Jornada',
+      journeyVersionId: r.journey_version_id,
+      strategyId: r.strategy_id,
+      strategyName: r.strategy_name ?? 'Estratégia',
+      strategyVersionId: r.strategy_version_id,
+      strategyVersion: r.strategy_version ?? 1,
+      startMode: r.start_mode,
+      sourceCampaignId: r.source_campaign_id,
+      sourceCampaignName: r.source_campaign_name,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+      usageCount: r.usage_count ?? 0,
+    }));
+    return { items };
+  });
+
+  app.get<{ Params: { id: string } }>('/campaign-templates/:id', async (req) => {
+    const a = actor(req);
+    const r = await one(
+      getPool(),
+      `SELECT t.*, j.name AS journey_name, s.name AS strategy_name, sv.version AS strategy_version
+         FROM campaign_templates t
+         LEFT JOIN journeys j ON j.id = t.journey_id
+         LEFT JOIN strategies s ON s.id = t.strategy_id
+         LEFT JOIN strategy_versions sv ON sv.id = t.strategy_version_id
+        WHERE t.workspace_id = $1 AND t.id = $2`,
+      [a.workspaceId, req.params.id],
+    );
+    if (!r) throw notFound('Modelo de campanha não encontrado');
+    return {
+      id: r.id,
+      name: r.name,
+      description: r.description,
+      purposeCode: r.purpose_code,
+      journeyId: r.journey_id,
+      journeyName: r.journey_name ?? 'Jornada',
+      journeyVersionId: r.journey_version_id,
+      strategyId: r.strategy_id,
+      strategyName: r.strategy_name ?? 'Estratégia',
+      strategyVersionId: r.strategy_version_id,
+      strategyVersion: r.strategy_version ?? 1,
+      startMode: r.start_mode,
+      sourceCampaignId: r.source_campaign_id,
+      sourceCampaignName: r.source_campaign_name,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+      usageCount: r.usage_count ?? 0,
+    };
+  });
+
+  app.post('/campaign-templates', { preHandler: requireRoles(...CAN.manageData) }, async (req) => {
+    const a = actor(req);
+    const body = parse(CampaignTemplateCreateSchema, req.body);
+    const r = await one(
+      getPool(),
+      `INSERT INTO campaign_templates (
+        workspace_id, name, description, purpose_code,
+        journey_id, journey_version_id, strategy_id, strategy_version_id,
+        start_mode, source_campaign_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING *`,
+      [
+        a.workspaceId,
+        body.name,
+        body.description ?? null,
+        body.purposeCode ?? 'COBRANCA',
+        body.journeyId ?? null,
+        body.journeyVersionId ?? null,
+        body.strategyId ?? null,
+        body.strategyVersionId ?? null,
+        body.startMode ?? 'NOW',
+        body.sourceCampaignId ?? null,
+      ],
+    );
+    return r;
+  });
+
+  app.delete<{ Params: { id: string } }>('/campaign-templates/:id', { preHandler: requireRoles(...CAN.manageData) }, async (req, reply) => {
+    const a = actor(req);
+    await getPool().query(`DELETE FROM campaign_templates WHERE workspace_id = $1 AND id = $2`, [a.workspaceId, req.params.id]);
+    return reply.code(204).send();
   });
 }

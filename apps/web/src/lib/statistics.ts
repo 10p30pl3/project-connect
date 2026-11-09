@@ -21,19 +21,19 @@ export function calculateStatisticalSampleSize(
   totalN: number,
   marginOfError = 0.05,
 ): SampleSizeResult {
-  if (totalN <= 0) {
+  if (totalN < 10) {
     return {
       sampleSize: 0,
       samplePct: 0,
-      confidence: 95,
-      marginOfError: 5,
+      confidence: 0,
+      marginOfError: 0,
       isSmallBase: true,
-      formulaText: 'Base vazia (N=0)',
-      explanation: 'Nenhum contato disponível na base da campanha.',
+      formulaText: `Base insuficiente (N=${totalN})`,
+      explanation: 'A Central de Inteligência e a Estratégia Desafiante funcionam com 10 ou mais contatos para permitir cálculo estatístico.',
     };
   }
 
-  // Bases pequenas: amostragem proporcional não atinge significância em 10%.
+  // Bases pequenas (10 a 100 contatos): amostragem proporcional não atinge significância em 10%.
   // Solução metodológica: Teste A/B balanceado 50/50.
   if (totalN <= 100) {
     const half = Math.max(2, Math.round(totalN * 0.5));

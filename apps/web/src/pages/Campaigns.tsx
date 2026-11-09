@@ -1,13 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Archive, ArrowRight, Database, ListFilter, Megaphone, Pause, Play, Sparkles, Square, Users } from 'lucide-react';
+import { Archive, ArrowRight, Bookmark, Database, ListFilter, Megaphone, Pause, Play, Rocket, Sparkles, Square, Users } from 'lucide-react';
 import { CAMPAIGN_STATUS, CAMPAIGN_STATUS_LABEL, type CampaignStatus } from '@voll/shared';
 import { errorMessage, get, post, qs } from '../lib/api';
 import type { CampaignSummary, Overview } from '../lib/types';
 import { fmtDateTime, fmtNumber } from '../lib/format';
 import { useAuth } from '../lib/auth';
 import { Button, btnClass, CampaignStatusBadge, Card, Empty, ErrorState, Field, Input, Loading, Modal, PageHeader, Stat, TableWrap, useToast } from '../components/ui';
+import { SaveAsTemplateModal } from '../components/SaveAsTemplateModal';
 
 export function CampaignsPage() {
   const { can } = useAuth();
@@ -18,6 +19,7 @@ export function CampaignsPage() {
   const [stopTarget, setStopTarget] = useState<CampaignSummary | null>(null);
   const [stopReason, setStopReason] = useState('');
   const [stopErr, setStopErr] = useState<string | null>(null);
+  const [templateTarget, setTemplateTarget] = useState<CampaignSummary | null>(null);
 
   const q = useQuery({
     queryKey: ['campaigns', status],
@@ -53,9 +55,10 @@ export function CampaignsPage() {
   });
 
   const shortcuts = [
-    { to: '/campanhas/nova', label: 'Nova campanha', desc: 'Crie com IA via prompt ou em 4 etapas estruturadas.', icon: Sparkles, perm: 'campaigns.create' as const },
+    { to: '/campanhas/nova', label: 'Nova campanha', desc: 'Configuração manual estruturada: Mailing, Público, Acionamento e Revisão.', icon: Rocket, perm: 'campaigns.create' as const },
+    { to: '/campanhas/modelos', label: 'Modelos de campanhas', desc: 'Jornadas e estratégias salvas para criar campanhas em 1 clique.', icon: Bookmark, perm: 'campaigns.create' as const },
     { to: '/contatos', label: 'Bases & Contatos', desc: 'Base unificada com estudo de propensão e DNC.', icon: Users, perm: 'contacts.write' as const },
-    { to: '/mailings/importar', label: 'Importar mailing', desc: 'Upload de arquivo CSV com validação por linha.', icon: Database, perm: 'mailings.write' as const },
+    { to: '/mailings/importar', label: 'Importar mailing', desc: 'Upload de arquivo CSV/XLSX com auto-detecção.', icon: Database, perm: 'mailings.write' as const },
   ];
 
   const canOperate = can('campaigns.operate');
@@ -65,9 +68,25 @@ export function CampaignsPage() {
       <PageHeader
         title="Campanhas"
         tooltip="Gerencie campanhas ativas, pausadas e agendadas com controle em tempo real de réguas e estratégias."
+        actions={
+          <div className="flex items-center gap-2">
+            <Link to="/campanhas/modelos">
+              <Button variant="secondary" icon={<Bookmark className="size-3.5" />}>
+                Modelos de campanhas
+              </Button>
+            </Link>
+            {can('campaigns.create') && (
+              <Link to="/campanhas/nova">
+                <Button variant="primary" icon={<Rocket className="size-3.5" />}>
+                  Nova campanha
+                </Button>
+              </Link>
+            )}
+          </div>
+        }
       />
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {shortcuts.map((s) =>
           can(s.perm) ? (
             <Link
@@ -285,6 +304,17 @@ export function CampaignsPage() {
                             >
                               Arquivar
                             </Button>
+
+                            {/* Salvar como modelo */}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              title="Salvar configurações desta campanha como modelo reutilizável"
+                              icon={<Bookmark className="size-3.5 text-brand-700" aria-hidden />}
+                              onClick={() => setTemplateTarget(c)}
+                            >
+                              Salvar modelo
+                            </Button>
                           </div>
                         </td>
                       )}
@@ -350,6 +380,15 @@ export function CampaignsPage() {
           )}
         </Field>
       </Modal>
+
+      {templateTarget && (
+        <SaveAsTemplateModal
+          open={!!templateTarget}
+          onClose={() => setTemplateTarget(null)}
+          campaignId={templateTarget.id}
+          campaignName={templateTarget.name}
+        />
+      )}
     </div>
   );
 }

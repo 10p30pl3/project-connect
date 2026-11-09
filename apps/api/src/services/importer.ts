@@ -59,14 +59,32 @@ export function parseContent(content: string, delimiter: string, hasHeader: bool
   });
   const data = res.data as string[][];
   const detected = (res.meta.delimiter as string) || ',';
+
+  // Detecção inteligente: se a 1ª linha for identificada como dados reais (telefone, email, etc.), não trata como cabeçalho
+  let effectiveHasHeader = hasHeader;
+  if (data.length > 0 && hasHeader) {
+    const firstCols = data[0] ?? [];
+    let dataScore = 0;
+    for (const c of firstCols) {
+      const s = String(c ?? '').trim();
+      if (s.includes('@')) dataScore += 3;
+      const digits = s.replace(/\D/g, '');
+      if (digits.length >= 8 && digits.length <= 15) dataScore += 2;
+      if (/^\d+$/.test(s)) dataScore += 1;
+    }
+    if (dataScore >= 2 || (data.length === 1 && dataScore >= 1)) {
+      effectiveHasHeader = false;
+    }
+  }
+
   let headers: string[];
   let body: string[][];
-  if (hasHeader) {
+  if (effectiveHasHeader) {
     headers = (data[0] ?? []).map((h, i) => (h?.trim() ? h.trim() : `coluna${i + 1}`));
     body = data.slice(1);
   } else {
     const width = Math.max(0, ...data.map((r) => r.length));
-    headers = Array.from({ length: width }, (_, i) => `coluna${i + 1}`);
+    headers = Array.from({ length: width }, (_, i) => `Coluna ${i + 1}`);
     body = data;
   }
   // nomes de coluna duplicados recebem sufixo
@@ -76,7 +94,7 @@ export function parseContent(content: string, delimiter: string, hasHeader: bool
     return seen[h] > 1 ? `${h}_${seen[h]}` : h;
   });
   const rows: ParsedRow[] = body.map((r, i) => ({
-    rowNumber: i + (hasHeader ? 2 : 1),
+    rowNumber: i + (effectiveHasHeader ? 2 : 1),
     values: Object.fromEntries(headers.map((h, j) => [h, (r[j] ?? '').trim()])),
   }));
   return { delimiter: detected, headers, rows };
@@ -86,7 +104,7 @@ export function suggestMapping(headers: string[], sample: ParsedRow[]): ColumnMa
   let phoneN = 0;
   let digitalN = 0;
   const used = new Set<string>();
-  return headers.map((h) => {
+  return headers.map((h, i) => {
     const k = strip(h);
     let target: MappingTarget = 'attribute';
     let digitalType: 'WHATSAPP' | 'SMS' | undefined;
@@ -109,10 +127,36 @@ export function suggestMapping(headers: string[], sample: ParsedRow[]): ColumnMa
       target = 'best_contact_duration';
     else if (['fuso', 'fusohorario', 'timezone', 'btctimezone', 'bttctimezone', 'iana'].includes(k) && !used.has('best_contact_timezone'))
       target = 'best_contact_timezone';
+
+    // Heurística de dados amostrais para quando a coluna for genérica (ex: "Coluna 1", "Coluna 2")
+    const vals = sample.map((r) => r.values[h]).filter((v) => v !== '' && v !== undefined).slice(0, 50);
+    const firstVal = vals[0] ?? '';
+    const digits = firstVal.replace(/\D/g, '');
+
+    if (target === 'attribute') {
+      if (firstVal.includes('@') && !used.has('email')) {
+        target = 'email';
+      } else if (digits.length >= 10 && digits.length <= 13) {
+        if (phoneN === 0) {
+          target = 'phone1';
+          phoneN = 1;
+        } else if (digitalN === 0) {
+          target = 'digital1';
+          digitalType = 'WHATSAPP';
+          digitalN = 1;
+        } else if (phoneN < 5) {
+          target = `phone${++phoneN}` as MappingTarget;
+        }
+      } else if (!used.has('external_id') && (/^\d{1,14}$/.test(firstVal) || i === 0)) {
+        target = 'external_id';
+      } else if (!used.has('name') && firstVal.length >= 2 && !/\d/.test(firstVal)) {
+        target = 'name';
+      }
+    }
+
     used.add(target);
     let type: ColumnMapping['type'] = 'text';
     if (target === 'attribute') {
-      const vals = sample.map((r) => r.values[h]).filter((v) => v !== '' && v !== undefined).slice(0, 50);
       if (vals.length && vals.every((v) => parseNumber(v) !== null) && !vals.some((v) => /^0\d/.test(v))) type = 'number';
       else if (vals.length && vals.every((v) => parseDate(v) !== null)) type = 'date';
     }

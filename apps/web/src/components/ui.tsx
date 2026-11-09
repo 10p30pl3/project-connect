@@ -65,7 +65,7 @@ type BtnProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; s
 export function btnClass(variant: Variant = 'secondary', size: 'sm' | 'md' = 'md', className?: string) {
   return clsx(
     'inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50',
-    size === 'sm' ? 'h-8 px-2.5 text-[13px]' : 'h-9 px-3.5 text-sm',
+    size === 'sm' ? 'h-7.5 px-2.5 text-[11px]' : 'h-8.5 px-3.5 text-[13px]',
     variant === 'primary' && 'bg-brand-700 text-white hover:bg-brand-800 shadow-sm',
     variant === 'secondary' && 'border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 shadow-sm',
     variant === 'ghost' && 'text-slate-700 hover:bg-slate-100',
@@ -172,10 +172,10 @@ export function PageHeader({
       <div className="min-w-0">
         {back}
         <div className="flex items-center gap-1.5">
-          <h1 className="text-xl font-bold tracking-tight text-slate-900">{title}</h1>
+          <h1 className="text-[17px] md:text-[18px] font-bold tracking-tight text-slate-900">{title}</h1>
           {tooltip && <InfoTooltip content={tooltip} />}
         </div>
-        {subtitle && <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p>}
+        {subtitle && <p className="mt-0.5 text-[12px] text-slate-500">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
@@ -200,9 +200,9 @@ export function Card({
   return (
     <section className={clsx('rounded-xl border border-slate-200/90 bg-white shadow-xs', className)}>
       {(title || actions) && (
-        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
+        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-5 py-3.5">
           {title && (
-            <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-800">
+            <div className="flex items-center gap-1.5 text-[13.5px] font-semibold text-slate-800">
               {typeof title === 'string' ? <h2>{title}</h2> : title}
               {tooltip && <InfoTooltip content={tooltip} />}
             </div>
@@ -210,7 +210,7 @@ export function Card({
           {actions}
         </header>
       )}
-      <div className={clsx(padded && 'p-4')}>{children}</div>
+      <div className={clsx(padded && 'p-5')}>{children}</div>
     </section>
   );
 }
@@ -229,14 +229,14 @@ export function Stat({
   tone?: 'warn' | 'bad' | 'good';
 }) {
   return (
-    <div className="rounded-xl border border-slate-200/90 bg-white px-4 py-3 shadow-xs transition-colors hover:border-slate-300/80">
-      <div className="flex items-center gap-1 text-xs font-medium text-slate-500">
+    <div className="rounded-xl border border-slate-200/90 bg-white px-5 py-4 shadow-xs transition-colors hover:border-slate-300/80">
+      <div className="flex items-center gap-1 text-[12px] font-medium uppercase tracking-[0.5px] text-slate-500">
         <span>{label}</span>
         {tooltip && <InfoTooltip content={tooltip} />}
       </div>
       <div
         className={clsx(
-          'tabular mt-1 text-2xl font-semibold tracking-tight text-slate-900',
+          'tabular mt-1 text-[26px] font-bold tracking-tight leading-tight text-slate-900',
           tone === 'warn' && 'text-amber-700',
           tone === 'bad' && 'text-red-700',
           tone === 'good' && 'text-emerald-700',
@@ -394,7 +394,7 @@ export function Field({ label, error, hint, tooltip, required, className, childr
   const describedBy = [hintId, errId].filter(Boolean).join(' ') || undefined;
   return (
     <div className={clsx('flex flex-col gap-1.5', className)}>
-      <label htmlFor={id} className="flex items-center gap-1.5 text-[13px] font-medium leading-snug text-slate-700">
+      <label htmlFor={id} className="flex items-center gap-1.5 text-[13px] font-semibold leading-snug text-slate-700">
         <span>{label}</span>
         {required && (
           <span className="text-red-600" aria-hidden>
@@ -420,7 +420,7 @@ export function Field({ label, error, hint, tooltip, required, className, childr
 }
 
 const inputCls =
-  'h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 shadow-xs transition-colors placeholder:text-slate-400 hover:border-slate-400 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-100 disabled:bg-slate-100 disabled:text-slate-500 aria-[invalid=true]:border-red-500 aria-[invalid=true]:ring-red-100';
+  'h-9 w-full rounded-lg border border-slate-300 bg-white px-3.5 text-[13px] text-slate-900 shadow-xs transition-colors placeholder:text-slate-400 hover:border-slate-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:bg-slate-100 disabled:text-slate-500 aria-[invalid=true]:border-red-500 aria-[invalid=true]:ring-red-100';
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, ...p }, ref) {
   return <input ref={ref} className={clsx(inputCls, className)} {...p} />;

@@ -23,6 +23,7 @@ import {
   type ChannelType,
   type ColumnMapping,
   type ListFilter,
+  type MappingTarget,
   type OperationPurpose,
   type ReasonCode,
   type Role,
@@ -35,6 +36,7 @@ import type {
   AuditRow,
   Block,
   CampaignDetail,
+  CampaignTemplate,
   Connection,
   ContactDetail,
   ContactRow,
@@ -82,6 +84,8 @@ const DEMO_USERS: Record<Role, User & { id: string }> = {
 const RULES: StrategyConfig['tabulationRules'] = {
   CONVERSION: 'FINISH_SUCCESS',
   CPC_NO_DEAL: 'RETRY',
+  CALLBACK_SCHEDULED: 'SCHEDULE_CALLBACK',
+  VOICEMAIL: 'RETRY',
   NO_ANSWER: 'RETRY',
   BUSY: 'RETRY',
   WRONG_PERSON: 'NEXT_DESTINATION',
@@ -94,6 +98,8 @@ const RULES: StrategyConfig['tabulationRules'] = {
 const TABULATIONS: Tabulation[] = [
   { id: uuid(20), code: 'CONVERSION', name: 'Acordo fechado', isCpc: true, isConversion: true, isOptOut: false, invalidatesDestination: false, channelTypes: ['VOICE', 'WHATSAPP', 'SMS', 'EMAIL'] },
   { id: uuid(21), code: 'CPC_NO_DEAL', name: 'Titular sem acordo', isCpc: true, isConversion: false, isOptOut: false, invalidatesDestination: false, channelTypes: ['VOICE', 'WHATSAPP', 'SMS', 'EMAIL'] },
+  { id: uuid(29), code: 'CALLBACK_SCHEDULED', name: 'Reagendamento solicitado', isCpc: true, isConversion: false, isOptOut: false, invalidatesDestination: false, channelTypes: ['VOICE'] },
+  { id: uuid(30), code: 'VOICEMAIL', name: 'Caixa postal', isCpc: false, isConversion: false, isOptOut: false, invalidatesDestination: false, channelTypes: ['VOICE'] },
   { id: uuid(22), code: 'NO_ANSWER', name: 'Não atendeu', isCpc: false, isConversion: false, isOptOut: false, invalidatesDestination: false, channelTypes: ['VOICE', 'WHATSAPP', 'SMS', 'EMAIL'] },
   { id: uuid(23), code: 'BUSY', name: 'Ocupado', isCpc: false, isConversion: false, isOptOut: false, invalidatesDestination: false, channelTypes: ['VOICE', 'WHATSAPP', 'SMS', 'EMAIL'] },
   { id: uuid(24), code: 'WRONG_PERSON', name: 'Terceiro', isCpc: false, isConversion: false, isOptOut: false, invalidatesDestination: false, channelTypes: ['VOICE', 'WHATSAPP', 'SMS', 'EMAIL'] },
@@ -109,8 +115,8 @@ const CONNECTIONS: Connection[] = [
     name: 'Discador IA · Tronco Direct Call',
     channelType: 'VOICE',
     provider: 'VOICE_APP',
-    endpointUrl: 'http://127.0.0.1:5050/v1/calls',
-    callerId: '+551140030000',
+    endpointUrl: 'http://192.168.15.36:8090/v1/calls',
+    callerId: '+5511989785888',
     tariff: 0.08,
     tariffUpdatedAt: '2026-11-04T12:00:00Z',
     active: true,
@@ -188,9 +194,35 @@ const CONNECTIONS: Connection[] = [
       noReturnRate: 0.05,
     },
   },
+  {
+    id: uuid(34),
+    name: 'E-mail transacional',
+    channelType: 'EMAIL',
+    provider: 'SIMULATED',
+    tariff: 0.01,
+    tariffUpdatedAt: '2026-10-15T10:00:00Z',
+    active: true,
+    simulation: {
+      outcomes: { READ_NO_REPLY: 4, REPLIED: 1.5, CONVERSION: 0.8, OPT_OUT: 0.1 },
+      minDelaySeconds: 2,
+      maxDelaySeconds: 8,
+      duplicateRate: 0.1,
+      noReturnRate: 0.05,
+    },
+  },
 ];
 
 const JOURNEYS: Journey[] = [
+  // --- Jornadas Simples (1 canal para começar rápido) ---
+  {
+    id: uuid(40),
+    name: 'Voz (Discador Padrão)',
+    latestVersion: {
+      id: uuid(41),
+      version: 1,
+      steps: [{ channelType: 'VOICE', connectionId: uuid(30), connectionName: 'Discador simulado', feedbackTimeoutMinutes: 2 }],
+    },
+  },
   {
     id: uuid(44),
     name: 'Voz IA · Tronco Direct Call',
@@ -201,17 +233,37 @@ const JOURNEYS: Journey[] = [
     },
   },
   {
-    id: uuid(40),
-    name: 'Discador',
+    id: uuid(46),
+    name: 'WhatsApp Simples',
     latestVersion: {
-      id: uuid(41),
+      id: uuid(47),
       version: 1,
-      steps: [{ channelType: 'VOICE', connectionId: uuid(30), connectionName: 'Discador simulado', feedbackTimeoutMinutes: 2 }],
+      steps: [{ channelType: 'WHATSAPP', connectionId: uuid(31), connectionName: 'WhatsApp simulado', feedbackTimeoutMinutes: 5 }],
     },
   },
   {
+    id: uuid(48),
+    name: 'E-mail Simples',
+    latestVersion: {
+      id: uuid(49),
+      version: 1,
+      steps: [{ channelType: 'EMAIL', connectionId: uuid(34), connectionName: 'E-mail transacional', feedbackTimeoutMinutes: 15 }],
+    },
+  },
+  {
+    id: uuid(401),
+    name: 'SMS Simples',
+    latestVersion: {
+      id: uuid(402),
+      version: 1,
+      steps: [{ channelType: 'SMS', connectionId: uuid(32), connectionName: 'SMS simulado', feedbackTimeoutMinutes: 5 }],
+    },
+  },
+
+  // --- Jornadas Completas (Multicanal com transbordo) ---
+  {
     id: uuid(42),
-    name: 'WhatsApp → Discador',
+    name: 'WhatsApp → Voz',
     latestVersion: {
       id: uuid(43),
       version: 1,
@@ -221,12 +273,96 @@ const JOURNEYS: Journey[] = [
       ],
     },
   },
+  {
+    id: uuid(403),
+    name: 'E-mail → WhatsApp → Voz',
+    latestVersion: {
+      id: uuid(404),
+      version: 1,
+      steps: [
+        { channelType: 'EMAIL', connectionId: uuid(34), connectionName: 'E-mail transacional', feedbackTimeoutMinutes: 15 },
+        { channelType: 'WHATSAPP', connectionId: uuid(31), connectionName: 'WhatsApp simulado', feedbackTimeoutMinutes: 5 },
+        { channelType: 'VOICE', connectionId: uuid(30), connectionName: 'Discador simulado', feedbackTimeoutMinutes: 2 },
+      ],
+    },
+  },
+  {
+    id: uuid(405),
+    name: 'Multicanal Completo (360°)',
+    latestVersion: {
+      id: uuid(406),
+      version: 1,
+      steps: [
+        { channelType: 'WHATSAPP', connectionId: uuid(31), connectionName: 'WhatsApp simulado', feedbackTimeoutMinutes: 5 },
+        { channelType: 'VOICE', connectionId: uuid(30), connectionName: 'Discador simulado', feedbackTimeoutMinutes: 2 },
+        { channelType: 'SMS', connectionId: uuid(32), connectionName: 'SMS simulado', feedbackTimeoutMinutes: 5 },
+        { channelType: 'EMAIL', connectionId: uuid(34), connectionName: 'E-mail transacional', feedbackTimeoutMinutes: 15 },
+      ],
+    },
+  },
 ];
 
 const STRATEGIES: StrategyDetail[] = [
+  // --- Estratégias Simples (para começar rápido) ---
+  {
+    id: uuid(56),
+    name: 'Simples · Disparo Único',
+    protected: false,
+    latestVersion: {
+      id: uuid(57),
+      version: 1,
+      publishedAt: '2026-10-10T12:00:00Z',
+      config: {
+        calendar: { days: [1, 2, 3, 4, 5], start: '08:00', end: '18:00', timezone: 'America/Sao_Paulo' },
+        limits: { total: 1, daily: 1, scope: 'WORKSPACE', incompleteHistory: 'USE_KNOWN' },
+        retry: { intervalMinutes: 60, maxPerDestination: 1 },
+        distribution: { batchSize: 20, maxPending: 50, leaseSeconds: 60 },
+        tabulationRules: RULES,
+      },
+    },
+    versions: [],
+  },
+  {
+    id: uuid(54),
+    name: 'Simples · 24x7 (Disparo Imediato)',
+    protected: false,
+    latestVersion: {
+      id: uuid(55),
+      version: 1,
+      publishedAt: '2026-10-10T12:00:00Z',
+      config: {
+        calendar: { days: [0, 1, 2, 3, 4, 5, 6], start: '00:00', end: '23:59', timezone: 'America/Sao_Paulo' },
+        limits: { total: 6, daily: 4, scope: 'WORKSPACE', incompleteHistory: 'USE_KNOWN' },
+        retry: { intervalMinutes: 1, maxPerDestination: 2 },
+        distribution: { batchSize: 10, maxPending: 20, leaseSeconds: 60 },
+        tabulationRules: RULES,
+      },
+    },
+    versions: [],
+  },
+  {
+    id: uuid(58),
+    name: 'Simples · Comercial Leve',
+    protected: false,
+    latestVersion: {
+      id: uuid(59),
+      version: 1,
+      publishedAt: '2026-10-10T12:00:00Z',
+      config: {
+        calendar: { days: [1, 2, 3, 4, 5], start: '09:00', end: '18:00', timezone: 'America/Sao_Paulo' },
+        limits: { total: 3, daily: 1, scope: 'WORKSPACE', incompleteHistory: 'USE_KNOWN' },
+        retry: { intervalMinutes: 60, maxPerDestination: 2 },
+        distribution: { batchSize: 20, maxPending: 50, leaseSeconds: 60 },
+        tabulationRules: RULES,
+      },
+    },
+    versions: [],
+  },
+
+  // --- Estratégias Completas (avançadas e parametrizáveis) ---
   {
     id: uuid(50),
-    name: 'Padrão cobrança',
+    name: 'Padrão Cobrança',
     protected: true,
     latestVersion: {
       id: uuid(51),
@@ -244,7 +380,7 @@ const STRATEGIES: StrategyDetail[] = [
   },
   {
     id: uuid(52),
-    name: 'Intensiva',
+    name: 'Intensiva (Recuperação)',
     protected: true,
     latestVersion: {
       id: uuid(53),
@@ -261,18 +397,18 @@ const STRATEGIES: StrategyDetail[] = [
     versions: [],
   },
   {
-    id: uuid(54),
-    name: 'Demonstração 24x7',
+    id: uuid(501),
+    name: 'Confirmação & Agendamentos',
     protected: false,
     latestVersion: {
-      id: uuid(55),
+      id: uuid(502),
       version: 1,
       publishedAt: '2026-10-10T12:00:00Z',
       config: {
-        calendar: { days: [0, 1, 2, 3, 4, 5, 6], start: '00:00', end: '23:59', timezone: 'America/Sao_Paulo' },
-        limits: { total: 6, daily: 4, scope: 'WORKSPACE', incompleteHistory: 'USE_KNOWN' },
-        retry: { intervalMinutes: 1, maxPerDestination: 2 },
-        distribution: { batchSize: 10, maxPending: 20, leaseSeconds: 60 },
+        calendar: { days: [1, 2, 3, 4, 5, 6], start: '08:00', end: '20:00', timezone: 'America/Sao_Paulo' },
+        limits: { total: 4, daily: 2, scope: 'WORKSPACE', incompleteHistory: 'USE_KNOWN' },
+        retry: { intervalMinutes: 120, maxPerDestination: 2 },
+        distribution: { batchSize: 30, maxPending: 60, leaseSeconds: 60 },
         tabulationRules: RULES,
       },
     },
@@ -343,6 +479,7 @@ const CAMPAIGN_3_ID = uuid(82);
 let MAILINGS: { detail: MailingDetail; records: MailingRecord[] }[] = [];
 let LISTS: ListDetail[] = [];
 let CAMPAIGNS: CampaignDetail[] = [];
+let CAMPAIGN_TEMPLATES: CampaignTemplate[] = [];
 const ATTEMPTS: Map<string, AttemptDetail> = new Map();
 let CONTROL: Control = { dailyLimit: null, totalLimit: null, globalSuspension: false };
 let AUDITS: AuditRow[] = [];
@@ -353,6 +490,7 @@ export function resetDatabaseToZero() {
   MAILINGS = [];
   LISTS = [];
   CAMPAIGNS = [];
+  CAMPAIGN_TEMPLATES = [];
   ATTEMPTS.clear();
   AUDITS = [];
   DRAFT = null;
@@ -538,6 +676,9 @@ export function seedSampleDemoData() {
     },
   ];
 
+  const seededJourney = JOURNEYS.find((j) => j.name === 'WhatsApp → Voz') ?? JOURNEYS[0];
+  const seededStrategy = STRATEGIES.find((s) => s.name === 'Simples · 24x7 (Disparo Imediato)') ?? STRATEGIES[0];
+
   CAMPAIGNS = [
     {
       id: CAMPAIGN_1_ID,
@@ -549,8 +690,8 @@ export function seedSampleDemoData() {
       operationalState: 'PROCESSING',
       operationalExplanation: 'Processando: ondas automáticas e distribuição inteligente dentro da janela operacional.',
       audience: { type: 'MAILING', name: 'Mailing Piloto 1.000 Contatos (Inteligência de CPC)' },
-      journeyName: 'WhatsApp → Discador',
-      strategyName: 'Demonstração 24x7',
+      journeyName: seededJourney.name,
+      strategyName: seededStrategy.name,
       strategyVersion: 1,
       createdAt: '2026-10-20T10:00:00Z',
       startedAt: '2026-10-20T10:05:00Z',
@@ -559,14 +700,14 @@ export function seedSampleDemoData() {
       mailing: { id: MAILING_ID, name: 'Mailing Piloto 1.000 Contatos (Inteligência de CPC)' },
       listVersion: null,
       journey: {
-        id: JOURNEYS[1].id,
+        id: seededJourney.id,
         version: 1,
-        steps: JOURNEYS[1].latestVersion!.steps,
+        steps: seededJourney.latestVersion!.steps,
       },
       strategy: {
-        id: STRATEGIES[2].id,
+        id: seededStrategy.id,
         version: 1,
-        config: STRATEGIES[2].latestVersion!.config,
+        config: seededStrategy.latestVersion!.config,
       },
     },
     {
@@ -579,8 +720,8 @@ export function seedSampleDemoData() {
       operationalState: 'PROCESSING',
       operationalExplanation: 'Processando: acionamentos prioritários em janelas de receptividade (almoço e fim de tarde).',
       audience: { type: 'MAILING', name: 'Mailing Piloto 1.000 Contatos (Inteligência de CPC)' },
-      journeyName: 'WhatsApp → Discador',
-      strategyName: 'Demonstração 24x7',
+      journeyName: seededJourney.name,
+      strategyName: seededStrategy.name,
       strategyVersion: 1,
       createdAt: '2026-10-21T09:00:00Z',
       startedAt: '2026-10-21T09:15:00Z',
@@ -589,14 +730,14 @@ export function seedSampleDemoData() {
       mailing: { id: MAILING_ID, name: 'Mailing Piloto 1.000 Contatos (Inteligência de CPC)' },
       listVersion: null,
       journey: {
-        id: JOURNEYS[1].id,
+        id: seededJourney.id,
         version: 1,
-        steps: JOURNEYS[1].latestVersion!.steps,
+        steps: seededJourney.latestVersion!.steps,
       },
       strategy: {
-        id: STRATEGIES[2].id,
+        id: seededStrategy.id,
         version: 1,
-        config: STRATEGIES[2].latestVersion!.config,
+        config: seededStrategy.latestVersion!.config,
       },
     },
     {
@@ -609,8 +750,8 @@ export function seedSampleDemoData() {
       operationalState: 'PROCESSING',
       operationalExplanation: 'Cadência ativa: lembretes de véspera (D-1) e do dia (D-0) sincronizados com as datas de agendamento.',
       audience: { type: 'MAILING', name: 'Mailing Piloto 1.000 Contatos (Inteligência de CPC)' },
-      journeyName: 'WhatsApp Prioritário',
-      strategyName: 'Demonstração 24x7',
+      journeyName: seededJourney.name,
+      strategyName: seededStrategy.name,
       strategyVersion: 1,
       createdAt: '2026-10-22T08:00:00Z',
       startedAt: '2026-10-22T08:10:00Z',
@@ -619,15 +760,209 @@ export function seedSampleDemoData() {
       mailing: { id: MAILING_ID, name: 'Mailing Piloto 1.000 Contatos (Inteligência de CPC)' },
       listVersion: null,
       journey: {
-        id: JOURNEYS[1].id,
+        id: seededJourney.id,
         version: 1,
-        steps: JOURNEYS[1].latestVersion!.steps,
+        steps: seededJourney.latestVersion!.steps,
       },
       strategy: {
-        id: STRATEGIES[2].id,
+        id: seededStrategy.id,
         version: 1,
-        config: STRATEGIES[2].latestVersion!.config,
+        config: seededStrategy.latestVersion!.config,
       },
+    },
+  ];
+
+  const jWhatsVoice = JOURNEYS.find((j) => j.name === 'WhatsApp → Voz') ?? JOURNEYS[0];
+  const jVoiceAi = JOURNEYS.find((j) => j.name.includes('Voz IA')) ?? JOURNEYS[0];
+  const jWhatsSimple = JOURNEYS.find((j) => j.name === 'WhatsApp Simples') ?? JOURNEYS[0];
+  const jMulti360 = JOURNEYS.find((j) => j.name.includes('Multicanal Completo')) ?? JOURNEYS[0];
+  const jEmailSimple = JOURNEYS.find((j) => j.name.includes('E-mail Simples')) ?? JOURNEYS[0];
+  const jSmsSimple = JOURNEYS.find((j) => j.name.includes('SMS Simples')) ?? JOURNEYS[0];
+  const jEmailWhatsVoice = JOURNEYS.find((j) => j.name.includes('E-mail → WhatsApp → Voz')) ?? JOURNEYS[0];
+
+  const sCobranca = STRATEGIES.find((s) => s.name === 'Padrão Cobrança') ?? STRATEGIES[0];
+  const sIntensiva = STRATEGIES.find((s) => s.name.includes('Intensiva')) ?? STRATEGIES[0];
+  const sUnico = STRATEGIES.find((s) => s.name.includes('Disparo Único')) ?? STRATEGIES[0];
+  const s24x7 = STRATEGIES.find((s) => s.name.includes('24x7')) ?? STRATEGIES[0];
+  const sComercial = STRATEGIES.find((s) => s.name.includes('Comercial Leve')) ?? STRATEGIES[0];
+  const sAgendamento = STRATEGIES.find((s) => s.name.includes('Agendamentos')) ?? STRATEGIES[0];
+
+  CAMPAIGN_TEMPLATES = [
+    {
+      id: uuid(901),
+      name: 'Cobrança Preventiva (Lembrete Pré-Vencimento D-3/D-1)',
+      description: 'Lembrete amigável enviado antes do vencimento com link do boleto e chave PIX copia-e-cola. Evita entrada em inadimplência e preserva o relacionamento com o cliente.',
+      purposeCode: 'COBRANCA',
+      journeyId: jWhatsSimple.id,
+      journeyName: jWhatsSimple.name,
+      journeyVersionId: jWhatsSimple.latestVersion?.id,
+      strategyId: sUnico.id,
+      strategyName: sUnico.name,
+      strategyVersionId: sUnico.latestVersion?.id,
+      strategyVersion: sUnico.latestVersion?.version ?? 1,
+      startMode: 'NOW',
+      createdAt: '2026-10-18T09:00:00Z',
+      updatedAt: '2026-10-18T09:00:00Z',
+      usageCount: 34,
+    },
+    {
+      id: uuid(902),
+      name: 'Cobrança Faixa 1 (1 a 30 dias) — WhatsApp → Voz',
+      description: 'Régua digital-first para atrasos recentes. Primeiro toque via WhatsApp oficial com cálculo de encargos; caso não haja confirmação em 120 minutos, transborda automaticamente para ligação ativa do discador.',
+      purposeCode: 'COBRANCA',
+      journeyId: jWhatsVoice.id,
+      journeyName: jWhatsVoice.name,
+      journeyVersionId: jWhatsVoice.latestVersion?.id,
+      strategyId: sCobranca.id,
+      strategyName: sCobranca.name,
+      strategyVersionId: sCobranca.latestVersion?.id,
+      strategyVersion: sCobranca.latestVersion?.version ?? 1,
+      startMode: 'NOW',
+      sourceCampaignId: CAMPAIGN_1_ID,
+      sourceCampaignName: 'Cobrança Outubro — Faixa 30+ dias (1.000 Contatos)',
+      createdAt: '2026-10-20T10:00:00Z',
+      updatedAt: '2026-10-20T10:00:00Z',
+      usageCount: 48,
+    },
+    {
+      id: uuid(903),
+      name: 'Recuperação Crítica (30 a 90 dias) — Voz IA Direct Call',
+      description: 'Acionamento de alta cadência para carteiras vencidas há mais de 30 dias. Utiliza agente de voz com inteligência artificial para negociar quitação à vista com desconto ou parcelamento imediato com chave PIX.',
+      purposeCode: 'COBRANCA',
+      journeyId: jVoiceAi.id,
+      journeyName: jVoiceAi.name,
+      journeyVersionId: jVoiceAi.latestVersion?.id,
+      strategyId: sIntensiva.id,
+      strategyName: sIntensiva.name,
+      strategyVersionId: sIntensiva.latestVersion?.id,
+      strategyVersion: sIntensiva.latestVersion?.version ?? 1,
+      startMode: 'NOW',
+      createdAt: '2026-10-21T09:00:00Z',
+      updatedAt: '2026-10-21T09:00:00Z',
+      usageCount: 27,
+    },
+    {
+      id: uuid(904),
+      name: 'Acordo Rompido — Notificação Imediata 24x7',
+      description: 'Acionamento de emergência multicanal ininterrupto (WhatsApp, Voz, SMS e E-mail) disparado no dia seguinte ao não pagamento de parcela de acordo renegociado.',
+      purposeCode: 'COBRANCA',
+      journeyId: jMulti360.id,
+      journeyName: jMulti360.name,
+      journeyVersionId: jMulti360.latestVersion?.id,
+      strategyId: s24x7.id,
+      strategyName: s24x7.name,
+      strategyVersionId: s24x7.latestVersion?.id,
+      strategyVersion: s24x7.latestVersion?.version ?? 1,
+      startMode: 'NOW',
+      createdAt: '2026-10-22T08:00:00Z',
+      updatedAt: '2026-10-22T08:00:00Z',
+      usageCount: 19,
+    },
+    {
+      id: uuid(905),
+      name: 'Venda Ativa & Upgrade — WhatsApp Interativo + Voz',
+      description: 'Campanha de up-sell e cross-sell para base qualificada. Envia catálogo de novas ofertas de fibra/celular via WhatsApp interativo nos horários de maior propensão e aciona chamada consultiva caso haja interesse.',
+      purposeCode: 'VENDAS',
+      journeyId: jWhatsVoice.id,
+      journeyName: jWhatsVoice.name,
+      journeyVersionId: jWhatsVoice.latestVersion?.id,
+      strategyId: sComercial.id,
+      strategyName: sComercial.name,
+      strategyVersionId: sComercial.latestVersion?.id,
+      strategyVersion: sComercial.latestVersion?.version ?? 1,
+      startMode: 'NOW',
+      sourceCampaignId: CAMPAIGN_2_ID,
+      sourceCampaignName: 'Venda Ativa — Oferta Fibra & Celular (800 Contatos)',
+      createdAt: '2026-10-22T14:00:00Z',
+      updatedAt: '2026-10-22T14:00:00Z',
+      usageCount: 31,
+    },
+    {
+      id: uuid(906),
+      name: 'Reativação de Inativos (Winback 90d+)',
+      description: 'Campanha econômica em 3 toques para resgate de ex-assinantes. Inicia com proposta exclusiva por e-mail, avança para WhatsApp com cupom promocional e realiza ligação final de consultor de retenção.',
+      purposeCode: 'VENDAS',
+      journeyId: jEmailWhatsVoice.id,
+      journeyName: jEmailWhatsVoice.name,
+      journeyVersionId: jEmailWhatsVoice.latestVersion?.id,
+      strategyId: sCobranca.id,
+      strategyName: sCobranca.name,
+      strategyVersionId: sCobranca.latestVersion?.id,
+      strategyVersion: sCobranca.latestVersion?.version ?? 1,
+      startMode: 'NOW',
+      createdAt: '2026-10-23T10:00:00Z',
+      updatedAt: '2026-10-23T10:00:00Z',
+      usageCount: 14,
+    },
+    {
+      id: uuid(907),
+      name: 'Confirmação de Agendamentos (Lembrete D-1 e D-0)',
+      description: 'Redução de no-show em consultas, exames e ordens de serviço. Lembrete interativo via WhatsApp 24h antes com botões "Confirmar Presença" ou "Reagendar Horário", atualizando a agenda automaticamente.',
+      purposeCode: 'AGENDAMENTOS',
+      journeyId: jWhatsSimple.id,
+      journeyName: jWhatsSimple.name,
+      journeyVersionId: jWhatsSimple.latestVersion?.id,
+      strategyId: sAgendamento.id,
+      strategyName: sAgendamento.name,
+      strategyVersionId: sAgendamento.latestVersion?.id,
+      strategyVersion: sAgendamento.latestVersion?.version ?? 1,
+      startMode: 'NOW',
+      sourceCampaignId: CAMPAIGN_3_ID,
+      sourceCampaignName: 'Confirmação de Agendamentos — Lembretes D-1 e D-0 (600 Contatos)',
+      createdAt: '2026-10-23T11:00:00Z',
+      updatedAt: '2026-10-23T11:00:00Z',
+      usageCount: 56,
+    },
+    {
+      id: uuid(908),
+      name: 'Janela de Chegada Técnica — SMS em Trânsito',
+      description: 'Disparo de alta velocidade por SMS avisando que o técnico iniciou o deslocamento até o endereço cadastrado, com previsão de chegada em até 30 minutos e código de identificação do colaborador.',
+      purposeCode: 'CONFIRMACAO_SERVICO',
+      journeyId: jSmsSimple.id,
+      journeyName: jSmsSimple.name,
+      journeyVersionId: jSmsSimple.latestVersion?.id,
+      strategyId: sUnico.id,
+      strategyName: sUnico.name,
+      strategyVersionId: sUnico.latestVersion?.id,
+      strategyVersion: sUnico.latestVersion?.version ?? 1,
+      startMode: 'NOW',
+      createdAt: '2026-10-24T08:30:00Z',
+      updatedAt: '2026-10-24T08:30:00Z',
+      usageCount: 42,
+    },
+    {
+      id: uuid(909),
+      name: 'Pesquisa NPS & CSAT — Pós-Atendimento SAC',
+      description: 'Avaliação rápida de atendimento disparada 15 minutos após a conclusão de chamados. Coleta nota de 0 a 10 no WhatsApp e registra feedback aberto sobre a resolução do operador.',
+      purposeCode: 'PESQUISA_RELACIONAMENTO',
+      journeyId: jWhatsSimple.id,
+      journeyName: jWhatsSimple.name,
+      journeyVersionId: jWhatsSimple.latestVersion?.id,
+      strategyId: sUnico.id,
+      strategyName: sUnico.name,
+      strategyVersionId: sUnico.latestVersion?.id,
+      strategyVersion: sUnico.latestVersion?.version ?? 1,
+      startMode: 'NOW',
+      createdAt: '2026-10-24T09:00:00Z',
+      updatedAt: '2026-10-24T09:00:00Z',
+      usageCount: 65,
+    },
+    {
+      id: uuid(910),
+      name: 'Alerta Crítico de Indisponibilidade & Manutenção',
+      description: 'Disparo massivo imediato nos 4 canais para comunicar falhas de rede, manutenção preventiva programada ou avisos de segurança ininterruptos para clientes da região afetada.',
+      purposeCode: 'ATENDIMENTO_SUPORTE',
+      journeyId: jMulti360.id,
+      journeyName: jMulti360.name,
+      journeyVersionId: jMulti360.latestVersion?.id,
+      strategyId: s24x7.id,
+      strategyName: s24x7.name,
+      strategyVersionId: s24x7.latestVersion?.id,
+      strategyVersion: s24x7.latestVersion?.version ?? 1,
+      startMode: 'NOW',
+      createdAt: '2026-10-24T10:00:00Z',
+      updatedAt: '2026-10-24T10:00:00Z',
+      usageCount: 22,
     },
   ];
 
@@ -779,6 +1114,9 @@ function seedAttempts() {
   }
 }
 
+// Inicializa dados de demonstração automaticamente na primeira carga
+seedSampleDemoData();
+
 function currentRole(headers: Record<string, string>): Role {
   const h = (headers['X-Demo-Role'] || headers['x-demo-role'] || '').toUpperCase();
   return (ROLES as readonly string[]).includes(h) ? (h as Role) : 'ADMIN';
@@ -806,25 +1144,63 @@ function parseQuery(path: string): { pathname: string; searchParams: URLSearchPa
 function buildImportPreview(body: any): ImportPreview {
   const content = String(body?.content ?? '').trim();
   const lines = content.split(/\r?\n/).filter((l) => l.trim().length > 0);
-  const delimiter = body?.delimiter && body.delimiter !== 'auto' ? body.delimiter : (lines[0]?.includes(';') ? ';' : ',');
-  const hasHeader = body?.hasHeader !== false;
-  const rawHeaders = hasHeader && lines.length > 0 ? lines[0].split(delimiter).map((s: string) => s.trim()) : ['col1', 'col2', 'col3'];
+  const delimiter = body?.delimiter && body.delimiter !== 'auto' ? body.delimiter : (lines[0]?.includes(';') ? ';' : lines[0]?.includes('\t') ? '\t' : lines[0]?.includes('|') ? '|' : ',');
+  
+  // Detecção inteligente de cabeçalho: se a 1ª linha parecer uma linha de dados (telefones, e-mail, etc.), auto-corrige hasHeader
+  const firstLineCols = lines.length > 0 ? lines[0].split(delimiter).map((s: string) => s.trim()) : [];
+  let dataScore = 0;
+  for (const c of firstLineCols) {
+    if (c.includes('@')) dataScore += 3;
+    const digits = c.replace(/\D/g, '');
+    if (digits.length >= 8 && digits.length <= 15) dataScore += 2;
+    if (/^\d+$/.test(c)) dataScore += 1;
+  }
+  const looksLikeDataRow = dataScore >= 2 || (lines.length === 1 && dataScore >= 1);
+  const hasHeader = body?.hasHeader !== undefined ? (body.hasHeader && !looksLikeDataRow) : !looksLikeDataRow;
+
+  const rawHeaders =
+    hasHeader && lines.length > 0
+      ? firstLineCols
+      : Array.from({ length: Math.max(1, firstLineCols.length) }, (_, i) => `Coluna ${i + 1}`);
   const dataLines = hasHeader ? lines.slice(1) : lines;
+
+  // Amostra de valores para inferência de tipos e destinos
+  const firstDataRow = dataLines.length > 0 ? dataLines[0].split(delimiter).map((s: string) => s.trim()) : [];
+
+  let hasExtId = false;
+  let hasName = false;
+  let hasEmail = false;
+  let phoneCount = 0;
+  let digitalCount = 0;
 
   const suggestedMapping: ColumnMapping[] =
     body?.mapping ??
     rawHeaders.map((h: string, i: number) => {
       const lower = h.toLowerCase();
-      if (lower === 'id' || lower.includes('external') || lower.includes('cpf') || lower.includes('contrato') || i === 0)
+      const val = firstDataRow[i] ? String(firstDataRow[i]).trim() : '';
+      const digits = val.replace(/\D/g, '');
+
+      // 1. Por nome de coluna convencional
+      if ((lower === 'id' || lower.includes('external') || lower.includes('cpf') || lower.includes('contrato')) && !hasExtId) {
+        hasExtId = true;
         return { column: h, target: 'external_id', type: 'text', required: true };
-      if (lower.includes('nome') || lower === 'name')
+      }
+      if ((lower.includes('nome') || lower === 'name') && !hasName) {
+        hasName = true;
         return { column: h, target: 'name', type: 'text', required: false };
-      if (lower.includes('tel') || lower.includes('fone') || lower.includes('cel'))
-        return { column: h, target: 'phone1', type: 'text', required: false };
-      if (lower.includes('whats'))
-        return { column: h, target: 'digital1', digitalType: 'WHATSAPP', type: 'text', required: false };
-      if (lower.includes('email'))
+      }
+      if (lower.includes('tel') || lower.includes('fone') || lower.includes('cel')) {
+        phoneCount++;
+        return { column: h, target: `phone${Math.min(5, phoneCount)}` as MappingTarget, type: 'text', required: false };
+      }
+      if (lower.includes('whats') || lower.includes('zap')) {
+        digitalCount++;
+        return { column: h, target: `digital${Math.min(3, digitalCount)}` as MappingTarget, digitalType: 'WHATSAPP', type: 'text', required: false };
+      }
+      if (lower.includes('email') && !hasEmail) {
+        hasEmail = true;
         return { column: h, target: 'email', type: 'text', required: false };
+      }
       if (lower.includes('fim') || lower.includes('end') || lower.includes('ate'))
         return { column: h, target: 'best_contact_end', type: 'text', required: false };
       if (lower.includes('inicio') || lower.includes('start') || lower.includes('bttc') || lower.includes('btc') || lower.includes('melhor_horario'))
@@ -833,6 +1209,33 @@ function buildImportPreview(body: any): ImportPreview {
         return { column: h, target: 'best_contact_duration', type: 'text', required: false };
       if (lower.includes('fuso') || lower.includes('timezone') || lower.includes('tz') || lower.includes('iana'))
         return { column: h, target: 'best_contact_timezone', type: 'text', required: false };
+
+      // 2. Inferência por conteúdo dos dados se a coluna for genérica (ex: Coluna 1, Coluna 2) ou desconhecida
+      if (val.includes('@') && !hasEmail) {
+        hasEmail = true;
+        return { column: h, target: 'email', type: 'text', required: false };
+      }
+      if (digits.length >= 10 && digits.length <= 13) {
+        if (phoneCount === 0) {
+          phoneCount++;
+          return { column: h, target: 'phone1', type: 'text', required: false };
+        } else if (digitalCount === 0) {
+          digitalCount++;
+          return { column: h, target: 'digital1', digitalType: 'WHATSAPP', type: 'text', required: false };
+        } else {
+          phoneCount++;
+          return { column: h, target: `phone${Math.min(5, phoneCount)}` as MappingTarget, type: 'text', required: false };
+        }
+      }
+      if (!hasExtId && (/^\d{1,14}$/.test(val) || i === 0)) {
+        hasExtId = true;
+        return { column: h, target: 'external_id', type: 'text', required: true };
+      }
+      if (!hasName && val.length >= 2 && !/\d/.test(val)) {
+        hasName = true;
+        return { column: h, target: 'name', type: 'text', required: false };
+      }
+
       return { column: h, target: 'attribute', attributeName: h, type: 'text', required: false };
     });
 
@@ -1149,8 +1552,16 @@ export async function handleMockApi<T = unknown>(
     const verId = nextUuid();
     const now = new Date().toISOString();
     const validRows = prev.rows.filter((r) => r.errors.length === 0);
+    const effectiveMapping = (body.mapping && body.mapping.length ? body.mapping : prev.suggestedMapping) as ColumnMapping[];
+    const extIdCol = effectiveMapping.find((m) => m.target === 'external_id')?.column;
+    const nameCol = effectiveMapping.find((m) => m.target === 'name')?.column;
+    const phoneCols = effectiveMapping.filter((m) => m.target.startsWith('phone')).map((m) => m.column);
+    const waCols = effectiveMapping.filter((m) => m.target.startsWith('digital') && m.digitalType === 'WHATSAPP').map((m) => m.column);
+    const emailCol = effectiveMapping.find((m) => m.target === 'email')?.column;
+
     const records: MailingRecord[] = validRows.map((r, idx) => {
       const extId =
+        (extIdCol ? r.values[extIdCol] : null) ||
         r.values['id'] ||
         r.values['external_id'] ||
         r.values['externalId'] ||
@@ -1160,6 +1571,7 @@ export async function handleMockApi<T = unknown>(
         String(idx + 1).padStart(4, '0');
 
       const name =
+        (nameCol ? r.values[nameCol] : null) ||
         r.values['nome'] ||
         r.values['name'] ||
         r.values['cliente'] ||
@@ -1167,6 +1579,7 @@ export async function handleMockApi<T = unknown>(
         `Contato ${extId}`;
 
       const rawPhone =
+        (phoneCols.length ? r.values[phoneCols[0]] : null) ||
         r.values['telefone'] ||
         r.values['telefone1'] ||
         r.values['phone'] ||
@@ -1176,6 +1589,8 @@ export async function handleMockApi<T = unknown>(
         Object.values(r.values).find((v) => String(v).replace(/\D/g, '').length >= 10);
 
       const rawWa =
+        (waCols.length ? r.values[waCols[0]] : null) ||
+        (phoneCols.length > 1 ? r.values[phoneCols[1]] : null) ||
         r.values['whatsapp'] ||
         r.values['whatsapp1'] ||
         r.values['whats'] ||
@@ -1183,6 +1598,7 @@ export async function handleMockApi<T = unknown>(
         rawPhone;
 
       const rawEmail =
+        (emailCol ? r.values[emailCol] : null) ||
         r.values['email'] ||
         r.values['e-mail'] ||
         Object.values(r.values).find((v) => String(v).includes('@'));
@@ -1705,17 +2121,27 @@ export async function handleMockApi<T = unknown>(
           ],
         });
 
-        void fetch('http://127.0.0.1:5050/v1/calls', {
+        const firstStep = c.journey?.steps?.[0];
+        const stepConn = CONNECTIONS.find((cn) => cn.id === firstStep?.connectionId)
+          || CONNECTIONS.find((cn) => cn.provider === 'VOICE_APP')
+          || CONNECTIONS[0];
+        const targetUrl = stepConn?.endpointUrl || 'http://192.168.15.36:8090/v1/calls';
+        const callerId = stepConn?.callerId || '+5511989785888';
+
+        void fetch(targetUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Idempotency-Key': attemptId,
+            ...(stepConn?.authToken ? { Authorization: `Bearer ${stepConn.authToken}` } : {}),
           },
           body: JSON.stringify({
             attemptId,
             to: phone,
-            callerId: '+551140030000',
-            trunkName: 'Direct Call (SIP Trunk)',
+            from: callerId,
+            callerId,
+            trunkName: 'directcall',
+            tenantId: 'default',
             contact: {
               externalId: r.externalId,
               name: r.name,
@@ -1723,14 +2149,85 @@ export async function handleMockApi<T = unknown>(
             campaign: { id: c.id, name: c.name },
           }),
         }).then(async (res) => {
-          if (res.ok) {
-            const data = await res.json().catch(() => ({}));
-            const att = ATTEMPTS.get(attemptId);
-            if (att) {
-              att.attempt.providerAttemptId = data.providerAttemptId || att.attempt.providerAttemptId;
+          const data = await res.json().catch(() => ({}));
+          const att = ATTEMPTS.get(attemptId);
+          if (att) {
+            if (res.ok) {
+              const pId = data.providerAttemptId || data.callId || att.attempt.providerAttemptId;
+              att.attempt.providerAttemptId = pId;
+              att.timeline.push({
+                id: att.timeline.length + 1,
+                eventType: 'DISPATCH_ACCEPTED',
+                label: `Aceito pelo Voice-App (${pId})`,
+                fromState: 'SENT',
+                toState: 'SENT',
+                reasonCode: null,
+                duplicate: false,
+                occurredAt: new Date().toISOString(),
+                receivedAt: new Date().toISOString(),
+                data,
+              });
+            } else {
+              att.attempt.state = 'RECONCILIATION';
+              att.attempt.stateLabel = 'Falha no disparo';
+              att.attempt.nextAction = 'Revisar endpoint e tronco de voz';
+              att.timeline.push({
+                id: att.timeline.length + 1,
+                eventType: 'DISPATCH_REJECTED',
+                label: `Rejeitado pelo Voice-App: ${data.message || res.statusText}`,
+                fromState: 'SENT',
+                toState: 'RECONCILIATION',
+                reasonCode: 'VOICE_APP_ERROR',
+                duplicate: false,
+                occurredAt: new Date().toISOString(),
+                receivedAt: new Date().toISOString(),
+                data,
+              });
             }
           }
-        }).catch(() => {});
+        }).catch((err) => {
+          console.error('[mock-backend] Falha ao enviar chamada para', targetUrl, err);
+          const att = ATTEMPTS.get(attemptId);
+          if (att) {
+            const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+            const isLocalHttpTarget = targetUrl.startsWith('http://');
+            const isMixedContent = isHttps && isLocalHttpTarget;
+
+            const errorTitle = isMixedContent
+              ? 'Bloqueio de Mixed Content / Rede Privada pelo navegador'
+              : `Erro de conexão com o Gateway de Voz (${targetUrl})`;
+
+            const detailedMsg = isMixedContent
+              ? 'A aplicação está rodando sob HTTPS na Vercel e o navegador bloqueia chamadas diretas a servidores HTTP ou IPs locais (192.168.15.36). Para disparar chamadas ao discador local: 1) Execute o frontend localmente em http://localhost:5173, OU 2) Configure um túnel HTTPS seguro (Cloudflare Tunnel / ngrok) para o Voice-App.'
+              : `Não foi possível conectar ao Voice-App em ${targetUrl}. Verifique se o serviço está rodando e acessível na rede.`;
+
+            att.attempt.state = 'RECONCILIATION';
+            att.attempt.stateLabel = isMixedContent ? 'Bloqueio HTTPS/Mixed Content' : 'Erro de Rede';
+            att.attempt.nextAction = isMixedContent ? 'Testar em http://localhost:5173 ou usar túnel HTTPS' : 'Verificar status do servidor Voice-App';
+            att.explanation = {
+              whatHappened: errorTitle,
+              why: detailedMsg,
+              nextAction: att.attempt.nextAction,
+            };
+            att.timeline.push({
+              id: att.timeline.length + 1,
+              eventType: 'DISPATCH_REJECTED',
+              label: `${errorTitle}: ${err.message || 'Falha de requisição'}`,
+              fromState: 'SENT',
+              toState: 'RECONCILIATION',
+              reasonCode: 'NETWORK_ERROR',
+              duplicate: false,
+              occurredAt: new Date().toISOString(),
+              receivedAt: new Date().toISOString(),
+              data: {
+                targetUrl,
+                error: String(err),
+                isMixedContent,
+                hint: detailedMsg,
+              },
+            });
+          }
+        });
       }
     }
   }
@@ -1784,6 +2281,10 @@ export async function handleMockApi<T = unknown>(
       strategy: { id: s?.id ?? uuid(50), version: sv?.version ?? 1, config: sv?.config ?? ({} as any) },
     };
     CAMPAIGNS.unshift(camp);
+    if (body.templateId) {
+      const tmpl = CAMPAIGN_TEMPLATES.find((t) => t.id === body.templateId);
+      if (tmpl) tmpl.usageCount = (tmpl.usageCount || 0) + 1;
+    }
     DRAFT = null;
     if (status === 'RUNNING') {
       triggerVoiceAppCalls(camp);
@@ -1838,6 +2339,117 @@ export async function handleMockApi<T = unknown>(
     const c = CAMPAIGNS.find((c) => c.id === campMatch[1]);
     if (!c) throw new ApiError({ type: 'not_found', title: 'Campanha não encontrada', status: 404 });
     return c as T;
+  }
+
+  // Salvar campanha como modelo: POST /campaigns/:id/save-as-template
+  const saveAsTemplateMatch = pathname.match(/^\/campaigns\/([^/]+)\/save-as-template$/);
+  if (saveAsTemplateMatch && method === 'POST') {
+    const c = CAMPAIGNS.find((x) => x.id === saveAsTemplateMatch[1]);
+    if (!c) throw new ApiError({ type: 'not_found', title: 'Campanha não encontrada', status: 404 });
+    const j = JOURNEYS.find((x) => x.name === c.journeyName) ?? JOURNEYS[0];
+    const s = STRATEGIES.find((x) => x.name === c.strategyName) ?? STRATEGIES[0];
+    const sv = s.versions.find((v) => v.version === c.strategyVersion) ?? s.latestVersion!;
+    const now = new Date().toISOString();
+    const template: CampaignTemplate = {
+      id: nextUuid(),
+      name: body?.name?.trim() || `Modelo - ${c.name}`,
+      description: body?.description?.trim() ?? c.description ?? `Modelo gerado a partir da campanha "${c.name}"`,
+      purposeCode: c.purposeCode ?? 'COBRANCA',
+      journeyId: c.journey?.id || j.id,
+      journeyName: c.journeyName,
+      journeyVersionId: j.latestVersion?.id,
+      strategyId: c.strategy?.id || s.id,
+      strategyName: c.strategyName,
+      strategyVersionId: sv?.id,
+      strategyVersion: c.strategyVersion ?? 1,
+      startMode: c.scheduledAt ? 'SCHEDULE' : 'NOW',
+      sourceCampaignId: c.id,
+      sourceCampaignName: c.name,
+      createdAt: now,
+      updatedAt: now,
+      usageCount: 0,
+    };
+    CAMPAIGN_TEMPLATES.unshift(template);
+    return template as T;
+  }
+
+  // Modelos de campanha (Templates)
+  if (pathname === '/campaign-templates' && method === 'GET') {
+    return { items: CAMPAIGN_TEMPLATES } as T;
+  }
+
+  const templateMatch = pathname.match(/^\/campaign-templates\/([^/]+)$/);
+  if (templateMatch && method === 'GET') {
+    const t = CAMPAIGN_TEMPLATES.find((x) => x.id === templateMatch[1]);
+    if (!t) throw new ApiError({ type: 'not_found', title: 'Modelo não encontrado', status: 404 });
+    return t as T;
+  }
+
+  if (pathname === '/campaign-templates' && method === 'POST') {
+    if (!body?.name?.trim()) {
+      throw new ApiError({ type: 'validation', title: 'Verifique os campos', status: 422, fieldErrors: { name: 'Informe o nome do modelo' } });
+    }
+    const j = JOURNEYS.find((x) => x.id === body.journeyId || x.latestVersion?.id === body.journeyVersionId) ?? JOURNEYS[0];
+    const s = STRATEGIES.find((x) => x.id === body.strategyId || x.versions.some((v) => v.id === body.strategyVersionId)) ?? STRATEGIES[0];
+    const sv = s?.versions.find((v) => v.id === body.strategyVersionId) ?? s?.latestVersion!;
+    const now = new Date().toISOString();
+    const template: CampaignTemplate = {
+      id: nextUuid(),
+      name: body.name.trim(),
+      description: body.description ?? null,
+      purposeCode: body.purposeCode ?? 'COBRANCA',
+      journeyId: j.id,
+      journeyName: j.name,
+      journeyVersionId: j.latestVersion?.id,
+      strategyId: s.id,
+      strategyName: s.name,
+      strategyVersion: sv?.version ?? 1,
+      strategyVersionId: sv?.id,
+      startMode: body.startMode ?? 'NOW',
+      sourceCampaignId: body.sourceCampaignId ?? null,
+      sourceCampaignName: body.sourceCampaignName ?? null,
+      createdAt: now,
+      updatedAt: now,
+      usageCount: 0,
+    };
+    CAMPAIGN_TEMPLATES.unshift(template);
+    return template as T;
+  }
+
+  if (templateMatch && method === 'PUT') {
+    const t = CAMPAIGN_TEMPLATES.find((x) => x.id === templateMatch[1]);
+    if (!t) throw new ApiError({ type: 'not_found', title: 'Modelo não encontrado', status: 404 });
+    if (body.name?.trim()) t.name = body.name.trim();
+    if (body.description !== undefined) t.description = body.description;
+    if (body.purposeCode) t.purposeCode = body.purposeCode;
+    if (body.journeyId || body.journeyVersionId) {
+      const j = JOURNEYS.find((x) => x.id === body.journeyId || x.latestVersion?.id === body.journeyVersionId);
+      if (j) {
+        t.journeyId = j.id;
+        t.journeyName = j.name;
+        t.journeyVersionId = j.latestVersion?.id;
+      }
+    }
+    if (body.strategyId || body.strategyVersionId) {
+      const s = STRATEGIES.find((x) => x.id === body.strategyId || x.versions.some((v) => v.id === body.strategyVersionId));
+      if (s) {
+        const sv = s.versions.find((v) => v.id === body.strategyVersionId) ?? s.latestVersion!;
+        t.strategyId = s.id;
+        t.strategyName = s.name;
+        t.strategyVersion = sv?.version ?? 1;
+        t.strategyVersionId = sv?.id;
+      }
+    }
+    if (body.startMode) t.startMode = body.startMode;
+    t.updatedAt = new Date().toISOString();
+    return t as T;
+  }
+
+  if (templateMatch && method === 'DELETE') {
+    const idx = CAMPAIGN_TEMPLATES.findIndex((x) => x.id === templateMatch[1]);
+    if (idx === -1) throw new ApiError({ type: 'not_found', title: 'Modelo não encontrado', status: 404 });
+    CAMPAIGN_TEMPLATES.splice(idx, 1);
+    return { success: true } as T;
   }
   const campAttemptsMatch = pathname.match(/^\/campaigns\/([^/]+)\/attempts$/);
   if (campAttemptsMatch && method === 'GET') {

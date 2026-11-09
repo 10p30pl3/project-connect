@@ -43,6 +43,7 @@ import { get, post } from '../lib/api';
 import type { CampaignSummary, Journey, MailingSummary, Strategy } from '../lib/types';
 import { fmtDateTime, fmtMoney, fmtNumber, fmtPercent } from '../lib/format';
 import { calculateStatisticalSampleSize } from '../lib/statistics';
+import { DashboardChartsGrid } from '../components/DashboardCharts';
 import {
   Alert,
   Badge,
@@ -166,7 +167,7 @@ export function CentralIntelligencePage() {
       setIsSimulating(false);
       setHasExperimentRun(true);
       setActiveWave(1);
-      toast('success', `Challenger iniciado: Onda 1 disparada. Próximas ondas agendadas diariamente às ${dispatchTime}.`);
+      toast('success', `Estratégia desafiante iniciada: Onda 1 disparada. Próximas ondas agendadas diariamente às ${dispatchTime}.`);
     }, 700);
   };
 
@@ -328,7 +329,7 @@ export function CentralIntelligencePage() {
             <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-950 flex items-center gap-2.5">
               <CalendarClock className="size-4 text-emerald-700 shrink-0" />
               <span>
-                <strong>Régua de Agendamentos Ativa:</strong> O Challenger avalia a eficácia do Lembrete D-1 (1 dia antes com botões interativos de confirmação) e Lembrete D-0 (no dia 2h antes com localização e orientações), projetando redução de 52% nas faltas (No-Show).
+                <strong>Régua de Agendamentos Ativa:</strong> A estratégia desafiante avalia a eficácia do Lembrete D-1 (1 dia antes com botões interativos de confirmação) e Lembrete D-0 (no dia 2h antes com localização e orientações), projetando redução de 52% nas faltas (No-Show).
               </span>
             </div>
           )}
@@ -342,7 +343,7 @@ export function CentralIntelligencePage() {
                     : campaignPurpose === 'VENDAS'
                     ? 'Custo/Conversão Atual'
                     : 'Custo/CPC Produção'}
-                  <InfoTooltip content="Custo médio unitário observado na produção sem a otimização do Challenger." />
+                  <InfoTooltip content="Custo médio unitário observado na produção sem a otimização da estratégia desafiante." />
                 </span>
               }
               value={`R$ ${championCpcCost.toFixed(2)}`}
@@ -374,15 +375,15 @@ export function CentralIntelligencePage() {
       </Card>
 
       {/* =========================================================================
-          SEÇÃO 2: CONFIGURAR EXPERIMENTO DESAFIADOR (CHALLENGER)
+          SEÇÃO 2: CONFIGURAR ESTRATÉGIA DESAFIANTE
       ========================================================================= */}
       <Card
         title={
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-2">
               <FlaskConical className="size-4 text-brand-700" aria-hidden />
-              <span className="font-semibold text-slate-900">2. Configurar Experimento Desafiador (Challenger)</span>
-              <InfoTooltip content="O Challenger testa uma hipótese concorrente em uma amostra estatisticamente calculada antes de liberar para a base inteira." />
+              <span className="font-semibold text-slate-900">2. Configurar Estratégia Desafiante</span>
+              <InfoTooltip content="A estratégia desafiante testa uma hipótese concorrente em uma amostra estatisticamente calculada antes de liberar para a base inteira." />
             </div>
             <div className="flex items-center gap-1.5 rounded-lg bg-slate-100 p-0.5 text-xs">
               <button
@@ -414,7 +415,13 @@ export function CentralIntelligencePage() {
         }
       >
         <div className="space-y-4">
-          {/* Parâmetros do Challenger */}
+          {totalBase < 10 && (
+            <Alert tone="warn" title="Base insuficiente para Estratégia Desafiante (N < 10)">
+              A Central de Inteligência requer uma campanha com 10 ou mais contatos na carteira para cálculo de significância estatística e disparo do modelo desafiante.
+            </Alert>
+          )}
+
+          {/* Parâmetros da Estratégia Desafiante */}
           {challengerMode === 'RECOMMENDED' ? (
             <div className="space-y-4">
               <div className="rounded-xl border border-brand-200/90 bg-gradient-to-r from-brand-50/70 via-indigo-50/40 to-slate-50 p-4">
@@ -495,11 +502,11 @@ export function CentralIntelligencePage() {
                 <Button
                   variant="primary"
                   loading={isSimulating}
-                  disabled={!selectedCampaignId}
+                  disabled={!selectedCampaignId || totalBase < 10}
                   onClick={handleStartExperiment}
                   icon={<Play className="size-4" />}
                 >
-                  {hasExperimentRun ? 'Recalcular e Reexecutar Challenger' : 'Disparar Challenger Recomendado ⚡'}
+                  {hasExperimentRun ? 'Recalcular e Reexecutar Desafiante' : 'Disparar Desafiante Recomendada ⚡'}
                 </Button>
               </div>
             </div>
@@ -636,11 +643,11 @@ export function CentralIntelligencePage() {
                 <Button
                   variant="primary"
                   loading={isSimulating}
-                  disabled={!selectedCampaignId}
+                  disabled={!selectedCampaignId || totalBase < 10}
                   onClick={handleStartExperiment}
                   icon={<Play className="size-4" />}
                 >
-                  Disparar Challenger Personalizado ⚡
+                  Disparar Desafiante Personalizada ⚡
                 </Button>
               </div>
             </div>
@@ -649,7 +656,7 @@ export function CentralIntelligencePage() {
       </Card>
 
       {/* =========================================================================
-          SEÇÃO 3: PLACAR DE CONFRONTO EM TEMPO REAL (CHAMPION VS. CHALLENGER)
+          SEÇÃO 3: PLACAR DE CONFRONTO EM TEMPO REAL (PRODUÇÃO VS. DESAFIANTE)
       ========================================================================= */}
       <Card
         title={
@@ -670,7 +677,7 @@ export function CentralIntelligencePage() {
         {!hasExperimentRun ? (
           <div className="py-8 text-center text-xs text-slate-500">
             <FlaskConical className="mx-auto mb-2 size-8 text-slate-400" />
-            Nenhum experimento disparado ainda. Clique em <strong>Disparar Challenger</strong> acima para confrontar os parâmetros com a produção.
+            Nenhum experimento disparado ainda. Clique em <strong>Disparar Desafiante</strong> acima para confrontar os parâmetros com a produção.
           </div>
         ) : (
           <div className="space-y-4">
@@ -755,7 +762,7 @@ export function CentralIntelligencePage() {
                     <th className="py-2.5 px-3.5 font-semibold">Dimensão</th>
                     <th className="py-2.5 px-3.5 font-semibold">Produção (Champion Vigente)</th>
                     <th className="py-2.5 px-3.5 font-semibold text-brand-900 bg-brand-50/40">
-                      Experimento (Challenger)
+                      Estratégia Desafiante
                     </th>
                     <th className="py-2.5 px-3.5 font-semibold text-emerald-800 bg-emerald-50/30">
                       Ganho Comprovado (*Expected Lift*)
@@ -843,7 +850,7 @@ export function CentralIntelligencePage() {
                   <div className="flex items-center gap-1.5">
                     <CheckCircle2 className="size-4 text-emerald-600" />
                     <span className="text-xs font-bold uppercase tracking-wider text-emerald-950">
-                      Veredito Estatístico: Challenger Venceu com {sampleCalc.confidence}% de Confiança
+                      Veredito Estatístico: Estratégia Desafiante Venceu com {sampleCalc.confidence}% de Confiança
                     </span>
                     <InfoTooltip content={`Teste de hipóteses confirmou superioridade com Z=1,96 e margem de erro de ±${sampleCalc.marginOfError}%.`} />
                   </div>
@@ -880,6 +887,20 @@ export function CentralIntelligencePage() {
           </div>
         )}
       </Card>
+
+      {/* =========================================================================
+          SEÇÃO: GRÁFICOS DE EFICIÊNCIA DE CPC & DESEMPENHO MULTICANAL
+      ========================================================================= */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 px-1">
+          <TrendingUp className="size-4 text-brand-700" />
+          <span className="text-sm font-bold text-slate-800">
+            Eficiência Real de CPC: Modelo Desafiante vs. Força Bruta
+          </span>
+          <InfoTooltip content="Comparação visual entre o custo por contato confirmado no modelo otimizado e a abordagem tradicional de repetição indiscriminada." />
+        </div>
+        <DashboardChartsGrid />
+      </div>
 
       {/* =========================================================================
           SEÇÃO 4: DECISÕES NA AMOSTRA & MATRIZ DOS 8 BLOCOS (TIC 2025)

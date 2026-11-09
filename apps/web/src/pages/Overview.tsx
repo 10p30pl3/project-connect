@@ -7,7 +7,6 @@ import type { AttemptRow, CampaignSummary, Eligibility, Overview, OverviewQueueI
 import { fmtDateTime, fmtNumber } from '../lib/format';
 import { Alert, Badge, btnClass, Card, Empty, ErrorState, InfoTooltip, Loading, PageHeader, Stat, TableWrap } from '../components/ui';
 import { AttemptsTable } from '../components/AttemptsTable';
-import { DashboardChartsGrid } from '../components/DashboardCharts';
 import { useAuth } from '../lib/auth';
 
 export function OverviewPage() {
@@ -113,32 +112,23 @@ export function OverviewPage() {
                   />
                 </div>
 
-                {/* Gráficos de Inteligência de CPC ou Banner de Base Limpa */}
-                {!hasData ? (
-                  <Card className="border-dashed border-slate-300 bg-slate-50/70 py-10 text-center">
-                    <div className="mx-auto max-w-md space-y-3">
-                      <div className="mx-auto grid size-12 place-items-center rounded-xl bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-200">
-                        <Sparkles className="size-6 text-brand-600" />
-                      </div>
-                      <div className="flex items-center justify-center gap-1.5">
-                        <h3 className="text-base font-semibold text-slate-900">Base limpa pronta para operação</h3>
-                        <InfoTooltip content="Importe seu primeiro mailing CSV ou crie sua primeira campanha inteligente com auxílio do assistente de IA." />
-                      </div>
-                      <p className="text-sm text-slate-600">
+                {!hasData && (
+                  <Card className="border-dashed border-slate-300 bg-slate-50/70 py-8 text-center">
+                    <div className="mx-auto max-w-md space-y-2.5">
+                      <h3 className="text-sm font-semibold text-slate-900">Base limpa pronta para operação</h3>
+                      <p className="text-xs text-slate-600">
                         Nenhum contato ou campanha cadastrado ainda.
                       </p>
-                      <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                        <Link to="/mailings/importar" className={btnClass('primary')}>
+                      <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                        <Link to="/mailings/importar" className={btnClass('primary', 'sm')}>
                           Importar primeiro mailing
                         </Link>
-                        <Link to="/campanhas/nova" className={btnClass('secondary')}>
-                          Criar campanha com IA
+                        <Link to="/campanhas/nova" className={btnClass('secondary', 'sm')}>
+                          Nova campanha
                         </Link>
                       </div>
                     </div>
                   </Card>
-                ) : (
-                  <DashboardChartsGrid />
                 )}
               </>
             );

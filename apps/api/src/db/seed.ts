@@ -11,6 +11,8 @@ import { runIntelligencePipeline } from '../intelligence/cpc-plan-engine.js';
 const RULES: StrategyConfig['tabulationRules'] = {
   CONVERSION: 'FINISH_SUCCESS',
   CPC_NO_DEAL: 'RETRY',
+  CALLBACK_SCHEDULED: 'SCHEDULE_CALLBACK',
+  VOICEMAIL: 'RETRY',
   NO_ANSWER: 'RETRY',
   BUSY: 'RETRY',
   WRONG_PERSON: 'NEXT_DESTINATION',
@@ -21,8 +23,44 @@ const RULES: StrategyConfig['tabulationRules'] = {
 };
 
 export const STRATEGIES: { name: string; protected: boolean; config: StrategyConfig }[] = [
+  // --- Estratégias Simples (para começar rápido) ---
   {
-    name: 'Padrão cobrança',
+    name: 'Simples · Disparo Único',
+    protected: false,
+    config: {
+      calendar: { days: [1, 2, 3, 4, 5], start: '08:00', end: '18:00', timezone: 'America/Sao_Paulo' },
+      limits: { total: 1, daily: 1, scope: 'WORKSPACE', incompleteHistory: 'USE_KNOWN' },
+      retry: { intervalMinutes: 60, maxPerDestination: 1 },
+      distribution: { batchSize: 20, maxPending: 50, leaseSeconds: 60 },
+      tabulationRules: RULES,
+    },
+  },
+  {
+    name: 'Simples · 24x7 (Disparo Imediato)',
+    protected: false,
+    config: {
+      calendar: { days: [0, 1, 2, 3, 4, 5, 6], start: '00:00', end: '23:59', timezone: 'America/Sao_Paulo' },
+      limits: { total: 6, daily: 4, scope: 'WORKSPACE', incompleteHistory: 'USE_KNOWN' },
+      retry: { intervalMinutes: 1, maxPerDestination: 2 },
+      distribution: { batchSize: 10, maxPending: 20, leaseSeconds: 60 },
+      tabulationRules: RULES,
+    },
+  },
+  {
+    name: 'Simples · Comercial Leve',
+    protected: false,
+    config: {
+      calendar: { days: [1, 2, 3, 4, 5], start: '09:00', end: '18:00', timezone: 'America/Sao_Paulo' },
+      limits: { total: 3, daily: 1, scope: 'WORKSPACE', incompleteHistory: 'USE_KNOWN' },
+      retry: { intervalMinutes: 60, maxPerDestination: 2 },
+      distribution: { batchSize: 20, maxPending: 50, leaseSeconds: 60 },
+      tabulationRules: RULES,
+    },
+  },
+
+  // --- Estratégias Completas (avançadas e parametrizáveis) ---
+  {
+    name: 'Padrão Cobrança',
     protected: true,
     config: {
       calendar: { days: [1, 2, 3, 4, 5], start: '08:00', end: '20:00', timezone: 'America/Sao_Paulo' },
@@ -33,7 +71,7 @@ export const STRATEGIES: { name: string; protected: boolean; config: StrategyCon
     },
   },
   {
-    name: 'Intensiva',
+    name: 'Intensiva (Recuperação)',
     protected: true,
     config: {
       calendar: { days: [1, 2, 3, 4, 5, 6], start: '08:00', end: '21:00', timezone: 'America/Sao_Paulo' },
@@ -44,13 +82,13 @@ export const STRATEGIES: { name: string; protected: boolean; config: StrategyCon
     },
   },
   {
-    name: 'Demonstração 24x7',
+    name: 'Confirmação & Agendamentos',
     protected: false,
     config: {
-      calendar: { days: [0, 1, 2, 3, 4, 5, 6], start: '00:00', end: '23:59', timezone: 'America/Sao_Paulo' },
-      limits: { total: 6, daily: 4, scope: 'WORKSPACE', incompleteHistory: 'USE_KNOWN' },
-      retry: { intervalMinutes: 1, maxPerDestination: 2 },
-      distribution: { batchSize: 10, maxPending: 20, leaseSeconds: 60 },
+      calendar: { days: [1, 2, 3, 4, 5, 6], start: '08:00', end: '20:00', timezone: 'America/Sao_Paulo' },
+      limits: { total: 4, daily: 2, scope: 'WORKSPACE', incompleteHistory: 'USE_KNOWN' },
+      retry: { intervalMinutes: 120, maxPerDestination: 2 },
+      distribution: { batchSize: 30, maxPending: 60, leaseSeconds: 60 },
       tabulationRules: RULES,
     },
   },
@@ -61,6 +99,8 @@ export const STRATEGIES: { name: string; protected: boolean; config: StrategyCon
 const TABULATIONS = [
   { code: 'CONVERSION', name: 'Acordo fechado', cpc: true, conv: true },
   { code: 'CPC_NO_DEAL', name: 'Titular sem acordo', cpc: true },
+  { code: 'CALLBACK_SCHEDULED', name: 'Reagendamento solicitado', cpc: true, channels: ['VOICE'] },
+  { code: 'VOICEMAIL', name: 'Caixa postal', channels: ['VOICE'] },
   { code: 'NO_ANSWER', name: 'Não atendeu' },
   { code: 'BUSY', name: 'Ocupado' },
   { code: 'WRONG_PERSON', name: 'Terceiro' },
@@ -153,13 +193,13 @@ export async function seed(opts: { withSampleMailing?: boolean } = {}) {
         [
           wsId,
           JSON.stringify({
-            voiceAppBaseUrl: 'http://127.0.0.1:5050',
+            voiceAppBaseUrl: 'http://192.168.15.36:8090',
             voiceAppToken: 'voll-token-prod',
             trunkName: 'Direct Call (SIP Trunk)',
-            sipServer: 'sip.directcall.com.br',
+            sipServer: 'sip1.directdial.com.br',
             sipPort: 5060,
             sipTransport: 'UDP',
-            defaultCallerId: '+551140030000',
+            defaultCallerId: '+5511989785888',
           }),
           randomBytes(24).toString('hex'),
         ],
@@ -169,7 +209,10 @@ export async function seed(opts: { withSampleMailing?: boolean } = {}) {
     const whatsapp = await conn('WhatsApp simulado', 'WHATSAPP', 0.05, {
       READ_NO_REPLY: 4, REPLIED: 2, CONVERSION: 1, OPT_OUT: 0.3, RESULT_UNKNOWN: 0.3,
     });
-    await conn('SMS simulado', 'SMS', null, { READ_NO_REPLY: 5, REPLIED: 1, OPT_OUT: 0.2 });
+    const sms = await conn('SMS simulado', 'SMS', null, { READ_NO_REPLY: 5, REPLIED: 1, OPT_OUT: 0.2 });
+    const email = await conn('E-mail transacional', 'EMAIL', 0.01, {
+      READ_NO_REPLY: 4, REPLIED: 1.5, CONVERSION: 0.8, OPT_OUT: 0.1,
+    });
 
     const journey = async (name: string, steps: unknown[]) => {
       const ex = await one(c, `SELECT id FROM journeys WHERE workspace_id=$1 AND name=$2`, [wsId, name]);
@@ -177,11 +220,28 @@ export async function seed(opts: { withSampleMailing?: boolean } = {}) {
       const j = await one(c, `INSERT INTO journeys (workspace_id, name) VALUES ($1,$2) RETURNING id`, [wsId, name]);
       await c.query(`INSERT INTO journey_versions (journey_id, version, steps) VALUES ($1,1,$2)`, [j!.id, JSON.stringify(steps)]);
     };
-    await journey('Discador', [{ channelType: 'VOICE', connectionId: voice, feedbackTimeoutMinutes: 2 }]);
+    // Jornadas Simples
+    await journey('Voz (Discador Padrão)', [{ channelType: 'VOICE', connectionId: voice, feedbackTimeoutMinutes: 2 }]);
     await journey('Voz IA · Tronco Direct Call', [{ channelType: 'VOICE', connectionId: directCallVoice, feedbackTimeoutMinutes: 3 }]);
-    await journey('WhatsApp → Discador', [
+    await journey('WhatsApp Simples', [{ channelType: 'WHATSAPP', connectionId: whatsapp, feedbackTimeoutMinutes: 5 }]);
+    await journey('E-mail Simples', [{ channelType: 'EMAIL', connectionId: email, feedbackTimeoutMinutes: 15 }]);
+    await journey('SMS Simples', [{ channelType: 'SMS', connectionId: sms, feedbackTimeoutMinutes: 5 }]);
+
+    // Jornadas Completas
+    await journey('WhatsApp → Voz', [
       { channelType: 'WHATSAPP', connectionId: whatsapp, feedbackTimeoutMinutes: 5 },
       { channelType: 'VOICE', connectionId: voice, feedbackTimeoutMinutes: 2 },
+    ]);
+    await journey('E-mail → WhatsApp → Voz', [
+      { channelType: 'EMAIL', connectionId: email, feedbackTimeoutMinutes: 15 },
+      { channelType: 'WHATSAPP', connectionId: whatsapp, feedbackTimeoutMinutes: 5 },
+      { channelType: 'VOICE', connectionId: voice, feedbackTimeoutMinutes: 2 },
+    ]);
+    await journey('Multicanal Completo (360°)', [
+      { channelType: 'WHATSAPP', connectionId: whatsapp, feedbackTimeoutMinutes: 5 },
+      { channelType: 'VOICE', connectionId: voice, feedbackTimeoutMinutes: 2 },
+      { channelType: 'SMS', connectionId: sms, feedbackTimeoutMinutes: 5 },
+      { channelType: 'EMAIL', connectionId: email, feedbackTimeoutMinutes: 15 },
     ]);
 
     for (const s of STRATEGIES) {
@@ -191,6 +251,121 @@ export async function seed(opts: { withSampleMailing?: boolean } = {}) {
       await c.query(`INSERT INTO strategy_versions (strategy_id, version, config, published_by) VALUES ($1,1,$2,$3)`, [
         st!.id, JSON.stringify(s.config), adminId,
       ]);
+    }
+
+    const TEMPLATES = [
+      {
+        name: 'Cobrança Preventiva (Lembrete Pré-Vencimento D-3/D-1)',
+        description: 'Lembrete amigável enviado antes do vencimento com link do boleto e chave PIX copia-e-cola. Evita entrada em inadimplência e preserva o relacionamento com o cliente.',
+        purposeCode: 'COBRANCA',
+        journeyName: 'WhatsApp Simples',
+        strategyName: 'Simples · Disparo Único',
+        usageCount: 34,
+      },
+      {
+        name: 'Cobrança Faixa 1 (1 a 30 dias) — WhatsApp → Voz',
+        description: 'Régua digital-first para atrasos recentes. Primeiro toque via WhatsApp oficial com cálculo de encargos; caso não haja confirmação em 120 minutos, transborda automaticamente para ligação ativa do discador.',
+        purposeCode: 'COBRANCA',
+        journeyName: 'WhatsApp → Voz',
+        strategyName: 'Padrão Cobrança',
+        usageCount: 48,
+      },
+      {
+        name: 'Recuperação Crítica (30 a 90 dias) — Voz IA Direct Call',
+        description: 'Acionamento de alta cadência para carteiras vencidas há mais de 30 dias. Utiliza agente de voz com inteligência artificial para negociar quitação à vista com desconto ou parcelamento imediato com chave PIX.',
+        purposeCode: 'COBRANCA',
+        journeyName: 'Voz IA · Tronco Direct Call',
+        strategyName: 'Intensiva (Recuperação)',
+        usageCount: 27,
+      },
+      {
+        name: 'Acordo Rompido — Notificação Imediata 24x7',
+        description: 'Acionamento de emergência multicanal ininterrupto (WhatsApp, Voz, SMS e E-mail) disparado no dia seguinte ao não pagamento de parcela de acordo renegociado.',
+        purposeCode: 'COBRANCA',
+        journeyName: 'Multicanal Completo (360°)',
+        strategyName: 'Simples · 24x7 (Disparo Imediato)',
+        usageCount: 19,
+      },
+      {
+        name: 'Venda Ativa & Upgrade — WhatsApp Interativo + Voz',
+        description: 'Campanha de up-sell e cross-sell para base qualificada. Envia catálogo de novas ofertas de fibra/celular via WhatsApp interativo nos horários de maior propensão e aciona chamada consultiva caso haja interesse.',
+        purposeCode: 'VENDAS',
+        journeyName: 'WhatsApp → Voz',
+        strategyName: 'Simples · Comercial Leve',
+        usageCount: 31,
+      },
+      {
+        name: 'Reativação de Inativos (Winback 90d+)',
+        description: 'Campanha econômica em 3 toques para resgate de ex-assinantes. Inicia com proposta exclusiva por e-mail, avança para WhatsApp com cupom promocional e realiza ligação final de consultor de retenção.',
+        purposeCode: 'VENDAS',
+        journeyName: 'E-mail → WhatsApp → Voz',
+        strategyName: 'Padrão Cobrança',
+        usageCount: 14,
+      },
+      {
+        name: 'Confirmação de Agendamentos (Lembrete D-1 e D-0)',
+        description: 'Redução de no-show em consultas, exames e ordens de serviço. Lembrete interativo via WhatsApp 24h antes com botões "Confirmar Presença" ou "Reagendar Horário", atualizando a agenda automaticamente.',
+        purposeCode: 'AGENDAMENTOS',
+        journeyName: 'WhatsApp Simples',
+        strategyName: 'Confirmação & Agendamentos',
+        usageCount: 56,
+      },
+      {
+        name: 'Janela de Chegada Técnica — SMS em Trânsito',
+        description: 'Disparo de alta velocidade por SMS avisando que o técnico iniciou o deslocamento até o endereço cadastrado, com previsão de chegada em até 30 minutos e código de identificação do colaborador.',
+        purposeCode: 'CONFIRMACAO_SERVICO',
+        journeyName: 'SMS Simples',
+        strategyName: 'Simples · Disparo Único',
+        usageCount: 42,
+      },
+      {
+        name: 'Pesquisa NPS & CSAT — Pós-Atendimento SAC',
+        description: 'Avaliação rápida de atendimento disparada 15 minutos após a conclusão de chamados. Coleta nota de 0 a 10 no WhatsApp e registra feedback aberto sobre a resolução do operador.',
+        purposeCode: 'PESQUISA_RELACIONAMENTO',
+        journeyName: 'WhatsApp Simples',
+        strategyName: 'Simples · Disparo Único',
+        usageCount: 65,
+      },
+      {
+        name: 'Alerta Crítico de Indisponibilidade & Manutenção',
+        description: 'Disparo massivo imediato nos 4 canais para comunicar falhas de rede, manutenção preventiva programada ou avisos de segurança ininterruptos para clientes da região afetada.',
+        purposeCode: 'ATENDIMENTO_SUPORTE',
+        journeyName: 'Multicanal Completo (360°)',
+        strategyName: 'Simples · 24x7 (Disparo Imediato)',
+        usageCount: 8,
+      },
+    ];
+
+    for (const tmpl of TEMPLATES) {
+      const ex = await one(c, `SELECT id FROM campaign_templates WHERE workspace_id=$1 AND name=$2`, [wsId, tmpl.name]);
+      if (ex) continue;
+      const jRow = await one<{ id: string; vid: string }>(c, `
+        SELECT j.id, (SELECT jv.id FROM journey_versions jv WHERE jv.journey_id = j.id ORDER BY jv.version DESC LIMIT 1) as vid
+        FROM journeys j WHERE j.workspace_id=$1 AND j.name=$2
+      `, [wsId, tmpl.journeyName]);
+      const sRow = await one<{ id: string; vid: string }>(c, `
+        SELECT s.id, (SELECT sv.id FROM strategy_versions sv WHERE sv.strategy_id = s.id ORDER BY sv.version DESC LIMIT 1) as vid
+        FROM strategies s WHERE s.workspace_id=$1 AND s.name=$2
+      `, [wsId, tmpl.strategyName]);
+
+      await c.query(
+        `INSERT INTO campaign_templates (
+          workspace_id, name, description, purpose_code,
+          journey_id, journey_version_id, strategy_id, strategy_version_id,
+          start_mode, usage_count
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'NOW', $9)`,
+        [
+          wsId,
+          tmpl.name,
+          tmpl.description,
+          tmpl.purposeCode,
+          jRow?.id ?? null,
+          jRow?.vid ?? null,
+          sRow?.id ?? null,
+          sRow?.vid ?? null,
+          tmpl.usageCount,
+        ],
+      );
     }
 
     if (withSample) {

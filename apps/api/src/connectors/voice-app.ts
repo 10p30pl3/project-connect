@@ -59,8 +59,18 @@ export const voiceAppAdapter: ConnectorAdapter = {
       }
     }
 
-    if (!baseUrl) baseUrl = 'http://127.0.0.1:5050';
-    if (!callerId) callerId = '+551140030000';
+    let webhookSecret = (connection as any).webhook_secret;
+    if (!webhookSecret) {
+      try {
+        const cRow = await one<{ webhook_secret: string }>(db, `SELECT webhook_secret FROM connections WHERE id = $1`, [connection.id]);
+        webhookSecret = cRow?.webhook_secret;
+      } catch {
+        /* fallback */
+      }
+    }
+
+    if (!baseUrl) baseUrl = 'http://192.168.15.36:8090';
+    if (!callerId) callerId = '+5511989785888';
 
     const payload = {
       attemptId: attempt.id,
@@ -68,7 +78,9 @@ export const voiceAppAdapter: ConnectorAdapter = {
       connectionId: connection.id,
       workspaceId: row?.workspace_id,
       to: attempt.destination_address,
+      from: callerId,
       callerId,
+      tenantId: cfg.tenantId || 'default',
       contact: {
         externalId: row?.contact_ext_id ?? attempt.id,
         name: row?.contact_name ?? 'Cliente',
@@ -78,15 +90,16 @@ export const voiceAppAdapter: ConnectorAdapter = {
         id: row?.campaign_id,
       },
       limits: {
-        maxDurationSec: 300,
+        maxDurationSec: cfg.maxDurationSec || 300,
       },
       callback: {
-        url: `${config.publicUrl}/connectors/${connection.id}/events`,
+        url: `${config.publicUrl}/api/connectors/${connection.id}/events`,
+        secret: webhookSecret || '',
       },
     };
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000);
+    const timeout = setTimeout(() => controller.abort(), 5000);
 
     try {
       const res = await fetch(`${baseUrl}/v1/calls`, {
@@ -107,8 +120,8 @@ export const voiceAppAdapter: ConnectorAdapter = {
 
       const body: any = await res.json().catch(() => ({}));
 
-      if (res.status === 200 || res.status === 202) {
-        const providerAttemptId = body.providerAttemptId || body.id || `va-${attempt.id}`;
+      if (res.status === 200 || res.status === 201 || res.status === 202) {
+        const providerAttemptId = body.providerAttemptId || body.callId || body.id || `va-${attempt.id}`;
         return { status: 'ACCEPTED', providerAttemptId };
       }
 
@@ -140,7 +153,7 @@ export const voiceAppAdapter: ConnectorAdapter = {
 
   async queryStatus(attemptId: string, connection: any): Promise<{ status: string; result?: any }> {
     const cfg = connection.config ?? {};
-    const baseUrl = (cfg.voiceAppBaseUrl || cfg.endpointUrl || 'http://127.0.0.1:5050').replace(/\/+$/, '');
+    const baseUrl = (cfg.voiceAppBaseUrl || cfg.endpointUrl || 'http://192.168.15.36:8090').replace(/\/+$/, '');
     const token = cfg.voiceAppToken || '';
 
     try {
@@ -159,7 +172,7 @@ export const voiceAppAdapter: ConnectorAdapter = {
 
   async cancel(attemptId: string, connection: any): Promise<boolean> {
     const cfg = connection.config ?? {};
-    const baseUrl = (cfg.voiceAppBaseUrl || cfg.endpointUrl || 'http://127.0.0.1:5050').replace(/\/+$/, '');
+    const baseUrl = (cfg.voiceAppBaseUrl || cfg.endpointUrl || 'http://192.168.15.36:8090').replace(/\/+$/, '');
     const token = cfg.voiceAppToken || '';
 
     try {

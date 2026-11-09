@@ -222,7 +222,7 @@ export async function catalogRoutes(app: FastifyInstance) {
 
       if (channel === 'voice') {
         const voiceCfg = cfg.voice;
-        const targetUrl = voiceCfg.voiceAppBaseUrl || 'http://127.0.0.1:5050';
+        const targetUrl = voiceCfg.voiceAppBaseUrl || 'http://192.168.15.36:8090';
         const t0 = Date.now();
         try {
           const controller = new AbortController();

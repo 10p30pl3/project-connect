@@ -755,7 +755,7 @@ function TechnicalEndpointsTab({ canEdit }: { canEdit: boolean }) {
               <Field
                 label="URL da API do Voice-App"
                 required
-                tooltip="Endpoint HTTP onde o servidor Fastify/Node do discador de IA escuta ordens de originação de chamadas (ex: http://127.0.0.1:5050)."
+                tooltip="Endpoint HTTP onde o servidor Fastify/Node do discador de IA escuta ordens de originação de chamadas (ex: http://192.168.15.36:8090)."
               >
                 {(ids) => (
                   <Input
@@ -1196,8 +1196,8 @@ function NewConnectionDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   const [name, setName] = useState('Discador IA · Tronco Direct Call');
   const [channelType, setChannelType] = useState<ChannelType>('VOICE');
   const [provider, setProvider] = useState('VOICE_APP');
-  const [endpointUrl, setEndpointUrl] = useState('http://127.0.0.1:5050/v1/calls');
-  const [callerId, setCallerId] = useState('+551140030000');
+  const [endpointUrl, setEndpointUrl] = useState('http://192.168.15.36:8090/v1/calls');
+  const [callerId, setCallerId] = useState('+5511989785888');
   const [authToken, setAuthToken] = useState('');
   const [tariff, setTariff] = useState('0.08');
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -1212,8 +1212,8 @@ function NewConnectionDialog({ open, onOpenChange }: { open: boolean; onOpenChan
     if (newProv === 'VOICE_APP') {
       setName('Discador IA · Tronco Direct Call');
       setChannelType('VOICE');
-      setEndpointUrl('http://127.0.0.1:5050/v1/calls');
-      setCallerId('+551140030000');
+      setEndpointUrl('http://192.168.15.36:8090/v1/calls');
+      setCallerId('+5511989785888');
       setTariff('0.08');
     } else if (newProv === 'API_TRIGGER') {
       setName('API de Gatilhos & Disparos Voll Plan');
@@ -1352,13 +1352,13 @@ function NewConnectionDialog({ open, onOpenChange }: { open: boolean; onOpenChan
         <fieldset className="space-y-3.5 rounded-xl border border-slate-200/90 bg-white p-4">
           <legend className="px-1.5 text-xs font-semibold uppercase tracking-wider text-slate-600">Conexão de API &amp; Gateway Técnico</legend>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Field label="URL do Endpoint / API Base" hint="Ex: http://127.0.0.1:5050/v1/calls ou https://api.voll.solutions/v1/trigger">
+            <Field label="URL do Endpoint / API Base" hint="Ex: http://192.168.15.36:8090/v1/calls ou https://api.voll.solutions/v1/trigger">
               {(p) => (
                 <Input
                   id={p.id}
                   value={endpointUrl}
                   onChange={(e) => setEndpointUrl(e.target.value)}
-                  placeholder="http://127.0.0.1:5050/v1/calls"
+                  placeholder="http://192.168.15.36:8090/v1/calls"
                 />
               )}
             </Field>
@@ -1568,13 +1568,13 @@ function EditConnection({ c, onClose }: { c: Connection; onClose: () => void }) 
         <fieldset className="space-y-3.5 rounded-xl border border-slate-200/90 bg-white p-4">
           <legend className="px-1.5 text-xs font-semibold uppercase tracking-wider text-slate-600">Conexão de API &amp; Gateway Técnico</legend>
           <div className="grid items-start gap-4 sm:grid-cols-2">
-            <Field label="URL do Endpoint / API Base" hint="Ex: http://127.0.0.1:5050/v1/calls ou https://api.voll.solutions/v1/trigger">
+            <Field label="URL do Endpoint / API Base" hint="Ex: http://192.168.15.36:8090/v1/calls ou https://api.voll.solutions/v1/trigger">
               {(p) => (
                 <Input
                   id={p.id}
                   value={endpointUrl}
                   onChange={(e) => setEndpointUrl(e.target.value)}
-                  placeholder="http://127.0.0.1:5050/v1/calls"
+                  placeholder="http://192.168.15.36:8090/v1/calls"
                 />
               )}
             </Field>

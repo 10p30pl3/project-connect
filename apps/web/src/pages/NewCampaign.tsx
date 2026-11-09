@@ -1,82 +1,56 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Link, useBlocker, useNavigate } from 'react-router-dom';
+import { Link, useBlocker, useNavigate, useSearchParams } from 'react-router-dom';
 import clsx from 'clsx';
 import {
   ArrowLeft,
   ArrowRight,
-  BrainCircuit,
-  Building2,
-  CalendarCheck,
-  CalendarClock,
+  Bookmark,
   Check,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
-  CloudOff,
-  Coins,
   Database,
-  FileSpreadsheet,
-  FileText,
+  ExternalLink,
   Filter,
-  FlaskConical,
-  KeyRound,
+  Layers,
+  ListFilter,
   Loader2,
-  Paperclip,
+  Megaphone,
   Pencil,
   Plus,
-  RefreshCw,
   Rocket,
   Save,
-  Send,
-  Settings2,
-  ShieldCheck,
-  ShoppingBag,
-  Shuffle,
   SlidersHorizontal,
-  Sparkles,
-  TrendingDown,
-  UploadCloud,
-  User,
   Users,
 } from 'lucide-react';
 import {
-  AUDIENCE_SEGMENTS,
-  AUDIENCE_SEGMENT_LABEL,
-  AUDIENCE_SEGMENT_METADATA,
-  CETIC_AGE_BRACKET_LABEL,
   CHANNEL_LABEL,
-  OPERATING_MODE_LABEL,
-  OPERATION_PURPOSE_LABEL,
-  OPERATION_PURPOSES,
-  PRIMARY_OPERATION_PURPOSES,
-  PURPOSE_METADATA,
-  type AiCampaignChatResponse,
-  type AiCampaignExtractedState,
-  type AudienceSegment,
   type CampaignDraft,
   type ChannelType,
-  type OperatingMode,
   type OperationPurpose,
 } from '@voll/shared';
-import { parseCampaignPrompt, type ParsedCampaignResult } from '../lib/campaign-prompt-parser';
-import { ApiError, del, errorMessage, get, newIdempotencyKey, post, put } from '../lib/api';
 import type {
   Campaign,
-  DraftEnvelope,
+  CampaignTemplate,
   Journey,
-  ListPublishResult,
   ListSummary,
   MailingSummary,
   Preflight,
   Strategy,
   Tabulation,
 } from '../lib/types';
-import { fmtDateTime, fmtMoney, fmtNumber, nowSaoPauloLocal, saoPauloLocalToIso } from '../lib/format';
+import {
+  fmtDateTime,
+  fmtMoney,
+  fmtNumber,
+  nowSaoPauloLocal,
+  saoPauloLocalToIso,
+} from '../lib/format';
+import { ApiError, get, post, put, del, errorMessage } from '../lib/api';
 import {
   Alert,
   Badge,
-  btnClass,
   Button,
   Card,
   Empty,
@@ -84,28 +58,28 @@ import {
   InfoTooltip,
   Input,
   Loading,
-  Modal,
+  PageHeader,
   RadioCard,
   Select,
-  Stat,
-  TableWrap,
   Textarea,
   useToast,
 } from '../components/ui';
 import { ImportFlow } from '../components/ImportFlow';
 import { ListEditor, type ListEditorState } from '../components/ListEditor';
-import { JourneySteps, StrategySummary } from '../components/Summaries';
+import { JourneySteps } from '../components/Summaries';
+import { SaveAsTemplateModal } from '../components/SaveAsTemplateModal';
 import { useAuth } from '../lib/auth';
 
 type Step = CampaignDraft['step'];
-const STEPS: { key: Step; label: string }[] = [
-  { key: 'MAILING', label: 'Mailing' },
-  { key: 'AUDIENCE', label: 'Público' },
-  { key: 'ACTIVATION', label: 'Inteligência' },
-  { key: 'CAMPAIGN', label: 'Revisar e finalizar' },
+const STEPS: { id: Step; label: string; num: number }[] = [
+  { id: 'MAILING', label: 'Mailing', num: 1 },
+  { id: 'AUDIENCE', label: 'Público (filtro)', num: 2 },
+  { id: 'ACTIVATION', label: 'Acionamento', num: 3 },
+  { id: 'CAMPAIGN', label: 'Revisar e finalizar', num: 4 },
 ];
 
-type MailingSource = 'IMPORT' | 'MAILING' | 'LIST';
+type MailingSource = 'IMPORT' | 'MAILING';
+
 type Extra = {
   mailingSource?: MailingSource;
   mailingName?: string;
@@ -116,33 +90,44 @@ type Extra = {
   listName?: string;
   listVersion?: number;
   scheduleLocal?: string;
-  intelligenceMode?: 'INTELLIGENT' | 'MANUAL';
-  operatingMode?: OperatingMode;
+  templateApplied?: string;
+  templateName?: string;
+  templateJourney?: string;
+  templateStrategy?: string;
   purposeCode?: OperationPurpose;
-  purposePrompt?: string;
-  maxAcceptableCpcBrl?: number;
-  labSamplePct?: number;
-  intelligenceRunId?: string;
-  audienceSegment?: AudienceSegment;
-  creationExperience?: 'AI_PROMPT' | 'STRUCTURED';
 };
 
 const EMPTY: CampaignDraft = { step: 'MAILING', extra: {} };
+
+type DraftEnvelope = { draft: CampaignDraft; revision: number; savedAt: string };
+type UpdateFn = (patch: Partial<CampaignDraft>, extraPatch?: Partial<Extra>) => void;
 
 export function NewCampaignPage() {
   const { can } = useAuth();
   const nav = useNavigate();
   const qc = useQueryClient();
   const toast = useToast();
+  const [sp] = useSearchParams();
+  const modeloId = sp.get('modeloId');
 
-  const draftQ = useQuery({ queryKey: ['campaign-draft'], queryFn: () => get<DraftEnvelope>('/campaign-draft'), staleTime: Infinity, gcTime: 0 });
+  const draftQ = useQuery({
+    queryKey: ['campaign-draft'],
+    queryFn: () => get<DraftEnvelope>('/campaign-draft'),
+    staleTime: Infinity,
+    gcTime: 0,
+  });
+
+  const templateQ = useQuery({
+    queryKey: ['campaign-template', modeloId],
+    queryFn: () => get<CampaignTemplate>(`/campaign-templates/${modeloId}`),
+    enabled: !!modeloId,
+  });
+  const appliedTemplateRef = useRef<string | null>(null);
+
   const [draft, setDraft] = useState<CampaignDraft | null>(null);
   const [revision, setRevision] = useState(0);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'error' | 'conflict'>('idle');
-  const [resumed, setResumed] = useState(false);
-  const [finished, setFinished] = useState(false);
-  const [isManualWizard, setIsManualWizard] = useState(false);
   const dirtyRef = useRef(false);
   const revRef = useRef(0);
   revRef.current = revision;
@@ -150,3160 +135,423 @@ export function NewCampaignPage() {
   useEffect(() => {
     if (draftQ.data !== undefined && draft === null) {
       if (draftQ.data) {
-        setDraft(draftQ.data.data);
+        setDraft(draftQ.data.draft);
         setRevision(draftQ.data.revision);
-        setSavedAt(new Date(draftQ.data.updatedAt));
-        setResumed(true);
-        if (draftQ.data.data.extra?.intelligenceMode === 'MANUAL') {
-          setIsManualWizard(true);
+        if (draftQ.data.savedAt) {
+          const d = new Date(draftQ.data.savedAt);
+          if (!isNaN(d.getTime())) setSavedAt(d);
         }
-      } else setDraft(EMPTY);
+      } else {
+        setDraft({ ...EMPTY });
+      }
     }
   }, [draftQ.data, draft]);
 
-  const extra = (draft?.extra ?? {}) as Extra;
-  const update = useCallback((patch: Partial<CampaignDraft>, extraPatch?: Partial<Extra>) => {
-    dirtyRef.current = true;
-    setDraft((d) => {
-      const base = d ?? EMPTY;
-      return { ...base, ...patch, extra: { ...(base.extra ?? {}), ...(extraPatch ?? {}) } };
-    });
-  }, []);
-
-  // ---------------------------------------------------------- autosave (§26.1)
-  const save = useCallback(async (d: CampaignDraft) => {
-    setSaveState('saving');
-    try {
-      const r = await put<{ revision: number; updatedAt: string }>('/campaign-draft', { data: d, revision: revRef.current });
-      setRevision(r.revision);
-      revRef.current = r.revision;
-      setSavedAt(new Date(r.updatedAt));
+  const saveMut = useMutation({
+    mutationFn: (d: CampaignDraft) =>
+      put<DraftEnvelope>('/campaign-draft', { draft: d, clientRevision: revRef.current }),
+    onSuccess: (data) => {
+      setRevision(data.revision);
+      setSavedAt(new Date(data.savedAt));
       setSaveState('idle');
       dirtyRef.current = false;
-      return true;
-    } catch (e) {
-      setSaveState(e instanceof ApiError && e.status === 409 ? 'conflict' : 'error');
-      return false;
-    }
-  }, []);
+      qc.setQueryData(['campaign-draft'], data);
+    },
+    onError: (e) => {
+      if (e instanceof ApiError && e.status === 409) {
+        setSaveState('conflict');
+      } else {
+        setSaveState('error');
+      }
+    },
+  });
+
+  const timerRef = useRef<number | null>(null);
+  const saveNow = useCallback(
+    (next: CampaignDraft) => {
+      if (timerRef.current) window.clearTimeout(timerRef.current);
+      setSaveState('saving');
+      saveMut.mutate(next);
+    },
+    [saveMut],
+  );
+
+  const update: UpdateFn = useCallback(
+    (patch, extraPatch) => {
+      setDraft((cur) => {
+        const base = cur ?? EMPTY;
+        const next: CampaignDraft = {
+          ...base,
+          ...patch,
+          extra: { ...(base.extra ?? {}), ...(extraPatch ?? {}) },
+        };
+        dirtyRef.current = true;
+        if (timerRef.current) window.clearTimeout(timerRef.current);
+        timerRef.current = window.setTimeout(() => saveNow(next), 1200);
+        return next;
+      });
+    },
+    [saveNow],
+  );
+
+  // Aplica modelo de campanha se presente via ?modeloId=...
   useEffect(() => {
-    if (!draft || !dirtyRef.current || finished || saveState === 'conflict') return;
-    const t = setTimeout(() => save(draft), 700);
-    return () => clearTimeout(t);
-  }, [draft, save, finished, saveState]);
-
-  async function reloadDraft() {
-    const r = await get<DraftEnvelope>('/campaign-draft');
-    dirtyRef.current = false;
-    setDraft(r?.data ?? EMPTY);
-    setRevision(r?.revision ?? 0);
-    setSaveState('idle');
-  }
-
-  // ---------------------------------------------------------- catálogos
-  const mailingsQ = useQuery({ queryKey: ['mailings'], queryFn: () => get<{ items: MailingSummary[] }>('/mailings') });
-  const listsQ = useQuery({ queryKey: ['lists'], queryFn: () => get<{ items: ListSummary[] }>('/lists') });
-  const journeysQ = useQuery({ queryKey: ['journeys'], queryFn: () => get<{ items: Journey[] }>('/journeys') });
-  const strategiesQ = useQuery({ queryKey: ['strategies'], queryFn: () => get<{ items: Strategy[] }>('/strategies') });
-  const tabsQ = useQuery({ queryKey: ['tabulations'], queryFn: () => get<{ items: Tabulation[] }>('/tabulations') });
-
-  const mailing = mailingsQ.data?.items.find((m) => m.id === draft?.mailingId);
-  const journey = journeysQ.data?.items.find((j) => j.latestVersion?.id === draft?.journeyVersionId);
-  const strategy = strategiesQ.data?.items.find((s) => s.latestVersion?.id === draft?.strategyVersionId);
-  // versão selecionada pode não ser a mais recente (rascunho antigo): mostra aviso
-  const strategyMissing = !!draft?.strategyVersionId && strategiesQ.data && !strategy;
-  const journeyMissing = !!draft?.journeyVersionId && journeysQ.data && !journey;
-
-  // ---------------------------------------------------------- validação por etapa
-  const valid: Record<Step, boolean> = {
-    MAILING: !!draft?.mailingId,
-    AUDIENCE: draft?.audienceMode === 'ALL' || (draft?.audienceMode === 'LIST' && !!draft?.listVersionId),
-    ACTIVATION: !!draft?.journeyVersionId && !!draft?.strategyVersionId && !strategyMissing && !journeyMissing,
-    CAMPAIGN: true,
-  };
-  const stepIdx = STEPS.findIndex((s) => s.key === (draft?.step ?? 'MAILING'));
-  const reachable = (i: number) => STEPS.slice(0, i).every((s) => valid[s.key]);
-
-  const headingRef = useRef<HTMLHeadingElement>(null);
-  const goStep = (s: Step) => {
-    update({ step: s });
-    setTimeout(() => headingRef.current?.focus(), 0);
-  };
-
-  // ---------------------------------------------------------- saída protegida
-  const hasContent = !!draft && (draft.mailingId || draft.name || draft.step !== 'MAILING');
-  const blocker = useBlocker(({ currentLocation, nextLocation }) => !finished && !!hasContent && currentLocation.pathname !== nextLocation.pathname);
-  const [discardConfirm, setDiscardConfirm] = useState(false);
-
-  async function saveAndExit() {
-    if (draft) await save(draft);
-    if (blocker.state === 'blocked') blocker.proceed();
-    else {
-      setFinished(true);
-      setTimeout(() => nav('/campanhas'));
+    if (templateQ.data && draft && appliedTemplateRef.current !== templateQ.data.id) {
+      appliedTemplateRef.current = templateQ.data.id;
+      update(
+        {
+          journeyVersionId: templateQ.data.journeyVersionId || templateQ.data.journeyId,
+          strategyVersionId: templateQ.data.strategyVersionId || templateQ.data.strategyId,
+          name: draft.name || `Campanha - ${templateQ.data.name}`,
+        },
+        {
+          purposeCode: templateQ.data.purposeCode ?? 'COBRANCA',
+          templateApplied: templateQ.data.id,
+          templateName: templateQ.data.name,
+          templateJourney: templateQ.data.journeyName,
+          templateStrategy: templateQ.data.strategyName,
+        },
+      );
+      toast('success', `Modelo "${templateQ.data.name}" aplicado! Jornada e estratégia foram pré-configuradas.`);
     }
-  }
-  async function discard() {
-    await del('/campaign-draft').catch(() => {});
-    qc.removeQueries({ queryKey: ['campaign-draft'] });
-    setFinished(true);
-    if (blocker.state === 'blocked') blocker.proceed();
-    else setTimeout(() => nav('/campanhas'));
-  }
-  async function startOver() {
-    await del('/campaign-draft').catch(() => {});
-    dirtyRef.current = false;
-    setDraft(EMPTY);
-    setRevision(0);
-    setResumed(false);
-    setDiscardConfirm(false);
-  }
+  }, [templateQ.data, draft, update, toast]);
 
-  if (!can('campaigns.create'))
-    return <Empty title="Seu perfil não pode criar campanhas">Peça a um gestor ou administrador.</Empty>;
-  if (draftQ.isLoading || !draft) return <Loading rows={6} />;
+  const extra: Extra = (draft?.extra as Extra) ?? {};
+  const currentStep = draft?.step ?? 'MAILING';
 
-  // Modo Dia a Dia: Jornada Única e Minimalista (estilo Google / ChatGPT)
-  if (!isManualWizard) {
+  const mailingsQ = useQuery({
+    queryKey: ['mailings'],
+    queryFn: () => get<{ items: MailingSummary[] }>('/mailings'),
+  });
+
+  const listsQ = useQuery({
+    queryKey: ['lists'],
+    queryFn: () => get<{ items: ListSummary[] }>('/lists'),
+  });
+
+  const journeysQ = useQuery({
+    queryKey: ['journeys'],
+    queryFn: () => get<{ items: Journey[] }>('/journeys'),
+  });
+
+  const strategiesQ = useQuery({
+    queryKey: ['strategies'],
+    queryFn: () => get<{ items: Strategy[] }>('/strategies'),
+  });
+
+  const tabulationsQ = useQuery({
+    queryKey: ['tabulations'],
+    queryFn: () => get<{ items: Tabulation[] }>('/tabulations'),
+  });
+
+  const selectedMailing = useMemo(
+    () => mailingsQ.data?.items.find((m) => m.id === draft?.mailingId),
+    [mailingsQ.data, draft?.mailingId],
+  );
+
+  const selectedJourney = useMemo(
+    () => journeysQ.data?.items.find((j) => j.latestVersion?.id === draft?.journeyVersionId),
+    [journeysQ.data, draft?.journeyVersionId],
+  );
+
+  const selectedStrategy = useMemo(
+    () => strategiesQ.data?.items.find((s) => s.latestVersion?.id === draft?.strategyVersionId),
+    [strategiesQ.data, draft?.strategyVersionId],
+  );
+
+  const curIdx = STEPS.findIndex((s) => s.id === currentStep);
+
+  const goStep = (target: Step) => {
+    const tIdx = STEPS.findIndex((s) => s.id === target);
+    if (tIdx > 0 && !draft?.mailingId) {
+      toast('info', 'Importe ou selecione um mailing antes de avançar.');
+      return;
+    }
+    if (tIdx > 2 && (!draft?.journeyVersionId || !draft?.strategyVersionId)) {
+      toast('info', 'Selecione uma jornada e uma estratégia antes de avançar.');
+      return;
+    }
+    update({ step: target });
+  };
+
+  if (!can('campaigns.create')) {
     return (
-      <div className="w-full space-y-6 py-2">
-        <UnifiedCampaignCreator
-          mailings={mailingsQ.data?.items}
-          lists={listsQ.data?.items}
-          journeys={journeysQ.data?.items}
-          strategies={strategiesQ.data?.items}
-          draft={draft}
-          extra={extra}
-          update={update}
-          onCreated={async (c) => {
-            setFinished(true);
-            await del('/campaign-draft').catch(() => {});
-            qc.removeQueries({ queryKey: ['campaign-draft'] });
-            qc.invalidateQueries({ queryKey: ['campaigns'] });
-            qc.invalidateQueries({ queryKey: ['overview'] });
-            toast('success', `Campanha "${c.name}" criada com sucesso.`);
-            setTimeout(() => nav(`/campanhas/${c.id}`));
-          }}
-        />
+      <div className="mx-auto max-w-xl py-12 text-center">
+        <Alert tone="warn" title="Permissão insuficiente">
+          Seu perfil não tem permissão para criar campanhas.
+        </Alert>
       </div>
     );
   }
 
-  const audienceCount =
-    draft.audienceMode === 'ALL' ? (mailing?.recordCount ?? null) : draft.audienceMode === 'LIST' ? (extra.audienceCount ?? null) : null;
+  if (draft === null) {
+    return (
+      <div className="py-12">
+        <Loading label="Carregando assistente de campanha…" />
+      </div>
+    );
+  }
 
   return (
-    <div>
-      {/* Banner de retorno para a Jornada Única */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-200 bg-brand-50/70 p-3.5 shadow-2xs">
-        <div className="text-xs text-brand-900">
-          Você está no <strong>Assistente Manual Clássico</strong> (construção com filtros SQL e réguas manuais).
-        </div>
-        <Button
-          size="sm"
-          variant="secondary"
-          icon={<ArrowLeft className="size-3.5" aria-hidden />}
-          onClick={() => {
-            update({}, { intelligenceMode: 'INTELLIGENT' });
-            setIsManualWizard(false);
-          }}
-        >
-          Voltar para a Jornada Única Inteligente
-        </Button>
-      </div>
+    <div className="mx-auto max-w-5xl space-y-6">
+      <PageHeader
+        title="Nova campanha"
+        subtitle="Configuração 100% manual em 4 pilares: Mailing, Público (filtro), Jornadas e Estratégias."
+        actions={
+          <div className="flex items-center gap-2">
+            {saveState === 'saving' && (
+              <span className="flex items-center gap-1.5 text-xs text-slate-500">
+                <Loader2 className="size-3 animate-spin text-brand-700" />
+                Salvando rascunho…
+              </span>
+            )}
+            {saveState === 'idle' && savedAt && !isNaN(savedAt.getTime()) && (
+              <span className="text-xs text-slate-400">
+                Rascunho salvo às {savedAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+            <Link to="/campanhas/modelos">
+              <Button size="sm" variant="secondary" icon={<Bookmark className="size-3.5" />}>
+                Modelos de campanhas
+              </Button>
+            </Link>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                if (window.confirm('Deseja descartar este rascunho e recomeçar do zero?')) {
+                  del('/campaign-draft').then(() => {
+                    setDraft({ ...EMPTY });
+                    setRevision(0);
+                    toast('info', 'Rascunho descartado.');
+                  });
+                }
+              }}
+            >
+              Descartar rascunho
+            </Button>
+          </div>
+        }
+      />
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Preparar campanha</h1>
-          <p className="text-sm text-slate-600">A campanha só é criada na confirmação final.</p>
+      {/* Banner de Modelo Aplicado */}
+      {(draft.extra?.templateName || templateQ.data) && (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-brand-200 bg-brand-50/70 px-4 py-2.5 text-xs text-brand-900 shadow-xs">
+          <div className="flex items-center gap-2">
+            <Bookmark className="size-4 text-brand-700 shrink-0" />
+            <div>
+              <span>Modelo em uso: <strong>{String(draft.extra?.templateName || templateQ.data?.name || '')}</strong></span>
+              {(draft.extra?.templateJourney || templateQ.data?.journeyName) && (
+                <span className="text-brand-800 ml-1.5">
+                  (Jornada: <em>{String(draft.extra?.templateJourney || templateQ.data?.journeyName || '')}</em> · Estratégia: <em>{String(draft.extra?.templateStrategy || templateQ.data?.strategyName || '')}</em>)
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Link
+              to="/campanhas/modelos"
+              className="font-medium text-brand-700 hover:text-brand-900 hover:underline"
+            >
+              Trocar modelo →
+            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                update({}, { templateApplied: undefined, templateName: undefined, templateJourney: undefined, templateStrategy: undefined });
+                appliedTemplateRef.current = null;
+                toast('info', 'Vínculo com o modelo removido.');
+              }}
+              className="text-[11px] text-slate-500 hover:text-slate-800 underline"
+            >
+              Remover
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <SaveIndicator state={saveState} savedAt={savedAt} />
-          <Button icon={<Save className="size-4" aria-hidden />} onClick={saveAndExit}>
-            Salvar e sair
-          </Button>
-        </div>
-      </div>
-
-      {saveState === 'conflict' && (
-        <Alert tone="warn" title="O rascunho foi alterado em outra aba ou dispositivo" className="mb-4">
-          Para não sobrescrever a outra alteração, recarregue o rascunho mais recente.{' '}
-          <Button variant="link" onClick={reloadDraft}>
-            Recarregar rascunho
-          </Button>
-        </Alert>
       )}
-      {resumed && (
-        <Alert tone="info" title="Retomamos seu rascunho" className="mb-4">
-          Você está na etapa {STEPS[stepIdx]?.label}. Revise as seleções: mailings, listas e estratégias podem ter mudado desde então.{' '}
-          <Button variant="link" onClick={() => setDiscardConfirm(true)}>
-            Começar outra
-          </Button>
-        </Alert>
-      )}
 
-      {/* Stepper */}
-      <nav aria-label="Etapas da preparação" className="mb-5">
-        <ol className="grid grid-cols-4 gap-1 sm:gap-2">
-          {STEPS.map((s, i) => {
-            const current = i === stepIdx;
-            const done = i < stepIdx && valid[s.key];
-            const enabled = reachable(i);
+      {/* Stepper Superior (1. Mailing → 2. Público → 3. Acionamento → 4. Revisar) */}
+      <nav aria-label="Progresso da criação" className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
+        <ol className="flex items-center justify-between gap-2 overflow-x-auto">
+          {STEPS.map((s, idx) => {
+            const isActive = s.id === currentStep;
+            const isCompleted = idx < curIdx;
             return (
-              <li key={s.key}>
+              <li key={s.id} className="flex flex-1 items-center gap-2 min-w-[140px]">
                 <button
                   type="button"
-                  disabled={!enabled}
-                  aria-current={current ? 'step' : undefined}
-                  onClick={() => goStep(s.key)}
+                  onClick={() => goStep(s.id)}
                   className={clsx(
-                    'flex w-full items-center gap-2 rounded-md border px-2 py-2 text-left text-xs sm:text-sm',
-                    current && 'border-brand-600 bg-brand-50 font-semibold text-brand-900',
-                    !current && enabled && 'border-slate-200 bg-white hover:border-brand-300',
-                    !enabled && 'cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400',
+                    'flex flex-1 items-center gap-2.5 rounded-lg px-3 py-2 text-left text-xs font-medium transition-colors cursor-pointer',
+                    isActive && 'bg-brand-50 text-brand-900 ring-1 ring-inset ring-brand-200 font-semibold',
+                    isCompleted && 'text-slate-800 hover:bg-slate-50',
+                    !isActive && !isCompleted && 'text-slate-400 hover:text-slate-600',
                   )}
                 >
                   <span
                     className={clsx(
-                      'grid size-6 shrink-0 place-items-center rounded-full text-xs',
-                      current ? 'bg-brand-700 text-white' : done ? 'bg-brand-100 text-brand-800' : 'bg-slate-200 text-slate-600',
+                      'flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold',
+                      isActive && 'bg-brand-700 text-white',
+                      isCompleted && 'bg-emerald-600 text-white',
+                      !isActive && !isCompleted && 'bg-slate-100 text-slate-500',
                     )}
-                    aria-hidden
                   >
-                    {done ? <Check className="size-3.5" /> : i + 1}
+                    {isCompleted ? <Check className="size-3.5 stroke-[3]" /> : s.num}
                   </span>
                   <span className="truncate">{s.label}</span>
-                  {done && <span className="sr-only">(concluída)</span>}
                 </button>
+                {idx < STEPS.length - 1 && <span className="text-slate-300 font-light select-none">/</span>}
               </li>
             );
           })}
         </ol>
       </nav>
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_18rem]">
-        <div className="min-w-0">
-          <h2 ref={headingRef} tabIndex={-1} className="mb-3 text-lg font-semibold focus:outline-none" aria-live="polite">
-            Etapa {stepIdx + 1} de 4: {STEPS[stepIdx]?.label}
-          </h2>
+      {/* Conteúdo do Passo Ativo */}
+      <div className="space-y-6">
+        {currentStep === 'MAILING' && (
+          <MailingStep
+            draft={draft}
+            extra={extra}
+            mailings={mailingsQ.data?.items}
+            update={update}
+            onNext={() => goStep('AUDIENCE')}
+          />
+        )}
 
-          {draft.step === 'MAILING' && (
-            <MailingStep
-              draft={draft}
-              extra={extra}
-              mailings={mailingsQ.data?.items}
-              lists={listsQ.data?.items}
-              update={update}
-              onNext={() => goStep('AUDIENCE')}
-            />
-          )}
-          {draft.step === 'AUDIENCE' && draft.mailingId && (
-            <AudienceStep draft={draft} extra={extra} mailing={mailing} update={update} onBack={() => goStep('MAILING')} onNext={() => goStep('ACTIVATION')} />
-          )}
-          {draft.step === 'ACTIVATION' && (
-            <ActivationStep
-              draft={draft}
-              extra={extra}
-              mailing={mailing}
-              journeys={journeysQ.data?.items}
-              strategies={strategiesQ.data?.items}
-              tabulations={tabsQ.data?.items}
-              strategyMissing={!!strategyMissing}
-              journeyMissing={!!journeyMissing}
-              update={update}
-              onBack={() => goStep('AUDIENCE')}
-              onNext={() => goStep('CAMPAIGN')}
-              beforeLeave={async () => {
-                await save(draft);
-                setFinished(true);
-              }}
-            />
-          )}
-          {draft.step === 'CAMPAIGN' && (
-            <CampaignStep
-              draft={draft}
-              extra={extra}
-              update={update}
-              goStep={goStep}
-              onCreated={async (c) => {
-                setFinished(true);
-                await del('/campaign-draft').catch(() => {});
-                qc.removeQueries({ queryKey: ['campaign-draft'] });
-                qc.invalidateQueries({ queryKey: ['campaigns'] });
-                toast('success', `Campanha "${c.name}" criada.`);
-                setTimeout(() => nav(`/campanhas/${c.id}`));
-              }}
-            />
-          )}
-        </div>
+        {currentStep === 'AUDIENCE' && (
+          <AudienceStep
+            draft={draft}
+            extra={extra}
+            mailing={selectedMailing}
+            update={update}
+            onBack={() => goStep('MAILING')}
+            onNext={() => goStep('ACTIVATION')}
+          />
+        )}
 
-        {/* Resumo lateral */}
-        <aside aria-label="Resumo da preparação" className="lg:sticky lg:top-20 lg:self-start">
-          <Card title="Resumo">
-            <dl className="space-y-3 text-sm">
-              <SummaryItem label="Mailing" value={mailing?.name ?? extra.mailingName ?? null} />
-              <SummaryItem
-                label="Público"
-                value={
-                  draft.audienceMode === 'ALL'
-                    ? 'Todos os contatos do mailing'
-                    : draft.audienceMode === 'LIST'
-                      ? `${extra.listName ?? 'Lista'}${extra.listVersion ? ` · v${extra.listVersion}` : ''}`
-                      : null
-                }
-              />
-              <SummaryItem label="Contatos na prévia" value={audienceCount !== null ? fmtNumber(audienceCount) : null} />
-              <SummaryItem label="Jornada" value={journey ? `${journey.name} · v${journey.latestVersion?.version}` : null} />
-              <SummaryItem label="Estratégia" value={strategy ? `${strategy.name} · v${strategy.latestVersion?.version}` : null} />
-            </dl>
-          </Card>
-        </aside>
+        {currentStep === 'ACTIVATION' && (
+          <ActivationStep
+            draft={draft}
+            extra={extra}
+            journeys={journeysQ.data?.items}
+            strategies={strategiesQ.data?.items}
+            selectedJourney={selectedJourney}
+            selectedStrategy={selectedStrategy}
+            update={update}
+            onBack={() => goStep('AUDIENCE')}
+            onNext={() => goStep('CAMPAIGN')}
+          />
+        )}
+
+        {currentStep === 'CAMPAIGN' && (
+          <ReviewStep
+            draft={draft}
+            extra={extra}
+            selectedMailing={selectedMailing}
+            selectedJourney={selectedJourney}
+            selectedStrategy={selectedStrategy}
+            update={update}
+            onBack={() => goStep('ACTIVATION')}
+            onDone={(campaign) => {
+              del('/campaign-draft').catch(() => {});
+              toast('success', `Campanha "${campaign.name}" criada com sucesso!`);
+              nav(`/campanhas/${campaign.id}`);
+            }}
+          />
+        )}
       </div>
-
-      <Modal
-        open={blocker.state === 'blocked'}
-        onOpenChange={(o) => !o && blocker.state === 'blocked' && blocker.reset()}
-        title="Sair da preparação?"
-        description="O rascunho é salvo automaticamente. Escolha o que fazer com ele."
-        footer={
-          <>
-            <Button variant="danger" onClick={discard}>
-              Descartar
-            </Button>
-            <Button onClick={saveAndExit}>Salvar rascunho e sair</Button>
-            <Button variant="primary" onClick={() => blocker.state === 'blocked' && blocker.reset()}>
-              Continuar editando
-            </Button>
-          </>
-        }
-      >
-        <p className="text-sm text-slate-700">Descartar remove apenas o rascunho sem afetar mailings ou listas.</p>
-      </Modal>
-      <Modal
-        open={discardConfirm}
-        onOpenChange={setDiscardConfirm}
-        title="Começar outra preparação?"
-        footer={
-          <>
-            <Button onClick={() => setDiscardConfirm(false)}>Manter rascunho</Button>
-            <Button variant="danger" onClick={startOver}>
-              Substituir rascunho
-            </Button>
-          </>
-        }
-      >
-        <p className="text-sm">O rascunho atual será substituído sem remover mailings ou listas já salvos.</p>
-      </Modal>
     </div>
   );
 }
 
-function SaveIndicator({ state, savedAt }: { state: string; savedAt: Date | null }) {
-  if (state === 'saving') return <span className="text-xs text-slate-500" role="status">Salvando…</span>;
-  if (state === 'error')
-    return (
-      <span className="flex items-center gap-1 text-xs font-medium text-red-700" role="alert">
-        <CloudOff className="size-3.5" aria-hidden /> Falha ao salvar o rascunho
-      </span>
-    );
-  if (!savedAt) return null;
-  return (
-    <span className="flex items-center gap-1 text-xs text-emerald-700" role="status" data-testid="draft-saved">
-      <Check className="size-3.5" aria-hidden /> Rascunho salvo {savedAt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-    </span>
-  );
-}
-
-function SummaryItem({ label, value }: { label: string; value: ReactNode | null }) {
-  return (
-    <div>
-      <dt className="text-xs text-slate-500">{label}</dt>
-      <dd className={clsx('font-medium', !value && 'font-normal text-slate-400')}>{value ?? 'Não definido'}</dd>
-    </div>
-  );
-}
-
-function Footer({ onBack, children }: { onBack?: () => void; children: ReactNode }) {
-  return (
-    <div className="sticky bottom-14 z-10 mt-6 flex items-center justify-between gap-2 border-t border-slate-200 bg-slate-50/95 py-3 backdrop-blur md:bottom-0">
-      <div>{onBack && <Button onClick={onBack}>Voltar</Button>}</div>
-      <div className="flex flex-wrap justify-end gap-2">{children}</div>
-    </div>
-  );
-}
-
-type UpdateFn = (patch: Partial<CampaignDraft>, extra?: Partial<Extra>) => void;
-
-type IntelligenceRunItem = {
-  id: string;
-  mailingId: string;
-  mailingName: string;
-  mode: OperatingMode;
-  purposeCode: OperationPurpose;
-  purposePrompt: string;
-  labSamplePct: number;
-  maxAcceptableCpcBrl: number;
-  createdAt?: string;
-  cohortSummary: {
-    totalReceived?: number;
-    eligibleCount?: number;
-    excludedCount?: number;
-    coveragePct?: number;
-    estimatedCpcRatePct?: number;
-    expectedCostPerCpcBrl?: number;
-    bruteForceCostPerCpcBrl?: number;
-    savingsVsBruteForcePct?: number;
-  };
-};
-
-const BLOCKS_TEMPLATE = [
-  {
-    blockNum: 1,
-    name: 'Jovens Digitais (18–24 anos)',
-    demographics: 'TIC Domicílios: 94% online · Preferência WhatsApp/RCS',
-    channel: 'WHATSAPP' as ChannelType,
-    timeWindow: '12h–14h e 18h–20h (Pico Móvel)',
-    phoneTier: 'P1 (Base Histórica)',
-    estimatedCpcBrl: 2.45,
-    decision: 'Produção',
-    tone: 'green' as const,
-  },
-  {
-    blockNum: 2,
-    name: 'Adultos Jovens (25–34 anos)',
-    demographics: 'TIC Domicílios: 92% online · Multicanal Dinâmico',
-    channel: 'WHATSAPP' as ChannelType,
-    timeWindow: '10h–12h e 18h–19h (Comercial / Noite)',
-    phoneTier: 'P1 (Confirmado)',
-    estimatedCpcBrl: 2.8,
-    decision: 'Produção',
-    tone: 'green' as const,
-  },
-  {
-    blockNum: 3,
-    name: 'Adultos Plenos (35–44 anos)',
-    demographics: 'TIC Domicílios: 86% online · Voz Inteligente + BINA Local',
-    channel: 'VOICE' as ChannelType,
-    timeWindow: '14h–16h e 18h–20h (Residencial)',
-    phoneTier: 'P1 / P2',
-    estimatedCpcBrl: 3.15,
-    decision: 'Produção',
-    tone: 'green' as const,
-  },
-  {
-    blockNum: 4,
-    name: 'Adultos Maduros (45–59 anos)',
-    demographics: 'TIC Domicílios: 77% online · Voz Prioritária / Agente',
-    channel: 'VOICE' as ChannelType,
-    timeWindow: '09h–11h e 16h–18h (Manhã / Fim de tarde)',
-    phoneTier: 'P2',
-    estimatedCpcBrl: 3.6,
-    decision: 'Produção',
-    tone: 'green' as const,
-  },
-  {
-    blockNum: 5,
-    name: 'Sênior (60+ anos)',
-    demographics: 'TIC Domicílios: 52% online · Atendimento Humanizado',
-    channel: 'VOICE' as ChannelType,
-    timeWindow: '09h–12h (Manhã comercial)',
-    phoneTier: 'P2 / P3',
-    estimatedCpcBrl: 4.1,
-    decision: 'Produção',
-    tone: 'green' as const,
-  },
-  {
-    blockNum: 6,
-    name: 'Telefonia Fixa / Residencial',
-    demographics: 'Cobertura Domiciliar IBGE · Janela Noturna',
-    channel: 'VOICE' as ChannelType,
-    timeWindow: '18h–20h30 (Pico Residencial)',
-    phoneTier: 'P3',
-    estimatedCpcBrl: 3.85,
-    decision: 'Produção',
-    tone: 'green' as const,
-  },
-  {
-    blockNum: 7,
-    name: 'Ondas Experimentais (Lab)',
-    demographics: 'Amostra A/B para calibração de hipóteses H-A..H-L',
-    channel: 'RCS' as ChannelType,
-    timeWindow: 'Janelas Alternativas TIC',
-    phoneTier: 'P2 (Em Teste)',
-    estimatedCpcBrl: 3.2,
-    decision: 'Laboratório',
-    tone: 'amber' as const,
-  },
-  {
-    blockNum: 8,
-    name: 'Incerteza Cadastral & Governança',
-    demographics: 'Telefones com histórico de falha / Bloqueios DNC',
-    channel: 'SMS' as ChannelType,
-    timeWindow: 'Sob Demanda / Revalidação',
-    phoneTier: 'P4 (Revalidar)',
-    estimatedCpcBrl: 5.1,
-    decision: 'Pausado / DNC',
-    tone: 'gray' as const,
-  },
-];
-
-const PROMPT_TEMPLATES = [
-  // Cobrança
-  {
-    label: 'Cobrança B2B Faturamento & Boletos (PJ)',
-    prompt:
-      'Cobrança corporativa B2B para títulos e faturamento com atraso superior a 30 dias e valor acima de R$ 1.000, ordenando por maior valor primeiro. Priorizar e-mail corporativo com boleto/DDA e WhatsApp Business formal em horário comercial (08:30 às 18:00).',
-    defaultName: 'Cobrança B2B · Faturamento',
-    purposeCode: 'COBRANCA' as OperationPurpose,
-    audienceSegment: 'B2B' as AudienceSegment,
-  },
-  {
-    label: 'Cobrança Preventiva (1–30 dias)',
-    prompt:
-      'Cobrança preventiva e amigável para atrasos recentes de até 30 dias, priorizando canais digitais de baixo custo no primeiro toque e direcionando voz inteligente nas melhores janelas.',
-    defaultName: 'Cobrança Preventiva · Faixa 1-30d',
-    purposeCode: 'COBRANCA' as OperationPurpose,
-    audienceSegment: 'B2C' as AudienceSegment,
-  },
-  {
-    label: 'Recuperação Crítica (> 60 dias)',
-    prompt:
-      'Recuperação de crédito para dívidas vencidas há mais de 60 dias com acionamento multicanal intensivo, voz inteligente e BINA local nas melhores janelas.',
-    defaultName: 'Recuperação Crítica · Atraso 60d+',
-    purposeCode: 'COBRANCA' as OperationPurpose,
-    audienceSegment: 'B2C' as AudienceSegment,
-  },
-  {
-    label: 'Renegociação com PIX Instantâneo',
-    prompt:
-      'Proposta de acordo e renegociação com envio de link seguro e chave PIX copiável diretamente no WhatsApp, com desconto especial para quitação à vista.',
-    defaultName: 'Acordo PIX · Renegociação',
-    purposeCode: 'COBRANCA' as OperationPurpose,
-    audienceSegment: 'B2C' as AudienceSegment,
-  },
-
-  // Vendas
-  {
-    label: 'Venda Ativa Corporativa B2B (PME)',
-    prompt:
-      'Prospecção ativa e venda corporativa de novos planos e serviços para empresas e PMEs (B2B) com abordagem consultiva em horário comercial.',
-    defaultName: 'Venda Corporativa · Planos PME',
-    purposeCode: 'VENDAS' as OperationPurpose,
-    audienceSegment: 'B2B' as AudienceSegment,
-  },
-  {
-    label: 'Venda Ativa de Novos Planos',
-    prompt:
-      'Campanha de venda ativa comercial com disparo inicial via WhatsApp interativo e encaminhamento imediato para consultor de vendas.',
-    defaultName: 'Venda Ativa · Novos Planos',
-    purposeCode: 'VENDAS' as OperationPurpose,
-    audienceSegment: 'B2C' as AudienceSegment,
-  },
-  {
-    label: 'Up-sell & Renovação Comercial',
-    prompt:
-      'Oferta de upgrade de plano e renovação para clientes da base. Abordagem consultiva multicanal em janelas de receptividade (almoço e pós-expediente comercial).',
-    defaultName: 'Up-sell · Oferta Exclusiva',
-    purposeCode: 'VENDAS' as OperationPurpose,
-    audienceSegment: 'B2C' as AudienceSegment,
-  },
-  {
-    label: 'Reativação de Inativos',
-    prompt:
-      'Campanha de reengajamento e resgate de clientes inativos com condições especiais de retorno e atendimento prioritário.',
-    defaultName: 'Reativação Comercial · Clientes',
-    purposeCode: 'VENDAS' as OperationPurpose,
-    audienceSegment: 'B2C' as AudienceSegment,
-  },
-
-  // Agendamentos
-  {
-    label: 'Confirmação de Reunião B2B (D-1 e D-0)',
-    prompt:
-      'Confirmação de reuniões comerciais e demonstrações corporativas B2B: Lembrete 1 dia antes (D-1) com link de videoconferência e lembrete no dia (D-0) 2h antes com material preparatório.',
-    defaultName: 'Confirmação Reuniões · B2B',
-    purposeCode: 'AGENDAMENTOS' as OperationPurpose,
-    audienceSegment: 'B2B' as AudienceSegment,
-  },
-  {
-    label: 'Lembrete de Consulta / Exame (D-1 e D-0)',
-    prompt:
-      'Cadência de confirmação de consultas e exames: Lembrete 1 dia antes (D-1) via WhatsApp interativo com botões de confirmação rápida e lembrete no dia (D-0) 2h antes com endereço e orientações.',
-    defaultName: 'Confirmação Consultas · D-1 e D-0',
-    purposeCode: 'AGENDAMENTOS' as OperationPurpose,
-    audienceSegment: 'B2C' as AudienceSegment,
-  },
-  {
-    label: 'Confirmação de Visita Técnica (D-1 e D-0)',
-    prompt:
-      'Confirmação de agendamento de visita técnica domiciliar com verificação de presença do responsável no D-1 e envio de dados do técnico no dia (D-0 2h antes).',
-    defaultName: 'Visitas Técnicas · Lembretes',
-    purposeCode: 'AGENDAMENTOS' as OperationPurpose,
-    audienceSegment: 'B2C' as AudienceSegment,
-  },
-  {
-    label: 'Reagendamento de Faltas (No-Show)',
-    prompt:
-      'Campanha preventiva para recuperação de faltas e reagendamento amigável de horários vagos com botão de escolha rápida de nova data.',
-    defaultName: 'Prevenção No-Show · Reagendamento',
-    purposeCode: 'AGENDAMENTOS' as OperationPurpose,
-    audienceSegment: 'B2C' as AudienceSegment,
-  },
-];
-
-// ------------------------------------------------------------------ Criação de Campanha: Jornada Única e Minimalista (Google / ChatGPT)
-function UnifiedCampaignCreator({
-  mailings,
-  lists,
-  journeys,
-  strategies,
-  draft,
-  extra,
-  update,
-  onCreated,
-}: {
-  mailings?: MailingSummary[];
-  lists?: ListSummary[];
-  journeys?: Journey[];
-  strategies?: Strategy[];
-  draft: CampaignDraft;
-  extra: Extra;
-  update: UpdateFn;
-  onCreated: (c: Campaign) => void;
-}) {
-  const qc = useQueryClient();
-  const toast = useToast();
-  const idemRef = useRef<string | null>(null);
-
-  // Wizard Step: 1 = Mailing, 2 = Público, 3 = Acionamento, 4 = Campanha
-  const [wizardStep, setWizardStep] = useState<1 | 2 | 3 | 4>(1);
-
-  // IA Step: 1 = Objetivo e mailing, 2 = Revisão e início
-  const [aiStep, setAiStep] = useState<1 | 2>(1);
-
-  // Opção de salvar campanha como template no passo 2
-  const [saveAsTemplate, setSaveAsTemplate] = useState<boolean>(false);
-  const [scheduleChoice, setScheduleChoice] = useState<'NOW' | 'SCHEDULED'>('NOW');
-
-  // 1. Base selection state
-  const [sourceType, setSourceType] = useState<'EXISTING' | 'IMPORT'>('EXISTING');
-  const [useList, setUseList] = useState<boolean>(draft.audienceMode === 'LIST');
-  const [listSelectionMode, setListSelectionMode] = useState<'SELECT' | 'CREATE'>('SELECT');
-  const [selectedMailingId, setSelectedMailingId] = useState<string>(
-    draft.mailingId || '',
-  );
-  const [selectedListId, setSelectedListId] = useState<string>(
-    extra.listId || '',
-  );
-
-  // Segmento do Público (B2B vs B2C vs MIXED)
-  const [audienceSegment, setAudienceSegment] = useState<AudienceSegment>(
-    extra.audienceSegment || 'B2C',
-  );
-
-  // Switcher de Experiências (§Requisito: Prompt IA vs Forma Estruturada)
-  const [experience, setExperience] = useState<'AI_PROMPT' | 'STRUCTURED'>(
-    extra.creationExperience || 'AI_PROMPT',
-  );
-
-  // Chat Conversacional da IA (OpenAI API + Assistente Interativo): histórico de mensagens
-  type ChatMessage = {
-    id: string;
-    sender: 'user' | 'assistant';
-    text: string;
-    missingInfo?: 'MAILING' | 'PURPOSE' | 'AUDIENCE_SEGMENT' | 'CHANNELS' | 'SCHEDULE' | null;
-    suggestedReplies?: string[];
-    provider?: 'OPENAI' | 'LOCAL_ASSISTANT';
-    model?: string;
-    timestamp: Date;
-  };
-
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => [
-    {
-      id: 'welcome',
-      sender: 'assistant',
-      text: 'Olá! Sou o assistente de IA da Voll Plan. Qual campanha vamos criar hoje? Você pode descrever o objetivo com suas palavras ou escolher uma das opções abaixo para começarmos:',
-      missingInfo: 'PURPOSE',
-      suggestedReplies: [
-        'Cobrança de faturas em atraso',
-        'Venda ativa de planos e ofertas',
-        'Confirmação de agendamentos (D-1 e D-0)',
-      ],
-      timestamp: new Date(),
-    },
-  ]);
-  const [chatInput, setChatInput] = useState('');
-  const [isAiTyping, setIsAiTyping] = useState(false);
-  const [aiExtracted, setAiExtracted] = useState<AiCampaignExtractedState>({});
-  const chatScrollRef = useRef<HTMLDivElement>(null);
-
-  // Estado e Modal de Configuração da API da OpenAI
-  const [openAiModalOpen, setOpenAiModalOpen] = useState(false);
-  const [openAiApiKeyInput, setOpenAiApiKeyInput] = useState<string>(() => {
-    try {
-      return localStorage.getItem('vc_openai_api_key') ?? '';
-    } catch {
-      return '';
-    }
-  });
-  const [openAiModelInput, setOpenAiModelInput] = useState<string>(() => {
-    try {
-      return localStorage.getItem('vc_openai_model') || 'gpt-4o-mini';
-    } catch {
-      return 'gpt-4o-mini';
-    }
-  });
-  const aiStatusQ = useQuery({
-    queryKey: ['ai-status'],
-    queryFn: () => get<{ configured: boolean; provider: 'OPENAI' | 'LOCAL_ASSISTANT'; model: string }>('/ai/status'),
-  });
-  const isOpenAiConfigured = Boolean(aiStatusQ.data?.configured || openAiApiKeyInput.trim().length > 10);
-
-  // Upload/Anexo de Mailing no Modo Prompt
-  const [showImportInPrompt, setShowImportInPrompt] = useState(false);
-
-  // 2. Prompt & Identification
-  const [promptText, setPromptText] = useState<string>(
-    extra.purposePrompt || '',
-  );
-  const [purposeCode, setPurposeCode] = useState<OperationPurpose>(
-    extra.purposeCode || 'COBRANCA',
-  );
-  const [campaignName, setCampaignName] = useState<string>(() => {
-    if (draft.name) return draft.name;
-    const dateStr = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-    return `${PROMPT_TEMPLATES[0].defaultName} · ${dateStr}`;
-  });
-
-  // 3. Execution parameters
-  const [maxAcceptableCpcBrl, setMaxAcceptableCpcBrl] = useState<number>(
-    extra.maxAcceptableCpcBrl || 4.5,
-  );
-  const [skipAiOptimization, setSkipAiOptimization] = useState<boolean>(false);
-
-  // UI details toggle
-  const [showBlocksDetail, setShowBlocksDetail] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
-  const [createStartMode, setCreateStartMode] = useState<'NOW' | 'READY'>('NOW');
-  const [formError, setFormError] = useState<string | null>(null);
-
-  const activeMailing = selectedMailingId ? mailings?.find((m) => m.id === selectedMailingId) : null;
-  const activeList = useList ? lists?.find((l) => l.id === selectedListId) : null;
-  const targetCount = useList
-    ? (activeList?.latestVersion?.memberCount ?? activeMailing?.recordCount ?? 0)
-    : (activeMailing?.recordCount ?? 0);
-
-  const bestJourney = journeys?.find((j) => (j.latestVersion?.steps.length ?? 0) > 1) ?? journeys?.[0];
-  const bestStrategy = strategies?.[0];
-
-  // Motor NLP Parser: combina o estado extraído pela OpenAI com o fallback local
-  const parsedPrompt = useMemo(() => {
-    const base = parseCampaignPrompt(promptText || 'Cobrança', activeMailing);
-    return {
-      ...base,
-      purposeCode: aiExtracted.purposeCode ?? base.purposeCode,
-      audienceSegment: aiExtracted.audienceSegment ?? base.audienceSegment,
-      campaignName: aiExtracted.campaignName || base.campaignName,
-      description: aiExtracted.description || base.description,
-      recommendedChannels:
-        aiExtracted.recommendedChannels && aiExtracted.recommendedChannels.length > 0
-          ? aiExtracted.recommendedChannels
-          : base.recommendedChannels,
-      extractedFilters:
-        aiExtracted.extractedFilters && aiExtracted.extractedFilters.length > 0
-          ? aiExtracted.extractedFilters
-          : base.extractedFilters,
-      extractedSort: aiExtracted.extractedSort ?? base.extractedSort,
-      cadenceSummary: aiExtracted.cadenceSummary || base.cadenceSummary,
-      maxCpcBrl: aiExtracted.maxAcceptableCpcBrl ?? base.maxCpcBrl,
-    };
-  }, [promptText, activeMailing, aiExtracted]);
-
-  // Sincroniza detecção B2B automática a partir do nome do mailing
-  useEffect(() => {
-    if (activeMailing?.name) {
-      const n = activeMailing.name.toLowerCase();
-      if (n.includes('b2b') || n.includes('cnpj') || n.includes('pj') || n.includes('empresa')) {
-        setAudienceSegment('B2B');
-      }
-    }
-  }, [activeMailing?.name]);
-
-  // Rolagem suave do chat sempre que uma nova mensagem for postada
-  useEffect(() => {
-    if (chatScrollRef.current) {
-      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
-    }
-  }, [chatMessages, isAiTyping]);
-
-  // Salvar configuração da API Key da OpenAI
-  const handleSaveOpenAiConfig = async () => {
-    try {
-      localStorage.setItem('vc_openai_api_key', openAiApiKeyInput.trim());
-      localStorage.setItem('vc_openai_model', openAiModelInput.trim() || 'gpt-4o-mini');
-      await post('/ai/config', {
-        apiKey: openAiApiKeyInput.trim(),
-        model: openAiModelInput.trim() || 'gpt-4o-mini',
-      });
-      await qc.invalidateQueries({ queryKey: ['ai-status'] });
-      setOpenAiModalOpen(false);
-      toast(
-        'success',
-        openAiApiKeyInput.trim()
-          ? `OpenAI API (${openAiModelInput}) conectada com sucesso!`
-          : 'Chave OpenAI removida. Usando assistente interativo integrado.',
-      );
-    } catch (err) {
-      toast('error', `Falha ao salvar configuração OpenAI: ${errorMessage(err)}`);
-    }
-  };
-
-  // Handler de envio do usuário no chat (consulta POST /ai/campaign-chat -> OpenAI API)
-  const handleSendChatMessage = async (
-    textToSend?: string,
-    overrideMailing?: { id: string; name: string; count: number },
-  ) => {
-    const raw = (textToSend ?? chatInput).trim();
-    if (!raw || isAiTyping) return;
-
-    setChatInput('');
-    setPromptText((prev) => (prev ? `${prev}\n${raw}` : raw));
-
-    const userMsg: ChatMessage = {
-      id: `user-${Date.now()}`,
-      sender: 'user',
-      text: raw,
-      timestamp: new Date(),
-    };
-
-    const nextMessages = [...chatMessages, userMsg];
-    setChatMessages(nextMessages);
-    setIsAiTyping(true);
-
-    const mId = overrideMailing?.id ?? selectedMailingId ?? activeMailing?.id ?? null;
-    const mName = overrideMailing?.name ?? activeMailing?.name ?? null;
-    const mCount = overrideMailing?.count ?? activeMailing?.recordCount ?? null;
-
-    try {
-      const apiMessages = nextMessages.map((m) => ({
-        role: m.sender === 'user' ? ('user' as const) : ('assistant' as const),
-        content: m.text,
-      }));
-
-      const res = await post<AiCampaignChatResponse>('/ai/campaign-chat', {
-        messages: apiMessages,
-        currentState: aiExtracted,
-        selectedMailingId: mId,
-        selectedMailingName: mName,
-        selectedMailingCount: mCount,
-        apiKey: openAiApiKeyInput.trim() || undefined,
-        model: openAiModelInput.trim() || 'gpt-4o-mini',
-      });
-
-      setAiExtracted(res.extracted);
-      if (res.extracted.purposeCode) setPurposeCode(res.extracted.purposeCode);
-      if (res.extracted.audienceSegment) setAudienceSegment(res.extracted.audienceSegment);
-      if (res.extracted.campaignName) setCampaignName(res.extracted.campaignName);
-      if (res.extracted.maxAcceptableCpcBrl) setMaxAcceptableCpcBrl(res.extracted.maxAcceptableCpcBrl);
-
-      const assistantReply: ChatMessage = {
-        id: `ai-${Date.now() + 1}`,
-        sender: 'assistant',
-        text: res.reply,
-        missingInfo: res.missingInfo,
-        suggestedReplies: res.suggestedReplies,
-        provider: res.provider,
-        model: res.model,
-        timestamp: new Date(),
-      };
-      setChatMessages((prev) => [...prev, assistantReply]);
-    } catch (err) {
-      const currentParsed = parseCampaignPrompt(raw, activeMailing);
-      setPurposeCode(currentParsed.purposeCode);
-      setAudienceSegment(currentParsed.audienceSegment);
-      const assistantReply: ChatMessage = {
-        id: `ai-${Date.now() + 1}`,
-        sender: 'assistant',
-        text: `Entendido! Atualizei os parâmetros da campanha (${currentParsed.campaignName}). ${!mId ? 'Agora selecione ou anexe o mailing de contatos abaixo para prosseguirmos.' : 'Clique em "Continuar para revisão" quando desejar iniciar.'}`,
-        missingInfo: !mId ? 'MAILING' : null,
-        timestamp: new Date(),
-      };
-      setChatMessages((prev) => [...prev, assistantReply]);
-    } finally {
-      setIsAiTyping(false);
-    }
-  };
-
-  // Responde quando o usuário anexa ou seleciona o mailing
-  const handleMailingAttached = (mId: string, mName: string, count: number) => {
-    setSelectedMailingId(mId);
-    void handleSendChatMessage(
-      `Selecionei a base de contatos "${mName}" com ${fmtNumber(count)} registros.`,
-      { id: mId, name: mName, count },
-    );
-  };
-
-  const handleApplyTemplate = (tmpl: (typeof PROMPT_TEMPLATES)[number]) => {
-    setPromptText(tmpl.prompt);
-    setPurposeCode(tmpl.purposeCode);
-    if (tmpl.audienceSegment) {
-      setAudienceSegment(tmpl.audienceSegment);
-    }
-    const dateStr = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-    setCampaignName(`${tmpl.defaultName} · ${dateStr}`);
-    handleSendChatMessage(tmpl.prompt);
-  };
-
-  const handleResetChat = () => {
-    setChatMessages([
-      {
-        id: 'welcome',
-        sender: 'assistant',
-        text: 'Olá! Sou o assistente de IA da Voll Plan. Qual campanha vamos criar hoje? Você pode descrever o objetivo com suas palavras ou escolher uma das opções abaixo para começarmos:',
-        missingInfo: 'PURPOSE',
-        suggestedReplies: [
-          'Cobrança de faturas em atraso',
-          'Venda ativa de planos e ofertas',
-          'Confirmação de agendamentos (D-1 e D-0)',
-        ],
-        timestamp: new Date(),
-      },
-    ]);
-    setChatInput('');
-    setAiExtracted({});
-    setSelectedMailingId('');
-    toast('info', 'Conversa reiniciada.');
-  };
-
-  const handleSelectPurpose = (purp: 'COBRANCA' | 'VENDAS' | 'AGENDAMENTOS') => {
-    setPurposeCode(purp);
-    const tmpl = PROMPT_TEMPLATES.find((t) => t.purposeCode === purp) ?? PROMPT_TEMPLATES[0];
-    setPromptText(tmpl.prompt);
-    if (tmpl.audienceSegment) {
-      setAudienceSegment(tmpl.audienceSegment);
-    }
-    const dateStr = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-    setCampaignName(`${tmpl.defaultName} · ${dateStr}`);
-  };
-
-  // Transfere o estado interpretado do prompt IA para as etapas da forma estruturada
-  const handleRefineInStructured = () => {
-    setPurposeCode(parsedPrompt.purposeCode);
-    setAudienceSegment(parsedPrompt.audienceSegment);
-    if (!draft.name && parsedPrompt.campaignName) {
-      setCampaignName(parsedPrompt.campaignName);
-    }
-    setExperience('STRUCTURED');
-    setWizardStep(selectedMailingId || activeMailing?.id ? 2 : 1);
-    toast('info', 'Configuração transferida para a Forma Estruturada. Refine os detalhes.');
-  };
-
-  const handleCreate = async (startMode: 'NOW' | 'READY') => {
-    setFormError(null);
-    const mailingIdToUse = selectedMailingId || activeMailing?.id;
-    if (!mailingIdToUse) {
-      setFormError('Selecione ou anexe uma base de contatos (mailing) para continuar.');
-      if (experience === 'STRUCTURED') setWizardStep(1);
-      return;
-    }
-    const finalName = (
-      campaignName.trim() ||
-      (experience === 'AI_PROMPT' ? parsedPrompt.campaignName : '')
-    ).trim();
-    if (!finalName) {
-      setFormError('Informe o nome da campanha.');
-      if (experience === 'STRUCTURED') setWizardStep(4);
-      return;
-    }
-    if (!bestJourney?.latestVersion?.id || !bestStrategy?.latestVersion?.id) {
-      setFormError('Aguardando conexões disponíveis. Tente novamente em instantes.');
-      return;
-    }
-
-    setIsCreating(true);
-    setCreateStartMode(startMode);
-    idemRef.current ??= newIdempotencyKey();
-
-    try {
-      const activePurpose = experience === 'AI_PROMPT' ? parsedPrompt.purposeCode : purposeCode;
-      const activeSegment = experience === 'AI_PROMPT' ? parsedPrompt.audienceSegment : audienceSegment;
-
-      const desc = skipAiOptimization
-        ? (promptText.trim() ? `${promptText.trim()} [Disparo direto sem otimização IA]` : 'Disparo direto sem otimização IA')
-        : (promptText.trim() || undefined);
-
-      const payload = {
-        name: finalName,
-        description: desc,
-        mailingId: mailingIdToUse,
-        listVersionId: useList && activeList?.latestVersion ? activeList.latestVersion.id : null,
-        journeyVersionId: bestJourney.latestVersion.id,
-        strategyVersionId: bestStrategy.latestVersion.id,
-        purposeCode: activePurpose,
-        audienceSegment: activeSegment,
-        startMode,
-        scheduledAt: null,
-      };
-
-      const c = await post<Campaign>('/campaigns', payload, {
-        'Idempotency-Key': idemRef.current,
-      });
-
-      onCreated(c);
-    } catch (e) {
-      setIsCreating(false);
-      setFormError(errorMessage(e));
-      if (e instanceof ApiError && e.status === 422) idemRef.current = null;
-    }
-  };
-
-  const WIZARD_STEPS = [
-    { num: 1, label: 'Mailing' },
-    { num: 2, label: 'Público' },
-    { num: 3, label: 'Acionamento' },
-    { num: 4, label: 'Campanha' },
-  ] as const;
-
-  return (
-    <div className="space-y-6">
-      {formError && (
-        <Alert tone="error">
-          {formError}
-        </Alert>
-      )}
-
-      {/* Header com Switcher das Duas Experiências (§Requisito: Prompt IA vs Forma Estruturada) */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200/80 pb-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold tracking-tight text-slate-900">Nova campanha</h1>
-            <InfoTooltip
-              content={
-                experience === 'AI_PROMPT'
-                  ? 'Descreva a campanha em texto livre, anexe o arquivo e a IA estrutura filtros, ordenação e plano de acionamento.'
-                  : 'Configure passo a passo: mailing, estratégias de público B2B/B2C, acionamento multicanal e disparo.'
-              }
-            />
-            <Badge tone={experience === 'AI_PROMPT' ? 'brand' : 'gray'}>
-              {experience === 'AI_PROMPT' ? '✨ Criar com IA' : '📋 Forma Estruturada'}
-            </Badge>
-          </div>
-        </div>
-
-        {/* Switcher Interativo de Experiências */}
-        <div className="flex items-center rounded-xl bg-slate-100 p-1 border border-slate-200/80 shadow-2xs self-start md:self-auto">
-          <button
-            type="button"
-            onClick={() => setExperience('AI_PROMPT')}
-            className={clsx(
-              'flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition-all cursor-pointer',
-              experience === 'AI_PROMPT'
-                ? 'bg-white text-brand-900 shadow-xs ring-1 ring-slate-200/60'
-                : 'text-slate-600 hover:text-slate-900',
-            )}
-          >
-            <Sparkles className="size-4 text-brand-600 shrink-0" />
-            <span>Criar com IA (Prompt)</span>
-            <span className="rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-bold text-brand-700">Rápido</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setExperience('STRUCTURED')}
-            className={clsx(
-              'flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition-all cursor-pointer',
-              experience === 'STRUCTURED'
-                ? 'bg-white text-slate-900 shadow-xs ring-1 ring-slate-200/60'
-                : 'text-slate-600 hover:text-slate-900',
-            )}
-          >
-            <SlidersHorizontal className="size-4 text-slate-600 shrink-0" />
-            <span>Forma Estruturada</span>
-            <span className="rounded bg-slate-200/70 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">4 Etapas</span>
-          </button>
-        </div>
-      </div>
-
-      {/* ============================================================== */}
-      {/* EXPERIÊNCIA 1: CRIAR COM IA (PROMPT & ANEXOS EM 2 PASSOS)      */}
-      {/* ============================================================== */}
-      {experience === 'AI_PROMPT' && (
-        <div className="space-y-6">
-          {/* Stepper das 2 etapas da IA (conforme esboço) */}
-          <div className="border-b border-slate-200/80 pb-3">
-            <nav aria-label="Etapas da IA" className="flex items-center gap-8 pt-1">
-              {/* Passo 1 */}
-              <button
-                type="button"
-                onClick={() => setAiStep(1)}
-                className={clsx(
-                  'group flex items-center gap-2.5 pb-2.5 border-b-[3px] transition-all cursor-pointer',
-                  aiStep === 1
-                    ? 'border-brand-700 text-brand-900 font-bold'
-                    : 'border-transparent text-slate-400 font-medium hover:text-slate-600',
-                )}
-              >
-                <span
-                  className={clsx(
-                    'grid size-7 place-items-center rounded-full text-xs font-bold transition-all',
-                    aiStep === 1
-                      ? 'bg-brand-700 text-white shadow-xs'
-                      : 'bg-brand-100 text-brand-800',
-                  )}
-                >
-                  {aiStep > 1 ? <Check className="size-4 stroke-[2.5]" /> : '1'}
-                </span>
-                <span className="text-base tracking-tight">Objetivo e mailing</span>
-              </button>
-
-              {/* Passo 2 */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (selectedMailingId || activeMailing?.id) {
-                    setAiStep(2);
-                  } else {
-                    setFormError('Selecione ou anexe uma base de contatos antes de avançar para a revisão.');
-                  }
-                }}
-                className={clsx(
-                  'group flex items-center gap-2.5 pb-2.5 border-b-[3px] transition-all',
-                  aiStep === 2
-                    ? 'border-brand-700 text-brand-900 font-bold cursor-pointer'
-                    : 'border-transparent text-slate-400 font-medium hover:text-slate-600 cursor-pointer',
-                )}
-              >
-                <span
-                  className={clsx(
-                    'grid size-7 place-items-center rounded-full text-xs font-bold transition-all',
-                    aiStep === 2
-                      ? 'bg-brand-700 text-white shadow-xs'
-                      : 'bg-slate-100 text-slate-400',
-                  )}
-                >
-                  2
-                </span>
-                <span className="text-base tracking-tight">Revisão e início</span>
-              </button>
-            </nav>
-          </div>
-
-          {/* PASSO 1 DA IA: OBJETIVO E MAILING (CHAT CONVERSACIONAL COM OPENAI API) */}
-          {aiStep === 1 && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-              {/* Coluna Principal da Esquerda: Janela Única do Chat estilo ChatGPT */}
-              <div className="lg:col-span-8">
-                <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden flex flex-col h-[620px]">
-                  {/* Header Integrado da Janela do Chat */}
-                  <div className="bg-slate-50/90 border-b border-slate-200/80 px-4 py-3 flex items-center justify-between gap-3 shrink-0">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="grid size-8 place-items-center rounded-xl bg-brand-700 text-white shadow-2xs shrink-0">
-                        <Sparkles className="size-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-bold text-sm text-slate-900 tracking-tight">
-                            Assistente de IA · Criação Interativa
-                          </span>
-                          <InfoTooltip content="Converse em linguagem natural. A IA extrai os parâmetros, recomenda canais e monta a campanha passo a passo." />
-                          <Badge tone={isOpenAiConfigured ? 'green' : 'brand'}>
-                            {isOpenAiConfigured ? `OpenAI · ${aiStatusQ.data?.model || openAiModelInput}` : 'OpenAI Ready · Assistente Ativo'}
-                          </Badge>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        icon={<RefreshCw className="size-3.5 text-slate-500" />}
-                        onClick={handleResetChat}
-                        title="Reiniciar conversa"
-                      >
-                        <span className="hidden sm:inline">Reiniciar</span>
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        icon={<KeyRound className="size-3.5 text-brand-700" />}
-                        onClick={() => setOpenAiModalOpen(true)}
-                      >
-                        {isOpenAiConfigured ? 'Configurar OpenAI' : 'Conectar OpenAI'}
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Corpo da Conversa com Scroll Integrado */}
-                  <div
-                    ref={chatScrollRef}
-                    className="flex-1 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-slate-50/40 via-white to-white"
-                  >
-                    {chatMessages.map((msg, idx) => {
-                      const isLastAssistant = msg.sender === 'assistant' && idx === chatMessages.length - 1;
-                      const isWelcome = msg.id === 'welcome';
-
-                      return (
-                        <div
-                          key={msg.id}
-                          className={clsx(
-                            'flex gap-2.5 max-w-[90%] text-xs leading-relaxed',
-                            msg.sender === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto',
-                          )}
-                        >
-                          {msg.sender === 'assistant' ? (
-                            <div className="grid size-7 place-items-center rounded-full bg-brand-700 text-white shrink-0 mt-0.5 shadow-2xs">
-                              <Sparkles className="size-3.5" />
-                            </div>
-                          ) : (
-                            <div className="grid size-7 place-items-center rounded-full bg-slate-800 text-white shrink-0 mt-0.5 shadow-2xs">
-                              <User className="size-3.5" />
-                            </div>
-                          )}
-
-                          <div
-                            className={clsx(
-                              'p-3.5 rounded-2xl shadow-2xs space-y-2.5',
-                              msg.sender === 'user'
-                                ? 'bg-brand-600 text-white rounded-tr-xs'
-                                : 'bg-white border border-slate-200/90 text-slate-800 rounded-tl-xs',
-                            )}
-                          >
-                            <p className="whitespace-pre-wrap">{msg.text}</p>
-
-                            {/* Respostas sugeridas pela IA (chips clicáveis dentro da conversa) */}
-                            {isLastAssistant && msg.suggestedReplies && msg.suggestedReplies.length > 0 && !isAiTyping && (
-                              <div className="pt-2 border-t border-slate-100 flex flex-wrap gap-1.5">
-                                {msg.suggestedReplies.map((replyOpt) => (
-                                  <button
-                                    key={replyOpt}
-                                    type="button"
-                                    onClick={() => handleSendChatMessage(replyOpt)}
-                                    className="inline-flex items-center gap-1 rounded-lg border border-brand-200 bg-brand-50/80 px-2.5 py-1 text-[11px] font-semibold text-brand-900 hover:bg-brand-100 transition cursor-pointer"
-                                  >
-                                    <span>{replyOpt}</span>
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-
-                            {/* Exemplos Rápidos incorporados diretamente na conversa inicial */}
-                            {isWelcome && isLastAssistant && !isAiTyping && (
-                              <div className="pt-2 border-t border-slate-100 space-y-1.5">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                                  Exemplos rápidos prontos para iniciar:
-                                </span>
-                                <div className="flex flex-wrap gap-1.5">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleApplyTemplate(PROMPT_TEMPLATES[0])}
-                                    className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-brand-50 hover:border-brand-200 hover:text-brand-900 transition cursor-pointer"
-                                  >
-                                    Cobrança B2B
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleApplyTemplate(PROMPT_TEMPLATES[1])}
-                                    className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-brand-50 hover:border-brand-200 hover:text-brand-900 transition cursor-pointer"
-                                  >
-                                    Cobrança Preventiva PIX
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleApplyTemplate(PROMPT_TEMPLATES[4])}
-                                    className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-brand-50 hover:border-brand-200 hover:text-brand-900 transition cursor-pointer"
-                                  >
-                                    Vendas de Planos
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleApplyTemplate(PROMPT_TEMPLATES[9])}
-                                    className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-brand-50 hover:border-brand-200 hover:text-brand-900 transition cursor-pointer"
-                                  >
-                                    Confirmação de Consultas
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Vinculação de Mailing incorporada na conversa */}
-                            {msg.missingInfo === 'MAILING' && !selectedMailingId && (
-                              <div className="pt-2 border-t border-slate-100 space-y-2">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => setShowImportInPrompt(true)}
-                                    className="inline-flex items-center gap-1.5 rounded-lg border border-brand-300 bg-brand-50 px-2.5 py-1 text-[11px] font-semibold text-brand-900 hover:bg-brand-100 transition cursor-pointer"
-                                  >
-                                    <Paperclip className="size-3 text-brand-600" />
-                                    <span>Anexar CSV agora</span>
-                                  </button>
-
-                                  <div className="flex-1 min-w-[200px]">
-                                    <Select
-                                      id="ai-inline-mailing-select"
-                                      value={selectedMailingId}
-                                      onChange={(e) => {
-                                        const val = e.target.value;
-                                        const found = mailings?.find((m) => m.id === val);
-                                        if (found) {
-                                          handleMailingAttached(found.id, found.name, found.recordCount);
-                                        }
-                                      }}
-                                      className="text-xs rounded-lg py-1"
-                                    >
-                                      <option value="">Ou selecione um mailing existente...</option>
-                                      {mailings?.map((m) => (
-                                        <option key={m.id} value={m.id}>
-                                          {m.name} ({fmtNumber(m.recordCount)} contatos)
-                                        </option>
-                                      ))}
-                                    </Select>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Tag de Mailing Conectado na Mensagem */}
-                            {activeMailing && idx === chatMessages.length - 1 && (
-                              <div className="mt-2 flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50/80 px-2.5 py-1.5 text-[11px] text-emerald-900 font-medium">
-                                <span className="flex items-center gap-1.5">
-                                  <FileSpreadsheet className="size-3.5 text-emerald-700" />
-                                  Mailing vinculado: <strong>{activeMailing.name}</strong> ({fmtNumber(activeMailing.recordCount)} contatos)
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setSelectedMailingId('');
-                                    toast('info', 'Mailing desvinculado.');
-                                  }}
-                                  className="text-emerald-700 hover:text-emerald-900 text-xs ml-2 cursor-pointer"
-                                  title="Desvincular mailing"
-                                >
-                                  ✕
-                                </button>
-                              </div>
-                            )}
-
-                            {/* Botão de Avançar quando a IA finaliza os parâmetros */}
-                            {aiExtracted.purposeCode && selectedMailingId && isLastAssistant && (
-                              <div className="pt-2 border-t border-slate-100">
-                                <Button
-                                  size="sm"
-                                  variant="primary"
-                                  onClick={() => setAiStep(2)}
-                                  icon={<ArrowRight className="size-3.5" />}
-                                >
-                                  Continuar para revisão e início →
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-
-                    {/* Indicador de Digitando */}
-                    {isAiTyping && (
-                      <div className="flex gap-2.5 max-w-[80%] text-xs mr-auto items-center">
-                        <div className="grid size-7 place-items-center rounded-full bg-brand-700 text-white shrink-0 shadow-2xs">
-                          <Loader2 className="size-3.5 animate-spin" />
-                        </div>
-                        <div className="rounded-2xl rounded-tl-xs border border-slate-200 bg-white px-3.5 py-2.5 text-slate-500 shadow-2xs flex items-center gap-2">
-                          <span>Analisando parâmetros da campanha...</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Modal/Gaveta Inline de Importação de Arquivo */}
-                    {showImportInPrompt && (
-                      <div className="rounded-xl border border-brand-200 bg-white p-3 space-y-2 shadow-xs">
-                        <div className="flex items-center justify-between text-xs font-semibold text-brand-900 border-b border-slate-100 pb-2">
-                          <span className="flex items-center gap-1.5">
-                            <Paperclip className="size-3.5 text-brand-600" /> Anexar arquivo de contatos (CSV / Planilha)
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setShowImportInPrompt(false)}
-                            className="text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
-                          >
-                            ✕ Fechar importação
-                          </button>
-                        </div>
-                        <ImportFlow
-                          onImported={(r) => {
-                            qc.invalidateQueries({ queryKey: ['mailings'] });
-                            handleMailingAttached(r.mailingId, r.name, r.validRows ?? 0);
-                            setShowImportInPrompt(false);
-                            toast('success', `Arquivo "${r.name}" importado e selecionado!`);
-                          }}
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Rodapé Integrado: Campo de Input Estilo ChatGPT */}
-                  <div className="border-t border-slate-200 bg-slate-50/70 p-3 shrink-0">
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        void handleSendChatMessage();
-                      }}
-                      className="rounded-xl border border-slate-300 bg-white p-2 shadow-xs focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-slate-100 transition flex flex-col gap-1.5"
-                    >
-                      <textarea
-                        id="ai-prompt-input"
-                        rows={2}
-                        disabled={isAiTyping}
-                        style={{ outline: 'none', boxShadow: 'none' }}
-                        className="w-full border-0 border-none bg-transparent p-1 text-xs text-slate-800 placeholder-slate-400 outline-none focus:outline-none focus:border-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 resize-none leading-relaxed shadow-none"
-                        placeholder="Escreva sua mensagem ou responda ao assistente (ex: Cobrança B2B acima de R$ 1.000 via WhatsApp e Voz)..."
-                        value={chatInput}
-                        onChange={(e) => setChatInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            void handleSendChatMessage();
-                          }
-                        }}
-                      />
-
-                      <div className="flex items-center justify-between pt-1 border-t border-slate-100">
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setShowImportInPrompt((v) => !v)}
-                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-slate-500 hover:text-brand-800 hover:bg-slate-100 transition cursor-pointer"
-                            title="Anexar arquivo CSV de contatos"
-                          >
-                            <Paperclip className="size-3.5" />
-                            <span className="hidden sm:inline text-[11px] font-medium">Anexar mailing</span>
-                          </button>
-
-                          {activeMailing ? (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 border border-emerald-200">
-                              📎 {activeMailing.name.slice(0, 20)}...
-                            </span>
-                          ) : (
-                            <span className="text-[11px] text-slate-400 hidden sm:inline">
-                              Pressione Enter para enviar · Shift+Enter para nova linha
-                            </span>
-                          )}
-                        </div>
-
-                        <button
-                          type="submit"
-                          disabled={!chatInput.trim() || isAiTyping}
-                          className="grid size-7 place-items-center rounded-full bg-brand-700 text-white shadow-xs hover:bg-brand-800 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
-                          title="Enviar mensagem"
-                        >
-                          {isAiTyping ? <Loader2 className="size-3.5 animate-spin" /> : <ArrowRight className="size-3.5" />}
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              </div>
-
-              {/* Coluna Lateral da Direita: Checklist da Campanha */}
-              <div className="lg:col-span-4">
-                <div className="rounded-2xl border border-slate-200/90 bg-slate-50/50 p-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-800 tracking-tight">
-                      Checklist da campanha
-                    </span>
-                    <Badge tone="gray">Tempo real</Badge>
-                  </div>
-
-                  {/* Verificadores das condições progressivas */}
-                  {(() => {
-                    const hasPrompt = Boolean(aiExtracted.purposeCode || promptText.trim().length > 0);
-                    const hasMailing = Boolean(selectedMailingId && activeMailing);
-                    const hasChannel = hasPrompt && (hasMailing || (aiExtracted.recommendedChannels?.length ?? 0) > 0);
-                    const hasDays = hasPrompt && (hasMailing || Boolean(aiExtracted.operatingStart));
-                    const hasAttempts = hasPrompt;
-                    const maxAtt = aiExtracted.maxAttemptsPerContact ?? 3;
-                    const startH = aiExtracted.operatingStart ?? (parsedPrompt.audienceSegment === 'B2B' ? '08:30' : '08:00');
-                    const endH = aiExtracted.operatingEnd ?? (parsedPrompt.audienceSegment === 'B2B' ? '18:00' : '20:00');
-
-                    return (
-                      <div className="space-y-3 text-xs">
-                        {/* Item 1: Descritivo */}
-                        <div className="flex items-start gap-2.5">
-                          <div
-                            className={clsx(
-                              'grid size-5 place-items-center rounded-full shrink-0 mt-0.5 transition-colors',
-                              hasPrompt
-                                ? 'bg-emerald-100 text-emerald-700'
-                                : 'bg-slate-200 text-slate-400',
-                            )}
-                          >
-                            <Check className="size-3 stroke-[2.5]" />
-                          </div>
-                          <div>
-                            <div className="font-bold text-slate-800">Objetivo &amp; Segmento</div>
-                            <div className="text-slate-500 text-[11px] leading-tight line-clamp-2">
-                              {hasPrompt
-                                ? `${OPERATION_PURPOSE_LABEL[parsedPrompt.purposeCode]} · ${parsedPrompt.audienceSegment}`
-                                : 'Descreva o objetivo da campanha no chat'}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Item 2: Canal */}
-                        <div className="flex items-start gap-2.5">
-                          <div
-                            className={clsx(
-                              'grid size-5 place-items-center rounded-full shrink-0 mt-0.5 transition-colors',
-                              hasChannel
-                                ? 'bg-emerald-100 text-emerald-700'
-                                : 'bg-slate-200 text-slate-400',
-                            )}
-                          >
-                            <Check className="size-3 stroke-[2.5]" />
-                          </div>
-                          <div>
-                            <div className="font-bold text-slate-800">Canais</div>
-                            <div className="text-slate-500 text-[11px]">
-                              {hasChannel ? (
-                                parsedPrompt.recommendedChannels.map((c) => CHANNEL_LABEL[c] ?? c).join(' → ')
-                              ) : (
-                                <span className="text-slate-400 italic">
-                                  Aguardando definição na conversa
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Item 3: Dias e Horários */}
-                        <div className="flex items-start gap-2.5">
-                          <div
-                            className={clsx(
-                              'grid size-5 place-items-center rounded-full shrink-0 mt-0.5 transition-colors',
-                              hasDays
-                                ? 'bg-emerald-100 text-emerald-700'
-                                : 'bg-slate-200 text-slate-400',
-                            )}
-                          >
-                            <Check className="size-3 stroke-[2.5]" />
-                          </div>
-                          <div>
-                            <div className="font-bold text-slate-800">Dias e Janela</div>
-                            <div className="text-slate-500 text-[11px]">
-                              {hasDays ? (
-                                `${parsedPrompt.audienceSegment === 'B2B' ? 'Segunda a sexta' : 'Seg a Sáb'} (${startH}–${endH})`
-                              ) : (
-                                <span className="text-slate-400 italic">
-                                  Aguardando definição do público
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Item 4: Tentativas */}
-                        <div className="flex items-start gap-2.5">
-                          <div
-                            className={clsx(
-                              'grid size-5 place-items-center rounded-full shrink-0 mt-0.5 transition-colors',
-                              hasAttempts
-                                ? 'bg-emerald-100 text-emerald-700'
-                                : 'bg-slate-200 text-slate-400',
-                            )}
-                          >
-                            <Check className="size-3 stroke-[2.5]" />
-                          </div>
-                          <div>
-                            <div className="font-bold text-slate-800">Tentativas</div>
-                            <div className="text-slate-500 text-[11px]">
-                              {hasAttempts ? (
-                                `Até ${maxAtt} por contato`
-                              ) : (
-                                <span className="text-slate-400 italic">Definido pelo objetivo</span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Item 5: CSV */}
-                        <div className="flex items-start gap-2.5">
-                          <div
-                            className={clsx(
-                              'grid size-5 place-items-center rounded-full shrink-0 mt-0.5 transition-colors',
-                              hasMailing
-                                ? 'bg-emerald-100 text-emerald-700'
-                                : 'bg-slate-200 text-slate-400',
-                            )}
-                          >
-                            <Check className="size-3 stroke-[2.5]" />
-                          </div>
-                          <div>
-                            <div className="font-bold text-slate-800">Mailing / CSV</div>
-                            <div className="text-slate-500 text-[11px]">
-                              {hasMailing && activeMailing
-                                ? `${activeMailing.name} (${fmtNumber(activeMailing.recordCount)} contatos)`
-                                : 'Pendente anexar ou selecionar'}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-
-                  <div className="pt-2 border-t border-slate-200/80 text-[10px] text-slate-400 leading-tight">
-                    O checklist é atualizado automaticamente a cada resposta da IA.
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* PASSO 2 DA IA: REVISÃO E INÍCIO */}
-          {aiStep === 2 && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-lg font-bold text-slate-900 tracking-tight">
-                  Revisar e iniciar
-                </h2>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                {/* Coluna Principal da Esquerda: Configurações estruturadas da campanha */}
-                <div className="lg:col-span-8 rounded-2xl border border-slate-200 bg-white p-5 space-y-5 shadow-xs">
-                  <div className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-3">
-                    Configuração extraída pela IA
-                  </div>
-
-                  {/* Nome da Campanha */}
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-600 block">
-                      Nome da campanha
-                    </label>
-                    <Input
-                      id="review-campaign-name"
-                      value={campaignName}
-                      onChange={(e) => setCampaignName(e.target.value)}
-                      className="text-sm rounded-xl font-medium"
-                      placeholder="Identificação da campanha"
-                    />
-                  </div>
-
-                  {/* Mailing */}
-                  <div className="space-y-1">
-                    <div className="text-xs font-semibold text-slate-600">
-                      Mailing
-                    </div>
-                    <div className="font-bold text-sm text-slate-900">
-                      {activeMailing?.name ?? 'mailing_clientes.csv'}
-                    </div>
-                    <div className="text-xs text-slate-500">
-                      {activeMailing ? fmtNumber(activeMailing.recordCount) : '1.248'} contatos · campos validados · DNC aplicado
-                    </div>
-                  </div>
-
-                  {/* Prioridade */}
-                  <div className="space-y-1 border-t border-slate-100 pt-3">
-                    <div className="text-xs font-semibold text-slate-600">
-                      Prioridade e Ordenação
-                    </div>
-                    <div className="font-bold text-sm text-slate-900">
-                      {parsedPrompt.extractedSort.label}
-                    </div>
-                    <div className="text-xs text-slate-500">
-                      Segmento {parsedPrompt.audienceSegment} · {OPERATION_PURPOSE_LABEL[parsedPrompt.purposeCode]}
-                    </div>
-                  </div>
-
-                  {/* Canais e Tentativas */}
-                  <div className="space-y-2 border-t border-slate-100 pt-3">
-                    <div className="text-xs font-semibold text-slate-600">
-                      Canais e tentativas
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {parsedPrompt.recommendedChannels.map((ch, idx) => (
-                        <div
-                          key={ch}
-                          className={clsx(
-                            'flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs',
-                            idx === 0
-                              ? 'border-brand-200 bg-brand-50/80 font-bold text-brand-900'
-                              : 'border-slate-200 bg-white font-medium text-slate-700',
-                          )}
-                        >
-                          <span>{idx + 1}</span>
-                          <span>{CHANNEL_LABEL[ch]}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="text-xs text-slate-500">
-                      Até {aiExtracted.maxAttemptsPerContact ?? 3} tentativas por contato · aguardar feedback entre canais
-                    </div>
-                  </div>
-
-                  {/* Horário Permitido */}
-                  <div className="space-y-2 border-t border-slate-100 pt-3">
-                    <div className="text-xs font-semibold text-slate-600">
-                      Horário permitido
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {(parsedPrompt.audienceSegment === 'B2B'
-                        ? ['Seg', 'Ter', 'Qua', 'Qui', 'Sex']
-                        : ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
-                      ).map((d) => (
-                        <span
-                          key={d}
-                          className="rounded-lg border border-brand-200 bg-brand-50/80 px-2.5 py-1 text-xs font-semibold text-brand-900"
-                        >
-                          {d}
-                        </span>
-                      ))}
-                    </div>
-                    <div className="text-xs text-slate-500">
-                      {aiExtracted.operatingStart ?? (parsedPrompt.audienceSegment === 'B2B' ? '08:30' : '08:00')}–
-                      {aiExtracted.operatingEnd ?? (parsedPrompt.audienceSegment === 'B2B' ? '18:00' : '20:00')} · horário local do contato
-                    </div>
-                  </div>
-                </div>
-
-                {/* Coluna Lateral da Direita: Resumo, Início e Ações de Disparo */}
-                <div className="lg:col-span-4 space-y-4">
-                  <div className="rounded-2xl border border-slate-200/90 bg-slate-50/50 p-4 space-y-4">
-                    <div className="text-xs font-bold text-slate-800 tracking-tight">
-                      Resumo
-                    </div>
-
-                    {/* Card 1: Base elegível */}
-                    <div className="rounded-xl border border-slate-200/80 bg-white p-3 space-y-0.5">
-                      <div className="text-[11px] font-medium text-slate-500">Base elegível</div>
-                      <div className="text-base font-bold text-slate-900">
-                        {activeMailing ? fmtNumber(activeMailing.recordCount) : '1.248'} contatos
-                      </div>
-                    </div>
-
-                    {/* Card 2: Estratégia */}
-                    <div className="rounded-xl border border-slate-200/80 bg-white p-3 space-y-0.5">
-                      <div className="text-[11px] font-medium text-slate-500">Estratégia</div>
-                      <div className="text-sm font-bold text-slate-900">
-                        Confirmação básica · v1
-                      </div>
-                    </div>
-
-                    {/* Card 3: Custo estimado */}
-                    <div className="rounded-xl border border-slate-200/80 bg-white p-3 space-y-0.5">
-                      <div className="text-[11px] font-medium text-slate-500">Custo estimado</div>
-                      <div className="text-sm font-bold text-slate-900">
-                        {fmtMoney((activeMailing?.recordCount ?? 1248) * 0.05)} · 1ª tentativa
-                      </div>
-                    </div>
-
-                    <div className="text-[11px] text-slate-500 leading-snug">
-                      Conexões e bloqueios globais serão verificados antes de cada acionamento.
-                    </div>
-
-                    {/* Seletor de Início */}
-                    <div className="space-y-1.5 pt-1 border-t border-slate-200/80">
-                      <label className="text-xs font-semibold text-slate-700 block">
-                        Início
-                      </label>
-                      <Select
-                        id="start-choice-select"
-                        value={scheduleChoice}
-                        onChange={(e) => setScheduleChoice(e.target.value as 'NOW' | 'SCHEDULED')}
-                        className="text-xs rounded-xl"
-                      >
-                        <option value="NOW">Iniciar agora</option>
-                        <option value="SCHEDULED">Agendar para mais tarde</option>
-                      </Select>
-                    </div>
-
-                    {/* Checkbox Salvar como template */}
-                    <div className="flex items-center gap-2 pt-1">
-                      <input
-                        type="checkbox"
-                        id="save-as-template-check"
-                        checked={saveAsTemplate}
-                        onChange={(e) => setSaveAsTemplate(e.target.checked)}
-                        className="size-4 rounded border-slate-300 accent-slate-900 focus:ring-slate-300 cursor-pointer"
-                      />
-                      <label htmlFor="save-as-template-check" className="text-xs font-medium text-slate-700 cursor-pointer">
-                        Salvar campanha como template
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Botões do Rodapé no Passo 2 */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200">
-                <Button
-                  variant="secondary"
-                  size="md"
-                  onClick={() => setAiStep(1)}
-                  icon={<ArrowLeft className="size-4" />}
-                >
-                  ← Voltar à conversa
-                </Button>
-
-                <div className="flex items-center gap-2.5">
-                  <Button
-                    variant="secondary"
-                    size="md"
-                    onClick={() => handleCreate('READY')}
-                    loading={isCreating && createStartMode === 'READY'}
-                    disabled={isCreating}
-                  >
-                    Salvar como pronta
-                  </Button>
-                  <Button
-                    variant="primary"
-                    size="md"
-                    onClick={() => handleCreate('NOW')}
-                    loading={isCreating && createStartMode === 'NOW'}
-                    disabled={isCreating}
-                    icon={<Rocket className="size-4" />}
-                  >
-                    Iniciar campanha
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ============================================================== */}
-      {/* EXPERIÊNCIA 2: FORMA ESTRUTURADA (4 ETAPAS)                    */}
-      {/* ============================================================== */}
-      {experience === 'STRUCTURED' && (
-        <div className="space-y-6">
-          {/* Stepper Bar das 4 Etapas */}
-          <div className="border-b border-slate-200/80 pb-4">
-            <nav aria-label="Etapas da campanha" className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 pt-1">
-            {WIZARD_STEPS.map((s) => {
-              const isActive = wizardStep === s.num;
-              const isDone = wizardStep > s.num;
-              const isClickable =
-                s.num === 1 ||
-                (s.num === 2 && Boolean(selectedMailingId || activeMailing?.id)) ||
-                (s.num === 3 && Boolean(selectedMailingId || activeMailing?.id)) ||
-                (s.num === 4 && Boolean(selectedMailingId || activeMailing?.id));
-
-              return (
-              <button
-                key={s.num}
-                type="button"
-                disabled={!isClickable}
-                onClick={() => isClickable && setWizardStep(s.num)}
-                aria-current={isActive ? 'step' : undefined}
-                className={clsx(
-                  'group flex flex-col gap-2 pb-3.5 border-b-[3px] text-left transition-all duration-150',
-                  isActive
-                    ? 'border-brand-700'
-                    : isDone
-                    ? 'border-brand-300 hover:border-brand-400 cursor-pointer'
-                    : 'border-slate-200 cursor-default',
-                )}
-              >
-                <div className="flex items-center gap-2.5">
-                  <span
-                    className={clsx(
-                      'grid size-7 sm:size-8 shrink-0 place-items-center rounded-full text-xs sm:text-sm font-bold transition-all',
-                      isActive
-                        ? 'bg-brand-700 text-white shadow-xs'
-                        : isDone
-                        ? 'bg-brand-100 text-brand-800'
-                        : 'bg-slate-100 text-slate-400 font-medium',
-                    )}
-                  >
-                    {isDone ? <Check className="size-4 stroke-[2.5]" /> : s.num}
-                  </span>
-                  <span
-                    className={clsx(
-                      'text-sm sm:text-base tracking-tight transition-colors',
-                      isActive
-                        ? 'text-brand-900 font-bold'
-                        : isDone
-                        ? 'text-slate-700 font-semibold group-hover:text-brand-800'
-                        : 'text-slate-400 font-medium',
-                    )}
-                  >
-                    {s.label}
-                  </span>
-                </div>
-              </button>
-            );
-          })}
-        </nav>
-      </div>
-
-      {/* ETAPA 1: MAILING */}
-      {wizardStep === 1 && (
-        <div className="space-y-4">
-          <Card
-            title={
-              <div className="flex items-center justify-between w-full">
-                <span className="flex items-center gap-2">
-                  <Database className="size-4 text-brand-700" aria-hidden />
-                  <span>1. Seleção do Mailing</span>
-                </span>
-                {activeMailing && (
-                  <Badge tone="green">
-                    ✓ {fmtNumber(activeMailing.recordCount)} contatos importados
-                  </Badge>
-                )}
-              </div>
-            }
-          >
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setSourceType('EXISTING')}
-                  className={clsx(
-                    'flex items-center gap-3 rounded-xl border p-4 text-left transition',
-                    sourceType === 'EXISTING'
-                      ? 'border-brand-500 bg-brand-50/70 font-semibold text-brand-900 ring-2 ring-brand-500/20'
-                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
-                  )}
-                >
-                  <FileSpreadsheet className="size-5 text-brand-700 shrink-0" aria-hidden />
-                  <div>
-                    <div className="text-sm font-semibold">Usar mailing existente</div>
-                    <div className="text-xs font-normal text-slate-500">Selecione uma base já carregada no workspace</div>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSourceType('IMPORT')}
-                  className={clsx(
-                    'flex items-center gap-3 rounded-xl border p-4 text-left transition',
-                    sourceType === 'IMPORT'
-                      ? 'border-brand-500 bg-brand-50/70 font-semibold text-brand-900 ring-2 ring-brand-500/20'
-                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
-                  )}
-                >
-                  <UploadCloud className="size-5 text-brand-700 shrink-0" aria-hidden />
-                  <div>
-                    <div className="text-sm font-semibold">Carregar novo mailing (CSV)</div>
-                    <div className="text-xs font-normal text-slate-500">Upload de planilha com conferência de colunas</div>
-                  </div>
-                </button>
-              </div>
-
-              {sourceType === 'EXISTING' ? (
-                <div className="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 space-y-3">
-                  <label htmlFor="select-base" className="text-xs font-medium text-slate-700 block">
-                    Selecione o mailing para a campanha
-                  </label>
-
-                  <Select
-                    id="select-base"
-                    value={selectedMailingId}
-                    onChange={(e) => setSelectedMailingId(e.target.value)}
-                  >
-                    <option value="">Selecione um mailing...</option>
-                    {mailings?.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name} — {fmtNumber(m.recordCount)} registros ({fmtDateTime(m.createdAt)})
-                      </option>
-                    ))}
-                  </Select>
-
-                  {activeMailing && (
-                    <div className="flex items-center gap-2 text-xs text-slate-600 pt-1">
-                      <Check className="size-3.5 text-emerald-600" />
-                      <span>
-                        Mailing selecionado: <strong>{activeMailing.name}</strong> · {fmtNumber(activeMailing.recordCount)} contatos disponíveis
-                      </span>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="rounded-xl border border-slate-200 bg-white p-4">
-                  <ImportFlow
-                    onImported={(r) => {
-                      qc.invalidateQueries({ queryKey: ['mailings'] });
-                      setSelectedMailingId(r.mailingId);
-                      setSourceType('EXISTING');
-                      toast('success', `Mailing "${r.name}" importado e selecionado!`);
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-          </Card>
-
-          <div className="flex items-center justify-end gap-3 pt-2">
-            <Button
-              variant="primary"
-              size="md"
-              disabled={!selectedMailingId && !activeMailing?.id}
-              onClick={() => setWizardStep(2)}
-            >
-              <span>Avançar para Público</span>
-              <ArrowRight className="size-4" aria-hidden />
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* ETAPA 2: PÚBLICO */}
-      {wizardStep === 2 && (
-        <div className="space-y-4">
-          <Card
-            title={
-              <div className="flex items-center justify-between w-full">
-                <span className="flex items-center gap-2">
-                  <Users className="size-4 text-brand-700" aria-hidden />
-                  <span>2. Definição do Público</span>
-                </span>
-                <Badge tone="green">
-                  ✓ {fmtNumber(targetCount)} contatos qualificados
-                </Badge>
-              </div>
-            }
-          >
-            <div className="space-y-4">
-              {/* Seletor Estratégico B2B vs B2C (§Requisito: Estratégias Diferentes em Público) */}
-              <div className="space-y-3 border-b border-slate-200/80 pb-5">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-semibold text-slate-800 uppercase tracking-wider">
-                    Segmento do Público &amp; Estratégia de Contato
-                  </span>
-                  <InfoTooltip content="Calibra janelas de horário (comercial corporativo vs. residencial), canais prioritários e tom de comunicação." />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {/* B2C */}
-                  <button
-                    type="button"
-                    onClick={() => setAudienceSegment('B2C')}
-                    className={clsx(
-                      'flex flex-col text-left p-3.5 rounded-xl border transition-all text-xs space-y-2 cursor-pointer',
-                      audienceSegment === 'B2C'
-                        ? 'border-brand-600 bg-brand-50/50 shadow-xs ring-2 ring-brand-500/20'
-                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60',
-                    )}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-1.5 font-bold text-slate-900">
-                        <User className="size-4 text-brand-600 shrink-0" />
-                        <span>👤 B2C · Pessoa Física</span>
-                        <InfoTooltip content="Consumidor final (CPF). Prioriza horários de almoço, noites Wi-Fi e sábados, com envio de chave PIX instantânea e discador com BINA local." />
-                      </div>
-                      {audienceSegment === 'B2C' && <span className="size-2 rounded-full bg-brand-600" />}
-                    </div>
-                    <p className="text-[11px] text-slate-600">
-                      Consumidor final (CPF) com janelas residenciais, PIX instantâneo e BINA local.
-                    </p>
-                    <div className="pt-1 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100">
-                      <span>Janelas</span>
-                      <strong className="text-slate-800">Almoço, Noite Wi-Fi e Sábados</strong>
-                    </div>
-                  </button>
-
-                  {/* B2B */}
-                  <button
-                    type="button"
-                    onClick={() => setAudienceSegment('B2B')}
-                    className={clsx(
-                      'flex flex-col text-left p-3.5 rounded-xl border transition-all text-xs space-y-2 cursor-pointer',
-                      audienceSegment === 'B2B'
-                        ? 'border-indigo-600 bg-indigo-50/50 shadow-xs ring-2 ring-indigo-500/20'
-                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60',
-                    )}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-1.5 font-bold text-slate-900">
-                        <Building2 className="size-4 text-indigo-600 shrink-0" />
-                        <span>🏢 B2B · Pessoa Jurídica</span>
-                        <InfoTooltip content="Empresas e PMEs (CNPJ). Foco no financeiro/contas a pagar com boleto bancário, DDA e e-mail corporativo em horário comercial." />
-                      </div>
-                      {audienceSegment === 'B2B' && <span className="size-2 rounded-full bg-indigo-600" />}
-                    </div>
-                    <p className="text-[11px] text-slate-600">
-                      Empresas e PMEs (CNPJ) com foco em contas a pagar via boleto e e-mail corporativo.
-                    </p>
-                    <div className="pt-1 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100">
-                      <span>Horários</span>
-                      <strong className="text-indigo-800">Seg–Sex 08:30–18:00 (Comercial)</strong>
-                    </div>
-                  </button>
-
-                  {/* Misto */}
-                  <button
-                    type="button"
-                    onClick={() => setAudienceSegment('MIXED')}
-                    className={clsx(
-                      'flex flex-col text-left p-3.5 rounded-xl border transition-all text-xs space-y-2 cursor-pointer',
-                      audienceSegment === 'MIXED'
-                        ? 'border-purple-600 bg-purple-50/50 shadow-xs ring-2 ring-purple-500/20'
-                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60',
-                    )}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-1.5 font-bold text-slate-900">
-                        <Shuffle className="size-4 text-purple-600 shrink-0" />
-                        <span>🔄 Misto / Dinâmico</span>
-                        <InfoTooltip content="Base híbrida. Roteamento automático da régua por tamanho de documento (11 dígitos CPF / 14 dígitos CNPJ)." />
-                      </div>
-                      {audienceSegment === 'MIXED' && <span className="size-2 rounded-full bg-purple-600" />}
-                    </div>
-                    <p className="text-[11px] text-slate-600">
-                      Base mista com roteamento dinâmico de horário e canal por CPF ou CNPJ.
-                    </p>
-                    <div className="pt-1 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100">
-                      <span>Roteamento</span>
-                      <strong className="text-purple-800">Segmentação Inteligente</strong>
-                    </div>
-                  </button>
-                </div>
-
-                {/* Painel Informativo da Estratégia Calibrada */}
-                <div
-                  className={clsx(
-                    'rounded-xl border p-3.5 text-xs space-y-2',
-                    audienceSegment === 'B2B'
-                      ? 'border-indigo-200 bg-indigo-50/70 text-indigo-950'
-                      : audienceSegment === 'MIXED'
-                      ? 'border-purple-200 bg-purple-50/70 text-purple-950'
-                      : 'border-brand-200 bg-brand-50/70 text-brand-950',
-                  )}
-                >
-                  <div className="flex items-center gap-2 font-bold">
-                    {audienceSegment === 'B2B' ? (
-                      <>
-                        <Building2 className="size-4 text-indigo-700 shrink-0" />
-                        <span>Estratégia Calibrada para Pessoa Jurídica (B2B Corporativo)</span>
-                      </>
-                    ) : audienceSegment === 'MIXED' ? (
-                      <>
-                        <Shuffle className="size-4 text-purple-700 shrink-0" />
-                        <span>Estratégia Híbrida Dinâmica (Roteamento Automático por CPF / CNPJ)</span>
-                      </>
-                    ) : (
-                      <>
-                        <User className="size-4 text-brand-700 shrink-0" />
-                        <span>Estratégia Calibrada para Consumidor Final (B2C)</span>
-                      </>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-[11px]">
-                    <div className="rounded-lg bg-white/90 p-2.5 border border-slate-200/60 shadow-2xs">
-                      <span className="text-slate-500 font-semibold block">Canais Prioritários</span>
-                      <strong className="text-slate-900 block mt-0.5">
-                        {audienceSegment === 'B2B'
-                          ? 'E-mail Corporativo + WhatsApp Business + Voz Comercial'
-                          : audienceSegment === 'MIXED'
-                          ? 'Dinâmico por tipo de documento'
-                          : 'WhatsApp Oficial + Discador BINA Local'}
-                      </strong>
-                    </div>
-                    <div className="rounded-lg bg-white/90 p-2.5 border border-slate-200/60 shadow-2xs">
-                      <span className="text-slate-500 font-semibold block">Janelas de Operação</span>
-                      <strong className="text-slate-900 block mt-0.5">
-                        {audienceSegment === 'B2B'
-                          ? 'Seg–Sex 08:30 às 18:00 (Comercial)'
-                          : audienceSegment === 'MIXED'
-                          ? 'Comercial (CNPJ) e Residencial (CPF)'
-                          : 'Almoço 11:30–13:30 e Noite Wi-Fi 18:00–20:45'}
-                      </strong>
-                    </div>
-                    <div className="rounded-lg bg-white/90 p-2.5 border border-slate-200/60 shadow-2xs">
-                      <span className="text-slate-500 font-semibold block">Formato do Acordo</span>
-                      <strong className="text-slate-900 block mt-0.5">
-                        {audienceSegment === 'B2B'
-                          ? 'Boleto bancário / DDA com código de barras'
-                          : audienceSegment === 'MIXED'
-                          ? 'Boleto (PJ) / Chave PIX copiável (PF)'
-                          : 'Chave PIX instantânea copiável no WhatsApp'}
-                      </strong>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="text-xs text-slate-600">
-                Mailing de origem: <strong className="text-slate-900">{activeMailing?.name}</strong> ({fmtNumber(activeMailing?.recordCount ?? 0)} registros totais)
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setUseList(false)}
-                  className={clsx(
-                    'flex items-start gap-3 rounded-xl border p-4 text-left transition',
-                    !useList
-                      ? 'border-brand-500 bg-brand-50/70 font-semibold text-brand-900 ring-2 ring-brand-500/20'
-                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
-                  )}
-                >
-                  <Users className="size-5 text-brand-700 shrink-0 mt-0.5" aria-hidden />
-                  <div>
-                    <div className="flex items-center gap-1.5 text-sm font-semibold">
-                      <span>Toda a base do mailing</span>
-                      <InfoTooltip content="Dispara para todos os contatos válidos do mailing, sem filtros restritivos adicionais." />
-                    </div>
-                    <div className="text-xs font-normal text-slate-500 mt-0.5">
-                      {fmtNumber(activeMailing?.recordCount ?? 0)} contatos disponíveis
-                    </div>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setUseList(true)}
-                  className={clsx(
-                    'flex items-start gap-3 rounded-xl border p-4 text-left transition',
-                    useList
-                      ? 'border-brand-500 bg-brand-50/70 font-semibold text-brand-900 ring-2 ring-brand-500/20'
-                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
-                  )}
-                >
-                  <SlidersHorizontal className="size-5 text-brand-700 shrink-0 mt-0.5" aria-hidden />
-                  <div>
-                    <div className="flex items-center gap-1.5 text-sm font-semibold">
-                      <span>Lista segmentada</span>
-                      <InfoTooltip content="Filtre e ordene contatos específicos a partir de regras customizadas sobre o mailing." />
-                    </div>
-                    <div className="text-xs font-normal text-slate-500 mt-0.5">
-                      Filtros avançados e segmentações salvas
-                    </div>
-                  </div>
-                </button>
-              </div>
-
-              {useList && (
-                <div className="rounded-xl border border-slate-200/90 bg-slate-50/50 p-4 space-y-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-3">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-semibold text-slate-800 uppercase tracking-wider">
-                        Configuração do Público (Lista)
-                      </span>
-                      <InfoTooltip content="Selecione um público existente já publicado ou crie uma nova lista com filtros sobre o mailing." />
-                    </div>
-
-                    <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-0.5 text-xs font-medium">
-                      <button
-                        type="button"
-                        onClick={() => setListSelectionMode('SELECT')}
-                        className={clsx(
-                          'rounded-md px-3 py-1.5 transition',
-                          listSelectionMode === 'SELECT'
-                            ? 'bg-brand-50 text-brand-800 font-semibold shadow-xs'
-                            : 'text-slate-600 hover:text-slate-900',
-                        )}
-                      >
-                        Selecionar existente
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setListSelectionMode('CREATE')}
-                        className={clsx(
-                          'inline-flex items-center gap-1 rounded-md px-3 py-1.5 transition',
-                          listSelectionMode === 'CREATE'
-                            ? 'bg-brand-50 text-brand-800 font-semibold shadow-xs'
-                            : 'text-slate-600 hover:text-slate-900',
-                        )}
-                      >
-                        <Plus className="size-3.5" /> Criar nova lista
-                      </button>
-                    </div>
-                  </div>
-
-                  {listSelectionMode === 'SELECT' ? (
-                    <div className="space-y-3">
-                      <label htmlFor="select-list" className="text-xs font-medium text-slate-700 block">
-                        Selecione a lista segmentada
-                      </label>
-
-                      {lists && lists.length > 0 ? (
-                        <div className="space-y-2">
-                          <Select
-                            id="select-list"
-                            value={selectedListId}
-                            onChange={(e) => {
-                              setSelectedListId(e.target.value);
-                              const l = lists.find((x) => x.id === e.target.value);
-                              if (l) setSelectedMailingId(l.mailing.id);
-                            }}
-                          >
-                            <option value="">Selecione uma lista...</option>
-                            {lists.map((l) => (
-                              <option key={l.id} value={l.id}>
-                                {l.name} — {fmtNumber(l.latestVersion?.memberCount ?? 0)} membros (v{l.latestVersion?.version})
-                              </option>
-                            ))}
-                          </Select>
-
-                          {activeList && (
-                            <div className="flex items-center justify-between rounded-lg bg-white p-2.5 border border-slate-200 text-xs text-slate-700">
-                              <div className="flex items-center gap-2">
-                                <Check className="size-3.5 text-emerald-600" />
-                                <span>
-                                  Público selecionado: <strong>{activeList.name}</strong> · {fmtNumber(activeList.latestVersion?.memberCount ?? 0)} membros
-                                </span>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => setListSelectionMode('CREATE')}
-                                className="text-brand-700 hover:underline font-semibold flex items-center gap-1"
-                              >
-                                <Plus className="size-3.5" /> Criar nova lista
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="rounded-lg border border-dashed border-slate-300 p-4 text-center">
-                          <p className="text-xs text-slate-500 mb-2">Nenhuma lista segmentada cadastrada no workspace.</p>
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => setListSelectionMode('CREATE')}
-                            icon={<Plus className="size-3.5" />}
-                          >
-                            Criar nova lista agora
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="space-y-3 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                      <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                        <div>
-                          <span className="text-xs font-semibold text-slate-800">
-                            Criar Nova Lista Segmentada
-                          </span>
-                          <span className="text-xs text-slate-500 block">
-                            Filtros aplicados sobre "{activeMailing?.name}"
-                          </span>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setListSelectionMode('SELECT')}
-                        >
-                          Cancelar e voltar
-                        </Button>
-                      </div>
-                      <ListEditor
-                        mailingId={selectedMailingId || activeMailing?.id || ''}
-                        initial={{ name: `${activeMailing?.name ?? 'Mailing'} · Lista ${new Date().toLocaleDateString('pt-BR')}` }}
-                        onPublished={(r, s) => {
-                          qc.invalidateQueries({ queryKey: ['lists'] });
-                          setSelectedListId(r.listId);
-                          setListSelectionMode('SELECT');
-                          toast('success', `Lista "${s.name}" criada com sucesso (${fmtNumber(r.memberCount)} membros).`);
-                        }}
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/40 p-3.5 flex items-center justify-between text-xs text-emerald-950">
-                <div className="flex items-center gap-2">
-                  <Check className="size-4 text-emerald-600 shrink-0" />
-                  <span>
-                    Público configurado: <strong>{fmtNumber(targetCount)} contatos qualificados</strong> prontos para acionamento.
-                  </span>
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          <div className="flex items-center justify-between gap-3 pt-2">
-            <Button
-              variant="secondary"
-              onClick={() => setWizardStep(1)}
-              icon={<ArrowLeft className="size-4" aria-hidden />}
-            >
-              Voltar para Mailing
-            </Button>
-            <Button
-              variant="primary"
-              size="md"
-              onClick={() => setWizardStep(3)}
-            >
-              <span>Avançar para Acionamento</span>
-              <ArrowRight className="size-4" aria-hidden />
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* ETAPA 3: ACIONAMENTO */}
-      {wizardStep === 3 && (
-        <div className="space-y-4">
-          <Card
-            title={
-              <div className="flex items-center justify-between w-full">
-                <span className="flex items-center gap-2">
-                  <Sparkles className="size-4 text-brand-700" aria-hidden />
-                  <span>3. Acionamento & Inteligência de CPC</span>
-                </span>
-                {skipAiOptimization ? (
-                  <Badge tone="amber">Sem Otimização IA</Badge>
-                ) : (
-                  <Badge tone="green">Otimização Automática Ativa</Badge>
-                )}
-              </div>
-            }
-          >
-            <div className="space-y-4">
-              {skipAiOptimization && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3.5 text-xs text-amber-900 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <SlidersHorizontal className="size-4 text-amber-700 shrink-0" />
-                    <span>
-                      <strong>Otimização IA ignorada:</strong> o acionamento seguirá a ordem sequencial direta da base e os parâmetros padrão da estratégia.
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setSkipAiOptimization(false)}
-                    className="font-semibold text-brand-700 underline hover:text-brand-900 ml-2 shrink-0"
-                  >
-                    Reativar Otimização IA
-                  </button>
-                </div>
-              )}
-
-              {/* Seletor Visual dos 3 Objetivos da Plataforma */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-semibold text-slate-800">
-                    Objetivo Principal da Operação
-                  </span>
-                  <InfoTooltip content="Calibra réguas de disparo, canais prioritários e o modelo preditivo de contato com a pessoa certa." />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {/* Cobrança */}
-                  <button
-                    type="button"
-                    onClick={() => handleSelectPurpose('COBRANCA')}
-                    className={clsx(
-                      'flex flex-col text-left p-3.5 rounded-xl border transition-all text-xs space-y-1.5 cursor-pointer',
-                      purposeCode === 'COBRANCA'
-                        ? 'border-brand-600 bg-brand-50/50 shadow-xs ring-2 ring-brand-500/20'
-                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60',
-                    )}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-1.5 font-bold text-slate-900">
-                        <Coins className="size-4 text-amber-600 shrink-0" />
-                        <span>🪙 Cobrança</span>
-                        <InfoTooltip content="Localização de titular, renegociação amigável e acordos com envio de PIX instantâneo ou boleto." />
-                      </div>
-                      {purposeCode === 'COBRANCA' && (
-                        <span className="size-2 rounded-full bg-brand-600" />
-                      )}
-                    </div>
-                    <div className="pt-1 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100">
-                      <span>Custo/CPC Otimizado</span>
-                      <strong className="text-emerald-700">R$ 3,18</strong>
-                    </div>
-                  </button>
-
-                  {/* Venda */}
-                  <button
-                    type="button"
-                    onClick={() => handleSelectPurpose('VENDAS')}
-                    className={clsx(
-                      'flex flex-col text-left p-3.5 rounded-xl border transition-all text-xs space-y-1.5 cursor-pointer',
-                      purposeCode === 'VENDAS'
-                        ? 'border-brand-600 bg-brand-50/50 shadow-xs ring-2 ring-brand-500/20'
-                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60',
-                    )}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-1.5 font-bold text-slate-900">
-                        <ShoppingBag className="size-4 text-blue-600 shrink-0" />
-                        <span>🛍️ Venda</span>
-                        <InfoTooltip content="Ofertas ativas, upgrade de planos e conversão consultiva de leads com maior propensão de compra." />
-                      </div>
-                      {purposeCode === 'VENDAS' && (
-                        <span className="size-2 rounded-full bg-brand-600" />
-                      )}
-                    </div>
-                    <div className="pt-1 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100">
-                      <span>Custo/Lead Otimizado</span>
-                      <strong className="text-emerald-700">R$ 8,20</strong>
-                    </div>
-                  </button>
-
-                  {/* Agendamentos */}
-                  <button
-                    type="button"
-                    onClick={() => handleSelectPurpose('AGENDAMENTOS')}
-                    className={clsx(
-                      'flex flex-col text-left p-3.5 rounded-xl border transition-all text-xs space-y-1.5 cursor-pointer',
-                      purposeCode === 'AGENDAMENTOS'
-                        ? 'border-emerald-600 bg-emerald-50/50 shadow-xs ring-2 ring-emerald-500/20'
-                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60',
-                    )}
-                  >
-                    <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-1.5 font-bold text-slate-900">
-                        <CalendarCheck className="size-4 text-emerald-600 shrink-0" />
-                        <span>📅 Agendamentos</span>
-                        <InfoTooltip content="Confirmação de presença e prevenção de no-show em duas etapas: D-1 com botões interativos e D-0 2h antes com localização." />
-                      </div>
-                      {purposeCode === 'AGENDAMENTOS' && (
-                        <span className="size-2 rounded-full bg-emerald-600" />
-                      )}
-                    </div>
-                    <div className="pt-1 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100">
-                      <span>Custo/Confirmação</span>
-                      <strong className="text-emerald-700">R$ 0,42</strong>
-                    </div>
-                  </button>
-                </div>
-              </div>
-
-              {/* Banner de Cadência Automática para Agendamentos (D-1 e D-0) */}
-              {purposeCode === 'AGENDAMENTOS' && (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3.5 text-xs text-emerald-950 space-y-2">
-                  <div className="flex items-center gap-2 font-bold text-emerald-900">
-                    <CalendarClock className="size-4 text-emerald-700 shrink-0" />
-                    <span>Cadência Automática de Agendamento (Prevenção de No-Show)</span>
-                    <InfoTooltip content="Disparos inteligentes calibrados para confirmação prévia e redução comprovada de faltas." />
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
-                    <div className="rounded-lg border border-emerald-200/80 bg-white/95 p-2.5 space-y-0.5 shadow-2xs">
-                      <div className="font-bold text-emerald-900 flex items-center gap-1.5 text-xs">
-                        <span>🔔 Lembrete 1 dia antes (D-1)</span>
-                      </div>
-                      <p className="text-slate-600 text-[11px] leading-snug">
-                        WhatsApp Oficial interativo com botões: <strong>[1 - Confirmo]</strong> e <strong>[2 - Reagendar]</strong>.
-                      </p>
-                    </div>
-                    <div className="rounded-lg border border-emerald-200/80 bg-white/95 p-2.5 space-y-0.5 shadow-2xs">
-                      <div className="font-bold text-emerald-900 flex items-center gap-1.5 text-xs">
-                        <span>📍 Lembrete no dia (D-0 · 2h antes)</span>
-                      </div>
-                      <p className="text-slate-600 text-[11px] leading-snug">
-                        WhatsApp (ou SMS fallback) com endereço completo e instruções de chegada.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <div className="flex items-center gap-1.5">
-                  <label htmlFor="campaign-prompt" className="text-xs font-medium text-slate-700">
-                    Descreva o objetivo do acionamento
-                  </label>
-                  <InfoTooltip content="Descreva em linguagem natural o contexto da ação para calibrar tom de voz e canais prioritários." />
-                </div>
-                <Textarea
-                  id="campaign-prompt"
-                  rows={3}
-                  className="font-sans text-sm p-3.5 rounded-xl border-slate-200 focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
-                  placeholder="Ex: Cobrança preventiva recente 15 a 30 dias com foco em WhatsApp e menor custo por CPC..."
-                  value={promptText}
-                  onChange={(e) => setPromptText(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 mb-1.5">
-                  <span>Sugestões rápidas ({AUDIENCE_SEGMENT_LABEL[audienceSegment]}):</span>
-                  <InfoTooltip content="Modelos prontos de acionamento adaptados para o objetivo e segmento selecionados." />
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {PROMPT_TEMPLATES.filter((t) => t.purposeCode === purposeCode).map((tmpl) => {
-                    const isSegmentMatch = tmpl.audienceSegment === audienceSegment;
-                    return (
-                      <button
-                        key={tmpl.label}
-                        type="button"
-                        onClick={() => handleApplyTemplate(tmpl)}
-                        className={clsx(
-                          'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium transition cursor-pointer',
-                          isSegmentMatch
-                            ? 'border border-brand-300 bg-brand-50 text-brand-900 font-semibold shadow-2xs hover:bg-brand-100'
-                            : 'border border-slate-200 bg-slate-50/70 text-slate-600 hover:border-slate-300 hover:bg-slate-100 opacity-80 hover:opacity-100',
-                        )}
-                      >
-                        <Sparkles className="size-3 text-brand-600" aria-hidden />
-                        <span>{tmpl.label}</span>
-                        {tmpl.audienceSegment && (
-                          <span className="rounded bg-white/80 px-1 py-0.2 text-[9px] font-bold uppercase text-slate-500">
-                            {tmpl.audienceSegment}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                  {PROMPT_TEMPLATES.filter((t) => t.purposeCode !== purposeCode).map((tmpl) => (
-                    <button
-                      key={tmpl.label}
-                      type="button"
-                      onClick={() => handleApplyTemplate(tmpl)}
-                      className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50/70 px-2.5 py-1 text-xs font-medium text-slate-600 hover:border-slate-300 hover:bg-slate-100 transition cursor-pointer opacity-70 hover:opacity-100"
-                    >
-                      {tmpl.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {(() => {
-                const meta =
-                  PURPOSE_METADATA[purposeCode as keyof typeof PURPOSE_METADATA] ??
-                  PURPOSE_METADATA.COBRANCA;
-
-                return (
-                  <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                      <Field
-                        label={`${meta.metricLabel} Máximo (R$)`}
-                        tooltip="Teto orçamentário aceitável por resultado alcançado. A IA suprime canais mais caros se ultrapassarem esta meta."
-                      >
-                        {(p) => (
-                          <Input
-                            id={p.id}
-                            type="number"
-                            step="0.10"
-                            min="0.10"
-                            value={maxAcceptableCpcBrl}
-                            onChange={(e) => setMaxAcceptableCpcBrl(Number(e.target.value) || 4.5)}
-                          />
-                        )}
-                      </Field>
-
-                      <div className="flex flex-col justify-end">
-                        <div className="flex items-center gap-1 text-xs text-slate-500 pb-1">
-                          <span>Canais Prioritários ({audienceSegment === 'B2B' ? 'B2B Corporativo' : audienceSegment === 'MIXED' ? 'Misto Dinâmico' : 'B2C Residencial'})</span>
-                          <InfoTooltip content="Canais de disparo ordenados por custo-efetividade para este segmento de público." />
-                        </div>
-                        <div className="flex items-center gap-1.5 text-sm font-semibold text-slate-800 flex-wrap">
-                          {audienceSegment === 'B2B' ? (
-                            <>
-                              <Badge tone="blue">E-mail Corporativo (#1)</Badge>
-                              <span className="text-xs text-slate-400">+</span>
-                              <Badge tone="brand">WhatsApp Business</Badge>
-                              <span className="text-xs text-slate-400">+</span>
-                              <Badge tone="gray">Voz Comercial</Badge>
-                            </>
-                          ) : audienceSegment === 'MIXED' ? (
-                            <>
-                              <Badge tone="blue">E-mail PJ (#1) / WhatsApp PF (#1)</Badge>
-                              <span className="text-xs text-slate-400">+</span>
-                              <Badge tone="brand">Voz Inteligente</Badge>
-                            </>
-                          ) : meta.code === 'AGENDAMENTOS' ? (
-                            <>
-                              <Badge tone="green">WhatsApp com Botões</Badge>
-                              <span className="text-xs text-slate-400">+</span>
-                              <Badge tone="brand">SMS / Voz Fallback</Badge>
-                            </>
-                          ) : meta.code === 'VENDAS' ? (
-                            <>
-                              <Badge tone="green">WhatsApp Interativo</Badge>
-                              <span className="text-xs text-slate-400">+</span>
-                              <Badge tone="brand">Discador Consultivo</Badge>
-                            </>
-                          ) : (
-                            <>
-                              <Badge tone="green">WhatsApp Oficial</Badge>
-                              <span className="text-xs text-slate-400">+</span>
-                              <Badge tone="brand">Discador BINA Local</Badge>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Indicadores de Eficiência Adaptados por Objetivo */}
-                    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 pt-2 border-t border-slate-200/80">
-                      <Stat
-                        label="Contatos Qualificados"
-                        value={fmtNumber(targetCount)}
-                        tooltip="Total de destinatários aptos no público configurado."
-                      />
-                      <Stat
-                        label={meta.secondaryMetricLabel}
-                        value={`${meta.expectedRatePct.toFixed(1)}%`}
-                        tone="good"
-                        tooltip="Taxa média projetada para contatos assertivos."
-                      />
-                      <Stat
-                        label={meta.metricLabel}
-                        value={fmtMoney(meta.optimizedUnitCostBrl)}
-                        tone="good"
-                        hint={`vs. ${fmtMoney(meta.benchmarkUnitCostBrl)} Tradicional`}
-                        tooltip={`Custo unitário estimado pelo modelo preditivo versus benchmark de mercado (${fmtMoney(meta.benchmarkUnitCostBrl)}).`}
-                      />
-                      <Stat
-                        label={
-                          meta.code === 'AGENDAMENTOS'
-                            ? 'Redução de No-Show'
-                            : meta.code === 'VENDAS'
-                            ? 'Aumento de Vendas'
-                            : 'Economia Projetada'
-                        }
-                        value={`${meta.code === 'VENDAS' ? '+' : '-'}${meta.savingsOrGainPct.toFixed(1)}%`}
-                        tone="good"
-                        tooltip={meta.cadenceSummary}
-                      />
-                    </div>
-                  </>
-                );
-              })()}
-
-              {/* Detalhe dos 8 blocos (colapsado por padrão) */}
-              <div className="border-t border-slate-200/80 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setShowBlocksDetail(!showBlocksDetail)}
-                  className="flex items-center gap-1.5 text-xs font-semibold text-brand-700 hover:text-brand-800 transition"
-                >
-                  {showBlocksDetail ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-                  <span>
-                    {showBlocksDetail
-                      ? 'Ocultar matriz dos 8 blocos (TIC Domicílios 2025)'
-                      : 'Ver matriz dos 8 blocos (TIC Domicílios 2025)'}
-                  </span>
-                </button>
-
-                {showBlocksDetail && (
-                  <div className="pt-3">
-                    <TableWrap label="8 Blocos Padronizados de Otimização">
-                      <table className="data">
-                        <thead>
-                          <tr>
-                            <th className="w-12">Bloco</th>
-                            <th>Segmento Demográfico (TIC 2025)</th>
-                            <th>Canal Primário</th>
-                            <th>Janela Ótima</th>
-                            <th>Phone-Intent</th>
-                            <th>Custo Previsto</th>
-                            <th>Decisão</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {BLOCKS_TEMPLATE.map((b) => (
-                            <tr key={b.blockNum}>
-                              <td className="tabular font-bold text-slate-500">#{b.blockNum}</td>
-                              <td>
-                                <div className="font-semibold text-slate-900">{b.name}</div>
-                                <div className="text-[11px] text-slate-500">{b.demographics}</div>
-                              </td>
-                              <td>
-                                <Badge
-                                  tone={
-                                    b.channel === 'WHATSAPP'
-                                      ? 'green'
-                                      : b.channel === 'VOICE'
-                                      ? 'brand'
-                                      : 'blue'
-                                  }
-                                >
-                                  {CHANNEL_LABEL[b.channel]}
-                                </Badge>
-                              </td>
-                              <td className="text-xs text-slate-700">{b.timeWindow}</td>
-                              <td>
-                                <Badge
-                                  tone={
-                                    b.phoneTier.startsWith('P1')
-                                      ? 'green'
-                                      : b.phoneTier.startsWith('P2')
-                                      ? 'brand'
-                                      : 'gray'
-                                  }
-                                >
-                                  {b.phoneTier}
-                                </Badge>
-                              </td>
-                              <td className="tabular font-semibold text-emerald-700">
-                                {fmtMoney(b.estimatedCpcBrl)}
-                              </td>
-                              <td>
-                                <Badge tone={b.tone}>{b.decision}</Badge>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </TableWrap>
-                  </div>
-                )}
-              </div>
-            </div>
-          </Card>
-
-          <div className="flex items-center justify-between gap-3 pt-2">
-            <Button
-              variant="secondary"
-              onClick={() => setWizardStep(2)}
-              icon={<ArrowLeft className="size-4" aria-hidden />}
-            >
-              Voltar para Público
-            </Button>
-            <div className="flex items-center gap-2.5">
-              <Button
-                variant="secondary"
-                size="md"
-                onClick={() => {
-                  setSkipAiOptimization(true);
-                  setWizardStep(4);
-                }}
-              >
-                Pular (sem otimização IA)
-              </Button>
-              <Button
-                variant="primary"
-                size="md"
-                onClick={() => {
-                  setSkipAiOptimization(false);
-                  setWizardStep(4);
-                }}
-              >
-                <span>Avançar para Campanha</span>
-                <ArrowRight className="size-4" aria-hidden />
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ETAPA 4: CAMPANHA */}
-      {wizardStep === 4 && (
-        <div className="space-y-4">
-          <Card
-            title={
-              <div className="flex items-center justify-between w-full">
-                <span className="flex items-center gap-2">
-                  <ShieldCheck className="size-4 text-brand-700" aria-hidden />
-                  <span>4. Finalização e Disparo da Campanha</span>
-                </span>
-                <Badge tone="green">Pronta para Disparo</Badge>
-              </div>
-            }
-          >
-            <div className="space-y-4">
-              <Field label="Nome da Campanha" required>
-                {(p) => (
-                  <Input
-                    id={p.id}
-                    value={campaignName}
-                    onChange={(e) => setCampaignName(e.target.value)}
-                    placeholder="Nome identificador da campanha"
-                  />
-                )}
-              </Field>
-
-              {/* Resumo consolidado dos 4 passos */}
-              <div className="rounded-xl border border-slate-200/90 bg-slate-50/60 p-4 space-y-3">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 uppercase tracking-wider">
-                  <span>Resumo dos parâmetros</span>
-                  <InfoTooltip content="Conferência dos blocos configurados antes da criação ou disparo da campanha." />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-                  <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1">
-                    <span className="text-slate-500 block text-[11px] font-medium">1. Mailing</span>
-                    <span className="font-semibold text-slate-900 block truncate">
-                      {activeMailing?.name ?? 'Mailing'}
-                    </span>
-                    <span className="text-slate-500 text-[11px] block">
-                      {fmtNumber(activeMailing?.recordCount ?? 0)} contatos
-                    </span>
-                  </div>
-
-                  <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1">
-                    <span className="text-slate-500 block text-[11px] font-medium">2. Público</span>
-                    <span className="font-semibold text-slate-900 block truncate">
-                      {audienceSegment === 'B2B'
-                        ? '🏢 B2B · Pessoa Jurídica'
-                        : audienceSegment === 'MIXED'
-                        ? '🔄 Misto (CPF e CNPJ)'
-                        : '👤 B2C · Pessoa Física'}
-                    </span>
-                    <span className="text-emerald-700 font-semibold text-[11px] block">
-                      {fmtNumber(targetCount)} contatos ({useList ? activeList?.name ?? 'Lista' : 'Toda a base'})
-                    </span>
-                  </div>
-
-                  <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1">
-                    <span className="text-slate-500 block text-[11px] font-medium">3. Acionamento</span>
-                    <span className="font-semibold text-slate-900 block truncate">
-                      {skipAiOptimization
-                        ? 'Disparo Direto'
-                        : purposeCode === 'AGENDAMENTOS'
-                        ? '📅 Agendamentos (D-1 e D-0)'
-                        : purposeCode === 'VENDAS'
-                        ? '🛍️ Venda & Up-sell'
-                        : '🪙 Cobrança & Recuperação'}
-                    </span>
-                    <span className="text-slate-500 text-[11px] block">
-                      {skipAiOptimization
-                        ? 'Sem otimização IA'
-                        : `Teto: ${fmtMoney(maxAcceptableCpcBrl)} / ${
-                            purposeCode === 'AGENDAMENTOS'
-                              ? 'Confirmação'
-                              : purposeCode === 'VENDAS'
-                              ? 'Lead'
-                              : 'CPC'
-                          }`}
-                    </span>
-                  </div>
-
-                  <div className="rounded-lg border border-slate-200/80 bg-white p-3 space-y-1">
-                    <span className="text-slate-500 block text-[11px] font-medium">4. Eficiência</span>
-                    {skipAiOptimization ? (
-                      <>
-                        <span className="font-semibold text-slate-700 block">
-                          Ordem Direta
-                        </span>
-                        <span className="text-slate-500 text-[11px] block">
-                          Sem filtro preditivo
-                        </span>
-                      </>
-                    ) : purposeCode === 'AGENDAMENTOS' ? (
-                      <>
-                        <span className="font-semibold text-emerald-700 block">
-                          R$ 0,42 / Confirmação
-                        </span>
-                        <span className="text-emerald-700 text-[11px] block">
-                          -52,0% redução de no-show (D-1 e D-0)
-                        </span>
-                      </>
-                    ) : purposeCode === 'VENDAS' ? (
-                      <>
-                        <span className="font-semibold text-emerald-700 block">
-                          R$ 8,20 / Conversão
-                        </span>
-                        <span className="text-emerald-700 text-[11px] block">
-                          +35,0% aumento de conversão
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="font-semibold text-emerald-700 block">
-                          R$ 3,18 / CPC
-                        </span>
-                        <span className="text-emerald-700 text-[11px] block">
-                          43,2% de economia prevista
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {purposeCode === 'AGENDAMENTOS' && !skipAiOptimization && (
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-950 flex items-center gap-2.5">
-                    <CalendarClock className="size-4 text-emerald-700 shrink-0" />
-                    <span>
-                      <strong>Régua de Agendamentos Ativa:</strong> Disparo automático de Lembrete 1 dia antes (D-1 com botões interativos de confirmação) e no dia (D-0 informativo 2h antes com localização e orientações).
-                    </span>
-                  </div>
-                )}
-
-                {audienceSegment === 'B2B' && (
-                  <div className="rounded-xl border border-indigo-200 bg-indigo-50/70 p-3 text-xs text-indigo-950 flex items-center gap-2.5">
-                    <Building2 className="size-4 text-indigo-700 shrink-0" />
-                    <div className="flex items-center gap-1.5">
-                      <span><strong>Compliance B2B Ativo:</strong> Disparos restritos ao horário comercial corporativo (Segunda a Sexta, 08h30 às 18h00).</span>
-                      <InfoTooltip content="Finais de semana e noites são bloqueados automaticamente." />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </Card>
-
-          {formError && <Alert tone="error">{formError}</Alert>}
-
-          {/* Barra de Ação Final */}
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
-            <Button
-              variant="secondary"
-              onClick={() => setWizardStep(3)}
-              icon={<ArrowLeft className="size-4" aria-hidden />}
-            >
-              Voltar para Acionamento
-            </Button>
-
-            <div className="flex flex-wrap items-center gap-2.5">
-              <Button
-                variant="secondary"
-                onClick={() => handleCreate('READY')}
-                loading={isCreating && createStartMode === 'READY'}
-                disabled={isCreating}
-              >
-                Salvar como pronta
-              </Button>
-              <Button
-                variant="primary"
-                onClick={() => handleCreate('NOW')}
-                loading={isCreating && createStartMode === 'NOW'}
-                disabled={isCreating}
-                icon={<Rocket className="size-4" aria-hidden />}
-              >
-                Criar e iniciar campanha
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-        </div>
-      )}
-
-      {/* Modal de Configuração da API da OpenAI */}
-      <Modal
-        open={openAiModalOpen}
-        onOpenChange={setOpenAiModalOpen}
-        title="Conectar API da OpenAI"
-        footer={
-          <>
-            <Button onClick={() => setOpenAiModalOpen(false)}>Cancelar</Button>
-            <Button variant="primary" onClick={handleSaveOpenAiConfig}>
-              Salvar configuração
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <Field
-            label="OpenAI API Key (sk-...)"
-            tooltip="Configure sua chave da OpenAI para habilitar o modelo GPT na criação interativa. Sua chave é enviada com segurança ao endpoint /api/ai/campaign-chat. Se deixada em branco, o assistente interativo integrado assume automaticamente."
-          >
-            {(p) => (
-              <Input
-                id={p.id}
-                type="password"
-                value={openAiApiKeyInput}
-                onChange={(e) => setOpenAiApiKeyInput(e.target.value)}
-                placeholder="sk-proj-..."
-              />
-            )}
-          </Field>
-
-          <Field label="Modelo da OpenAI">
-            {(p) => (
-              <Select
-                id={p.id}
-                value={openAiModelInput}
-                onChange={(e) => setOpenAiModelInput(e.target.value)}
-              >
-                <option value="gpt-4o-mini">gpt-4o-mini (Rápido e econômico · Recomendado)</option>
-                <option value="gpt-4o">gpt-4o (Alta precisão analítica)</option>
-                <option value="gpt-4.1-mini">gpt-4.1-mini</option>
-                <option value="gpt-4.1">gpt-4.1</option>
-              </Select>
-            )}
-          </Field>
-
-          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-xs text-slate-600 space-y-1">
-            <div className="font-semibold text-slate-800">Status atual do motor:</div>
-            <div>
-              Provedor ativo:{' '}
-              <strong>
-                {isOpenAiConfigured
-                  ? `OpenAI API (${aiStatusQ.data?.model || openAiModelInput})`
-                  : 'Assistente Interativo Voll Plan (Fallback Local)'}
-              </strong>
-            </div>
-          </div>
-        </div>
-      </Modal>
-    </div>
-  );
-}
-
-// ------------------------------------------------------------------ Etapa Mailing
+// ==================================================================
+// ETAPA 1: MAILING
+// ==================================================================
 function MailingStep({
   draft,
   extra,
   mailings,
-  lists,
   update,
   onNext,
 }: {
   draft: CampaignDraft;
   extra: Extra;
   mailings?: MailingSummary[];
-  lists?: ListSummary[];
   update: UpdateFn;
   onNext: () => void;
 }) {
   const qc = useQueryClient();
   const source: MailingSource = extra.mailingSource ?? (draft.mailingId ? 'MAILING' : 'IMPORT');
-  const [err, setErr] = useState<string | null>(null);
-  const selRef = useRef<HTMLSelectElement>(null);
+  const [selectedId, setSelectedId] = useState<string>(draft.mailingId ?? '');
 
-  // trocar de origem invalida público e acionamento revisados (§27.2)
-  const setMailing = (mailingId: string | null, ext: Partial<Extra> = {}) =>
+  const setMailing = (mailingId: string | null, name?: string, andGoNext = false) => {
+    setSelectedId(mailingId ?? '');
     update(
-      { mailingId, audienceMode: null, listVersionId: null, sourceListVersionId: null },
-      { audienceCount: null, listEditor: undefined, listId: undefined, listPublishedState: undefined, listName: undefined, listVersion: undefined, ...ext },
+      {
+        mailingId,
+        audienceMode: 'ALL',
+        listVersionId: null,
+        sourceListVersionId: null,
+        ...(andGoNext && mailingId ? { step: 'AUDIENCE' } : {}),
+      },
+      { mailingSource: source, mailingName: name, audienceCount: null },
     );
-
-  const selectedListId = lists?.find((l) => l.latestVersion?.id === draft.sourceListVersionId)?.id ?? '';
-
-  function next() {
-    if (!draft.mailingId) {
-      setErr(source === 'LIST' ? 'Selecione uma lista' : 'Selecione um mailing');
-      selRef.current?.focus();
-      return;
-    }
-    onNext();
-  }
+  };
 
   return (
     <div className="space-y-4">
-      <fieldset>
-        <legend className="mb-2 text-sm text-slate-700">De onde vêm os contatos?</legend>
-        <div className="grid gap-2 md:grid-cols-3">
-          <RadioCard
-            name="src"
-            value="IMPORT"
-            checked={source === 'IMPORT'}
-            onChange={() => update({}, { mailingSource: 'IMPORT' })}
-            title="Importar mailing"
-            description="CSV ou conteúdo colado de planilha."
-          />
-          <RadioCard
-            name="src"
-            value="MAILING"
-            checked={source === 'MAILING'}
-            onChange={() => update({}, { mailingSource: 'MAILING' })}
-            title="Mailing existente"
-            description="Reutilizar uma carga já importada."
-          />
-          <RadioCard
-            name="src"
-            value="LIST"
-            checked={source === 'LIST'}
-            onChange={() => update({}, { mailingSource: 'LIST' })}
-            title="Lista existente"
-            description="Mantém regras e ordenação publicadas."
-          />
-        </div>
-      </fieldset>
+      {/* Banner de atalho para modelos */}
+      <div className="flex items-center justify-between rounded-xl border border-brand-100 bg-brand-50/40 px-3.5 py-2 text-xs text-brand-900">
+        <span className="flex items-center gap-2">
+          <Bookmark className="size-3.5 text-brand-700 shrink-0" />
+          <span>Quer agilizar? Você pode carregar um modelo pré-configurado de jornada e estratégia.</span>
+        </span>
+        <Link to="/campanhas/modelos" className="font-semibold text-brand-700 hover:text-brand-900 hover:underline shrink-0">
+          Explorar modelos →
+        </Link>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <RadioCard
+          name="mailing-source"
+          value="IMPORT"
+          checked={source === 'IMPORT'}
+          onChange={() => update({}, { mailingSource: 'IMPORT' })}
+          title="Importar novo mailing"
+          description="Envie um arquivo CSV ou cole linhas com detecção automática de colunas."
+        />
+        <RadioCard
+          name="mailing-source"
+          value="MAILING"
+          checked={source === 'MAILING'}
+          onChange={() => update({}, { mailingSource: 'MAILING' })}
+          title="Selecionar mailing existente"
+          description="Reutilize um mailing já importado na sua conta com seus contatos e metadados."
+        />
+      </div>
 
       {source === 'IMPORT' && (
-        <Card>
+        <Card title="Importar arquivo ou colar dados de mailing">
           {draft.mailingId && extra.mailingName ? (
-            <Alert tone="success" title={`Mailing "${extra.mailingName}" importado e selecionado`}>
-              Continue para Público ou importe outro arquivo.{' '}
-              <Button variant="link" onClick={() => setMailing(null, { mailingName: undefined })}>
-                Importar outro
-              </Button>
-            </Alert>
+            <div className="space-y-3">
+              <Alert tone="success" title={`Mailing "${extra.mailingName}" importado com sucesso!`}>
+                O arquivo foi validado e vinculado a esta campanha. Você pode continuar para o público ou importar outro arquivo.
+              </Alert>
+              <div className="flex gap-2">
+                <Button variant="primary" onClick={onNext}>
+                  Continuar para público (filtro)
+                </Button>
+                <Button variant="secondary" onClick={() => setMailing(null)}>
+                  Importar outro arquivo
+                </Button>
+              </div>
+            </div>
           ) : (
             <ImportFlow
               onImported={(r) => {
                 qc.invalidateQueries({ queryKey: ['mailings'] });
-                setMailing(r.mailingId, { mailingName: r.name, mailingSource: 'IMPORT' });
-                onNext();
+                setMailing(r.mailingId, r.name, true);
               }}
             />
           )}
@@ -3311,101 +559,53 @@ function MailingStep({
       )}
 
       {source === 'MAILING' && (
-        <Card>
+        <Card title="Escolha um mailing da base">
           {!mailings ? (
-            <Loading />
+            <Loading rows={3} />
           ) : mailings.length === 0 ? (
-            <Empty title="Nenhum mailing importado">Use “Importar mailing”.</Empty>
+            <Empty title="Nenhum mailing disponível">
+              Importe um arquivo na opção "Importar novo mailing".
+            </Empty>
           ) : (
-            <Field label="Mailing" required error={err ?? undefined}>
-              {(p) => (
-                <Select
-                  id={p.id}
-                  ref={selRef}
-                  aria-describedby={p.describedBy}
-                  aria-invalid={p.invalid}
-                  value={draft.mailingId ?? ''}
-                  onChange={(e) => {
-                    setErr(null);
-                    const m = mailings.find((x) => x.id === e.target.value);
-                    setMailing(e.target.value || null, { mailingName: m?.name, mailingSource: 'MAILING' });
-                  }}
-                >
-                  <option value="">Selecione…</option>
-                  {mailings.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name} — {fmtNumber(m.recordCount)} registros
-                    </option>
-                  ))}
-                </Select>
+            <div className="space-y-4">
+              <Field label="Mailing disponível" required>
+                {(f) => (
+                  <Select
+                    id={f.id}
+                    value={selectedId}
+                    onChange={(e) => {
+                      const m = mailings.find((x) => x.id === e.target.value);
+                      setMailing(e.target.value || null, m?.name);
+                    }}
+                  >
+                    <option value="">Selecione um mailing…</option>
+                    {mailings.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name} — {fmtNumber(m.recordCount)} contatos ({fmtDateTime(m.createdAt)})
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </Field>
+
+              {draft.mailingId && (
+                <div className="flex justify-end pt-2">
+                  <Button variant="primary" onClick={onNext}>
+                    Continuar para público (filtro) <ArrowRight className="size-4 ml-1" />
+                  </Button>
+                </div>
               )}
-            </Field>
+            </div>
           )}
         </Card>
       )}
-
-      {source === 'LIST' && (
-        <Card>
-          {!lists ? (
-            <Loading />
-          ) : lists.length === 0 ? (
-            <Empty title="Nenhuma lista publicada">Crie uma lista a partir de um mailing.</Empty>
-          ) : (
-            <Field label="Lista" required error={err ?? undefined} hint="O mailing de origem é identificado automaticamente.">
-              {(p) => (
-                <Select
-                  id={p.id}
-                  ref={selRef}
-                  aria-describedby={p.describedBy}
-                  aria-invalid={p.invalid}
-                  value={selectedListId}
-                  onChange={(e) => {
-                    setErr(null);
-                    const l = lists.find((x) => x.id === e.target.value);
-                    if (!l?.latestVersion) return setMailing(null);
-                    update(
-                      {
-                        mailingId: l.mailing.id,
-                        sourceListVersionId: l.latestVersion.id,
-                        audienceMode: 'LIST',
-                        listVersionId: l.latestVersion.id,
-                      },
-                      {
-                        mailingSource: 'LIST',
-                        mailingName: l.mailing.name,
-                        listName: l.name,
-                        listVersion: l.latestVersion.version,
-                        listId: undefined,
-                        listEditor: undefined,
-                        listPublishedState: undefined,
-                        audienceCount: l.latestVersion.memberCount,
-                      },
-                    );
-                  }}
-                >
-                  <option value="">Selecione…</option>
-                  {lists.map((l) => (
-                    <option key={l.id} value={l.id} disabled={!l.latestVersion}>
-                      {l.name} (v{l.latestVersion?.version}) — mailing {l.mailing.name}
-                    </option>
-                  ))}
-                </Select>
-              )}
-            </Field>
-          )}
-        </Card>
-      )}
-
-      <Footer>
-        <Button variant="primary" onClick={next} disabled={source === 'IMPORT' && !draft.mailingId}>
-          Continuar para público
-        </Button>
-      </Footer>
     </div>
   );
 }
 
-// ------------------------------------------------------------------ Etapa Público
+// ==================================================================
+// ETAPA 2: PÚBLICO (FILTRO)
+// ==================================================================
 function AudienceStep({
   draft,
   extra,
@@ -3424,1018 +624,741 @@ function AudienceStep({
   const qc = useQueryClient();
   const publishRef = useRef<(() => Promise<boolean>) | null>(null);
   const [editorState, setEditorState] = useState<{ s: ListEditorState; pending: boolean; selected: number | null } | null>(null);
-  const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const fromExistingList = !!draft.sourceListVersionId && draft.listVersionId === draft.sourceListVersionId;
-  const mode = draft.audienceMode ?? null;
 
-  async function next() {
-    setErr(null);
-    if (!mode) return setErr('Escolha como definir o público.');
-    if (mode === 'ALL') return onNext();
-    if (fromExistingList) return onNext();
-    // revisitar sem mudanças não gera nova versão (§27.3)
-    const current = editorState ? JSON.stringify(editorState.s) : null;
-    if (draft.listVersionId && current && current === extra.listPublishedState && !editorState?.pending) return onNext();
+  const hasCustomFilters =
+    (editorState?.s.filters.length ?? 0) > 0 || (editorState?.s.sort.length ?? 0) > 0;
+
+  async function handleNext() {
+    // Se o usuário não adicionou nenhum filtro, avança com a base total em 1 clique
+    if (!hasCustomFilters && !draft.sourceListVersionId) {
+      update(
+        { audienceMode: 'ALL', listVersionId: null },
+        { audienceCount: mailing?.recordCount ?? null },
+      );
+      onNext();
+      return;
+    }
+
+    // Se adicionou filtros ou ordenação, publica a lista filtrada
     setBusy(true);
     const ok = await publishRef.current?.();
     setBusy(false);
-    if (ok) onNext();
+    if (ok) {
+      update({ audienceMode: 'LIST' });
+      onNext();
+    }
   }
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-slate-600">
-        Mailing: <strong>{mailing?.name ?? extra.mailingName}</strong>
-        {mailing && <> · {fmtNumber(mailing.recordCount)} registros</>}
-      </p>
-      <fieldset>
-        <legend className="sr-only">Definição do público</legend>
-        <div className="grid gap-2 md:grid-cols-2">
-          <RadioCard
-            name="aud"
-            value="ALL"
-            checked={mode === 'ALL'}
-            onChange={() => update({ audienceMode: 'ALL', listVersionId: null }, { audienceCount: mailing?.recordCount ?? null })}
-            title="Usar todos os contatos"
-            description="Referência direta ao mailing com validação e DNC obrigatórios."
-          />
-          <RadioCard
-            name="aud"
-            value="LIST"
-            checked={mode === 'LIST'}
-            onChange={() =>
-              update(
-                { audienceMode: 'LIST', listVersionId: draft.sourceListVersionId ?? (extra.listPublishedState ? draft.listVersionId : null) },
-                { audienceCount: extra.listEditor ? (extra.audienceCount ?? null) : null },
-              )
-            }
-            title={draft.sourceListVersionId ? 'Usar a lista escolhida ou filtrar' : 'Filtrar e criar lista'}
-            description="Filtros e ordenação para salvar uma lista publicada."
-          />
+      {/* Barra de resumo do mailing selecionado */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-5 py-3.5 shadow-2xs">
+        <div className="flex items-center gap-3">
+          <Database className="size-5 text-brand-700 shrink-0" />
+          <div>
+            <div className="text-sm font-semibold text-slate-900">
+              Mailing selecionado: <span className="text-brand-900">{mailing?.name ?? extra.mailingName ?? '—'}</span>
+            </div>
+            <div className="text-xs text-slate-500">
+              {mailing?.recordCount !== undefined ? (
+                <>
+                  <strong>{fmtNumber(mailing.recordCount)} contatos</strong> na base.{' '}
+                  {hasCustomFilters
+                    ? 'Filtros personalizados ativos abaixo.'
+                    : 'Todos os contatos selecionados por padrão.'}
+                </>
+              ) : (
+                'Carregando registros da base…'
+              )}
+            </div>
+          </div>
         </div>
-      </fieldset>
 
-      {mode === 'LIST' && fromExistingList && (
-        <Card title={`Lista ${extra.listName ?? ''} · v${extra.listVersion ?? ''}`}>
-          <p className="text-sm text-slate-700">
-            Esta lista será usada com as regras e a ordenação publicadas ({fmtNumber(extra.audienceCount ?? null)} membros na publicação).
-          </p>
-          <Button
-            className="mt-3"
-            size="sm"
-            onClick={() => update({ listVersionId: null }, { listName: undefined, listVersion: undefined, audienceCount: null })}
-          >
-            Criar nova seleção sobre este mailing
-          </Button>
-          <p className="mt-1 text-xs text-slate-500">A lista original é preservada.</p>
-        </Card>
-      )}
+        <Badge tone={hasCustomFilters ? 'brand' : 'green'}>
+          {hasCustomFilters ? 'Filtro personalizado ativo' : 'Base completa (100%)'}
+        </Badge>
+      </div>
 
-      {mode === 'LIST' && !fromExistingList && draft.mailingId && (
-        <Card>
-          <Alert tone="info" className="mb-4">
-            Continuar salva a versão da lista sem criar a campanha imediatamente.
-          </Alert>
+      {/* Editor direto de filtros e ordenação */}
+      {draft.mailingId && (
+        <Card
+          title="Filtros e Segmentação do Mailing"
+          tooltip="Se desejar acionar toda a base sem restrições, basta clicar em Continuar sem adicionar filtros."
+        >
           <ListEditor
             mailingId={draft.mailingId}
-            initial={extra.listEditor}
             listId={extra.listId}
-            hidePublish
+            initial={extra.listEditor}
             publishRef={publishRef}
-            onChange={(s, meta) => {
-              setEditorState({ s, ...meta });
-              if (JSON.stringify(s) !== JSON.stringify(extra.listEditor)) update({}, { listEditor: s, audienceCount: meta.selected });
+            onChange={(s: ListEditorState, meta: { pending: boolean; selected: number | null }) => {
+              setEditorState({ s, pending: meta.pending, selected: meta.selected });
+              update(
+                {},
+                {
+                  listEditor: s,
+                  audienceCount: meta.selected ?? mailing?.recordCount ?? null,
+                },
+              );
             }}
-            onPublished={(r: ListPublishResult, s) => {
+            onPublished={(res, s) => {
               qc.invalidateQueries({ queryKey: ['lists'] });
               update(
-                { listVersionId: r.listVersionId },
-                { listId: r.listId, listPublishedState: JSON.stringify(s), listName: s.name, listVersion: r.version, audienceCount: r.memberCount },
+                { listVersionId: res.listVersionId, audienceMode: 'LIST' },
+                {
+                  listId: res.listId,
+                  listVersion: res.version,
+                  audienceCount: res.memberCount,
+                  listPublishedState: JSON.stringify(s),
+                },
               );
             }}
           />
         </Card>
       )}
 
-      {err && <Alert tone="error">{err}</Alert>}
-      <Footer onBack={onBack}>
-        <Button variant="primary" loading={busy} onClick={next}>
-          Continuar para inteligência
+      {/* Rodapé de navegação */}
+      <div className="flex items-center justify-between pt-2">
+        <Button variant="secondary" onClick={onBack}>
+          <ArrowLeft className="size-4 mr-1" /> Voltar para mailing
         </Button>
-      </Footer>
+        <Button variant="primary" onClick={handleNext} disabled={busy} loading={busy}>
+          {hasCustomFilters ? 'Salvar filtro e ir para acionamento' : 'Continuar com todos os contatos'}{' '}
+          <ArrowRight className="size-4 ml-1" />
+        </Button>
+      </div>
     </div>
   );
 }
 
-// ------------------------------------------------------------------ Etapa Inteligência
+// ==================================================================
+// ETAPA 3: ACIONAMENTO (JORNADAS E ESTRATÉGIAS)
+// ==================================================================
 function ActivationStep({
   draft,
-  extra,
-  mailing,
   journeys,
   strategies,
-  tabulations,
-  strategyMissing,
-  journeyMissing,
+  selectedJourney,
+  selectedStrategy,
   update,
   onBack,
   onNext,
-  beforeLeave,
 }: {
   draft: CampaignDraft;
   extra: Extra;
-  mailing?: MailingSummary;
   journeys?: Journey[];
   strategies?: Strategy[];
-  tabulations?: Tabulation[];
-  strategyMissing: boolean;
-  journeyMissing: boolean;
+  selectedJourney?: Journey;
+  selectedStrategy?: Strategy;
   update: UpdateFn;
   onBack: () => void;
   onNext: () => void;
-  beforeLeave: () => Promise<void>;
 }) {
-  const nav = useNavigate();
-  const qc = useQueryClient();
-  const toast = useToast();
-
-  const [intelligenceMode, setIntelligenceMode] = useState<'INTELLIGENT' | 'MANUAL'>(extra.intelligenceMode ?? 'INTELLIGENT');
-  const [operatingMode, setOperatingMode] = useState<OperatingMode>(extra.operatingMode ?? 'PRODUCTION');
-  const [purposeCode, setPurposeCode] = useState<OperationPurpose>(extra.purposeCode ?? 'COBRANCA');
-  const [purposePrompt, setPurposePrompt] = useState<string>(
-    extra.purposePrompt ??
-      'Cobrança preventiva e amigável, priorizando canais digitais (WhatsApp e RCS) no primeiro toque e voz inteligente nas melhores janelas.',
-  );
-  const [maxAcceptableCpcBrl, setMaxAcceptableCpcBrl] = useState<number>(extra.maxAcceptableCpcBrl ?? 4.5);
-  const [labSamplePct, setLabSamplePct] = useState<number>(extra.labSamplePct ?? 10);
-  const [showManualOverrides, setShowManualOverrides] = useState(false);
+  const [journeyTab, setJourneyTab] = useState<'SIMPLE' | 'MULTI'>('SIMPLE');
+  const [strategyTab, setStrategyTab] = useState<'SIMPLE' | 'COMPLETE'>('SIMPLE');
+  const [showStrategyDetails, setShowStrategyDetails] = useState(false);
   const [err, setErr] = useState<{ journey?: string; strategy?: string }>({});
 
-  // Auto-seleciona jornada e estratégia recomendadas caso ainda não estejam no draft
+  // Auto-seleciona defaults se nenhum tiver sido escolhido
   useEffect(() => {
-    if (intelligenceMode === 'INTELLIGENT') {
-      const patch: Partial<CampaignDraft> = {};
-      if (!draft.journeyVersionId && journeys && journeys.length > 0) {
-        const bestJourney = journeys.find((j) => (j.latestVersion?.steps.length ?? 0) > 1) ?? journeys[0];
-        if (bestJourney.latestVersion) patch.journeyVersionId = bestJourney.latestVersion.id;
-      }
-      if (!draft.strategyVersionId && strategies && strategies.length > 0) {
-        const bestStrategy = strategies[0];
-        if (bestStrategy.latestVersion) patch.strategyVersionId = bestStrategy.latestVersion.id;
-      }
-      if (Object.keys(patch).length > 0) {
-        update(patch);
-      }
+    if (!draft.journeyVersionId && journeys && journeys.length > 0) {
+      const defJ = journeys.find((j) => j.name.includes('WhatsApp')) ?? journeys[0];
+      if (defJ.latestVersion) update({ journeyVersionId: defJ.latestVersion.id });
     }
-  }, [intelligenceMode, draft.journeyVersionId, draft.strategyVersionId, journeys, strategies, update]);
-
-  // Consulta execuções de inteligência já feitas para este mailing
-  const runsQ = useQuery({
-    queryKey: ['intelligence-runs-step3', draft.mailingId],
-    queryFn: () => get<{ items: IntelligenceRunItem[] }>(`/intelligence/runs?mailingId=${draft.mailingId}`),
-    enabled: !!draft.mailingId,
-  });
-
-  const latestRun = runsQ.data?.items?.[0];
-
-  // Executa ou recalcula a esteira de inteligência
-  const runMutation = useMutation({
-    mutationFn: () =>
-      post<IntelligenceRunItem>('/intelligence/runs', {
-        mailingId: draft.mailingId,
-        mode: operatingMode,
-        purposeCode,
-        purposePrompt,
-        maxAcceptableCpcBrl,
-        labSamplePct,
-      }),
-    onSuccess: (newRun) => {
-      toast('success', 'Esteira de inteligência executada e 8 blocos de CPC atualizados com sucesso.');
-      qc.invalidateQueries({ queryKey: ['intelligence-runs-step3'] });
-      update(
-        {},
-        {
-          intelligenceMode: 'INTELLIGENT',
-          operatingMode,
-          purposeCode,
-          purposePrompt,
-          maxAcceptableCpcBrl,
-          labSamplePct,
-          intelligenceRunId: newRun.id,
-        },
-      );
-    },
-    onError: (e) => {
-      toast('error', errorMessage(e));
-    },
-  });
-
-  const selectedJourney = journeys?.find((j) => j.latestVersion?.id === draft.journeyVersionId);
-  const selectedStrategy = strategies?.find((s) => s.latestVersion?.id === draft.strategyVersionId);
-
-  function next() {
-    if (intelligenceMode === 'INTELLIGENT') {
-      // Garante jornada e estratégia atribuídas
-      const patch: Partial<CampaignDraft> = {};
-      if (!draft.journeyVersionId && journeys && journeys.length > 0) {
-        const bestJourney = journeys.find((j) => (j.latestVersion?.steps.length ?? 0) > 1) ?? journeys[0];
-        if (bestJourney.latestVersion) patch.journeyVersionId = bestJourney.latestVersion.id;
-      }
-      if (!draft.strategyVersionId && strategies && strategies.length > 0) {
-        const bestStrategy = strategies[0];
-        if (bestStrategy.latestVersion) patch.strategyVersionId = bestStrategy.latestVersion.id;
-      }
-      update(patch, {
-        intelligenceMode: 'INTELLIGENT',
-        operatingMode,
-        purposeCode,
-        purposePrompt,
-        maxAcceptableCpcBrl,
-        labSamplePct,
-      });
-      onNext();
-      return;
+    if (!draft.strategyVersionId && strategies && strategies.length > 0) {
+      const defS = strategies.find((s) => s.name.includes('Simples') || s.name.includes('24x7')) ?? strategies[0];
+      if (defS.latestVersion) update({ strategyVersionId: defS.latestVersion.id });
     }
+  }, [draft.journeyVersionId, draft.strategyVersionId, journeys, strategies, update]);
 
-    // Modo Manual
-    const e: typeof err = {};
-    if (!draft.journeyVersionId || journeyMissing) e.journey = 'Escolha uma jornada publicada';
-    if (!draft.strategyVersionId || strategyMissing) e.strategy = 'Escolha uma estratégia publicada';
-    setErr(e);
-    if (e.journey || e.strategy) {
-      document.getElementById(e.journey ? 'journey-group' : 'strategy-group')?.querySelector<HTMLInputElement>('input')?.focus();
-      return;
+  // Filtra jornadas por Simples (1 canal) e Multicanal
+  const simpleJourneys = useMemo(
+    () => journeys?.filter((j) => (j.latestVersion?.steps.length ?? 0) <= 1) ?? [],
+    [journeys],
+  );
+  const multiJourneys = useMemo(
+    () => journeys?.filter((j) => (j.latestVersion?.steps.length ?? 0) > 1) ?? [],
+    [journeys],
+  );
+
+  // Filtra estratégias por Simples e Completas
+  const simpleStrategies = useMemo(
+    () => strategies?.filter((s) => s.name.toLowerCase().includes('simples') || (s.latestVersion?.config.limits.total ?? 0) <= 6) ?? [],
+    [strategies],
+  );
+  const completeStrategies = useMemo(
+    () => strategies?.filter((s) => !s.name.toLowerCase().includes('simples') && (s.latestVersion?.config.limits.total ?? 0) > 6) ?? [],
+    [strategies],
+  );
+
+  // Sincroniza abas com a seleção atual (ex: vinda de modelo)
+  useEffect(() => {
+    if (multiJourneys.some((j) => j.latestVersion?.id === draft.journeyVersionId)) {
+      setJourneyTab('MULTI');
     }
-    update({}, { intelligenceMode: 'MANUAL' });
-    onNext();
+  }, [draft.journeyVersionId, multiJourneys]);
+
+  useEffect(() => {
+    if (completeStrategies.some((s) => s.latestVersion?.id === draft.strategyVersionId)) {
+      setStrategyTab('COMPLETE');
+    }
+  }, [draft.strategyVersionId, completeStrategies]);
+
+  function handleNext() {
+    const errors: typeof err = {};
+    if (!draft.journeyVersionId) errors.journey = 'Selecione uma jornada para os disparos.';
+    if (!draft.strategyVersionId) errors.strategy = 'Selecione uma estratégia com janelas e limites.';
+    setErr(errors);
+    if (Object.keys(errors).length === 0) onNext();
   }
 
+  const stratCfg = selectedStrategy?.latestVersion?.config;
+
   return (
-    <div className="space-y-5">
-      {/* Seletor de Modo: Inteligência Voll Plan vs Modo Manual */}
-      <div className="grid gap-3 md:grid-cols-2">
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => {
-            setIntelligenceMode('INTELLIGENT');
-            update({}, { intelligenceMode: 'INTELLIGENT' });
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              setIntelligenceMode('INTELLIGENT');
-              update({}, { intelligenceMode: 'INTELLIGENT' });
-            }
-          }}
-          className={clsx(
-            'flex cursor-pointer flex-col justify-between rounded-xl border p-4 text-left transition-all',
-            intelligenceMode === 'INTELLIGENT'
-              ? 'border-brand-500 bg-gradient-to-br from-brand-50/90 via-white to-emerald-50/40 shadow-sm ring-2 ring-brand-500/20'
-              : 'border-slate-200 bg-white hover:border-slate-300',
-          )}
-        >
-          <div>
-            <div className="flex items-center gap-2">
-              <BrainCircuit className="size-4 text-brand-700" aria-hidden />
-              <span className="text-xs font-bold uppercase tracking-wider text-brand-800">Recomendado</span>
-              <Badge tone="brand">Esteira de Inteligência Voll Plan</Badge>
-            </div>
-            <h3 className="mt-1.5 text-sm font-semibold text-slate-900">
-              Otimização Autônoma de Custo por CPC Confirmado
-            </h3>
-            <p className="mt-1 text-xs text-slate-600">
-              Classificação em <strong>8 Blocos Padronizados</strong> com consulta contínua à base cumulativa histórica.
-            </p>
-          </div>
-          <div className="mt-3 flex items-center gap-2">
-            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700">
-              <Sparkles className="size-3.5" aria-hidden />
-              Otimização de canal, janela e custo
-            </span>
-          </div>
+    <div className="space-y-6">
+      {/* SEÇÃO 1: JORNADAS */}
+      <Card
+        title="1. Selecione a Jornada de Canais"
+        tooltip="A jornada determina quais canais serão acionados e em qual ordem com tempo de transbordo."
+        actions={
+          <Link
+            to="/jornadas"
+            target="_blank"
+            className="flex items-center gap-1 text-xs font-semibold text-brand-700 hover:underline"
+          >
+            <Plus className="size-3.5" /> Nova jornada
+            <ExternalLink className="size-3" />
+          </Link>
+        }
+      >
+        {/* Abas Simples vs Multicanal */}
+        <div className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-3">
+          <button
+            type="button"
+            onClick={() => setJourneyTab('SIMPLE')}
+            className={clsx(
+              'px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer',
+              journeyTab === 'SIMPLE'
+                ? 'bg-brand-50 text-brand-900 border border-brand-200'
+                : 'text-slate-600 hover:bg-slate-100',
+            )}
+          >
+            Jornadas Simples (1 Canal)
+          </button>
+          <button
+            type="button"
+            onClick={() => setJourneyTab('MULTI')}
+            className={clsx(
+              'px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer',
+              journeyTab === 'MULTI'
+                ? 'bg-brand-50 text-brand-900 border border-brand-200'
+                : 'text-slate-600 hover:bg-slate-100',
+            )}
+          >
+            Jornadas Multicanal (Transbordo Inteligente)
+          </button>
         </div>
 
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => {
-            setIntelligenceMode('MANUAL');
-            update({}, { intelligenceMode: 'MANUAL' });
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              setIntelligenceMode('MANUAL');
-              update({}, { intelligenceMode: 'MANUAL' });
-            }
-          }}
-          className={clsx(
-            'flex cursor-pointer flex-col justify-between rounded-xl border p-4 text-left transition-all',
-            intelligenceMode === 'MANUAL'
-              ? 'border-slate-500 bg-slate-50 shadow-sm ring-2 ring-slate-400/20'
-              : 'border-slate-200 bg-white hover:border-slate-300',
-          )}
-        >
-          <div>
-            <div className="flex items-center gap-2">
-              <SlidersHorizontal className="size-4 text-slate-600" aria-hidden />
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-600">Opcional</span>
-              <Badge tone="gray">Acionamento Manual</Badge>
-            </div>
-            <h3 className="mt-1.5 text-sm font-semibold text-slate-900">
-              Seleção Manual de Jornada e Réguas
-            </h3>
-            <p className="mt-1 text-xs text-slate-600">
-              Escolha direta de jornadas fixas (sequência de canais pré-definida) e estratégia de limites/horários sem a esteira autônoma de blocos.
-            </p>
-          </div>
-          <div className="mt-3 flex items-center gap-2">
-            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500">
-              Controle manual clássico
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {intelligenceMode === 'INTELLIGENT' ? (
-        <div className="space-y-4">
-          {/* Card de Configuração da Inteligência */}
-          <Card title="Configuração da Esteira de Otimização">
-            <div className="space-y-4">
-              <div className="grid gap-3 sm:grid-cols-2">
+        {/* Lista de Jornadas da Aba */}
+        <div className="grid gap-2 sm:grid-cols-2">
+          {(journeyTab === 'SIMPLE' ? simpleJourneys : multiJourneys).map((j) => {
+            const v = j.latestVersion;
+            if (!v) return null;
+            const isSelected = draft.journeyVersionId === v.id;
+            return (
+              <div
+                key={j.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  setErr((prev) => ({ ...prev, journey: undefined }));
+                  update({ journeyVersionId: v.id });
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    setErr((prev) => ({ ...prev, journey: undefined }));
+                    update({ journeyVersionId: v.id });
+                  }
+                }}
+                className={clsx(
+                  'flex flex-col justify-between rounded-xl border p-3.5 text-left transition-all cursor-pointer select-none',
+                  isSelected
+                    ? 'border-brand-500 bg-brand-50/50 shadow-2xs ring-1 ring-brand-500'
+                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50',
+                )}
+              >
                 <div>
-                  <label className="text-xs font-medium text-slate-700">Modo de Operação</label>
-                  <div className="mt-1.5 flex items-center justify-between rounded-lg border border-brand-200 bg-brand-50/70 p-2.5 text-xs">
-                    <span className="flex items-center gap-1.5 font-semibold text-brand-900">
-                      <Rocket className="size-3.5 text-brand-700" aria-hidden />
-                      Modo Produção Otimizada (Backend AI)
-                    </span>
-                    <Badge tone="green">Ativo</Badge>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[13px] font-semibold text-slate-900">{j.name}</span>
+                    <Badge tone={v.steps.length > 1 ? 'brand' : 'gray'}>
+                      {v.steps.length > 1 ? `${v.steps.length} canais` : '1 canal'}
+                    </Badge>
+                  </div>
+                  <div className="mt-2 text-xs text-slate-600">
+                    <JourneySteps steps={v.steps} />
                   </div>
                 </div>
+              </div>
+            );
+          })}
+        </div>
+        {err.journey && <p className="mt-2 text-xs font-medium text-red-600">{err.journey}</p>}
+      </Card>
 
+      {/* SEÇÃO 2: ESTRATÉGIAS */}
+      <Card
+        title="2. Selecione a Estratégia de Disparo"
+        tooltip="A estratégia define o calendário comercial permitido, limites diários e regras de retentativas."
+        actions={
+          <Link
+            to="/estrategias"
+            target="_blank"
+            className="flex items-center gap-1 text-xs font-semibold text-brand-700 hover:underline"
+          >
+            <Plus className="size-3.5" /> Nova estratégia
+            <ExternalLink className="size-3" />
+          </Link>
+        }
+      >
+        {/* Abas Simples vs Completas */}
+        <div className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-3">
+          <button
+            type="button"
+            onClick={() => setStrategyTab('SIMPLE')}
+            className={clsx(
+              'px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer',
+              strategyTab === 'SIMPLE'
+                ? 'bg-brand-50 text-brand-900 border border-brand-200'
+                : 'text-slate-600 hover:bg-slate-100',
+            )}
+          >
+            Estratégias Simples (Começo Rápido)
+          </button>
+          <button
+            type="button"
+            onClick={() => setStrategyTab('COMPLETE')}
+            className={clsx(
+              'px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer',
+              strategyTab === 'COMPLETE'
+                ? 'bg-brand-50 text-brand-900 border border-brand-200'
+                : 'text-slate-600 hover:bg-slate-100',
+            )}
+          >
+            Estratégias Completas (Avançadas)
+          </button>
+        </div>
+
+        {/* Lista de Estratégias */}
+        <div className="grid gap-2 sm:grid-cols-3">
+          {(strategyTab === 'SIMPLE' ? simpleStrategies : completeStrategies).map((s) => {
+            const v = s.latestVersion;
+            if (!v) return null;
+            const isSelected = draft.strategyVersionId === v.id;
+            return (
+              <div
+                key={s.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  setErr((prev) => ({ ...prev, strategy: undefined }));
+                  update({ strategyVersionId: v.id });
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    setErr((prev) => ({ ...prev, strategy: undefined }));
+                    update({ strategyVersionId: v.id });
+                  }
+                }}
+                className={clsx(
+                  'flex flex-col justify-between rounded-xl border p-3.5 text-left transition-all cursor-pointer select-none',
+                  isSelected
+                    ? 'border-brand-500 bg-brand-50/50 shadow-2xs ring-1 ring-brand-500'
+                    : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50',
+                )}
+              >
                 <div>
-                  <Field label="Finalidade da Operação" required>
-                    {(p) => (
-                      <Select
-                        id={p.id}
-                        value={purposeCode}
-                        onChange={(e) => setPurposeCode(e.target.value as OperationPurpose)}
-                      >
-                        {OPERATION_PURPOSES.map((purp) => (
-                          <option key={purp} value={purp}>
-                            {OPERATION_PURPOSE_LABEL[purp]}
-                          </option>
-                        ))}
-                      </Select>
-                    )}
-                  </Field>
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-[13px] font-semibold text-slate-900 truncate">{s.name}</span>
+                    {s.protected && <Badge tone="gray">Padrão</Badge>}
+                  </div>
+                  <div className="mt-2 space-y-1 text-xs text-slate-600">
+                    <div>
+                      Horário: <strong>{v.config.calendar.start}–{v.config.calendar.end}</strong>
+                    </div>
+                    <div>
+                      Até <strong>{v.config.limits.total} tentativas</strong> ({v.config.limits.daily}/dia)
+                    </div>
+                    <div>
+                      Retentativa em <strong>{v.config.retry.intervalMinutes} min</strong>
+                    </div>
+                  </div>
                 </div>
               </div>
+            );
+          })}
+        </div>
+        {err.strategy && <p className="mt-2 text-xs font-medium text-red-600">{err.strategy}</p>}
 
-              <Field
-                label="Diretriz de IA / Contexto Operacional"
-                hint="A IA utiliza esta diretriz para calibrar a priorização de canais digitais vs voz inteligente"
-              >
-                {(p) => (
-                  <Textarea
-                    id={p.id}
-                    rows={2}
-                    className="font-sans text-xs"
-                    value={purposePrompt}
-                    onChange={(e) => setPurposePrompt(e.target.value)}
-                  />
-                )}
-              </Field>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field
-                  label="Teto Máximo Aceitável por CPC (R$)"
-                  hint="Contatos com custo projetado superior são pausados ou redirecionados"
-                >
-                  {(p) => (
-                    <Input
-                      id={p.id}
-                      type="number"
-                      step="0.10"
-                      min="0.50"
-                      max="50.00"
-                      value={maxAcceptableCpcBrl}
-                      onChange={(e) => setMaxAcceptableCpcBrl(Number(e.target.value))}
-                    />
-                  )}
-                </Field>
-              </div>
-
-              <div className="flex items-center justify-between border-t border-slate-100 pt-3">
-                <span className="text-xs text-slate-500">
-                  {latestRun
-                    ? `Última esteira gerada para este mailing: ${fmtDateTime(latestRun.createdAt ?? new Date().toISOString())}`
-                    : 'Nenhum cálculo prévio executado para este mailing.'}
-                </span>
-                <Button
-                  size="sm"
-                  variant="primary"
-                  loading={runMutation.isPending}
-                  icon={<RefreshCw className={clsx('size-3.5', runMutation.isPending && 'animate-spin')} aria-hidden />}
-                  onClick={() => runMutation.mutate()}
-                >
-                  {latestRun ? 'Recalcular 8 Blocos de Inteligência' : 'Executar Esteira de Inteligência'}
-                </Button>
-              </div>
-            </div>
-          </Card>
-
-          {/* Resumo Consolidado de Otimização CPC */}
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-            <Stat
-              label="Contatos no Público"
-              value={fmtNumber(latestRun?.cohortSummary.totalReceived ?? mailing?.recordCount ?? extra.audienceCount ?? 0)}
-              hint="Base qualificada"
-            />
-            <Stat
-              label="Taxa Estimada de CPC"
-              value={`${(latestRun?.cohortSummary.estimatedCpcRatePct ?? 38.4).toFixed(1)}%`}
-              tone="good"
-              hint="Auditável por tabulação"
-            />
-            <Stat
-              label="Custo por CPC Otimizado"
-              value={fmtMoney(latestRun?.cohortSummary.expectedCostPerCpcBrl ?? 3.18)}
-              tone="good"
-              hint={`vs. ${fmtMoney(latestRun?.cohortSummary.bruteForceCostPerCpcBrl ?? 5.6)} Bruto`}
-            />
-            <Stat
-              label="Economia Estimada"
-              value={`${(latestRun?.cohortSummary.savingsVsBruteForcePct ?? 43.2).toFixed(1)}%`}
-              tone="good"
-              hint="Redução vs Força Bruta"
-            />
-          </div>
-
-          {/* Tabela dos 8 Blocos Padronizados de Otimização */}
-          <Card
-            padded={false}
-            title={
+        {/* Painel Expansível de Detalhes da Estratégia Selecionada */}
+        {selectedStrategy && stratCfg && (
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <BrainCircuit className="size-4 text-brand-700" aria-hidden />
-                <span>8 Blocos Padronizados de Otimização de CPC (TIC Domicílios 2025)</span>
+                <SlidersHorizontal className="size-4 text-brand-700" />
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Estratégia Ativa: {selectedStrategy.name}
+                </span>
               </div>
-            }
-            actions={
-              <Badge tone="brand">TIC Domicílios 2025</Badge>
-            }
-          >
-            <TableWrap label="8 Blocos Padronizados">
-              <table className="data">
-                <thead>
-                  <tr>
-                    <th className="w-12">Bloco</th>
-                    <th>Segmento Demográfico (TIC 2025)</th>
-                    <th>Canal Primário</th>
-                    <th>Janela Ótima de Atendimento</th>
-                    <th>Phone-Intent</th>
-                    <th>Custo Previsto / CPC</th>
-                    <th>Decisão</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {BLOCKS_TEMPLATE.map((b) => (
-                    <tr key={b.blockNum}>
-                      <td className="tabular font-bold text-slate-500">#{b.blockNum}</td>
-                      <td>
-                        <div className="font-semibold text-slate-900">{b.name}</div>
-                        <div className="text-[11px] text-slate-500">{b.demographics}</div>
-                      </td>
-                      <td>
-                        <Badge tone={b.channel === 'WHATSAPP' ? 'green' : b.channel === 'VOICE' ? 'brand' : 'blue'}>
-                          {CHANNEL_LABEL[b.channel]}
-                        </Badge>
-                      </td>
-                      <td className="text-xs text-slate-700">{b.timeWindow}</td>
-                      <td>
-                        <Badge tone={b.phoneTier.startsWith('P1') ? 'green' : b.phoneTier.startsWith('P2') ? 'brand' : 'gray'}>
-                          {b.phoneTier}
-                        </Badge>
-                      </td>
-                      <td className="tabular font-semibold text-emerald-700">{fmtMoney(b.estimatedCpcBrl)}</td>
-                      <td>
-                        <Badge tone={b.tone}>{b.decision}</Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </TableWrap>
-          </Card>
-
-          {/* Card Base Cumulativa Histórica */}
-          <div className="flex items-start gap-3 rounded-lg border border-brand-200 bg-brand-50/50 p-3.5 text-xs text-brand-950">
-            <Database className="mt-0.5 size-4 shrink-0 text-brand-700" aria-hidden />
-            <div className="flex items-center gap-1.5">
-              <span><strong>Base Cumulativa (Golden Record):</strong> Cada mailing enriquece a priorização com prioridade P1 para telefones confirmados.</span>
-              <InfoTooltip content="Números inválidos ou restritos no DNC/Procon são descartados automaticamente antes do acionamento." />
-            </div>
-          </div>
-
-          {/* Atribuição Automática de Jornada e Estratégia */}
-          <Card
-            title="Componentes de Execução Vinculados aos Blocos"
-            actions={
               <button
                 type="button"
-                onClick={() => setShowManualOverrides(!showManualOverrides)}
-                className="flex items-center gap-1 text-xs font-medium text-brand-700 hover:underline"
+                onClick={() => setShowStrategyDetails(!showStrategyDetails)}
+                className="flex items-center gap-1 text-xs font-semibold text-brand-700 hover:underline cursor-pointer"
               >
-                {showManualOverrides ? 'Ocultar ajuste manual' : 'Personalizar jornada ou limites'}
-                {showManualOverrides ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+                {showStrategyDetails ? 'Ocultar detalhes configuráveis' : 'Ver / Configurar detalhes da estratégia'}
+                {showStrategyDetails ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
               </button>
-            }
-          >
-            <div className="space-y-3 text-sm">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
-                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Jornada Vinculada</div>
-                  <div className="mt-1 font-semibold text-slate-900">
-                    {selectedJourney ? `${selectedJourney.name} (v${selectedJourney.latestVersion?.version})` : 'Multicanal Inteligente'}
-                  </div>
-                  <div className="mt-1 text-xs text-slate-600">
-                    {selectedJourney?.latestVersion ? (
-                      <JourneySteps steps={selectedJourney.latestVersion.steps} />
-                    ) : (
-                      'Sequência com fallback automático entre canais'
-                    )}
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
-                  <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Régua de Limites & Calendário</div>
-                  <div className="mt-1 font-semibold text-slate-900">
-                    {selectedStrategy ? `${selectedStrategy.name} (v${selectedStrategy.latestVersion?.version})` : 'Estratégia Padrão'}
-                  </div>
-                  <div className="mt-1 text-xs text-slate-600">
-                    {selectedStrategy?.latestVersion?.config ? (
-                      `Até ${selectedStrategy.latestVersion.config.limits.total} tentativas · Horário ${selectedStrategy.latestVersion.config.calendar.start}–${selectedStrategy.latestVersion.config.calendar.end}`
-                    ) : (
-                      'Limites e janelas comerciais ativos'
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {showManualOverrides && (
-                <div className="mt-4 border-t border-slate-200 pt-4 space-y-4">
-                  <div id="journey-group">
-                    <h4 className="mb-2 text-xs font-bold text-slate-700 uppercase">Alterar Jornada</h4>
-                    <div className="grid gap-2">
-                      {journeys?.filter((j) => j.latestVersion).map((j) => (
-                        <RadioCard
-                          key={j.id}
-                          name="override-journey"
-                          value={j.latestVersion!.id}
-                          checked={draft.journeyVersionId === j.latestVersion!.id}
-                          onChange={(v) => update({ journeyVersionId: v })}
-                          title={`${j.name} · v${j.latestVersion!.version}`}
-                          description={<JourneySteps steps={j.latestVersion!.steps} />}
-                        />
-                      ))}
-                    </div>
-                  </div>
-
-                  <div id="strategy-group">
-                    <h4 className="mb-2 text-xs font-bold text-slate-700 uppercase">Alterar Estratégia</h4>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {strategies?.filter((s) => s.latestVersion).map((s) => (
-                        <RadioCard
-                          key={s.id}
-                          name="override-strategy"
-                          value={s.latestVersion!.id}
-                          checked={draft.strategyVersionId === s.latestVersion!.id}
-                          onChange={(v) => update({ strategyVersionId: v })}
-                          title={`${s.name} · v${s.latestVersion!.version}`}
-                          description={`Até ${s.latestVersion!.config.limits.total} no total · ${s.latestVersion!.config.calendar.start}–${s.latestVersion!.config.calendar.end}`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
-          </Card>
-        </div>
-      ) : (
-        /* Modo Manual Clássico */
-        <div className="space-y-5">
-          <section id="journey-group" aria-labelledby="journey-title">
-            <h3 id="journey-title" className="mb-2 text-sm font-semibold">
-              Jornada Manual
-            </h3>
-            {journeyMissing && <Alert tone="warn" className="mb-2">A jornada do rascunho não está mais disponível; selecione outra jornada.</Alert>}
-            {!journeys ? (
-              <Loading />
-            ) : (
-              <div className="grid gap-2">
-                {journeys
-                  .filter((j) => j.latestVersion)
-                  .map((j) => (
-                    <RadioCard
-                      key={j.id}
-                      name="journey"
-                      value={j.latestVersion!.id}
-                      checked={draft.journeyVersionId === j.latestVersion!.id}
-                      onChange={(v) => {
-                        setErr((x) => ({ ...x, journey: undefined }));
-                        update({ journeyVersionId: v });
-                      }}
-                      title={
-                        <>
-                          {j.name} <span className="font-normal text-slate-500">· v{j.latestVersion!.version}</span>{' '}
-                          {j.latestVersion!.steps.length === 1 ? <Badge>Canal simples</Badge> : <Badge tone="brand">Multicanal</Badge>}
-                        </>
-                      }
-                      description={<JourneySteps steps={j.latestVersion!.steps} />}
-                    />
-                  ))}
+
+            {showStrategyDetails && (
+              <div className="mt-4 border-t border-slate-200 pt-3 space-y-3 text-xs text-slate-700">
+                <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+                  <div className="rounded-lg border border-slate-200 bg-white p-3">
+                    <div className="font-semibold text-slate-500 uppercase text-[10px]">Calendário Operacional</div>
+                    <div className="mt-1 font-bold text-slate-900">{stratCfg.calendar.start} às {stratCfg.calendar.end}</div>
+                    <div className="mt-0.5 text-slate-500">Dias: {stratCfg.calendar.days.map((d: number) => ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][d]).join(', ')}</div>
+                  </div>
+
+                  <div className="rounded-lg border border-slate-200 bg-white p-3">
+                    <div className="font-semibold text-slate-500 uppercase text-[10px]">Limites de Disparo</div>
+                    <div className="mt-1 font-bold text-slate-900">{stratCfg.limits.total} totais / {stratCfg.limits.daily} por dia</div>
+                    <div className="mt-0.5 text-slate-500">Escopo: {stratCfg.limits.scope}</div>
+                  </div>
+
+                  <div className="rounded-lg border border-slate-200 bg-white p-3">
+                    <div className="font-semibold text-slate-500 uppercase text-[10px]">Retentativas</div>
+                    <div className="mt-1 font-bold text-slate-900">Intervalo de {stratCfg.retry.intervalMinutes} min</div>
+                    <div className="mt-0.5 text-slate-500">Máx {stratCfg.retry.maxPerDestination} por destino</div>
+                  </div>
+
+                  <div className="rounded-lg border border-slate-200 bg-white p-3">
+                    <div className="font-semibold text-slate-500 uppercase text-[10px]">Lote & Distribuição</div>
+                    <div className="mt-1 font-bold text-slate-900">Lote {stratCfg.distribution.batchSize} contatos</div>
+                    <div className="mt-0.5 text-slate-500">Teto pendente: {stratCfg.distribution.maxPending}</div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-[11px] text-slate-500">
+                    Regras de tabulação: {Object.keys(stratCfg.tabulationRules).length} códigos configurados.
+                  </span>
+                  <Link
+                    to={`/estrategias/${selectedStrategy.id}`}
+                    target="_blank"
+                    className="flex items-center gap-1 font-semibold text-brand-700 hover:underline"
+                  >
+                    Ajustar ou copiar esta estratégia em nova aba <ExternalLink className="size-3" />
+                  </Link>
+                </div>
               </div>
             )}
-            {err.journey && <p className="mt-1 text-xs font-medium text-red-700">{err.journey}</p>}
-          </section>
+          </div>
+        )}
+      </Card>
 
-          <section id="strategy-group" aria-labelledby="strategy-title">
-            <h3 id="strategy-title" className="mb-2 text-sm font-semibold">
-              Estratégia & Horários Manual
-            </h3>
-            {strategyMissing && (
-              <Alert tone="warn" className="mb-2">
-                A estratégia do rascunho foi atualizada; selecione a versão publicada mais recente.
-              </Alert>
-            )}
-            {!strategies ? (
-              <Loading />
-            ) : (
-              <div className="grid gap-2 md:grid-cols-2">
-                {strategies
-                  .filter((s) => s.latestVersion)
-                  .map((s) => (
-                    <RadioCard
-                      key={s.id}
-                      name="strategy"
-                      value={s.latestVersion!.id}
-                      checked={draft.strategyVersionId === s.latestVersion!.id}
-                      onChange={(v) => {
-                        setErr((x) => ({ ...x, strategy: undefined }));
-                        update({ strategyVersionId: v });
-                      }}
-                      title={
-                        <>
-                          {s.name} <span className="font-normal text-slate-500">· v{s.latestVersion!.version}</span>
-                          {s.protected && (
-                            <Badge tone="gray" className="ml-1">
-                              Predefinida
-                            </Badge>
-                          )}
-                        </>
-                      }
-                      description={`Até ${s.latestVersion!.config.limits.total} no total e ${s.latestVersion!.config.limits.daily} por dia · ${s.latestVersion!.config.calendar.start}–${s.latestVersion!.config.calendar.end}`}
-                    />
-                  ))}
-              </div>
-            )}
-            {err.strategy && <p className="mt-1 text-xs font-medium text-red-700">{err.strategy}</p>}
-          </section>
-
-          {selectedStrategy?.latestVersion && (
-            <Card
-              title={`Resumo da estratégia ${selectedStrategy.name}`}
-              actions={
-                <Button
-                  size="sm"
-                  icon={<Pencil className="size-3.5" aria-hidden />}
-                  onClick={async () => {
-                    await beforeLeave();
-                    nav(`/estrategias/${selectedStrategy.id}?retorno=assistente`);
-                  }}
-                >
-                  Ajustar estratégia
-                </Button>
-              }
-            >
-              <StrategySummary config={selectedStrategy.latestVersion.config} version={selectedStrategy.latestVersion.version} tabulations={tabulations} />
-              <div className="mt-3 flex items-center gap-1.5 text-xs text-slate-500">
-                <span>Os parâmetros de estratégia são definidos pelo template selecionado.</span>
-                <InfoTooltip content="Bloqueios e limites globais do Controle central prevalecem sobre o template." />
-              </div>
-            </Card>
-          )}
-        </div>
-      )}
-
-      <Footer onBack={onBack}>
-        <Button variant="primary" onClick={next}>
-          Continuar para revisar e finalizar
+      {/* Rodapé de navegação */}
+      <div className="flex items-center justify-between pt-2">
+        <Button variant="secondary" onClick={onBack}>
+          <ArrowLeft className="size-4 mr-1" /> Voltar para público
         </Button>
-      </Footer>
+        <Button variant="primary" onClick={handleNext}>
+          Continuar para revisar e finalizar <ArrowRight className="size-4 ml-1" />
+        </Button>
+      </div>
     </div>
   );
 }
 
-// ------------------------------------------------------------------ Etapa Campanha
-function CampaignStep({
+// ==================================================================
+// ETAPA 4: REVISAR E FINALIZAR
+// ==================================================================
+function ReviewStep({
   draft,
   extra,
+  selectedMailing,
+  selectedJourney,
+  selectedStrategy,
   update,
-  goStep,
-  onCreated,
+  onBack,
+  onDone,
 }: {
   draft: CampaignDraft;
   extra: Extra;
+  selectedMailing?: MailingSummary;
+  selectedJourney?: Journey;
+  selectedStrategy?: Strategy;
   update: UpdateFn;
-  goStep: (s: Step) => void;
-  onCreated: (c: Campaign) => void;
+  onBack: () => void;
+  onDone: (c: Campaign) => void;
 }) {
-  const nameRef = useRef<HTMLInputElement>(null);
-  const schedRef = useRef<HTMLInputElement>(null);
-  const idemRef = useRef<string | null>(null);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [formErr, setFormErr] = useState<string | null>(null);
-  const scheduling = draft.startMode === 'SCHEDULE';
-  const scheduleLocal = extra.scheduleLocal ?? '';
+  const [name, setName] = useState(draft.name ?? `Campanha ${new Date().toLocaleDateString('pt-BR')}`);
+  const [description, setDescription] = useState(draft.description ?? '');
+  const [startNow, setStartNow] = useState(true);
+  const [scheduledAt, setScheduledAt] = useState(extra.scheduleLocal ?? nowSaoPauloLocal(60));
+  const [err, setErr] = useState<string | null>(null);
+  const [saveAsTemplateOpen, setSaveAsTemplateOpen] = useState(false);
 
-  const body = useMemo(
-    () => ({
-      name: draft.name ?? '',
-      description: draft.description || undefined,
-      mailingId: draft.mailingId,
-      listVersionId: draft.audienceMode === 'LIST' ? draft.listVersionId : null,
-      journeyVersionId: draft.journeyVersionId,
-      strategyVersionId: draft.strategyVersionId,
-    }),
-    [draft],
-  );
-  const preflightKey = JSON.stringify([body.mailingId, body.listVersionId, body.journeyVersionId, body.strategyVersionId]);
-  const pf = useQuery({
-    queryKey: ['preflight', preflightKey],
-    queryFn: () => post<Preflight>('/campaigns/preflight', { ...body, name: body.name || 'rascunho', startMode: 'READY' }),
+  const createMut = useMutation({
+    mutationFn: (status: 'RUNNING' | 'DRAFT' | 'SCHEDULED') =>
+      post<Campaign>('/campaigns', {
+        name: name.trim(),
+        description: description.trim() || undefined,
+        mailingId: draft.mailingId,
+        listVersionId: draft.audienceMode === 'LIST' ? draft.listVersionId : null,
+        journeyVersionId: draft.journeyVersionId,
+        strategyVersionId: draft.strategyVersionId,
+        status,
+        scheduledAt: status === 'SCHEDULED' ? saoPauloLocalToIso(scheduledAt) : null,
+      }),
+    onSuccess: (c) => onDone(c),
+    onError: (e) => setErr(errorMessage(e)),
   });
 
-  const create = useMutation({
-    mutationFn: (startMode: 'NOW' | 'SCHEDULE' | 'READY') => {
-      idemRef.current ??= newIdempotencyKey();
-      return post<Campaign>(
-        '/campaigns',
-        { ...body, startMode, scheduledAt: startMode === 'SCHEDULE' ? saoPauloLocalToIso(scheduleLocal) : null },
-        { 'Idempotency-Key': idemRef.current },
-      );
-    },
-    onSuccess: (c) => {
-      idemRef.current = null;
-      onCreated(c);
-    },
-    onError: (e) => {
-      const fe = e instanceof ApiError ? e.fieldErrors : {};
-      const next: Record<string, string> = {};
-      if (fe.name) next.name = fe.name;
-      if (fe.scheduledAt) next.scheduledAt = fe.scheduledAt;
-      setErrors(next);
-      if (next.name) nameRef.current?.focus();
-      else if (next.scheduledAt) schedRef.current?.focus();
-      setFormErr(Object.keys(next).length ? null : errorMessage(e));
-      // falha de validação: nova chave na próxima confirmação
-      if (e instanceof ApiError && e.status === 422) idemRef.current = null;
-    },
-  });
-
-  function submit(startMode: 'NOW' | 'SCHEDULE' | 'READY') {
-    const e: Record<string, string> = {};
-    if (!draft.name?.trim()) e.name = 'Informe o nome da campanha';
-    if (startMode === 'SCHEDULE') {
-      const iso = saoPauloLocalToIso(scheduleLocal);
-      if (!iso) e.scheduledAt = 'Informe data e hora';
-      else if (new Date(iso).getTime() <= Date.now()) e.scheduledAt = 'A data deve ser futura';
+  function handleSubmit(status: 'RUNNING' | 'DRAFT' | 'SCHEDULED') {
+    if (!name.trim()) {
+      setErr('Informe o nome da campanha.');
+      return;
     }
-    setErrors(e);
-    setFormErr(null);
-    if (e.name) return nameRef.current?.focus();
-    if (e.scheduledAt) return schedRef.current?.focus();
-    create.mutate(startMode);
+    if (status === 'SCHEDULED') {
+      const iso = saoPauloLocalToIso(scheduledAt);
+      if (!iso || new Date(iso).getTime() <= Date.now()) {
+        setErr('Informe uma data e hora futura para o agendamento.');
+        return;
+      }
+    }
+    setErr(null);
+    createMut.mutate(status);
   }
 
-  const p = pf.data;
+  const audienceLabel =
+    draft.audienceMode === 'LIST'
+      ? `Lista filtrada: ${extra.listName ?? 'Personalizada'} (${fmtNumber(extra.audienceCount ?? 0)} contatos)`
+      : `Base total: ${fmtNumber(selectedMailing?.recordCount ?? extra.audienceCount ?? 0)} contatos`;
+
   return (
-    <div className="space-y-4">
-      <Card>
-        <div className="grid gap-3">
-          <Field label="Nome da campanha" required error={errors.name}>
+    <div className="space-y-6">
+      {/* Dados Principais da Campanha */}
+      <Card title="Identificação da Campanha">
+        <div className="space-y-4">
+          <Field label="Nome da campanha" required error={err && !name.trim() ? err : undefined}>
             {(f) => (
               <Input
                 id={f.id}
-                ref={nameRef}
-                value={draft.name ?? ''}
-                onChange={(e) => update({ name: e.target.value })}
-                aria-describedby={f.describedBy}
-                aria-invalid={f.invalid}
-                maxLength={120}
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  update({ name: e.target.value });
+                }}
+                placeholder="Ex: Cobrança Novembro — Faixa 30+"
               />
             )}
           </Field>
-          <Field label="Descrição" hint="Opcional">
+          <Field label="Descrição (opcional)">
             {(f) => (
               <Textarea
                 id={f.id}
-                className="font-sans text-sm"
+                value={description}
+                onChange={(e) => {
+                  setDescription(e.target.value);
+                  update({ description: e.target.value });
+                }}
+                placeholder="Notas operacionais, objetivos de recuperação ou foco da ação."
                 rows={2}
-                value={draft.description ?? ''}
-                onChange={(e) => update({ description: e.target.value })}
-                aria-describedby={f.describedBy}
               />
             )}
           </Field>
         </div>
       </Card>
 
-      {pf.isLoading ? (
-        <Loading rows={5} />
-      ) : pf.error ? (
-        <Alert tone="error" title="Não foi possível validar os componentes">
-          {errorMessage(pf.error)}
-        </Alert>
-      ) : (
-        p && (
-          <>
-            {p.warnings.length > 0 && (
-              <Alert tone="warn" title="Atenção antes de iniciar">
-                <ul className="list-disc pl-4">
-                  {p.warnings.map((w) => (
-                    <li key={w}>{w}</li>
-                  ))}
-                </ul>
-              </Alert>
-            )}
-            <ReviewSection title="Quem será contatado" onEdit={() => goStep(draft.audienceMode ? 'AUDIENCE' : 'MAILING')}>
-              {p.audience.type === 'LIST' ? 'Lista' : 'Mailing'} <strong>{p.audience.name}</strong> · {fmtNumber(p.audience.count)} contatos
-              disponíveis na prévia.
-              <span className="block text-xs text-slate-500">Elegibilidade individual (DNC, limites, calendário e destinos) é avaliada a cada tentativa.</span>
-            </ReviewSection>
-            <ReviewSection title="Como será acionado (Inteligência & Canais)" onEdit={() => goStep('ACTIVATION')}>
-              {extra.intelligenceMode !== 'MANUAL' && (
-                <div className="mb-3 rounded-lg border border-brand-200 bg-brand-50/60 p-3.5">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge tone="brand">Inteligência Voll Plan</Badge>
-                    <Badge tone="green">Produção Otimizada</Badge>
-                    <span className="text-xs font-semibold text-slate-800">
-                      {OPERATION_PURPOSE_LABEL[extra.purposeCode ?? 'COBRANCA']}
-                    </span>
-                  </div>
-                  {extra.purposePrompt && (
-                    <p className="mt-1.5 text-xs italic text-slate-700">
-                      "{extra.purposePrompt}"
-                    </p>
-                  )}
-                  <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-brand-900">
-                    <span>
-                      🎯 <strong>8 Blocos Padronizados de CPC</strong> ativos
-                    </span>
-                    <span>·</span>
-                    <span>
-                      💰 Teto Máximo: <strong>{fmtMoney(extra.maxAcceptableCpcBrl ?? 4.5)}</strong> / CPC
-                    </span>
-                    <span>·</span>
-                    <span>
-                      📊 Base Cumulativa (Golden Record) vinculada
-                    </span>
-                  </div>
-                </div>
+      {/* Resumo Visual dos 4 Pilares Manuais */}
+      <Card title="Resumo dos 4 Pilares da Campanha">
+        <div className="grid gap-3 sm:grid-cols-2">
+          {/* Pilar 1: Mailing */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+              <Database className="size-4 text-brand-700" />
+              1. Mailing
+            </div>
+            <div className="mt-2 text-sm font-semibold text-slate-900">
+              {selectedMailing?.name ?? extra.mailingName ?? '—'}
+            </div>
+            <div className="mt-0.5 text-xs text-slate-500">
+              Total de registros: {fmtNumber(selectedMailing?.recordCount ?? 0)}
+            </div>
+          </div>
+
+          {/* Pilar 2: Público (filtro) */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+              <Filter className="size-4 text-brand-700" />
+              2. Público (filtro)
+            </div>
+            <div className="mt-2 text-sm font-semibold text-slate-900">{audienceLabel}</div>
+            <div className="mt-0.5 text-xs text-slate-500">
+              {draft.audienceMode === 'LIST'
+                ? 'Filtros e ordenação aplicados sobre a base.'
+                : 'Sem filtros — 100% da base elegível.'}
+            </div>
+          </div>
+
+          {/* Pilar 3: Jornada */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+              <Layers className="size-4 text-brand-700" />
+              3. Jornada
+            </div>
+            <div className="mt-2 text-sm font-semibold text-slate-900">
+              {selectedJourney?.name ?? '—'}
+            </div>
+            <div className="mt-1 text-xs text-slate-600">
+              {selectedJourney?.latestVersion ? (
+                <JourneySteps steps={selectedJourney.latestVersion.steps} />
+              ) : (
+                '—'
               )}
-              <div className="mb-2">
-                Jornada <strong>{p.journey.name}</strong> · {p.journey.steps.map((s) => CHANNEL_LABEL[s.channelType]).join(' → ')}
-              </div>
-              <JourneySteps steps={p.journey.steps} />
-            </ReviewSection>
-            <ReviewSection title="Quais limites serão respeitados" onEdit={() => goStep('ACTIVATION')}>
-              Estratégia <strong>{p.strategy.name}</strong> v{p.strategy.version}.
-              <StrategyText summary={p.strategy.summary} />
-              <span className="block text-xs text-slate-500">Bloqueios e limites globais prevalecem sobre o template.</span>
-            </ReviewSection>
-            <ReviewSection title="Previsão do primeiro acionamento">
-              {p.nextWindow ? (
+            </div>
+          </div>
+
+          {/* Pilar 4: Estratégia */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+              <SlidersHorizontal className="size-4 text-brand-700" />
+              4. Estratégia
+            </div>
+            <div className="mt-2 text-sm font-semibold text-slate-900">
+              {selectedStrategy?.name ?? '—'}
+            </div>
+            <div className="mt-0.5 text-xs text-slate-500">
+              {selectedStrategy?.latestVersion?.config ? (
                 <>
-                  Próxima janela permitida pelo calendário: <strong>{fmtDateTime(p.nextWindow)}</strong> (horário de São Paulo).
+                  Horário: {selectedStrategy.latestVersion.config.calendar.start}–
+                  {selectedStrategy.latestVersion.config.calendar.end} · Até{' '}
+                  {selectedStrategy.latestVersion.config.limits.total} tentativas
                 </>
               ) : (
-                'Sem janela prevista com o calendário atual.'
+                '—'
               )}
-              <span className="block text-xs text-slate-500">Previsão de calendário; não garante execução enquanto houver bloqueio, falta de capacidade ou destino inválido.</span>
-              <div className="mt-2">
-                Estimativa de custo:{' '}
-                <strong>{p.costEstimate.value === null ? 'não informada' : fmtMoney(p.costEstimate.value)}</strong>
-                <span className="block text-xs text-slate-500">{p.costEstimate.premise}</span>
-              </div>
-            </ReviewSection>
-          </>
-        )
-      )}
-
-      <Card title="Início">
-        <fieldset className="grid gap-2 md:grid-cols-2">
-          <legend className="sr-only">Quando iniciar</legend>
-          <RadioCard
-            name="start"
-            value="NOW"
-            checked={!scheduling}
-            onChange={() => update({ startMode: 'NOW' })}
-            title="Iniciar imediatamente"
-            description="As tentativas começam na próxima janela permitida."
-          />
-          <RadioCard
-            name="start"
-            value="SCHEDULE"
-            checked={scheduling}
-            onChange={() => update({ startMode: 'SCHEDULE' }, { scheduleLocal: scheduleLocal || nowSaoPauloLocal(60) })}
-            title="Agendar início"
-            description="A campanha fica Agendada até a data escolhida."
-          />
-        </fieldset>
-        {scheduling && (
-          <Field className="mt-3 max-w-xs" label="Data e hora (horário de São Paulo)" required error={errors.scheduledAt}>
-            {(f) => (
-              <Input
-                id={f.id}
-                ref={schedRef}
-                type="datetime-local"
-                min={nowSaoPauloLocal(1)}
-                value={scheduleLocal}
-                onChange={(e) => update({}, { scheduleLocal: e.target.value })}
-                aria-describedby={f.describedBy}
-                aria-invalid={f.invalid}
-              />
-            )}
-          </Field>
-        )}
+            </div>
+          </div>
+        </div>
       </Card>
 
-      {formErr && <Alert tone="error">{formErr}</Alert>}
+      {/* Quando Iniciar */}
+      <Card title="Agendamento do Disparo">
+        <div className="space-y-4">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <RadioCard
+              name="start-option"
+              value="NOW"
+              checked={startNow}
+              onChange={() => setStartNow(true)}
+              title="Iniciar imediatamente"
+              description="A campanha entra em processamento na próxima janela válida do calendário."
+            />
+            <RadioCard
+              name="start-option"
+              value="SCHEDULE"
+              checked={!startNow}
+              onChange={() => setStartNow(false)}
+              title="Agendar data futura"
+              description="A campanha fica aguardando a data e hora programadas."
+            />
+          </div>
 
-      <Footer onBack={() => goStep('ACTIVATION')}>
-        <Button onClick={() => submit('READY')} disabled={create.isPending} loading={create.isPending && create.variables === 'READY'}>
-          Salvar como pronta
+          {!startNow && (
+            <Field label="Data e hora do disparo (Horário de Brasília)" required>
+              {(f) => (
+                <Input
+                  id={f.id}
+                  type="datetime-local"
+                  value={scheduledAt}
+                  onChange={(e) => {
+                    setScheduledAt(e.target.value);
+                    update({}, { scheduleLocal: e.target.value });
+                  }}
+                  className="max-w-xs"
+                />
+              )}
+            </Field>
+          )}
+        </div>
+      </Card>
+
+      {err && <Alert tone="error">{err}</Alert>}
+
+      {/* Ações Finais */}
+      <div className="flex items-center justify-between pt-2">
+        <Button variant="secondary" onClick={onBack}>
+          <ArrowLeft className="size-4 mr-1" /> Voltar para acionamento
         </Button>
-        {scheduling ? (
-          <Button variant="primary" onClick={() => submit('SCHEDULE')} disabled={create.isPending} loading={create.isPending && create.variables === 'SCHEDULE'}>
-            Criar e agendar
+        <div className="flex items-center gap-3">
+          <Button
+            variant="secondary"
+            onClick={() => setSaveAsTemplateOpen(true)}
+            icon={<Bookmark className="size-3.5 text-brand-700" />}
+            title="Salvar jornada, estratégia e acionamento desta campanha como modelo reutilizável"
+          >
+            Salvar como modelo
           </Button>
-        ) : (
-          <Button variant="primary" onClick={() => submit('NOW')} disabled={create.isPending} loading={create.isPending && create.variables === 'NOW'}>
-            Criar e iniciar
+          <Button
+            variant="secondary"
+            onClick={() => handleSubmit('DRAFT')}
+            disabled={createMut.isPending}
+            loading={createMut.isPending && createMut.variables === 'DRAFT'}
+          >
+            <Save className="size-4 mr-1" /> Salvar como rascunho
           </Button>
-        )}
-      </Footer>
-    </div>
-  );
-}
-
-function StrategyText({ summary }: { summary: Preflight['strategy']['summary'] }) {
-  if (typeof summary === 'string') return <span className="block">{summary}</span>;
-  if (Array.isArray(summary))
-    return (
-      <ul className="mt-1 list-disc pl-4">
-        {summary.map((s) => (
-          <li key={s}>{s}</li>
-        ))}
-      </ul>
-    );
-  return (
-    <ul className="mt-1 list-disc pl-4">
-      {Object.entries(summary).map(([k, v]) => (
-        <li key={k}>
-          {k}: {String(v)}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function ReviewSection({ title, children, onEdit }: { title: string; children: ReactNode; onEdit?: () => void }) {
-  return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm" aria-label={title}>
-      <div className="mb-1.5 flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold">{title}</h3>
-        {onEdit && (
-          <Button size="sm" variant="ghost" icon={<Pencil className="size-3.5" aria-hidden />} onClick={onEdit} aria-label={`Editar: ${title}`}>
-            Editar
+          <Button
+            variant="primary"
+            onClick={() => handleSubmit(startNow ? 'RUNNING' : 'SCHEDULED')}
+            disabled={createMut.isPending}
+            loading={createMut.isPending && createMut.variables !== 'DRAFT'}
+          >
+            <Rocket className="size-4 mr-1" /> {startNow ? 'Criar e iniciar campanha' : 'Criar e agendar campanha'}
           </Button>
-        )}
+        </div>
       </div>
-      <div className="text-sm text-slate-800">{children}</div>
-    </section>
+
+      {saveAsTemplateOpen && (
+        <SaveAsTemplateModal
+          open={saveAsTemplateOpen}
+          onClose={() => setSaveAsTemplateOpen(false)}
+          initialName={name ? `Modelo - ${name}` : undefined}
+          initialDescription={description}
+          directData={{
+            journeyId: selectedJourney?.id || draft.journeyVersionId || undefined,
+            journeyVersionId: draft.journeyVersionId ?? undefined,
+            journeyName: selectedJourney?.name,
+            strategyId: selectedStrategy?.id || draft.strategyVersionId || undefined,
+            strategyVersionId: draft.strategyVersionId ?? undefined,
+            strategyName: selectedStrategy?.name,
+            purposeCode: (extra.purposeCode as OperationPurpose) ?? 'COBRANCA',
+            startMode: startNow ? 'NOW' : 'SCHEDULE',
+          }}
+          onSaved={(tmpl) => {
+            update({}, { templateApplied: tmpl.id, templateName: tmpl.name });
+          }}
+        />
+      )}
+    </div>
   );
 }
 
 export function WizardReturnBanner() {
   return (
-    <Alert tone="info" className="mb-4" title="Você veio do assistente Preparar campanha">
-      Crie uma cópia, publique a versão ajustada e volte para escolher a estratégia publicada.{' '}
+    <Alert tone="info" className="mb-4" title="Você veio do assistente de campanha">
+      Crie uma cópia, publique a versão ajustada e volte para escolher a estratégia na campanha.{' '}
       <Link to="/campanhas/nova" className="font-medium text-brand-800 underline">
-        Voltar ao assistente
+        Voltar à criação de campanha
       </Link>
     </Alert>
   );

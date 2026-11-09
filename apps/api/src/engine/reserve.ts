@@ -53,7 +53,7 @@ export async function reserveEnrollment(campaignId: string, enrollmentId: string
       if (!fresh || !rt) return { skipped: 'NOT_FOUND' as const };
       const ctx = (await buildContexts(c, rt, [fresh], now)).get(fresh.id)!;
       const ev = evaluateEnrollment(ctx);
-      await c.query(`UPDATE enrollments SET last_evaluated_at=$2 WHERE id=$1`, [fresh.id, now]);
+      await c.query(`UPDATE enrollments SET last_evaluated_at=$2, scheduled_callback_at=NULL WHERE id=$1`, [fresh.id, now]);
       if (!ev.eligible) {
         const onlyDestination = ev.reasons.every((r) => STEP_SKIP_REASONS.includes(r) || r === 'OUTSIDE_CALENDAR');
         if (onlyDestination && ev.reasons.some((r) => STEP_SKIP_REASONS.includes(r)) && fresh.state === 'ACTIVE') {
@@ -133,7 +133,7 @@ export async function runReservations(campaignId: string, now: Date = new Date()
     pool,
     `WITH evaluated_cands AS (
        SELECT e.id, e.contact_id, e.state, e.stage, e.destination_cursor, e.next_eligible_at, e.order_key, e.last_evaluated_at,
-              e.btc_start_minute, e.btc_end_minute, e.btc_timezone,
+              e.btc_start_minute, e.btc_end_minute, e.btc_timezone, e.scheduled_callback_at,
               EXTRACT(HOUR FROM $2 AT TIME ZONE COALESCE(e.btc_timezone, $5)) * 60 +
               EXTRACT(MINUTE FROM $2 AT TIME ZONE COALESCE(e.btc_timezone, $5)) AS cur_min
          FROM enrollments e
@@ -147,9 +147,10 @@ export async function runReservations(campaignId: string, now: Date = new Date()
        FROM evaluated_cands
       ORDER BY 
         CASE
-          WHEN btc_start_minute IS NOT NULL AND btc_start_minute <= cur_min AND btc_end_minute > cur_min THEN 0
-          WHEN btc_start_minute IS NULL THEN 1
-          ELSE 2
+          WHEN scheduled_callback_at IS NOT NULL AND scheduled_callback_at <= $2 THEN 0
+          WHEN btc_start_minute IS NOT NULL AND btc_start_minute <= cur_min AND btc_end_minute > cur_min THEN 1
+          WHEN btc_start_minute IS NULL THEN 2
+          ELSE 3
         END ASC,
         last_evaluated_at NULLS FIRST,
         order_key ASC
