@@ -9,7 +9,7 @@
     "dev": "node --watch index.js",
     "build": "esbuild index.js --bundle --platform=node --target=node20 --outfile=dist/index.js",
     "check": "node scripts/check-syntax.js",
-    "test": "node scripts/check-syntax.js"
+    "test": "node scripts/check-syntax.js && node --test \"test/**/*.test.js\""
   },
   "dependencies": {
     "ajv": "^8.17.1",

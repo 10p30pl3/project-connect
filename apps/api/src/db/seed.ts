@@ -188,20 +188,22 @@ export async function seed(opts: { withSampleMailing?: boolean } = {}) {
       if (ex) return ex.id as string;
       return (await one(
         c,
-        `INSERT INTO connections (workspace_id, name, channel_type, provider, config, webhook_secret, tariff, tariff_updated_at)
-         VALUES ($1, 'Discador IA · Tronco Direct Call', 'VOICE', 'VOICE_APP', $2, $3, 0.08, now()) RETURNING id`,
+        `INSERT INTO connections (workspace_id, name, channel_type, provider, config, webhook_secret, tariff, tariff_updated_at, active)
+         VALUES ($1, 'Discador IA · Tronco Direct Call', 'VOICE', 'VOICE_APP', $2, $3, 0.08, now(), $4) RETURNING id`,
         [
           wsId,
           JSON.stringify({
-            voiceAppBaseUrl: 'http://192.168.15.36:8090',
-            voiceAppToken: 'voll-token-prod',
+            // endereço, token e caller ID vêm do ambiente; sem eles a conexão nasce inativa
+            voiceAppBaseUrl: process.env.VOICE_APP_BASE_URL ?? '',
+            voiceAppToken: process.env.VOICE_APP_TOKEN ?? '',
             trunkName: 'Direct Call (SIP Trunk)',
             sipServer: 'sip1.directdial.com.br',
             sipPort: 5060,
             sipTransport: 'UDP',
-            defaultCallerId: '+5511989785888',
+            defaultCallerId: process.env.VOICE_APP_CALLER_ID ?? '',
           }),
           randomBytes(24).toString('hex'),
+          Boolean(process.env.VOICE_APP_BASE_URL && process.env.VOICE_APP_CALLER_ID),
         ],
       ))!.id as string;
     })();

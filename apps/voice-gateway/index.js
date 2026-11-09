@@ -40,6 +40,7 @@ const { createApiRouter } = require('./utils/api-router');
 const aiProviderManager = require('./utils/ai-provider-manager');
 const ElevenLabsS2SBridge = require('./media/elevenlabs-s2s-bridge');
 const { sendVollPlanWebhook } = require('./utils/voll-webhook');
+const { buildConnectorEvent } = require('./utils/voll-contract');
 
 function createAiBridge(tenant, sipHeaders) {
   const engine = (tenant?.stsEngine || 'openai').toLowerCase();
@@ -2037,18 +2038,16 @@ Sempre utilize a ferramenta "registrar_desfecho_chamada" ao identificar o desfec
           }
 
           if (params.callback && params.callback.url) {
-            sendVollPlanWebhook(params.callback, {
-              eventId: `evt-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            sendVollPlanWebhook(params.callback, buildConnectorEvent({
               attemptId: params.attemptId,
               providerAttemptId: params.providerAttemptId || callId,
-              type: 'RESULT',
-              occurredAt: new Date().toISOString(),
               tabulationCode,
               scheduledAt,
               summary,
-              durationSeconds: Math.round(callInfo ? callInfo.durationSec : 0),
-              cost: aiUsage ? aiUsage.costUsd : undefined
-            }).catch((whErr) => console.warn(`[${callId}] Falha ao despachar webhook para Voll Plan:`, whErr.message));
+              durationSeconds: callInfo ? callInfo.durationSec : 0,
+              // custo de IA em USD; o custo de telefonia (BRL) vem da tarifa da conexão no Voll Plan
+              aiCostUsd: aiUsage ? aiUsage.costUsd : undefined
+            })).catch((whErr) => console.warn(`[${callId}] Falha ao despachar webhook para Voll Plan:`, whErr.message));
           }
         }
       } catch (logErr) {
@@ -2142,16 +2141,13 @@ Sempre utilize a ferramenta "registrar_desfecho_chamada" ao identificar o desfec
       } else if (msg.includes('480') || msg.includes('timeout') || msg.includes('temporarily')) {
         tabCode = 'NO_ANSWER';
       }
-      sendVollPlanWebhook(params.callback, {
-        eventId: `evt-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      sendVollPlanWebhook(params.callback, buildConnectorEvent({
         attemptId: params.attemptId,
-        providerAttemptId: params.providerAttemptId || (dialog && dialog.sip?.callId) || `fail-${Date.now()}`,
-        type: 'RESULT',
-        occurredAt: new Date().toISOString(),
+        providerAttemptId: params.providerAttemptId || (dialog && dialog.sip?.callId) || `fail-${params.attemptId || Date.now()}`,
         tabulationCode: tabCode,
         durationSeconds: 0,
         summary: `Falha na originação SIP: ${err.message || 'originate_failed'}`
-      }).catch((whErr) => console.warn('Falha ao despachar webhook de erro para Voll Plan:', whErr.message));
+      })).catch((whErr) => console.warn('Falha ao despachar webhook de erro para Voll Plan:', whErr.message));
     }
     throw err;
   }

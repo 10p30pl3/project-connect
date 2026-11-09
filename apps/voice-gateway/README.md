@@ -1,3 +1,17 @@
+# Gateway de voz (apps/voice-gateway)
+
+Antigo `voice-app` (repositório `voice-lab-2`), agora parte do monorepo Voll Plan. O Voll Plan decide quem, quando e por qual canal; este serviço executa a chamada de voz (FreeSWITCH + Drachtio + agente de IA) e devolve a tabulação.
+
+- **Contrato com o Voll Plan:** `POST /v1/calls` recebe um `VoiceCallRequest` e o retorno sai como `ConnectorEvent` assinado (HMAC) para `/api/connectors/:id/events`. Os schemas são gerados em `packages/shared/contracts/` a partir do Zod do Voll Plan (`npm run contracts`) e validados em `utils/voll-contract.js`.
+- **Rodar:** `cp .env-example .env` aqui, `npm run voice:up` na raiz (Drachtio, FreeSWITCH e whisper) e `npm run dev:gateway`.
+- **Configuração de runtime** (`config/tenants.json`, `ai-providers.json`, `extensions.json`, `outbound-routes.json`…) não é versionada; parta dos `*.example.json`. Chaves de API só no `.env` ou no cofre de segredos.
+- **Testes:** `npm test -w @voll/voice-gateway` (sintaxe de todos os módulos + contrato).
+
+O texto original segue abaixo.
+
+---
+
+```text
 Voice App (Production-Ready Multi-Tenant Voice Gateway)
 ==========================================================
 
@@ -80,3 +94,5 @@ O arquivo `docker-compose.yml` inicia os containeres do Drachtio e FreeSWITCH.
 Certifique-se de preencher `DRACHTIO_EXTERNAL_IP` e `DRACHTIO_SECRET` no `.env`.
 Execute:
   docker-compose up -d
+
+```

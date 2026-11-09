@@ -1,0 +1,31 @@
+{
+  "type": "object",
+  "properties": {
+    "ok": {
+      "type": "boolean",
+      "const": true
+    },
+    "status": {
+      "type": "string",
+      "const": "ACCEPTED"
+    },
+    "providerAttemptId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "callId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "duplicate": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "ok",
+    "status",
+    "providerAttemptId"
+  ],
+  "additionalProperties": false,
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

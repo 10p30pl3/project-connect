@@ -70,7 +70,7 @@ class WsMediaServer {
 
     this.listenPromise = new Promise((resolve, reject) => {
       this.server = http.createServer(async (req, res) => {
-        if (req.url === '/health' || req.url === '/healthz') {
+        if (req.url === '/health' || req.url === '/healthz' || req.url === '/v1/health') {
           const status = this.getHealthObject();
           res.writeHead(200, { 'Content-Type': 'application/json' });
           return res.end(JSON.stringify(status, null, 2));

@@ -1,3 +1,4 @@
+const { validateCallRequest } = require('./voll-contract');
 const fs = require('fs');
 const path = require('path');
 const { URL } = require('url');
@@ -844,6 +845,20 @@ function createApiRouter({ activeBridges, tenantManager, fsPool, whisperPool, me
         return true;
       }
 
+      // Ordem vinda do Voll Plan: valida o contrato compartilhado (packages/shared/contracts)
+      if (body.attemptId) {
+        const check = validateCallRequest(body);
+        if (!check.ok) {
+          sendJson(res, 400, { error: 'invalid_call_request', message: 'Ordem fora do contrato Voll Plan', details: check.errors });
+          return true;
+        }
+        const headerKey = req.headers['idempotency-key'];
+        if (headerKey && headerKey !== body.attemptId) {
+          sendJson(res, 409, { error: 'idempotency_conflict', message: 'Idempotency-Key diferente de attemptId' });
+          return true;
+        }
+      }
+
       // Validação rápida de capacidade do cluster FreeSWITCH
       if (fsPool && typeof fsPool.hasHealthyNode === 'function' && !fsPool.hasHealthyNode()) {
         sendJson(res, 429, { error: 'capacity_exceeded', message: 'Nenhum nó de telefonia saudável no cluster FreeSWITCH' });
@@ -906,7 +921,8 @@ function createApiRouter({ activeBridges, tenantManager, fsPool, whisperPool, me
     if (callMatch) {
       const callId = decodeURIComponent(callMatch[1]);
       const action = callMatch[2] || null;
-      const bridge = activeBridges.get(callId);
+      // aceita o id da chamada SIP, o providerAttemptId (va-<attemptId>) ou o próprio attemptId do Voll Plan
+      const bridge = resolveBridge(activeBridges, callId);
 
       if (!bridge) {
         if ((req.method === 'DELETE' && !action) || (req.method === 'POST' && action === 'hangup')) {
@@ -1756,3 +1772,14 @@ module.exports = {
   createApiRouter,
   API_COMMANDS_CATALOG
 };
+
+/** Localiza a chamada ativa pelo id SIP, pelo providerAttemptId ou pelo attemptId do Voll Plan. */
+function resolveBridge(activeBridges, id) {
+  if (!activeBridges || !id) return null;
+  const direct = activeBridges.get(id);
+  if (direct) return direct;
+  for (const b of activeBridges.values()) {
+    if (b && (b.attemptId === id || b.providerAttemptId === id || `va-${b.attemptId}` === id)) return b;
+  }
+  return null;
+}

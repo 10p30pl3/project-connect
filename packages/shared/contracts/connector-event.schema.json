@@ -1,0 +1,65 @@
+{
+  "type": "object",
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "providerAttemptId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "attemptId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "DELIVERY_CONFIRMED",
+        "RESULT",
+        "OPT_OUT",
+        "RESULT_UNKNOWN"
+      ]
+    },
+    "occurredAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "tabulationCode": {
+      "type": "string"
+    },
+    "scheduledAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "cost": {
+      "type": "number",
+      "minimum": 0
+    },
+    "aiCostUsd": {
+      "type": "number",
+      "minimum": 0
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 2000
+    },
+    "durationSeconds": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "recordingUrl": {
+      "type": "string",
+      "format": "uri"
+    }
+  },
+  "required": [
+    "eventId",
+    "providerAttemptId",
+    "type",
+    "occurredAt"
+  ],
+  "additionalProperties": false,
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

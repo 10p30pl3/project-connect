@@ -30,6 +30,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Contrato Voll Plan <-> gateway de voz atualizado
+        run: npm run contracts:check -w @voll/shared
       - run: npm run typecheck
-      - run: npm test
+      - name: Testes (API/motor + contrato + gateway de voz)
+        run: npm test
       - run: npm run build
+      - name: Bundle do gateway de voz
+        run: npm run build -w @voll/voice-gateway

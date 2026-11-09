@@ -6,12 +6,19 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./contracts/*": "./contracts/*"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit -p ."
+    "typecheck": "tsc --noEmit -p .",
+    "contracts": "tsx scripts/gen-contracts.ts",
+    "contracts:check": "tsx scripts/gen-contracts.ts --check"
   },
   "dependencies": {
     "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "zod-to-json-schema": "^3.25.2",
+    "tsx": "^4.19.2"
   }
 }

@@ -82,6 +82,10 @@ async function applyEvent(c: Client, a: any, ev: ConnectorEvent): Promise<'OK' |
   if (ev.cost !== undefined && open) {
     await c.query(`UPDATE attempts SET cost_confirmed=$2 WHERE id=$1`, [a.id, ev.cost]);
   }
+  // custo de IA (USD) é registrado mesmo após o fim da tentativa, sem reabri-la nem reaplicar a estratégia
+  if (ev.aiCostUsd !== undefined) {
+    await c.query(`UPDATE attempts SET ai_cost_usd=$2 WHERE id=$1`, [a.id, ev.aiCostUsd]);
+  }
 
   if (ev.type === 'OPT_OUT') {
     if (open) {

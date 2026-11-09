@@ -278,6 +278,24 @@ describe('C02 contadores compartilhados e idempotência', () => {
   });
 });
 
+describe('consolidação gateway de voz', () => {
+  it('custo de IA (USD) fica separado do custo do canal (BRL) e chega mesmo após o fim', async () => {
+    const c = await campaign('Custo IA');
+    const at = await reserveAndSend(c.id, '0001');
+    const conn = cat.connection('VOICE');
+    const ev = { ...resultEvent(at.provider_attempt_id, 'CPC_NO_DEAL', `${at.id}:result`), attemptId: at.id, aiCostUsd: 0.0421 };
+    expect((await postWebhook(app, conn, ev)).json()).toMatchObject({ accepted: true, duplicate: false });
+    let row = await one(getPool(), `SELECT state, cost_confirmed, ai_cost_usd::float AS ai FROM attempts WHERE id=$1`, [at.id]);
+    expect(row).toMatchObject({ state: 'FINALIZED', cost_confirmed: null, ai: 0.0421 });
+    // o gateway repete o mesmo desfecho (eventId determinístico): nenhum efeito novo
+    expect((await postWebhook(app, conn, ev)).json()).toMatchObject({ duplicate: true });
+    // atualização tardia de custo de IA: registra sem reabrir a tentativa
+    await postWebhook(app, conn, { ...ev, eventId: `${at.id}:cost`, type: 'RESULT_UNKNOWN', tabulationCode: undefined, aiCostUsd: 0.05 });
+    row = await one(getPool(), `SELECT state, ai_cost_usd::float AS ai FROM attempts WHERE id=$1`, [at.id]);
+    expect(row).toMatchObject({ state: 'FINALIZED', ai: 0.05 });
+  });
+});
+
 describe('C05 custos', () => {
   it('CS01/CS02: tarifa preservada no envio; desconhecida ≠ zero; custo parcial omite unitários', async () => {
     const c = await campaign('Custos');

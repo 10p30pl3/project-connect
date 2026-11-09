@@ -501,12 +501,52 @@ export const ConnectorEventSchema = z.object({
   occurredAt: z.string().datetime({ offset: true }),
   tabulationCode: z.string().optional(),
   scheduledAt: z.string().datetime({ offset: true }).optional(),
+  /** Custo de telefonia/canal da tentativa, em BRL (substitui a estimativa pela tarifa). */
   cost: z.number().min(0).optional(),
-  summary: z.string().optional(),
+  /** Custo de IA (modelo de voz/texto) da tentativa, em USD. Nunca somado a `cost`. */
+  aiCostUsd: z.number().min(0).optional(),
+  summary: z.string().max(2000).optional(),
   durationSeconds: z.number().int().min(0).optional(),
   recordingUrl: z.string().url().optional(),
 });
 export type ConnectorEvent = z.infer<typeof ConnectorEventSchema>;
+
+/**
+ * Ordem de chamada Voll Plan -> gateway de voz (`POST /v1/calls`, header `Idempotency-Key = attemptId`).
+ * Contrato único: o adaptador `connectors/voice-app.ts` monta este payload e o `apps/voice-gateway`
+ * valida o mesmo schema (JSON Schema gerado em `packages/shared/contracts/`).
+ */
+export const VoiceCallRequestSchema = z.object({
+  attemptId: z.string().uuid(),
+  traceId: z.string().min(1),
+  connectionId: z.string().uuid(),
+  workspaceId: z.string().uuid(),
+  /** destino em E.164 */
+  to: z.string().regex(/^\+?[0-9]{8,15}$/, 'destino deve ter 8 a 15 dígitos'),
+  from: z.string().regex(/^\+?[0-9]{8,15}$/),
+  callerId: z.string().regex(/^\+?[0-9]{8,15}$/),
+  tenantId: z.string().min(1),
+  contact: z.object({
+    externalId: z.string().min(1),
+    name: z.string(),
+    variables: z.record(z.string(), z.unknown()),
+  }),
+  campaign: z.object({ id: z.string().uuid() }),
+  limits: z.object({ maxDurationSec: z.number().int().min(10).max(3600) }),
+  /** códigos de tabulação que o gateway pode devolver nesta tentativa (snapshot da estratégia) */
+  allowedTabulations: z.array(z.string().min(1)).optional(),
+  callback: z.object({ url: z.string().url(), secret: z.string().min(16) }),
+});
+export type VoiceCallRequest = z.infer<typeof VoiceCallRequestSchema>;
+
+/** Resposta do gateway a `POST /v1/calls`. 202 = aceita; 200 = repetição da mesma tentativa. */
+export const VoiceCallAcceptedSchema = z.object({
+  ok: z.literal(true),
+  status: z.literal('ACCEPTED'),
+  providerAttemptId: z.string().min(1),
+  callId: z.string().min(1).optional(),
+  duplicate: z.boolean().optional(),
+});
 
 // ------------------------------------------------------------------ helpers
 export type Paginated<T> = { items: T[]; nextCursor: string | null; total?: number };
@@ -854,9 +894,9 @@ export const ChannelEndpointConfigSchema = z.object({
     sipTransport: z.enum(['UDP', 'TCP', 'TLS']).default('TLS'),
     webrtcGatewayUrl: z.string().default('wss://webrtc.vollconnect.com.br/ws'),
     cdrWebhookUrl: z.string().default('https://api.vollconnect.com.br/webhooks/cdr'),
-    defaultCallerId: z.string().default('+5511989785888'),
+    defaultCallerId: z.string().default(''),
     outboundProxy: z.string().default('proxy.voip.vollconnect.com.br:5061'),
-    voiceAppBaseUrl: z.string().default('http://192.168.15.36:8090'),
+    voiceAppBaseUrl: z.string().default(''),
     voiceAppToken: z.string().default(''),
     maxConcurrent: z.number().int().min(1).default(30),
     maxConcurrentPerWorkspace: z.number().int().min(1).default(10),
@@ -900,9 +940,9 @@ export const DEFAULT_CHANNEL_ENDPOINTS: ChannelEndpointConfig = {
     sipTransport: 'TLS',
     webrtcGatewayUrl: 'wss://webrtc.vollconnect.com.br/ws',
     cdrWebhookUrl: 'https://api.vollconnect.com.br/webhooks/cdr',
-    defaultCallerId: '+5511989785888',
+    defaultCallerId: '',
     outboundProxy: 'proxy.voip.vollconnect.com.br:5061',
-    voiceAppBaseUrl: 'http://192.168.15.36:8090',
+    voiceAppBaseUrl: '',
     voiceAppToken: '',
     maxConcurrent: 30,
     maxConcurrentPerWorkspace: 10,

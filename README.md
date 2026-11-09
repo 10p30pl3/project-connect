@@ -40,10 +40,24 @@ npm run test:e2e     # Playwright; requer API, worker e web rodando (npm run dev
 
 Os testes do motor cobrem os critérios de aceite do plano (AC01–AC08, AC12, AC24, AC25, OP01, CT01, CS01/CS02, OB03, §26.5). O mapa critério → teste está em [`apps/api/README.md`](apps/api/README.md).
 
+## Gateway de voz
+
+O antigo `voice-app` (Voll Connect) vive em `apps/voice-gateway`, com o serviço Python de AMD/transcrição em `services/whisper`. O Voll Plan pede a chamada com `POST /v1/calls` e recebe o desfecho no webhook `/api/connectors/:id/events`; os dois lados validam o mesmo contrato, gerado em `packages/shared/contracts` (`npm run contracts`).
+
+```bash
+cp apps/voice-gateway/.env-example apps/voice-gateway/.env   # chaves OpenAI/ElevenLabs, Drachtio, FreeSWITCH
+npm run voice:up        # Drachtio + FreeSWITCH + whisper (docker compose --profile voice)
+npm run dev:gateway
+```
+
+Para a conexão "Discador IA" do seed ligar de verdade, defina `VOICE_APP_BASE_URL` e `VOICE_APP_CALLER_ID` no `.env` da raiz antes do `db:seed`. Detalhes e próximas fases em [docs/consolidacao-voll-plan-voice-gateway.md](docs/consolidacao-voll-plan-voice-gateway.md).
+
 ## Estrutura
 
 ```
 apps/api       API Fastify, worker do motor, migrações SQL, seed e testes
+apps/voice-gateway  gateway de voz (FreeSWITCH + Drachtio + agente de IA), Node CommonJS
+services/whisper    AMD, transcrição e biometria vocal (Python)
 apps/web       SPA React (assistente Preparar campanha, operação, contatos, catálogo, controle central)
 packages/shared contratos compartilhados
 docs/API.md    contrato HTTP entre front e back
