@@ -781,13 +781,6 @@ function PrototypeCampaignCreator({
               <p className="mt-1 text-sm font-semibold text-slate-800">{calendarSummary}</p>
               <p className="mt-1 text-xs text-slate-500">Horários e limites avançados podem ser ajustados em Configurações → Jornadas.</p>
             </div>
-            <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3.5">
-              <div>
-                <p className="text-xs font-medium text-slate-500">Estratégia padrão</p>
-                <p className="mt-1 text-sm font-semibold">{strategy?.name ?? 'Carregando estratégia publicada…'}</p>
-              </div>
-              <Link to="/jornadas" className="shrink-0 text-xs font-semibold text-brand-700 hover:underline">Personalizar em Configurações</Link>
-            </div>
           </Card>
 
           <Card title="Nome da campanha">
