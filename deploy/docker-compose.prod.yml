@@ -1,0 +1,138 @@
+# Voll Plan em produção (servidor único, acesso por IP).
+# Uso: ./deploy/deploy.sh   (gera deploy/.env.production, constrói, migra e sobe)
+# Gateway de voz: perfil "voice"  ·  AMD/transcrição (whisper, pesado): perfil "whisper"
+name: voll-plan
+
+x-api: &api
+  build:
+    context: ..
+    dockerfile: deploy/api.Dockerfile
+  image: voll-plan/api:latest
+  restart: unless-stopped
+  env_file: .env.production
+  environment:
+    NODE_ENV: production
+    DATABASE_URL: postgres://voll:${POSTGRES_PASSWORD}@db:5432/voll_plan
+    API_PORT: "3333"
+  extra_hosts:
+    # o gateway de voz roda na rede do host
+    - "host.docker.internal:host-gateway"
+  depends_on:
+    db:
+      condition: service_healthy
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: voll
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}
+      POSTGRES_DB: voll_plan
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U voll -d voll_plan"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    <<: *api
+    command: ["node", "dist/server.js"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3333/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  worker:
+    <<: *api
+    command: ["node", "dist/worker.js"]
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/web.Dockerfile
+    image: voll-plan/web:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # ---------------- gateway de voz (perfil "voice") ----------------
+  gateway:
+    profiles: ["voice"]
+    build:
+      context: ..
+      dockerfile: deploy/gateway.Dockerfile
+    image: voll-plan/voice-gateway:latest
+    restart: unless-stopped
+    network_mode: host
+    env_file: .env.production
+    environment:
+      NODE_ENV: production
+      MEDIA_WS_PORT: "8090"
+      DRACHTIO_HOST: 127.0.0.1
+      DRACHTIO_PORT: "9022"
+      FREESWITCH_HOST: 127.0.0.1
+      FREESWITCH_PORT: "8021"
+      AUDIO_FORK_WS_HOST: 127.0.0.1
+      SIP_INTERNAL_HOST: 127.0.0.1
+      WHISPER_NODES: http://127.0.0.1:8080
+    volumes:
+      - gateway-config:/app/apps/voice-gateway/config
+      - recordings:/app/apps/voice-gateway/recordings
+    depends_on:
+      - drachtio
+      - freeswitch
+
+  drachtio:
+    profiles: ["voice"]
+    image: drachtio/drachtio-server:latest
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - drachtio
+      - --contact
+      - "sip:*;transport=udp,tcp"
+      - --external-ip
+      - "${SERVER_IP:?defina SERVER_IP}"
+      - --port
+      - "9022"
+      - --secret
+      - "${DRACHTIO_SECRET:?defina DRACHTIO_SECRET}"
+      - --loglevel
+      - info
+
+  freeswitch:
+    profiles: ["voice"]
+    image: drachtio/drachtio-freeswitch-mrf:latest
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - recordings:/recordings
+
+  whisper:
+    profiles: ["whisper"]
+    build:
+      context: ../services/whisper
+    image: voll-plan/whisper:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      WHISPER_MODEL_SIZE: small
+      WHISPER_DEVICE: auto
+      WHISPER_COMPUTE_TYPE: auto
+      MODELS_DIR: /app/models
+    volumes:
+      - whisper-models:/app/models:ro
+
+volumes:
+  pgdata:
+  gateway-config:
+  recordings:
+  whisper-models:

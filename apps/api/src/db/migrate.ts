@@ -1,11 +1,13 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import { config } from '../config.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
-export const MIGRATIONS_DIR = join(here, '../../migrations');
+// src/db/ (tsx) ou dist/ (build): procura a pasta migrations da API nos dois arranjos
+export const MIGRATIONS_DIR =
+  process.env.MIGRATIONS_DIR ?? [join(here, '../../migrations'), join(here, '../migrations')].find((d) => existsSync(d)) ?? join(here, '../../migrations');
 
 export async function migrate(databaseUrl = config.databaseUrl, log = true) {
   const client = new pg.Client({ connectionString: databaseUrl });

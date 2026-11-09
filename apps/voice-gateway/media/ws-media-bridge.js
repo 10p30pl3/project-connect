@@ -117,7 +117,7 @@ class WsMediaServer {
           candidatePort += 1;
           console.warn(`[WsMediaServer] Porta em uso! Tentando próxima porta livre: ${candidatePort}...`);
           setTimeout(() => {
-            this.server.listen(candidatePort, '0.0.0.0');
+            this.server.listen(candidatePort, process.env.MEDIA_WS_BIND_HOST || '0.0.0.0');
           }, 50);
           return;
         }
@@ -126,7 +126,7 @@ class WsMediaServer {
         reject(err);
       });
 
-      this.server.listen(candidatePort, '0.0.0.0', () => {
+      this.server.listen(candidatePort, process.env.MEDIA_WS_BIND_HOST || '0.0.0.0', () => {
         this.port = this.server.address().port;
         this.isListening = true;
         console.log(`[WsMediaServer] 🚀 Worker #${WORKER_ID} (PID ${process.pid}) ouvindo mídia em 0.0.0.0:${this.port}`);

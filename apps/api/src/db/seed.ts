@@ -144,8 +144,10 @@ async function ensureUser(c: Client, orgId: string, email: string, name: string,
   ]))!.id;
 }
 
+const DEMO = process.env.SEED_DEMO !== 'false';
+
 export async function seed(opts: { withSampleMailing?: boolean } = {}) {
-  const withSample = opts.withSampleMailing ?? true;
+  const withSample = opts.withSampleMailing ?? DEMO;
   return tx(async (c) => {
     let org = await one(c, `SELECT id FROM organizations WHERE name='Voll Solutions'`);
     if (!org) org = await one(c, `INSERT INTO organizations (name) VALUES ('Voll Solutions') RETURNING id`);
@@ -155,11 +157,14 @@ export async function seed(opts: { withSampleMailing?: boolean } = {}) {
     const wsId = ws!.id as string;
 
     const adminId = await ensureUser(c, orgId, config.seedAdminEmail, 'Administrador Voll', 'ADMIN', config.seedAdminPassword);
-    await ensureUser(c, orgId, 'ricardo@vollsolutions.com.br', 'Ricardo (Voll Solutions)', 'ADMIN', 'Voll@2026');
-    await ensureUser(c, orgId, 'gestor@voll.local', 'Gestora Exemplo', 'MANAGER', 'Voll@2026');
-    await ensureUser(c, orgId, 'supervisor@voll.local', 'Supervisor Exemplo', 'SUPERVISOR', 'Voll@2026');
-    await ensureUser(c, orgId, 'operador@voll.local', 'Operador Exemplo', 'OPERATOR', 'Voll@2026');
-    await ensureUser(c, orgId, 'analista@voll.local', 'Analista Exemplo', 'ANALYST', 'Voll@2026');
+    // usuários de demonstração (senha conhecida): desligados em produção com SEED_DEMO=false
+    if (DEMO) {
+      await ensureUser(c, orgId, 'ricardo@vollsolutions.com.br', 'Ricardo (Voll Solutions)', 'ADMIN', 'Voll@2026');
+      await ensureUser(c, orgId, 'gestor@voll.local', 'Gestora Exemplo', 'MANAGER', 'Voll@2026');
+      await ensureUser(c, orgId, 'supervisor@voll.local', 'Supervisor Exemplo', 'SUPERVISOR', 'Voll@2026');
+      await ensureUser(c, orgId, 'operador@voll.local', 'Operador Exemplo', 'OPERATOR', 'Voll@2026');
+      await ensureUser(c, orgId, 'analista@voll.local', 'Analista Exemplo', 'ANALYST', 'Voll@2026');
+    }
 
     for (const t of TABULATIONS) {
       await c.query(
@@ -414,7 +419,7 @@ if (isMain) {
   seed()
     .then(async (r) => {
       console.log('seed ok', r);
-      console.log(`login: ${config.seedAdminEmail} / ${config.seedAdminPassword}`);
+      console.log(`login: ${config.seedAdminEmail}${DEMO ? ` / ${config.seedAdminPassword}` : ' (senha definida em SEED_ADMIN_PASSWORD)'}`);
       await closePool();
     })
     .catch(async (e) => {
