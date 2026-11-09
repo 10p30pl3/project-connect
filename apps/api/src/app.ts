@@ -11,6 +11,7 @@ import { mailingRoutes } from './modules/mailings.js';
 import { listRoutes } from './modules/lists.js';
 import { catalogRoutes } from './modules/catalog.js';
 import { campaignRoutes } from './modules/campaigns.js';
+import { calendarRoutes } from './modules/calendars.js';
 import { attemptRoutes } from './modules/attempts.js';
 import { contactRoutes } from './modules/contacts.js';
 import { controlRoutes } from './modules/control.js';
