@@ -17,6 +17,7 @@ import { JourneysPage } from './pages/Journeys';
 import { StrategiesPage, StrategyDetailPage } from './pages/Strategies';
 import { TabulationsPage } from './pages/Tabulations';
 import { ChannelsPage } from './pages/Channels';
+import { TelephonyPage } from './pages/Telephony';
 import { LimitsPage } from './pages/Limits';
 import { ObservabilityPage } from './pages/Observability';
 import { CentralIntelligencePage } from './pages/CentralIntelligence';
@@ -81,6 +82,7 @@ export const router = createBrowserRouter([
           { path: '/estrategias/:id', element: <StrategyDetailPage /> },
           { path: '/tabulacoes', element: <TabulationsPage /> },
           { path: '/canais', element: <ChannelsPage /> },
+          { path: '/telefonia', element: <TelephonyPage /> },
           { path: '/relatorios', element: <ReportsPage /> },
           { path: '/inteligencia', element: <CentralIntelligencePage /> },
           { path: '/limites', element: <LimitsPage /> },

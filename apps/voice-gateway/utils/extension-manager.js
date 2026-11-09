@@ -1,3 +1,4 @@
+const { SIP_HOST } = require('./env-defaults');
 const fs = require('fs');
 const path = require('path');
 
@@ -315,7 +316,7 @@ class ExtensionManager {
   }
 
   getSipConfig() {
-    const host = process.env.EXTERNAL_IP || process.env.SIP_DOMAIN || '192.168.15.36';
+    const host = process.env.EXTERNAL_IP || process.env.SIP_DOMAIN || SIP_HOST;
     return {
       server: host,
       port: 5080,

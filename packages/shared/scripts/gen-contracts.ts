@@ -6,13 +6,14 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { ConnectorEventSchema, VoiceCallAcceptedSchema, VoiceCallRequestSchema } from '../src/index.ts';
+import { ConnectorEventSchema, VoiceAgentTenantSchema, VoiceCallAcceptedSchema, VoiceCallRequestSchema } from '../src/index.ts';
 
 const dir = join(dirname(fileURLToPath(import.meta.url)), '..', 'contracts');
 const targets = {
   'voice-call-request.schema.json': VoiceCallRequestSchema,
   'voice-call-accepted.schema.json': VoiceCallAcceptedSchema,
   'connector-event.schema.json': ConnectorEventSchema,
+  'voice-agent-tenant.schema.json': VoiceAgentTenantSchema,
 };
 
 export function render(): Record<string, string> {

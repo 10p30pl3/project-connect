@@ -1,4 +1,5 @@
-const { validateCallRequest } = require('./voll-contract');
+const { requireCallerId } = require('./env-defaults');
+const { validateCallRequest, validateAgentTenant, checkOrderAgainstTenant, redactTenant } = require('./voll-contract');
 const fs = require('fs');
 const path = require('path');
 const { URL } = require('url');
@@ -857,6 +858,11 @@ function createApiRouter({ activeBridges, tenantManager, fsPool, whisperPool, me
           sendJson(res, 409, { error: 'idempotency_conflict', message: 'Idempotency-Key diferente de attemptId' });
           return true;
         }
+        const refusal = checkOrderAgainstTenant(body, tenantManager ? tenantManager.tenants.get(body.tenantId) : null);
+        if (refusal) {
+          sendJson(res, refusal.status, { error: refusal.error, message: refusal.message });
+          return true;
+        }
       }
 
       // Validação rápida de capacidade do cluster FreeSWITCH
@@ -1317,8 +1323,15 @@ function createApiRouter({ activeBridges, tenantManager, fsPool, whisperPool, me
 
     if (req.method === 'POST' && cleanPath === '/v1/tenants') {
       try {
+        if (body && body.vollAgentVersion != null) {
+          const check = validateAgentTenant(body);
+          if (!check.ok) {
+            sendJson(res, 400, { error: 'invalid_agent', message: 'Agente fora do contrato Voll Plan', details: check.errors });
+            return true;
+          }
+        }
         const saved = tenantManager.upsertTenant(body);
-        sendJson(res, 201, { ok: true, tenant: saved });
+        sendJson(res, 201, { ok: true, tenant: redactTenant(saved) });
       } catch (err) {
         sendJson(res, 400, { error: 'validation_error', message: err.message });
       }
@@ -1335,14 +1348,27 @@ function createApiRouter({ activeBridges, tenantManager, fsPool, whisperPool, me
           sendJson(res, 404, { error: 'tenant_not_found', message: `Tenant não encontrado: ${tenantId}` });
           return true;
         }
-        sendJson(res, 200, t);
+        sendJson(res, 200, redactTenant(t));
         return true;
       }
 
       if (req.method === 'PUT') {
         try {
+          if (body && body.vollAgentVersion != null) {
+            // agente gerenciado pelo Voll Plan: contrato estrito e nenhuma credencial vinda de fora
+            const check = validateAgentTenant({ ...body, id: tenantId });
+            if (!check.ok) {
+              sendJson(res, 400, { error: 'invalid_agent', message: 'Agente fora do contrato Voll Plan', details: check.errors });
+              return true;
+            }
+            const previous = tenantManager.tenants.get(tenantId);
+            if (previous && previous.vollAgentVersion != null && previous.vollAgentVersion > body.vollAgentVersion) {
+              sendJson(res, 409, { error: 'stale_agent_version', message: `Gateway já tem a versão ${previous.vollAgentVersion}` });
+              return true;
+            }
+          }
           const saved = tenantManager.upsertTenant({ ...body, id: tenantId });
-          sendJson(res, 200, { ok: true, tenant: saved });
+          sendJson(res, 200, { ok: true, tenant: redactTenant(saved) });
         } catch (err) {
           sendJson(res, 400, { error: 'validation_error', message: err.message });
         }
@@ -1426,6 +1452,20 @@ function createApiRouter({ activeBridges, tenantManager, fsPool, whisperPool, me
       sendJson(res, 200, {
         statement: tracker.getStatements({ provider, tenantId, limit }),
         summary: tracker.getCostSummary()
+      });
+      return true;
+    }
+
+    // Disparos e provedores SMS/WhatsApp legados: substituídos pelo motor de campanhas e pelos conectores do
+    // Voll Plan (DNC, limites, idempotência). Leitura continua disponível para consultar o histórico.
+    if (
+      process.env.LEGACY_OUTREACH_ENABLED !== 'true' &&
+      req.method !== 'GET' &&
+      (cleanPath.startsWith('/v1/outreach') || cleanPath.startsWith('/v1/providers'))
+    ) {
+      sendJson(res, 410, {
+        error: 'moved_to_voll_plan',
+        message: 'Disparos e provedores SMS/WhatsApp agora são feitos por campanhas e conexões no Voll Plan. Defina LEGACY_OUTREACH_ENABLED=true para reativar temporariamente.'
       });
       return true;
     }
@@ -1559,7 +1599,7 @@ function createApiRouter({ activeBridges, tenantManager, fsPool, whisperPool, me
           }
           const trunkId = sim.matchedRule && sim.matchedRule.trunkId !== '*' ? sim.matchedRule.trunkId : null;
           if (!fromDid) {
-            fromDid = '5511989785888';
+            fromDid = requireCallerId();
           }
           try {
             const call = await originateCallHandler({

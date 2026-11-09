@@ -1,3 +1,4 @@
+const { DEFAULT_CALLER_ID, SIP_HOST } = require('./env-defaults');
 const fs = require('fs');
 const path = require('path');
 const { readJsonList, writeJsonList } = require('./json-store');
@@ -21,8 +22,8 @@ const DEFAULT_OUTBOUND_ROUTES = [
     trunkId: 'directcall',
     pattern: '^(?:0055|55|0)?([1-9]\\d{9,10})$',
     prepend: '55',
-    callerIdNumber: '5511989785888',
-    callerIdName: '5511989785888',
+    callerIdNumber: DEFAULT_CALLER_ID,
+    callerIdName: DEFAULT_CALLER_ID,
     priority: 10,
     active: true,
     description: 'Celulares e fixos de todo o Brasil (com DDD). Normaliza e adiciona 55.'
@@ -33,8 +34,8 @@ const DEFAULT_OUTBOUND_ROUTES = [
     trunkId: 'directcall',
     pattern: '^([2-9]\\d{7,8})$',
     prepend: '5511',
-    callerIdNumber: '5511989785888',
-    callerIdName: '5511989785888',
+    callerIdNumber: DEFAULT_CALLER_ID,
+    callerIdName: DEFAULT_CALLER_ID,
     priority: 20,
     active: true,
     description: 'Números locais sem DDD (8 ou 9 dígitos). Adiciona 5511 automaticamente.'
@@ -245,7 +246,7 @@ class OutboundRouteManager {
     <extension name="ai_agent_call">
       <condition field="destination_number" expression="${aiPattern}">
         <action application="set" data="hangup_after_bridge=true"/>
-        <action application="bridge" data="sofia/drachtio_mrf/\${destination_number}@192.168.15.36:5060"/>
+        <action application="bridge" data="sofia/drachtio_mrf/\${destination_number}@${SIP_HOST}:5060"/>
       </condition>
     </extension>
 
@@ -280,7 +281,7 @@ ${renderRoutesXml()}
     <extension name="mrf_ai_agent_call">
       <condition field="destination_number" expression="${aiPattern}">
         <action application="set" data="hangup_after_bridge=true"/>
-        <action application="bridge" data="sofia/drachtio_mrf/\${destination_number}@192.168.15.36:5060"/>
+        <action application="bridge" data="sofia/drachtio_mrf/\${destination_number}@${SIP_HOST}:5060"/>
       </condition>
     </extension>
 

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import {
   ArrowRight,
+  Bot,
   Cable,
   CheckCircle2,
   ChevronDown,
@@ -31,6 +32,7 @@ import { ApiError, errorMessage, get, patch, post } from '../lib/api';
 import type { Connection, Simulation, Tabulation } from '../lib/types';
 import { fmtDateTime, fmtMoney } from '../lib/format';
 import { useAuth } from '../lib/auth';
+import { VoiceAgentPanel } from '../components/VoiceAgentPanel';
 import {
   Alert,
   Badge,
@@ -77,6 +79,7 @@ export function ChannelsPage() {
   const { can } = useAuth();
   const q = useQuery({ queryKey: ['connections'], queryFn: () => get<{ items: Connection[] }>('/connections') });
   const [edit, setEdit] = useState<Connection | null>(null);
+  const [agentFor, setAgentFor] = useState<Connection | null>(null);
   const [openNew, setOpenNew] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     try {
@@ -179,6 +182,11 @@ export function ChannelsPage() {
                               </span>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
+                              {c.provider === 'VOICE_APP' && (
+                                <Button size="sm" variant="secondary" icon={<Bot className="size-3.5" />} onClick={() => setAgentFor(c)}>
+                                  Agente de voz
+                                </Button>
+                              )}
                               {canEdit && (
                                 <Button
                                   size="sm"
@@ -264,6 +272,16 @@ export function ChannelsPage() {
                                 )}
                               </div>
 
+                              {c.provider === 'VOICE_APP' && (
+                                <button
+                                  type="button"
+                                  onClick={() => setAgentFor(c)}
+                                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700 hover:text-brand-800 bg-brand-50/80 hover:bg-brand-100/90 px-2.5 py-1 rounded-md border border-brand-200/80 transition"
+                                >
+                                  <Bot className="size-3 text-brand-600" />
+                                  <span>Agente de voz</span>
+                                </button>
+                              )}
                               {canEdit && (
                                 <button
                                   type="button"
@@ -340,6 +358,13 @@ export function ChannelsPage() {
                                 </td>
                                 <td>{c.active ? <Badge tone="green">Ativa</Badge> : <Badge tone="gray">Inativa</Badge>}</td>
                                 <td className="text-right">
+                                  {c.provider === 'VOICE_APP' && (
+                                    <div className="mb-1.5 flex items-center justify-end">
+                                      <Button size="sm" variant="secondary" icon={<Bot className="size-3.5" />} onClick={() => setAgentFor(c)}>
+                                        Agente de voz
+                                      </Button>
+                                    </div>
+                                  )}
                                   {canEdit && (
                                     <div className="flex items-center justify-end gap-1.5">
                                       <Button
@@ -379,6 +404,15 @@ export function ChannelsPage() {
       />
 
       {edit && <EditConnection c={edit} onClose={() => setEdit(null)} />}
+      {agentFor && (
+        <VoiceAgentPanel
+          connectionId={agentFor.id}
+          connectionName={agentFor.name}
+          open
+          onOpenChange={(o) => !o && setAgentFor(null)}
+          canEdit={can('voiceAgent.write')}
+        />
+      )}
       <NewConnectionDialog open={openNew} onOpenChange={setOpenNew} />
     </div>
   );

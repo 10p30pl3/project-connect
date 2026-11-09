@@ -535,9 +535,70 @@ export const VoiceCallRequestSchema = z.object({
   limits: z.object({ maxDurationSec: z.number().int().min(10).max(3600) }),
   /** códigos de tabulação que o gateway pode devolver nesta tentativa (snapshot da estratégia) */
   allowedTabulations: z.array(z.string().min(1)).optional(),
+  /** versão do agente de voz cadastrado na conexão; o gateway recusa se o tenant estiver em outra versão */
+  agentVersion: z.number().int().min(1).optional(),
   callback: z.object({ url: z.string().url(), secret: z.string().min(16) }),
 });
 export type VoiceCallRequest = z.infer<typeof VoiceCallRequestSchema>;
+
+const E164 = z.string().regex(/^\+?[0-9]{8,15}$/, 'Use de 8 a 15 dígitos, com DDI (ex.: +551130001000)');
+
+/**
+ * Agente de voz cadastrado na Conexão de voz do Voll Plan (cadastro único, fase 3 da consolidação).
+ * Não carrega credenciais: chaves da OpenAI/ElevenLabs ficam no ambiente do gateway.
+ */
+export const VoiceAgentSchema = z
+  .object({
+    name: z.string().min(1, 'Informe o nome do agente').max(120),
+    engine: z.enum(['openai', 'elevenlabs']).default('openai'),
+    openaiModel: z.string().max(80).optional(),
+    voice: z.string().max(80).optional(),
+    elevenlabsVoiceId: z.string().max(80).optional(),
+    elevenlabsModel: z.string().max(80).optional(),
+    instructions: z.string().min(20, 'Descreva o roteiro do agente (mínimo de 20 caracteres)').max(20000),
+    greeting: z.string().max(1000).optional(),
+    maxDurationSec: z.number().int().min(30).max(900).default(180),
+    amd: z.object({ enabled: z.boolean().default(true), mode: z.enum(['active', 'shadow']).default('active') }).default({}),
+    stt: z.object({ enabled: z.boolean().default(true) }).default({}),
+    bargeinLevel: z.number().int().min(1).max(5).default(3),
+    defaultCallerId: E164,
+    allowedCallerIds: z.array(E164).default([]),
+  })
+  .superRefine((a, ctx) => {
+    if (a.allowedCallerIds.length && !a.allowedCallerIds.includes(a.defaultCallerId))
+      ctx.addIssue({ code: 'custom', path: ['defaultCallerId'], message: 'O caller ID padrão precisa estar na lista de autorizados' });
+  });
+export type VoiceAgent = z.infer<typeof VoiceAgentSchema>;
+
+/**
+ * Agente publicado no gateway (`PUT /v1/tenants/:connectionId`). O tenant do gateway passa a ser a
+ * conexão de voz do Voll Plan, que pertence a um único workspace.
+ */
+export const VoiceAgentTenantSchema = z
+  .object({
+    id: z.string().uuid(),
+    name: z.string().min(1),
+    vollWorkspaceId: z.string().uuid(),
+    vollAgentVersion: z.number().int().min(1),
+    stsEngine: z.enum(['openai', 'elevenlabs']),
+    openaiModel: z.string().optional(),
+    voice: z.string().optional(),
+    elevenlabsVoiceId: z.string().optional(),
+    elevenlabsModel: z.string().optional(),
+    instructions: z.string().min(20),
+    greetingInstructions: z.string().nullable(),
+    maxDurationSec: z.number().int().min(30).max(900),
+    amd: z.object({ enabled: z.boolean(), mode: z.enum(['active', 'shadow']) }),
+    stt: z.object({ enabled: z.boolean() }),
+    bargeinLevel: z.number().int().min(1).max(5),
+    allowedCallerIds: z.array(E164),
+    /** tenant de campanha: não atende ramal nem DID de entrada */
+    extension: z.null(),
+    dids: z.array(z.string()).max(0),
+    active: z.boolean(),
+  })
+  .strict();
+export type VoiceAgentTenant = z.infer<typeof VoiceAgentTenantSchema>;
 
 /** Resposta do gateway a `POST /v1/calls`. 202 = aceita; 200 = repetição da mesma tentativa. */
 export const VoiceCallAcceptedSchema = z.object({

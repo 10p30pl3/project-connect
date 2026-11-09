@@ -1,0 +1,131 @@
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "vollWorkspaceId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "vollAgentVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "stsEngine": {
+      "type": "string",
+      "enum": [
+        "openai",
+        "elevenlabs"
+      ]
+    },
+    "openaiModel": {
+      "type": "string"
+    },
+    "voice": {
+      "type": "string"
+    },
+    "elevenlabsVoiceId": {
+      "type": "string"
+    },
+    "elevenlabsModel": {
+      "type": "string"
+    },
+    "instructions": {
+      "type": "string",
+      "minLength": 20
+    },
+    "greetingInstructions": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "maxDurationSec": {
+      "type": "integer",
+      "minimum": 30,
+      "maximum": 900
+    },
+    "amd": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "active",
+            "shadow"
+          ]
+        }
+      },
+      "required": [
+        "enabled",
+        "mode"
+      ],
+      "additionalProperties": false
+    },
+    "stt": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "additionalProperties": false
+    },
+    "bargeinLevel": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "allowedCallerIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^\\+?[0-9]{8,15}$"
+      }
+    },
+    "extension": {
+      "type": "null"
+    },
+    "dids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 0
+    },
+    "active": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "vollWorkspaceId",
+    "vollAgentVersion",
+    "stsEngine",
+    "instructions",
+    "greetingInstructions",
+    "maxDurationSec",
+    "amd",
+    "stt",
+    "bargeinLevel",
+    "allowedCallerIds",
+    "extension",
+    "dids",
+    "active"
+  ],
+  "additionalProperties": false,
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

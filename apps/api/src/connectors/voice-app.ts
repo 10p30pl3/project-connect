@@ -14,6 +14,7 @@ import type { Db } from '../db/pool.js';
 import { one } from '../db/pool.js';
 import type { ConnectorAdapter, SendInput, SendResult } from './adapter.js';
 import { TransientConnectorError } from './adapter.js';
+import { agentState } from '../modules/voice-agent.js';
 
 const SEND_TIMEOUT_MS = 5000;
 
@@ -75,6 +76,18 @@ export const voiceAppAdapter: ConnectorAdapter = {
     if (!row) return { status: 'REJECTED', reason: 'ATTEMPT_NOT_FOUND' };
 
     const ep = await resolveEndpoint(db, connection.config, row.workspace_id);
+    // agente de voz cadastrado na conexão: o tenant no gateway é a própria conexão, na versão publicada
+    const agent = agentState(connection.config);
+    let agentVersion: number | undefined;
+    if (agent.agent) {
+      if (!agent.inSync) {
+        return { status: 'REJECTED', reason: `VOICE_AGENT_NOT_SYNCED: versão ${agent.version} ainda não publicada no gateway` };
+      }
+      agentVersion = agent.version;
+      ep.tenantId = connection.id;
+      ep.callerId = agent.agent.defaultCallerId;
+      ep.maxDurationSec = agent.agent.maxDurationSec;
+    }
     if (!ep.baseUrl || !ep.callerId) {
       return { status: 'REJECTED', reason: 'VOICE_APP_NOT_CONFIGURED: informe endereço do gateway e caller ID' };
     }
@@ -102,6 +115,7 @@ export const voiceAppAdapter: ConnectorAdapter = {
       campaign: { id: row.campaign_id },
       limits: { maxDurationSec: ep.maxDurationSec },
       allowedTabulations: row.tabulation_rules ? Object.keys(row.tabulation_rules) : undefined,
+      agentVersion,
       callback: {
         url: `${config.publicUrl}/api/connectors/${connection.id}/events`,
         secret: webhookSecret ?? '',
@@ -131,6 +145,10 @@ export const voiceAppAdapter: ConnectorAdapter = {
       const body: any = await res.json().catch(() => ({}));
       if (res.status === 200 || res.status === 201 || res.status === 202) {
         return { status: 'ACCEPTED', providerAttemptId: body.providerAttemptId || body.callId || body.id || `va-${attempt.id}` };
+      }
+      if (res.status === 409 && body?.error === 'agent_version_mismatch') {
+        // o gateway recusou ANTES de aceitar: nenhuma chamada saiu; republicar o agente resolve
+        return { status: 'REJECTED', reason: `AGENT_VERSION_MISMATCH: ${body.message ?? ''}`.trim() };
       }
       if (res.status === 409) {
         // mesma Idempotency-Key com payload diferente: não rediscar, investigar

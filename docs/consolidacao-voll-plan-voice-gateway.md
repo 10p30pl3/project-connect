@@ -1,14 +1,24 @@
 # Consolidação Voll Plan + Voll Connect (voice-app)
 
-## Status (09/11/2026)
+## Status (09/11/2026, fases 0 a 6)
 
 | Fase | Situação |
 |---|---|
 | 0. Salvar o código | Feito: estado atual da pasta voice-app importado (sem histórico, que contém chaves de API) |
 | 1. Monorepo | Feito: `apps/voice-gateway`, `services/whisper`, docker-compose único (perfil `voice`) |
 | 2. Contrato único | Feito: `VoiceCallRequest` e `ConnectorEvent` em `packages/shared`, JSON Schema em `packages/shared/contracts`, validação nos dois lados, teste de contrato no CI, eventId determinístico, custo de IA separado (`aiCostUsd`), sem IP/caller ID/token fixos |
-| Gateway (interno) | Pendente: o gateway ainda tem BINA `5511989785888` e IP de laboratório fixos para chamadas de teste do painel (index.js, api-router.js, freeswitch-pool.js, outbound-route-manager.js). Ordens do Voll Plan sempre trazem `callerId`, então não dependem deles; removê-los entra na fase 3 |
-| 3 a 6 | Pendentes: cadastro único de agentes, interface única, desativar duplicados, persistência do gateway no Postgres |
+| 3. Cadastro único | Feito: agente de voz (roteiro, motor, voz, AMD, transcrição, caller IDs) cadastrado e versionado na Conexão de voz, publicado no gateway como tenant `<connectionId>` (`PUT /v1/tenants/:id`, contrato `VoiceAgentTenant`). O adaptador só liga com a versão publicada; o gateway recusa tenant inexistente (422), versão diferente (409) e caller ID não autorizado (422). Chaves de IA nunca saem do gateway e são mascaradas nas respostas |
+| 4. Interface única | Feito: botão **Agente de voz** em Canais e página **Telefonia** (ao vivo com encerrar chamada, histórico, gravações com áudio e transcrição, custo de IA, status do gateway). A API faz de intermediária, filtra por workspace e audita ouvir gravação e encerrar chamada. O `dashboard.html` fica como ferramenta técnica (troncos, ramais, rotas, diagnóstico) |
+| 5. Desativar duplicados | Feito: disparos (`/v1/outreach`) e provedores SMS/WhatsApp (`/v1/providers`) do gateway respondem 410 para escrita; leitura do histórico continua. `LEGACY_OUTREACH_ENABLED=true` reativa temporariamente |
+| 6. Persistência | Feito para agentes: o Postgres do Voll Plan é a fonte da verdade e o worker republica a cada minuto agente que sumiu ou mudou no gateway (nunca uma versão não liberada). Troncos, ramais e rotas SIP continuam em JSON no gateway: são configuração de infraestrutura de cada nó |
+| Valores fixos do gateway | Feito: BINA e IP do laboratório saíram do código (`DEFAULT_CALLER_ID`, `SIP_INTERNAL_HOST`); sem caller ID a chamada de teste falha com mensagem clara |
+
+### Pendências
+
+- Testar o ciclo completo com FreeSWITCH, tronco e um número real (cinco contatos, como no plano v3).
+- Ligar `API_AUTH_TOKEN` no gateway em produção (sem ele a API do gateway fica aberta na rede interna).
+- Rever com o time os 4 testes do Voll Plan marcados como desatualizados.
+- Trocar as chaves de OpenAI e ElevenLabs que estavam no histórico do `voice-lab-2` e arquivar o repositório.
 
 Avaliação original abaixo.
 

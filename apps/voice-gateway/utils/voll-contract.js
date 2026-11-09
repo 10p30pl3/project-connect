@@ -10,11 +10,13 @@ const addFormats = require('ajv-formats');
 
 const callRequestSchema = require('../../../packages/shared/contracts/voice-call-request.schema.json');
 const connectorEventSchema = require('../../../packages/shared/contracts/connector-event.schema.json');
+const agentTenantSchema = require('../../../packages/shared/contracts/voice-agent-tenant.schema.json');
 
 const ajv = new Ajv({ allErrors: true, strict: false });
 addFormats(ajv);
 const validateRequest = ajv.compile(callRequestSchema);
 const validateEvent = ajv.compile(connectorEventSchema);
+const validateTenant = ajv.compile(agentTenantSchema);
 
 function describeErrors(errors) {
   return (errors || []).map((e) => `${e.instancePath || '(raiz)'} ${e.message}`);
@@ -64,4 +66,52 @@ function validateConnectorEvent(event) {
   return ok ? { ok: true, errors: [] } : { ok: false, errors: describeErrors(validateEvent.errors) };
 }
 
-module.exports = { validateCallRequest, buildConnectorEvent, validateConnectorEvent };
+/** Valida o agente de voz publicado pelo Voll Plan (`PUT /v1/tenants/:connectionId`). */
+function validateAgentTenant(body) {
+  const ok = validateTenant(body);
+  return ok ? { ok: true, errors: [] } : { ok: false, errors: describeErrors(validateTenant.errors) };
+}
+
+/**
+ * Confere uma ordem do Voll Plan contra o tenant (agente) cadastrado no gateway.
+ * Devolve null quando pode originar, ou { status, error, message } para responder.
+ * - tenant inexistente: 422 (sem cair no tenant default, que teria outro roteiro)
+ * - versão do agente diferente: 409 (o Voll Plan precisa sincronizar antes)
+ * - caller ID fora da lista autorizada: 422
+ */
+function checkOrderAgainstTenant(order, tenant) {
+  if (!order || !order.attemptId) return null;
+  const managed = order.agentVersion != null;
+  if (!tenant) {
+    if (!managed && order.tenantId === 'default') return null; // conexão legada sem agente cadastrado
+    return { status: 422, error: 'unknown_tenant', message: `Agente ${order.tenantId} não está publicado neste gateway` };
+  }
+  if (managed && tenant.vollAgentVersion !== order.agentVersion) {
+    return {
+      status: 409,
+      error: 'agent_version_mismatch',
+      message: `Agente na versão ${tenant.vollAgentVersion ?? 'desconhecida'}; ordem pede ${order.agentVersion}`,
+    };
+  }
+  const allowed = Array.isArray(tenant.allowedCallerIds) ? tenant.allowedCallerIds : [];
+  if (allowed.length && !allowed.includes(order.callerId)) {
+    return { status: 422, error: 'caller_id_not_allowed', message: `Caller ID ${order.callerId} não autorizado para este agente` };
+  }
+  return null;
+}
+
+/** Remove credenciais de um tenant antes de devolvê-lo pela API. */
+function redactTenant(t) {
+  if (!t) return t;
+  const mask = (k) => (k ? `${String(k).slice(0, 7)}...${String(k).slice(-4)}` : null);
+  return { ...t, openaiApiKey: mask(t.openaiApiKey), elevenlabsApiKey: mask(t.elevenlabsApiKey) };
+}
+
+module.exports = {
+  validateCallRequest,
+  buildConnectorEvent,
+  validateConnectorEvent,
+  validateAgentTenant,
+  checkOrderAgainstTenant,
+  redactTenant,
+};

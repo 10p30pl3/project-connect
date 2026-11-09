@@ -53,3 +53,46 @@ test('evento de resultado segue o schema do Voll Plan, com custo de IA separado'
   assert.strictEqual(ev.aiCostUsd, 0.0123);
   assert.strictEqual(ev.durationSeconds, 63);
 });
+
+const { validateAgentTenant, checkOrderAgainstTenant, redactTenant } = require('../utils/voll-contract');
+
+const tenant = {
+  id: valid.connectionId,
+  name: 'Agente cobrança',
+  vollWorkspaceId: valid.workspaceId,
+  vollAgentVersion: 3,
+  stsEngine: 'openai',
+  openaiModel: 'gpt-realtime-mini',
+  voice: 'marin',
+  instructions: 'Você é o assistente de cobrança da Voll. Seja cordial e objetivo.',
+  greetingInstructions: null,
+  maxDurationSec: 180,
+  amd: { enabled: true, mode: 'active' },
+  stt: { enabled: true },
+  bargeinLevel: 3,
+  allowedCallerIds: ['+551130001000'],
+  extension: null,
+  dids: [],
+  active: true,
+};
+
+test('agente publicado pelo Voll Plan segue o contrato e não aceita credenciais', () => {
+  assert.deepStrictEqual(validateAgentTenant(tenant), { ok: true, errors: [] });
+  assert.strictEqual(validateAgentTenant({ ...tenant, openaiApiKey: 'qualquer-chave' }).ok, false);
+  assert.strictEqual(validateAgentTenant({ ...tenant, dids: ['1133334444'] }).ok, false);
+});
+
+test('ordem é conferida contra o agente: inexistente, versão e caller ID', () => {
+  const order = { ...valid, tenantId: tenant.id, agentVersion: 3 };
+  assert.strictEqual(checkOrderAgainstTenant(order, tenant), null);
+  assert.strictEqual(checkOrderAgainstTenant(order, null).error, 'unknown_tenant');
+  assert.strictEqual(checkOrderAgainstTenant({ ...order, agentVersion: 4 }, tenant).status, 409);
+  assert.strictEqual(checkOrderAgainstTenant({ ...order, callerId: '+551199990000' }, tenant).error, 'caller_id_not_allowed');
+  // conexão legada sem agente cadastrado continua usando o tenant default
+  assert.strictEqual(checkOrderAgainstTenant({ ...valid, tenantId: 'default' }, null), null);
+});
+
+test('tenant devolvido pela API tem as chaves mascaradas', () => {
+  const r = redactTenant({ ...tenant, openaiApiKey: 'fake-key-abcdefghijklmnop1234' });
+  assert.strictEqual(r.openaiApiKey, 'fake-ke...1234');
+});

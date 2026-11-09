@@ -20,6 +20,8 @@ import { overviewRoutes } from './modules/overview.js';
 import { intelligenceRoutes } from './modules/intelligence.js';
 import { reportRoutes } from './modules/reports.js';
 import { aiRoutes } from './modules/ai.js';
+import { voiceAgentRoutes } from './modules/voice-agent.js';
+import { telephonyRoutes } from './modules/telephony.js';
 
 export type BuildOptions = { logger?: boolean; loginRateMax?: number };
 
@@ -121,6 +123,8 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
         await intelligenceRoutes(p);
         await reportRoutes(p);
         await aiRoutes(p);
+        await voiceAgentRoutes(p);
+        await telephonyRoutes(p);
         if (!config.isProduction) await simRoutes(p);
       });
     },

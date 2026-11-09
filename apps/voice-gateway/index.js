@@ -1,3 +1,4 @@
+const { DEFAULT_CALLER_ID, SIP_HOST, requireCallerId } = require('./utils/env-defaults');
 require('dotenv').config({ override: true });
 // Voice App - High-Scalability Multi-Tenant & Multi-FreeSWITCH Voice Gateway
 
@@ -1876,7 +1877,7 @@ Sempre utilize a ferramenta "registrar_desfecho_chamada" ao identificar o desfec
   };
 
   try {
-    let from = (params.from && params.from.trim()) ? params.from.trim() : (params.callerId || '5511989785888');
+    let from = requireCallerId(params.from, params.callerId);
     let to = params.to ? String(params.to).trim() : '';
     if (to.startsWith('+')) {
       to = to.substring(1);
@@ -1890,9 +1891,9 @@ Sempre utilize a ferramenta "registrar_desfecho_chamada" ao identificar o desfec
     const cleanFrom = from.replace(/\D/g, '');
 
     // Normalização de BINA: se o destino for telefone público (>= 10 dígitos) e o From for ramal interno (< 10 dígitos),
-    // usa a BINA homologada na operadora (5511989785888) para evitar rejeição "603 Decline"
+    // usa a BINA homologada na operadora (callerId da ordem ou DEFAULT_CALLER_ID) para evitar rejeição "603 Decline"
     if (cleanTo.length >= 10 && cleanFrom.length < 10) {
-      from = params.callerId || '5511989785888';
+      from = requireCallerId(params.callerId);
       console.log(`[Originate] 🛡️ BINA normalizada para operadora: From=${from} (era ${cleanFrom}) para destino público To=${to}`);
     }
 
@@ -2114,7 +2115,7 @@ Sempre utilize a ferramenta "registrar_desfecho_chamada" ao identificar o desfec
           callId: (dialog && dialog.sip?.callId) || `fail-${Date.now()}`,
           direction: 'outbound',
           tenantId: tenant?.id || 'default',
-          caller: params.from || '5511989785888',
+          caller: params.from || params.callerId || DEFAULT_CALLER_ID || null,
           called: params.to || '1000',
           durationSec: 0,
           costUsd: 0,
@@ -2212,7 +2213,7 @@ srf.register(async (req, res) => {
   const user = req.get('From') || req.uri;
   console.log(`[SIP Register] Recebido REGISTER na porta 5060 para ${user}, repassando para FreeSWITCH 5080...`);
   try {
-    const fsTarget = 'sip:192.168.15.36:5080';
+    const fsTarget = `sip:${SIP_HOST}:5080`;
     await srf.proxyRequest(req, fsTarget);
   } catch (err) {
     console.error('[SIP Register Proxy] Erro ao repassar registro:', err.message);

@@ -1273,6 +1273,8 @@ function buildImportPreview(body: any): ImportPreview {
   };
 }
 
+const MOCK_VOICE_AGENTS: Record<string, any> = {};
+
 export async function handleMockApi<T = unknown>(
   rawPath: string,
   opts: { method?: string; body?: unknown; headers?: Record<string, string> } = {},
@@ -1823,6 +1825,34 @@ export async function handleMockApi<T = unknown>(
     if (b.invalidatesDestination !== undefined) tab.invalidatesDestination = b.invalidatesDestination;
     if (b.channelTypes !== undefined) tab.channelTypes = b.channelTypes;
     return tab as T;
+  }
+  // Agente de voz (fase 3) e Telefonia (fase 4) na demonstração: sem gateway real
+  const agentMatch = pathname.match(/^\/connections\/([^/]+)\/voice-agent(\/sync)?$/);
+  if (agentMatch) {
+    const st = (MOCK_VOICE_AGENTS[agentMatch[1]] ??= { agent: null, version: 0, syncedVersion: null, syncedAt: null, syncError: null, inSync: false });
+    if (method === 'PUT' && !agentMatch[2]) {
+      st.agent = body;
+      st.version += 1;
+      st.inSync = false;
+      return { ...st } as T;
+    }
+    if (method === 'POST' && agentMatch[2]) {
+      if (!st.agent) throw new ApiError({ type: 'bad_request', title: 'Requisição inválida', status: 400, detail: 'Cadastre o agente de voz antes de publicar' });
+      st.syncedVersion = st.version;
+      st.syncedAt = new Date().toISOString();
+      st.syncError = null;
+      st.inSync = true;
+      return { ...st, published: true } as T;
+    }
+    return { ...st } as T;
+  }
+  if (pathname.startsWith('/telephony/')) {
+    throw new ApiError({
+      type: 'conflict',
+      title: 'Gateway de voz não configurado',
+      status: 409,
+      detail: 'Na demonstração não há gateway de voz conectado. Informe o endereço em Canais > Endereços técnicos.',
+    });
   }
   if (pathname === '/connections' && method === 'GET') return { items: CONNECTIONS } as T;
   if (pathname === '/connections' && method === 'POST') {

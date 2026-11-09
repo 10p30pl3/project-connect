@@ -50,7 +50,7 @@ npm run voice:up        # Drachtio + FreeSWITCH + whisper (docker compose --prof
 npm run dev:gateway
 ```
 
-Para a conexão "Discador IA" do seed ligar de verdade, defina `VOICE_APP_BASE_URL` e `VOICE_APP_CALLER_ID` no `.env` da raiz antes do `db:seed`. Detalhes e próximas fases em [docs/consolidacao-voll-plan-voice-gateway.md](docs/consolidacao-voll-plan-voice-gateway.md).
+Para a conexão "Discador IA" do seed ligar de verdade, defina `VOICE_APP_BASE_URL` e `VOICE_APP_CALLER_ID` no `.env` da raiz antes do `db:seed`. Depois, em **Canais > Agente de voz**, cadastre o roteiro, a voz e os caller IDs e clique em **Publicar**: as chamadas só saem com a versão publicada. Chamadas ao vivo, histórico, gravações e custo de IA ficam em **Telefonia**. Em produção, defina `API_AUTH_TOKEN` no gateway e o mesmo token na conexão. Detalhes e próximas fases em [docs/consolidacao-voll-plan-voice-gateway.md](docs/consolidacao-voll-plan-voice-gateway.md).
 
 ## Estrutura
 

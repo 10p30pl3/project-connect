@@ -89,6 +89,10 @@
         "minLength": 1
       }
     },
+    "agentVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
     "callback": {
       "type": "object",
       "properties": {

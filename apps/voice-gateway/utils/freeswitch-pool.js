@@ -1,3 +1,4 @@
+const { SIP_HOST, requireCallerId } = require('./env-defaults');
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -236,7 +237,7 @@ class FreeSwitchPool {
     try {
       endpoint = await node.mediaserver.createEndpoint();
       let sipUri = String(to || '').trim();
-      const fsHost = process.env.AUDIO_FORK_WS_HOST || '192.168.15.36';
+      const fsHost = SIP_HOST;
 
       if (sipUri.startsWith('sip:')) {
         if (!sipUri.includes('@')) {
@@ -256,7 +257,7 @@ class FreeSwitchPool {
           sipUri = `sip:${cleanTo}@${fsHost}:5080`;
         }
       }
-      const callingNumber = from || '5511989785888';
+      const callingNumber = requireCallerId(from);
       const outboundHeaders = {
         ...headers
       };

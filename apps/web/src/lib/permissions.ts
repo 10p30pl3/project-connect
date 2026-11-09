@@ -15,19 +15,21 @@ export type Permission =
   | 'contacts.write' // destinos
   | 'connections.write'
   | 'control.write'
-  | 'sim.use';
+  | 'sim.use'
+  | 'voiceAgent.write' // cadastrar e publicar o agente de voz da conexão
+  | 'telephony.hangup'; // encerrar chamada em andamento
 
 const MATRIX: Record<Role, Permission[]> = {
   ADMIN: [
     'users.manage', 'mailings.write', 'lists.write', 'journeys.write', 'strategies.write', 'campaigns.create',
     'campaigns.operate', 'attempts.reconcile', 'blocks.write', 'blocks.revoke', 'contacts.write',
-    'connections.write', 'control.write', 'sim.use',
+    'connections.write', 'control.write', 'sim.use', 'voiceAgent.write', 'telephony.hangup',
   ],
   MANAGER: [
     'mailings.write', 'lists.write', 'journeys.write', 'strategies.write', 'campaigns.create', 'campaigns.operate',
-    'contacts.write', 'sim.use',
+    'contacts.write', 'sim.use', 'voiceAgent.write', 'telephony.hangup',
   ],
-  SUPERVISOR: ['campaigns.operate', 'attempts.reconcile', 'blocks.write', 'contacts.write', 'sim.use'],
+  SUPERVISOR: ['campaigns.operate', 'attempts.reconcile', 'blocks.write', 'contacts.write', 'sim.use', 'telephony.hangup'],
   OPERATOR: ['sim.use'],
   ANALYST: [],
 };

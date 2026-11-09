@@ -104,3 +104,23 @@ Indicators = { sent, contactsWorked, cpcContacts, cpcRate:number|null, conversio
 ## Simulador (somente ambiente de desenvolvimento)
 | POST | /sim/attempts/:id/repeat-last-event | — | reenvia o último webhook (demonstra idempotência) |
 | POST | /sim/attempts/:id/result | `{ tabulationCode }` | força um resultado para a tentativa enviada |
+
+## Agente de voz (cadastro único com o gateway de voz)
+| Método | Rota | Corpo | Resposta |
+|---|---|---|---|
+| GET | /connections/:id/voice-agent | — | `{ agent: VoiceAgent|null, version, syncedVersion, syncedAt, syncError, inSync }` |
+| PUT | /connections/:id/voice-agent | `VoiceAgentSchema` | nova versão (MANAGER); não publica |
+| POST | /connections/:id/voice-agent/sync | — | publica no gateway (`PUT /v1/tenants/:connectionId`, `VoiceAgentTenant`); `published` + estado |
+
+## Telefonia (proxy do gateway de voz, filtrado pelo workspace)
+| Método | Rota | Observação |
+|---|---|---|
+| GET | /telephony/status | estado do gateway (SIP, FreeSWITCH) |
+| GET | /telephony/calls | chamadas em andamento |
+| GET | /telephony/calls/history?limit&search | histórico |
+| GET | /telephony/calls/:id, /telephony/calls/:id/transcript | detalhe e transcrição |
+| POST | /telephony/calls/:id/hangup | `{ reason }` (MANAGER/SUPERVISOR), auditado |
+| GET | /telephony/recordings, /telephony/recordings/:id/transcript, /telephony/recordings/:id/audio | áudio auditado |
+| GET | /telephony/ai-costs, /telephony/trunks | custo de IA (USD) e troncos |
+
+Sem gateway configurado: 409; gateway fora do ar: 502.
