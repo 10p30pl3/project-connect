@@ -63,7 +63,7 @@ export function CalendarsPage() {
     </Card>
     {q.isLoading ? <Card>Carregando calendários…</Card> : q.isError ? <Card>Não foi possível carregar calendários: {errorMessage(q.error)}</Card> :
       <div className="grid gap-4 lg:grid-cols-2">{(q.data?.items??[]).map(calendar=><Card key={calendar.id}>
-        <div className="flex items-start justify-between gap-3"><div className="flex items-center gap-2"><CalendarDays className="size-4 text-brand-700"/><h2 className="text-sm font-semibold">{calendar.name}</h2><Badge tone={calendar.active?'green':'slate'}>{calendar.active?'Ativo':'Inativo'}</Badge></div></div>
+        <div className="flex items-start justify-between gap-3"><div className="flex items-center gap-2"><CalendarDays className="size-4 text-brand-700"/><h2 className="text-sm font-semibold">{calendar.name}</h2><Badge tone={calendar.active?'green':'gray'}>{calendar.active?'Ativo':'Inativo'}</Badge></div></div>
         <p className="mt-1 text-xs text-slate-500">{calendar.timezone} · {calendar.windows.map(w=>`${w.days.map(d=>days[d]).join(', ')} ${w.start}–${w.end}`).join(' · ')} · Feriados bloqueados</p>
         <div className="mt-4 border-t border-slate-100 pt-3"><div className="mb-2 text-xs font-semibold text-slate-700">Feriados e exceções</div>
           {calendar.holidays.length===0?<p className="text-xs text-slate-500">Nenhuma exceção cadastrada.</p>:<ul className="space-y-2">{calendar.holidays.map(h=><li key={h.id} className="flex items-center justify-between text-xs"><span>{h.date.slice(0,10)} · {h.name}</span><button aria-label="Remover feriado" onClick={()=>removeHoliday.mutate({calendarId:calendar.id,holidayId:h.id})} className="text-slate-400 hover:text-rose-600"><Trash2 className="size-4"/></button></li>)}</ul>}
