@@ -521,7 +521,9 @@ function PrototypeCampaignCreator({
   onCreated: (c: Campaign) => void | Promise<void>;
 }) {
   const toast = useToast();
+  const qc = useQueryClient();
   const [step, setStep] = useState<1 | 2>(1);
+  const [showImport, setShowImport] = useState(false);
   const [scheduleChoice, setScheduleChoice] = useState<'NOW' | 'SCHEDULED'>('NOW');
   const [scheduledAt, setScheduledAt] = useState(() => nowSaoPauloLocal(60));
   const [formError, setFormError] = useState<string | null>(null);
@@ -715,11 +717,28 @@ function PrototypeCampaignCreator({
                 )}
               </Field>
             </div>
-            <div className="mt-3 flex flex-wrap gap-3 text-xs">
-              <Link to="/mailings" className="font-medium text-brand-700 hover:underline">Importar mailing</Link>
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
+              <Button size="sm" variant="secondary" onClick={() => setShowImport((value) => !value)}>{showImport ? 'Fechar importação' : 'Importar mailing'}</Button>
               <Link to="/listas" className="font-medium text-brand-700 hover:underline">Criar lista com IA</Link>
               {audienceCount !== null && <span className="text-slate-500">{fmtNumber(audienceCount)} contatos na base selecionada</span>}
             </div>
+            {showImport && (
+              <div className="mt-4 rounded-xl border border-brand-200 bg-brand-50/30 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div><h3 className="font-semibold">Importar mailing</h3><p className="text-xs text-slate-600">Envie o CSV, revise os campos e confirme a importação sem sair da campanha.</p></div>
+                  <Button size="sm" variant="ghost" onClick={() => setShowImport(false)}>Fechar</Button>
+                </div>
+                <ImportFlow onImported={async (result) => {
+                  await qc.invalidateQueries({ queryKey: ['mailings'] });
+                  update(
+                    { mailingId: result.mailingId, audienceMode: 'ALL', listVersionId: null, sourceListVersionId: null },
+                    { mailingName: result.name, mailingSource: 'IMPORT', listId: undefined, listName: undefined, listVersion: undefined, audienceCount: result.validRows },
+                  );
+                  setShowImport(false);
+                  toast('success', 'Mailing importado e selecionado para a campanha.');
+                }} />
+              </div>
+            )}
           </Card>
 
           <Card title="2. Como acionar?">
