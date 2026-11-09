@@ -1,0 +1,123 @@
+[
+  {
+    "id": "1000",
+    "name": "Ramal 1000 - Suporte Principal",
+    "password": "<SENHA_DO_RAMAL>",
+    "context": "default",
+    "callgroup": "techsupport",
+    "effectiveCallerIdName": "Ramal 1000",
+    "effectiveCallerIdNumber": "1000",
+    "vmPassword": "1000",
+    "enabled": true
+  },
+  {
+    "id": "1001",
+    "name": "Ramal 1001 - Vendas 1",
+    "password": "<SENHA_DO_RAMAL>",
+    "context": "default",
+    "callgroup": "sales",
+    "effectiveCallerIdName": "Ramal 1001",
+    "effectiveCallerIdNumber": "1001",
+    "vmPassword": "1001",
+    "enabled": true
+  },
+  {
+    "id": "1002",
+    "name": "Ramal 1002 - Vendas 2",
+    "password": "<SENHA_DO_RAMAL>",
+    "context": "default",
+    "callgroup": "sales",
+    "effectiveCallerIdName": "Ramal 1002",
+    "effectiveCallerIdNumber": "1002",
+    "vmPassword": "1002",
+    "enabled": true
+  },
+  {
+    "id": "1003",
+    "name": "Ramal 1003 - Atendimento 1",
+    "password": "<SENHA_DO_RAMAL>",
+    "context": "default",
+    "callgroup": "support",
+    "effectiveCallerIdName": "Ramal 1003",
+    "effectiveCallerIdNumber": "1003",
+    "vmPassword": "1003",
+    "enabled": true
+  },
+  {
+    "id": "1004",
+    "name": "Ramal 1004 - Atendimento 2",
+    "password": "<SENHA_DO_RAMAL>",
+    "context": "default",
+    "callgroup": "support",
+    "effectiveCallerIdName": "Ramal 1004",
+    "effectiveCallerIdNumber": "1004",
+    "vmPassword": "1004",
+    "enabled": true
+  },
+  {
+    "id": "1005",
+    "name": "Ramal 1005 - Financeiro",
+    "password": "<SENHA_DO_RAMAL>",
+    "context": "default",
+    "callgroup": "billing",
+    "effectiveCallerIdName": "Ramal 1005",
+    "effectiveCallerIdNumber": "1005",
+    "vmPassword": "1005",
+    "enabled": true
+  },
+  {
+    "id": "1006",
+    "name": "Ramal 1006 - Cobrança",
+    "password": "<SENHA_DO_RAMAL>",
+    "context": "default",
+    "callgroup": "billing",
+    "effectiveCallerIdName": "Ramal 1006",
+    "effectiveCallerIdNumber": "1006",
+    "vmPassword": "1006",
+    "enabled": true
+  },
+  {
+    "id": "1007",
+    "name": "Ramal 1007 - Diretoria",
+    "password": "<SENHA_DO_RAMAL>",
+    "context": "default",
+    "callgroup": "executive",
+    "effectiveCallerIdName": "Ramal 1007",
+    "effectiveCallerIdNumber": "1007",
+    "vmPassword": "1007",
+    "enabled": true
+  },
+  {
+    "id": "1008",
+    "name": "Ramal 1008 - Operação",
+    "password": "<SENHA_DO_RAMAL>",
+    "context": "default",
+    "callgroup": "operations",
+    "effectiveCallerIdName": "Ramal 1008",
+    "effectiveCallerIdNumber": "1008",
+    "vmPassword": "1008",
+    "enabled": true
+  },
+  {
+    "id": "1009",
+    "name": "Ramal 1009 - Engenharia & TI",
+    "password": "<SENHA_DO_RAMAL>",
+    "context": "default",
+    "callgroup": "engineering",
+    "effectiveCallerIdName": "Ramal 1009",
+    "effectiveCallerIdNumber": "1009",
+    "vmPassword": "1009",
+    "enabled": true
+  },
+  {
+    "id": "1010",
+    "name": "Ramal 1010 - Testes & Laboratório",
+    "password": "<SENHA_DO_RAMAL>",
+    "context": "default",
+    "callgroup": "qa",
+    "effectiveCallerIdName": "Ramal 1010",
+    "effectiveCallerIdNumber": "1010",
+    "vmPassword": "1010",
+    "enabled": true
+  }
+]

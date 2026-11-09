@@ -16,5 +16,56 @@ services:
       timeout: 3s
       retries: 10
 
+  # --- Gateway de voz (perfil "voice"): docker compose --profile voice up -d ---
+  drachtio:
+    profiles: ["voice"]
+    image: drachtio/drachtio-server:latest
+    network_mode: "host"
+    command:
+      - "drachtio"
+      - "--contact"
+      - "sip:*;transport=udp,tcp"
+      - "--external-ip"
+      - "${DRACHTIO_EXTERNAL_IP:?defina DRACHTIO_EXTERNAL_IP no .env}"
+      - "--port"
+      - "9022"
+      - "--secret"
+      - "${DRACHTIO_SECRET:?defina DRACHTIO_SECRET no .env}"
+      - "--loglevel"
+      - "info"
+    restart: unless-stopped
+
+  freeswitch:
+    profiles: ["voice"]
+    image: drachtio/drachtio-freeswitch-mrf:latest
+    network_mode: "host"
+    volumes:
+      - ./apps/voice-gateway/recordings:/recordings
+    restart: unless-stopped
+
+  whisper:
+    profiles: ["voice"]
+    build:
+      context: ./services/whisper
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - WHISPER_MODEL_SIZE=small
+      - WHISPER_DEVICE=auto
+      - WHISPER_COMPUTE_TYPE=auto
+      - WHISPER_MAX_BATCH_SIZE=8
+      - WHISPER_BATCH_WINDOW_SEC=0.040
+      - MODELS_DIR=/app/models
+    volumes:
+      # modelos ONNX de biometria vocal (WeSpeaker CAM++ / ECAPA-TDNN) — não versionados
+      - ./services/whisper/models:/app/models:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
 volumes:
   pgdata:

@@ -1,0 +1,18 @@
+node_modules/
+.env
+dist/
+coverage/
+*.log
+logs/
+recordings/
+# configuração de runtime (pode conter chaves): use os *.example.json
+config/tenants.json
+config/ai-providers.json
+config/extensions.json
+config/outbound-routes.json
+config/outreach.json
+config/sip-trunks.json
+config/ai-costs.json
+config/routes.json
+config/providers.json
+config/*-history*.json

@@ -1,0 +1,26 @@
+[
+  {
+    "id": "out-directcall-national",
+    "name": "DirectCall Nacional (Celular / Fixo DDD)",
+    "trunkId": "directcall",
+    "pattern": "^(?:0055|55|0)?([1-9]\\d{9,10})$",
+    "prepend": "55",
+    "callerIdNumber": "5511989785888",
+    "callerIdName": "5511989785888",
+    "priority": 10,
+    "active": true,
+    "description": "Celulares e fixos de todo o Brasil (com DDD). Normaliza e adiciona 55."
+  },
+  {
+    "id": "out-directcall-local",
+    "name": "DirectCall Local (Sem DDD - SP 11)",
+    "trunkId": "directcall",
+    "pattern": "^([2-9]\\d{7,8})$",
+    "prepend": "5511",
+    "callerIdNumber": "5511989785888",
+    "callerIdName": "5511989785888",
+    "priority": 20,
+    "active": true,
+    "description": "Números locais sem DDD (8 ou 9 dígitos). Adiciona 5511 automaticamente."
+  }
+]

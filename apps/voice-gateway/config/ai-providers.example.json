@@ -1,0 +1,64 @@
+[
+  {
+    "id": "openai",
+    "name": "OpenAI (Speech-to-Speech Realtime)",
+    "icon": "⚡",
+    "type": "realtime_speech",
+    "active": true,
+    "defaultModel": "gpt-realtime-2.1-mini",
+    "models": [
+      "gpt-realtime-2.1-mini",
+      "gpt-realtime-2.1",
+      "gpt-live-1",
+      "gpt-live-1-mini",
+      "gpt-realtime-2",
+      "gpt-realtime-mini",
+      "gpt-realtime"
+    ],
+    "defaultVoice": "marin",
+    "voices": [
+      "marin",
+      "alloy",
+      "echo",
+      "shimmer",
+      "ash",
+      "ballad",
+      "coral",
+      "sage",
+      "verse",
+      "cedar"
+    ],
+    "apiKey": "<SUA_CHAVE_AQUI>",
+    "pricingDescription": "Audio In: $10/M | Audio Out: $20/M | Text In: $0.60/M | Text Out: $2.40/M",
+    "audioCodec": "g711_ulaw"
+  },
+  {
+    "id": "elevenlabs",
+    "name": "ElevenLabs (STS / Conversational AI)",
+    "icon": "🎙️",
+    "type": "sts_conversational",
+    "active": true,
+    "defaultModel": "eleven_turbo_v2_5",
+    "models": [
+      "eleven_turbo_v2_5",
+      "eleven_multilingual_v2",
+      "eleven_flash_v2_5"
+    ],
+    "defaultVoice": "Rachel",
+    "voices": [
+      "Rachel",
+      "Aria",
+      "Roger",
+      "Sarah",
+      "Laura",
+      "Charlie",
+      "George",
+      "Callum",
+      "Custom"
+    ],
+    "apiKey": "<SUA_CHAVE_AQUI>",
+    "agentId": "agent_01jvsk3cr8ep3an7shbcnfvt8d",
+    "pricingDescription": "Voz Duplex em Tempo Real: ~$0.08 / min",
+    "audioCodec": "pcm24k"
+  }
+]

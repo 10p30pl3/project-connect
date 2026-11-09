@@ -1,0 +1,25 @@
+{
+  "name": "@voll/voice-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Gateway de voz do Voll Plan (FreeSWITCH + Drachtio + agente de IA). Antigo repositório voice-app / voice-lab-2.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "build": "esbuild index.js --bundle --platform=node --target=node20 --outfile=dist/index.js",
+    "check": "node scripts/check-syntax.js",
+    "test": "node scripts/check-syntax.js"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "dotenv": "^17.3.1",
+    "drachtio-fsmrf": "4.1.2",
+    "drachtio-srf": "^5.0.6",
+    "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}
