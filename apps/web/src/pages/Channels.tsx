@@ -13,6 +13,8 @@ import {
   Pencil,
   Phone,
   Plus,
+  Power,
+  PowerOff,
   Radio,
   RefreshCw,
   Save,
@@ -77,6 +79,8 @@ export const PROVIDER_SHORT_LABEL: Record<string, string> = {
 
 export function ChannelsPage() {
   const { can } = useAuth();
+  const qc = useQueryClient();
+  const toast = useToast();
   const q = useQuery({ queryKey: ['connections'], queryFn: () => get<{ items: Connection[] }>('/connections') });
   const [edit, setEdit] = useState<Connection | null>(null);
   const [agentFor, setAgentFor] = useState<Connection | null>(null);
@@ -96,6 +100,23 @@ export function ChannelsPage() {
   };
   const [activeTab, setActiveTab] = useState<'conexoes' | 'enderecos'>('conexoes');
   const canEdit = can('connections.write');
+
+  const toggleActiveMutation = useMutation({
+    mutationFn: ({ id, active }: { id: string; active: boolean }) =>
+      patch<Connection>(`/connections/${id}`, { active }),
+    onSuccess: (updated) => {
+      qc.invalidateQueries({ queryKey: ['connections'] });
+      toast('success', `Canal "${updated.name}" ${updated.active ? 'habilitado' : 'desabilitado'} com sucesso.`);
+    },
+    onError: (e) => {
+      toast('error', `Erro ao alterar situação do canal: ${errorMessage(e)}`);
+    },
+  });
+
+  const handleToggleActive = (c: Connection) => {
+    if (!canEdit || toggleActiveMutation.isPending) return;
+    toggleActiveMutation.mutate({ id: c.id, active: !c.active });
+  };
 
   return (
     <div className="space-y-4">
@@ -174,7 +195,30 @@ export function ChannelsPage() {
                                 ) : (
                                   <Badge tone="blue">{c.provider}</Badge>
                                 )}
-                                {c.active ? <Badge tone="green">Ativa</Badge> : <Badge tone="gray">Inativa</Badge>}
+                                {canEdit ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleActive(c)}
+                                    disabled={toggleActiveMutation.isPending}
+                                    className="inline-flex items-center gap-1.5 focus:outline-hidden disabled:opacity-50 cursor-pointer"
+                                    title={c.active ? 'Clique para desabilitar este canal' : 'Clique para habilitar este canal'}
+                                  >
+                                    <span
+                                      className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                                        c.active ? 'bg-emerald-600' : 'bg-slate-300'
+                                      }`}
+                                    >
+                                      <span
+                                        className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
+                                          c.active ? 'translate-x-3' : 'translate-x-0'
+                                        }`}
+                                      />
+                                    </span>
+                                    {c.active ? <Badge tone="green">Ativa</Badge> : <Badge tone="gray">Inativa</Badge>}
+                                  </button>
+                                ) : (
+                                  c.active ? <Badge tone="green">Ativa</Badge> : <Badge tone="gray">Inativa</Badge>
+                                )}
                               </div>
                               <span className="text-[11px] text-slate-500">
                                 Provedor: {PROVIDER_SHORT_LABEL[c.provider] || c.provider}
@@ -188,14 +232,26 @@ export function ChannelsPage() {
                                 </Button>
                               )}
                               {canEdit && (
-                                <Button
-                                  size="sm"
-                                  variant="secondary"
-                                  icon={<Pencil className="size-3.5" />}
-                                  onClick={() => setEdit(c)}
-                                >
-                                  Editar canal
-                                </Button>
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    icon={c.active ? <PowerOff className="size-3.5 text-slate-400" /> : <Power className="size-3.5 text-emerald-600" />}
+                                    onClick={() => handleToggleActive(c)}
+                                    disabled={toggleActiveMutation.isPending}
+                                    title={c.active ? 'Desabilitar este canal' : 'Habilitar este canal'}
+                                  >
+                                    {c.active ? 'Desabilitar' : 'Habilitar'}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    icon={<Pencil className="size-3.5" />}
+                                    onClick={() => setEdit(c)}
+                                  >
+                                    Editar canal
+                                  </Button>
+                                </>
                               )}
                             </div>
                           </div>
@@ -356,28 +412,63 @@ export function ChannelsPage() {
                                   )}
                                   {c.tariffUpdatedAt && <div className="text-xs text-slate-500">desde {fmtDateTime(c.tariffUpdatedAt)}</div>}
                                 </td>
-                                <td>{c.active ? <Badge tone="green">Ativa</Badge> : <Badge tone="gray">Inativa</Badge>}</td>
+                                <td>
+                                  {canEdit ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleToggleActive(c)}
+                                      disabled={toggleActiveMutation.isPending}
+                                      className="group inline-flex items-center gap-2 text-left focus:outline-hidden disabled:opacity-50 cursor-pointer"
+                                      title={c.active ? 'Clique para desabilitar este canal' : 'Clique para habilitar este canal'}
+                                    >
+                                      <span
+                                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                                          c.active ? 'bg-emerald-600' : 'bg-slate-300'
+                                        }`}
+                                      >
+                                        <span
+                                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
+                                            c.active ? 'translate-x-4' : 'translate-x-0'
+                                          }`}
+                                        />
+                                      </span>
+                                      {c.active ? <Badge tone="green">Ativa</Badge> : <Badge tone="gray">Inativa</Badge>}
+                                    </button>
+                                  ) : (
+                                    c.active ? <Badge tone="green">Ativa</Badge> : <Badge tone="gray">Inativa</Badge>
+                                  )}
+                                </td>
                                 <td className="text-right">
-                                  {c.provider === 'VOICE_APP' && (
-                                    <div className="mb-1.5 flex items-center justify-end">
+                                  <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                                    {c.provider === 'VOICE_APP' && (
                                       <Button size="sm" variant="secondary" icon={<Bot className="size-3.5" />} onClick={() => setAgentFor(c)}>
                                         Agente de voz
                                       </Button>
-                                    </div>
-                                  )}
-                                  {canEdit && (
-                                    <div className="flex items-center justify-end gap-1.5">
-                                      <Button
-                                        size="sm"
-                                        variant="secondary"
-                                        icon={<SlidersHorizontal className="size-3.5" />}
-                                        onClick={() => setEdit(c)}
-                                        title="Configurar canal e parâmetros avançados"
-                                      >
-                                        Parâmetros avançados
-                                      </Button>
-                                    </div>
-                                  )}
+                                    )}
+                                    {canEdit && (
+                                      <>
+                                        <Button
+                                          size="sm"
+                                          variant="secondary"
+                                          icon={c.active ? <PowerOff className="size-3.5 text-slate-400" /> : <Power className="size-3.5 text-emerald-600" />}
+                                          onClick={() => handleToggleActive(c)}
+                                          disabled={toggleActiveMutation.isPending}
+                                          title={c.active ? 'Desabilitar este canal' : 'Habilitar este canal'}
+                                        >
+                                          {c.active ? 'Desabilitar' : 'Habilitar'}
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="secondary"
+                                          icon={<SlidersHorizontal className="size-3.5" />}
+                                          onClick={() => setEdit(c)}
+                                          title="Configurar canal e parâmetros avançados"
+                                        >
+                                          Parâmetros avançados
+                                        </Button>
+                                      </>
+                                    )}
+                                  </div>
                                 </td>
                               </tr>
                             );
