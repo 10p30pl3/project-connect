@@ -2,20 +2,22 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Pencil, Plus, Save, Trash2 } from 'lucide-react';
 import { CHANNEL_LABEL, CHANNEL_TYPES, type ChannelType, type JourneyStep } from '@voll/shared';
-import { ApiError, errorMessage, get, post } from '../lib/api';
+import { ApiError, del, errorMessage, get, post } from '../lib/api';
 import type { Connection, Journey, JourneyStepView } from '../lib/types';
 import { useAuth } from '../lib/auth';
-import { Alert, Badge, Button, Card, Empty, ErrorState, Field, InfoTooltip, Input, Loading, Modal, PageHeader, Select, TableWrap, useToast, ViewModeToggle, type ViewMode } from '../components/ui';
+import { Alert, Badge, Button, Card, ConfirmDialog, Empty, ErrorState, Field, InfoTooltip, Input, Loading, Modal, PageHeader, Select, TableWrap, useToast, ViewModeToggle, type ViewMode } from '../components/ui';
 import { JourneySteps } from '../components/Summaries';
 
 function EditableJourneyCard({
   journey,
   canEdit,
   connections,
+  onDelete,
 }: {
   journey: Journey;
   canEdit: boolean;
   connections: Connection[];
+  onDelete?: (j: Journey) => void;
 }) {
   const qc = useQueryClient();
   const toast = useToast();
@@ -134,14 +136,27 @@ function EditableJourneyCard({
         <div className="flex items-center gap-2 shrink-0">
           {!isEditing ? (
             canEdit && (
-              <Button
-                size="sm"
-                variant="secondary"
-                icon={<Pencil className="size-3.5" />}
-                onClick={() => setIsEditing(true)}
-              >
-                Editar jornada
-              </Button>
+              <div className="flex items-center gap-1.5">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon={<Pencil className="size-3.5" />}
+                  onClick={() => setIsEditing(true)}
+                >
+                  Editar jornada
+                </Button>
+                {onDelete && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                    icon={<Trash2 className="size-3.5" />}
+                    onClick={() => onDelete(journey)}
+                    title="Excluir jornada"
+                    aria-label="Excluir jornada"
+                  />
+                )}
+              </div>
             )
           ) : (
             <>
@@ -338,6 +353,8 @@ export function JourneysSection({
   onViewModeChange?: (v: ViewMode) => void;
 } = {}) {
   const { can } = useAuth();
+  const qc = useQueryClient();
+  const toast = useToast();
   const q = useQuery({ queryKey: ['journeys'], queryFn: () => get<{ items: Journey[] }>('/journeys') });
   const conns = useQuery({ queryKey: ['connections'], queryFn: () => get<{ items: Connection[] }>('/connections') });
 
@@ -361,6 +378,18 @@ export function JourneysSection({
   };
 
   const [editJourneyInModal, setEditJourneyInModal] = useState<Journey | null>(null);
+  const [deletingJourney, setDeletingJourney] = useState<Journey | null>(null);
+
+  const deleteM = useMutation({
+    mutationFn: (id: string) => del<{ deleted: boolean; id: string }>(`/journeys/${id}`),
+    onSuccess: () => {
+      toast('success', 'Jornada excluída.');
+      setDeletingJourney(null);
+      setEditJourneyInModal(null);
+      qc.invalidateQueries({ queryKey: ['journeys'] });
+    },
+    onError: (e) => toast('error', errorMessage(e)),
+  });
 
   const canEdit = can('journeys.write');
 
@@ -391,6 +420,7 @@ export function JourneysSection({
               journey={j}
               canEdit={canEdit}
               connections={conns.data?.items ?? []}
+              onDelete={(item) => setDeletingJourney(item)}
             />
           ))}
         </div>
@@ -426,14 +456,25 @@ export function JourneysSection({
                       </td>
                       <td className="text-right">
                         {canEdit && (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            icon={<Pencil className="size-3.5" />}
-                            onClick={() => setEditJourneyInModal(j)}
-                          >
-                            Editar jornada
-                          </Button>
+                          <div className="inline-flex items-center justify-end gap-1.5">
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              icon={<Pencil className="size-3.5" />}
+                              onClick={() => setEditJourneyInModal(j)}
+                            >
+                              Editar jornada
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                              icon={<Trash2 className="size-3.5" />}
+                              onClick={() => setDeletingJourney(j)}
+                              title="Excluir jornada"
+                              aria-label="Excluir jornada"
+                            />
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -457,9 +498,27 @@ export function JourneysSection({
             journey={q.data?.items.find((x) => x.id === editJourneyInModal.id) ?? editJourneyInModal}
             canEdit={canEdit}
             connections={conns.data?.items ?? []}
+            onDelete={(item) => {
+              setEditJourneyInModal(null);
+              setDeletingJourney(item);
+            }}
           />
         </Modal>
       )}
+
+      <ConfirmDialog
+        open={Boolean(deletingJourney)}
+        onOpenChange={(o) => !o && setDeletingJourney(null)}
+        title={`Excluir jornada "${deletingJourney?.name}"?`}
+        confirmLabel="Excluir"
+        danger
+        loading={deleteM.isPending}
+        onConfirm={() => deletingJourney && deleteM.mutate(deletingJourney.id)}
+      >
+        <p className="text-sm text-slate-600">
+          Esta ação remove a jornada e suas versões publicadas. Jornadas vinculadas a campanhas ou modelos não podem ser excluídas.
+        </p>
+      </ConfirmDialog>
 
       <NewJourneyDialog open={open} onOpenChange={setOpen} />
     </div>

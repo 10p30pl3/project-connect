@@ -6,17 +6,25 @@ import { notFound, parse, unprocessable } from '../lib/problem.js';
 import { buildPreview, commitImport } from '../services/importer.js';
 import { toCsv } from '../lib/csv.js';
 import { audit } from '../lib/audit.js';
+import { conflict } from '../lib/problem.js';
 
 export async function mailingRoutes(app: FastifyInstance) {
-  app.get('/mailings', async (req) => {
+  app.get<{ Querystring: { archived?: string } }>('/mailings', async (req) => {
+    const mode = req.query.archived === 'true' ? 'archived' : req.query.archived === 'all' ? 'all' : 'active';
+    const filterSql =
+      mode === 'archived'
+        ? 'AND m.archived_at IS NOT NULL'
+        : mode === 'all'
+          ? ''
+          : 'AND m.archived_at IS NULL';
     const rows = await q(
       getPool(),
-      `SELECT m.id, m.name, m.created_at,
+      `SELECT m.id, m.name, m.created_at, m.archived_at, m.archived_reason,
               (SELECT count(*)::int FROM mailing_records r WHERE r.mailing_id=m.id) AS record_count,
               v.version, v.valid_rows, v.rejected_rows, v.created_at AS v_created
          FROM mailings m
          JOIN LATERAL (SELECT * FROM mailing_versions WHERE mailing_id=m.id ORDER BY version DESC LIMIT 1) v ON true
-        WHERE m.workspace_id=$1 ORDER BY m.created_at DESC`,
+        WHERE m.workspace_id=$1 ${filterSql} ORDER BY m.created_at DESC`,
       [actor(req).workspaceId],
     );
     return {
@@ -24,6 +32,8 @@ export async function mailingRoutes(app: FastifyInstance) {
         id: r.id,
         name: r.name,
         createdAt: r.created_at,
+        archivedAt: r.archived_at ?? null,
+        archivedReason: r.archived_reason ?? null,
         recordCount: r.record_count,
         lastVersion: { version: r.version, validRows: r.valid_rows, rejectedRows: r.rejected_rows, createdAt: r.v_created },
       })),
@@ -47,6 +57,8 @@ export async function mailingRoutes(app: FastifyInstance) {
       id: m.id,
       name: m.name,
       createdAt: m.created_at,
+      archivedAt: m.archived_at ?? null,
+      archivedReason: m.archived_reason ?? null,
       recordCount: n,
       versions: versions.map((v) => ({
         id: v.id,
@@ -59,6 +71,57 @@ export async function mailingRoutes(app: FastifyInstance) {
       columns,
     };
   });
+
+  app.post<{ Params: { id: string }; Body: { reason?: string } }>(
+    '/mailings/:id/archive',
+    { preHandler: requireRoles(...CAN.manageData) },
+    async (req) => {
+      const a = actor(req);
+      const row = await tx(async (c) => {
+        const m = await one(c, `SELECT id, name, archived_at FROM mailings WHERE id=$1 AND workspace_id=$2 FOR UPDATE`, [req.params.id, a.workspaceId]);
+        if (!m) throw notFound('Mailing');
+        if (m.archived_at) throw conflict('Este mailing já está arquivado.');
+        const activeCamp = await one(
+          c,
+          `SELECT name FROM campaigns WHERE workspace_id=$1 AND mailing_id=$2 AND status='RUNNING' LIMIT 1`,
+          [a.workspaceId, m.id],
+        );
+        if (activeCamp) {
+          throw conflict(`O mailing está sendo utilizado na campanha ativa "${activeCamp.name}". Pause ou encerre a campanha antes de arquivá-lo.`);
+        }
+        const reason = typeof req.body?.reason === 'string' && req.body.reason.trim() ? req.body.reason.trim() : null;
+        const upd = await one(
+          c,
+          `UPDATE mailings SET archived_at = now(), archived_reason = $2 WHERE id=$1 RETURNING id, name, archived_at, archived_reason`,
+          [m.id, reason],
+        );
+        await audit(c, a, 'mailing.archive', 'mailing', m.id, { before: { archivedAt: null }, after: { archivedAt: upd!.archived_at, reason } });
+        return upd!;
+      });
+      return { id: row.id, name: row.name, archivedAt: row.archived_at, archivedReason: row.archived_reason };
+    },
+  );
+
+  app.post<{ Params: { id: string } }>(
+    '/mailings/:id/unarchive',
+    { preHandler: requireRoles(...CAN.manageData) },
+    async (req) => {
+      const a = actor(req);
+      const row = await tx(async (c) => {
+        const m = await one(c, `SELECT id, name, archived_at FROM mailings WHERE id=$1 AND workspace_id=$2 FOR UPDATE`, [req.params.id, a.workspaceId]);
+        if (!m) throw notFound('Mailing');
+        if (!m.archived_at) throw conflict('Este mailing não está arquivado.');
+        const upd = await one(
+          c,
+          `UPDATE mailings SET archived_at = NULL, archived_reason = NULL WHERE id=$1 RETURNING id, name, archived_at, archived_reason`,
+          [m.id],
+        );
+        await audit(c, a, 'mailing.unarchive', 'mailing', m.id, { before: { archivedAt: m.archived_at }, after: { archivedAt: null } });
+        return upd!;
+      });
+      return { id: row.id, name: row.name, archivedAt: row.archived_at, archivedReason: row.archived_reason };
+    },
+  );
 
   app.get<{ Params: { id: string }; Querystring: { cursor?: string; limit?: string; q?: string } }>(
     '/mailings/:id/records',

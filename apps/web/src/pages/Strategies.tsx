@@ -2,18 +2,18 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useState } from 'react';
 import { clsx } from 'clsx';
-import { ArrowLeft, ArrowRight, AlertCircle, Check, ChevronDown, Copy, Lock, Pencil, Plus, RotateCcw, Save } from 'lucide-react';
+import { ArrowLeft, ArrowRight, AlertCircle, Check, ChevronDown, Copy, Lock, Pencil, Plus, RotateCcw, Save, Trash2 } from 'lucide-react';
 import {
   TABULATION_ACTIONS,
   TABULATION_ACTION_LABEL,
   type StrategyConfig,
   type TabulationAction,
 } from '@voll/shared';
-import { errorMessage, get, post, put } from '../lib/api';
+import { del, errorMessage, get, post, put } from '../lib/api';
 import type { DraftEnvelope, Strategy, StrategyDetail, StrategyVersion, Tabulation } from '../lib/types';
 import { fmtDateTime, WEEKDAYS } from '../lib/format';
 import { useAuth } from '../lib/auth';
-import { Alert, Badge, Button, Card, Empty, ErrorState, Field, InfoTooltip, Input, Loading, Modal, PageHeader, Select, TableWrap, useToast, ViewModeToggle, type ViewMode } from '../components/ui';
+import { Alert, Badge, Button, Card, ConfirmDialog, Empty, ErrorState, Field, InfoTooltip, Input, Loading, Modal, PageHeader, Select, TableWrap, useToast, ViewModeToggle, type ViewMode } from '../components/ui';
 import { StrategySummary, daysLabel, fmtMinutes } from '../components/Summaries';
 import { StrategyForm } from '../components/StrategyForm';
 import { WizardReturnBanner } from './NewCampaign';
@@ -26,7 +26,21 @@ export function StrategiesSection({
   onViewModeChange?: (v: ViewMode) => void;
 } = {}) {
   const nav = useNavigate();
+  const { can } = useAuth();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const canWrite = can('strategies.write');
+  const [deletingStrat, setDeletingStrat] = useState<Strategy | null>(null);
   const q = useQuery({ queryKey: ['strategies'], queryFn: () => get<{ items: Strategy[] }>('/strategies') });
+  const deleteM = useMutation({
+    mutationFn: (id: string) => del<{ deleted: boolean; id: string }>(`/strategies/${id}`),
+    onSuccess: () => {
+      toast('success', 'Estratégia excluída.');
+      setDeletingStrat(null);
+      qc.invalidateQueries({ queryKey: ['strategies'] });
+    },
+    onError: (e) => toast('error', errorMessage(e)),
+  });
   const [localViewMode, setLocalViewMode] = useState<ViewMode>(() => {
     try {
       const saved = localStorage.getItem('strategies_view_mode');
@@ -91,7 +105,7 @@ export function StrategiesSection({
                         : 'Sem versão publicada'}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <Button
                       size="sm"
                       variant="secondary"
@@ -100,6 +114,17 @@ export function StrategiesSection({
                     >
                       Editar estratégia
                     </Button>
+                    {canWrite && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                        icon={<Trash2 className="size-3.5" />}
+                        onClick={() => setDeletingStrat(s)}
+                        title="Excluir estratégia"
+                        aria-label="Excluir estratégia"
+                      />
+                    )}
                   </div>
                 </div>
 
@@ -186,14 +211,27 @@ export function StrategiesSection({
                       <td className="text-xs">{c ? `${c.retry.intervalMinutes} min · até ${c.retry.maxPerDestination}/destino` : '—'}</td>
                       <td className="text-xs">{fmtDateTime(s.latestVersion?.publishedAt)}</td>
                       <td className="text-right">
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          icon={<Pencil className="size-3.5" />}
-                          onClick={() => nav(`/estrategias/${s.id}`)}
-                        >
-                          Editar estratégia
-                        </Button>
+                        <div className="inline-flex items-center justify-end gap-1.5">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            icon={<Pencil className="size-3.5" />}
+                            onClick={() => nav(`/estrategias/${s.id}`)}
+                          >
+                            Editar estratégia
+                          </Button>
+                          {canWrite && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                              icon={<Trash2 className="size-3.5" />}
+                              onClick={() => setDeletingStrat(s)}
+                              title="Excluir estratégia"
+                              aria-label="Excluir estratégia"
+                            />
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -203,6 +241,20 @@ export function StrategiesSection({
           </TableWrap>
         </Card>
       )}
+
+      <ConfirmDialog
+        open={Boolean(deletingStrat)}
+        onOpenChange={(o) => !o && setDeletingStrat(null)}
+        title={`Excluir estratégia "${deletingStrat?.name}"?`}
+        confirmLabel="Excluir"
+        danger
+        loading={deleteM.isPending}
+        onConfirm={() => deletingStrat && deleteM.mutate(deletingStrat.id)}
+      >
+        <p className="text-sm text-slate-600">
+          Esta ação remove a estratégia e suas versões publicadas. Estratégias vinculadas a campanhas ou modelos não podem ser excluídas.
+        </p>
+      </ConfirmDialog>
     </div>
   );
 }
@@ -349,8 +401,19 @@ export function StrategyDetailPage() {
   const tabs = useQuery({ queryKey: ['tabulations'], queryFn: () => get<{ items: Tabulation[] }>('/tabulations') });
   const [editing, setEditing] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [justPublished, setJustPublished] = useState<StrategyVersion | null>(null);
+
+  const deleteM = useMutation({
+    mutationFn: () => del<{ deleted: boolean; id: string }>(`/strategies/${id}`),
+    onSuccess: () => {
+      toast('success', 'Estratégia excluída.');
+      qc.invalidateQueries({ queryKey: ['strategies'] });
+      nav('/estrategias');
+    },
+    onError: (e) => toast('error', errorMessage(e)),
+  });
 
   const useInWizard = useMutation({
     mutationFn: async (versionId: string) => {
@@ -400,9 +463,19 @@ export function StrategyDetailPage() {
               </Button>
             )}
             {can('strategies.write') && (
-              <Button icon={<Copy className="size-4" aria-hidden />} onClick={() => setCopyOpen(true)}>
-                Criar cópia
-              </Button>
+              <>
+                <Button icon={<Copy className="size-4" aria-hidden />} onClick={() => setCopyOpen(true)}>
+                  Criar cópia
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                  icon={<Trash2 className="size-4" aria-hidden />}
+                  onClick={() => setConfirmDelete(true)}
+                >
+                  Excluir
+                </Button>
+              </>
             )}
           </>
         }
@@ -444,6 +517,7 @@ export function StrategyDetailPage() {
           {current ? (
             <StrategyInteractiveConfig
               strategyId={id}
+              strategyName={s.name}
               version={current}
               isLatest={current.id === latest?.id}
               tabulations={tabs.data?.items}
@@ -479,6 +553,20 @@ export function StrategyDetailPage() {
           onCreated={(newId) => nav(`/estrategias/${newId}${fromWizard ? '?retorno=assistente' : ''}`)}
         />
       )}
+
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title={`Excluir estratégia "${s.name}"?`}
+        confirmLabel="Excluir"
+        danger
+        loading={deleteM.isPending}
+        onConfirm={() => deleteM.mutate()}
+      >
+        <p className="text-sm text-slate-600">
+          Esta ação remove a estratégia e suas versões publicadas. Estratégias vinculadas a campanhas ou modelos não podem ser excluídas.
+        </p>
+      </ConfirmDialog>
     </div>
   );
 }
@@ -486,12 +574,14 @@ export function StrategyDetailPage() {
 // Painel de Configuração Avançada em 2 Colunas com Edição Direta ao Clicar nas Opções
 function StrategyInteractiveConfig({
   strategyId,
+  strategyName,
   version,
   isLatest,
   tabulations,
   onUpdated,
 }: {
   strategyId: string;
+  strategyName: string;
   version: StrategyVersion;
   isLatest: boolean;
   tabulations?: Tabulation[];
@@ -499,19 +589,24 @@ function StrategyInteractiveConfig({
 }) {
   const toast = useToast();
   const [saving, setSaving] = useState(false);
+  const [draftName, setDraftName] = useState(strategyName);
   const [draftConfig, setDraftConfig] = useState<StrategyConfig>(() => JSON.parse(JSON.stringify(version.config)));
   const [openRows, setOpenRows] = useState<Set<string>>(new Set());
 
-  // Sincroniza draft se mudar de versão selecionada
+  // Sincroniza draft se mudar de versão selecionada ou nome
   const [lastVerId, setLastVerId] = useState(version.id);
-  if (version.id !== lastVerId) {
+  const [lastName, setLastName] = useState(strategyName);
+  if (version.id !== lastVerId || strategyName !== lastName) {
     setLastVerId(version.id);
+    setLastName(strategyName);
+    setDraftName(strategyName);
     setDraftConfig(JSON.parse(JSON.stringify(version.config)));
     setOpenRows(new Set());
   }
 
-  // Verifica se há qualquer alteração real em relação à versão original
-  const isDirty = JSON.stringify(draftConfig) !== JSON.stringify(version.config);
+  // Verifica se há qualquer alteração real em relação à versão/nome original
+  const isNameDirty = draftName.trim() !== strategyName.trim();
+  const isDirty = isNameDirty || JSON.stringify(draftConfig) !== JSON.stringify(version.config);
 
   const toggleRow = (rowKey: string) => {
     setOpenRows((prev) => {
@@ -526,12 +621,17 @@ function StrategyInteractiveConfig({
   };
 
   const handleDiscard = () => {
+    setDraftName(strategyName);
     setDraftConfig(JSON.parse(JSON.stringify(version.config)));
     setOpenRows(new Set());
     toast('info', 'Alterações descartadas.');
   };
 
   const handleSave = async () => {
+    if (!draftName.trim()) {
+      toast('error', 'Informe o nome da estratégia.');
+      return;
+    }
     // Só gera nova versão se houver mudança real (§Requisito do usuário)
     if (!isDirty) {
       toast('info', 'Nenhuma alteração foi realizada.');
@@ -539,7 +639,10 @@ function StrategyInteractiveConfig({
     }
     setSaving(true);
     try {
-      const v = await post<StrategyVersion>(`/strategies/${strategyId}/versions`, { config: draftConfig });
+      const v = await post<StrategyVersion>(`/strategies/${strategyId}/versions`, {
+        name: isNameDirty ? draftName.trim() : undefined,
+        config: draftConfig,
+      });
       onUpdated(v);
       setOpenRows(new Set());
       toast('success', `Nova versão v${v.version} salva e publicada.`);
@@ -563,7 +666,7 @@ function StrategyInteractiveConfig({
     <div className="space-y-4">
       {/* Barra Superior de Status & Ações */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 pb-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm font-bold text-slate-900">
             Configuração v{version.version}
           </span>
@@ -598,6 +701,20 @@ function StrategyInteractiveConfig({
             </div>
           )}
         </div>
+      </div>
+
+      {/* Nome editável da estratégia */}
+      <div className="rounded-xl border border-slate-200/90 bg-white px-4 py-3 flex flex-wrap items-center gap-3 shadow-2xs">
+        <label htmlFor="strategy-name-input" className="text-xs font-semibold text-slate-700 shrink-0">
+          Nome da estratégia
+        </label>
+        <Input
+          id="strategy-name-input"
+          value={draftName}
+          onChange={(e) => setDraftName(e.target.value)}
+          className="h-8 text-sm max-w-md flex-1"
+          placeholder="Nome da estratégia"
+        />
       </div>
 
       {/* Grade em 2 Colunas */}

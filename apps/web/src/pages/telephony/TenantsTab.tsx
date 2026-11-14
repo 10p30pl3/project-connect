@@ -126,7 +126,7 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
   const toast = useToast();
   const canManage = can('connections.write');
 
-  const [editing, setEditing] = useState<{ isNew: boolean; form: TenantForm } | null>(null);
+  const [editing, setEditing] = useState<{ isNew: boolean; idManual: boolean; form: TenantForm } | null>(null);
   const [showDsp, setShowDsp] = useState(false);
   const [deleting, setDeleting] = useState<TenantConfig | null>(null);
 
@@ -215,7 +215,7 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
               size="sm"
               variant="primary"
               icon={<Plus className="size-3.5" aria-hidden />}
-              onClick={() => setEditing({ isNew: true, form: toForm(null) })}
+              onClick={() => setEditing({ isNew: true, idManual: false, form: toForm(null) })}
             >
               Novo Agente / Tenant
             </Button>
@@ -303,19 +303,21 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
                                 size="sm"
                                 variant="secondary"
                                 icon={<Edit className="size-3.5" aria-hidden />}
-                                onClick={() => setEditing({ isNew: false, form: toForm(t) })}
+                                onClick={() => setEditing({ isNew: false, idManual: true, form: toForm(t) })}
+                                title="Editar agente"
                               >
                                 Editar
                               </Button>
-                              {t.id !== 'default' && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="text-red-600 hover:bg-red-50"
-                                  icon={<Trash2 className="size-3.5" aria-hidden />}
-                                  onClick={() => setDeleting(t)}
-                                />
-                              )}
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={t.id === 'default'}
+                                title={t.id === 'default' ? 'O agente padrão do gateway não pode ser excluído' : 'Excluir agente'}
+                                aria-label="Excluir agente"
+                                className="text-red-600 hover:bg-red-50"
+                                icon={<Trash2 className="size-3.5" aria-hidden />}
+                                onClick={() => setDeleting(t)}
+                              />
                             </>
                           )}
                         </div>
@@ -352,7 +354,7 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
         {editing && (
           <div className="space-y-4">
             {/* Camada Essencial */}
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-3">
               <Field label="Nome de Exibição" required>
                 {(f) => (
                   <Input
@@ -360,24 +362,39 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
                     value={editing.form.name}
                     onChange={(e) => {
                       const nextName = e.target.value;
+                      const slug = nextName
+                        .toLowerCase()
+                        .normalize('NFD')
+                        .replace(/[\u0300-\u036f]/g, '')
+                        .replace(/[^a-z0-9]+/g, '-')
+                        .replace(/(^-|-$)/g, '');
                       setEditing({
                         ...editing,
                         form: {
                           ...editing.form,
                           name: nextName,
-                          id:
-                            editing.isNew && !editing.form.id
-                              ? nextName
-                                  .toLowerCase()
-                                  .normalize('NFD')
-                                  .replace(/[\u0300-\u036f]/g, '')
-                                  .replace(/[^a-z0-9]+/g, '-')
-                                  .replace(/(^-|-$)/g, '')
-                              : editing.form.id,
+                          id: editing.isNew && !editing.idManual ? slug : editing.form.id,
                         },
                       });
                     }}
                     placeholder="Agente Voll Atendimento"
+                  />
+                )}
+              </Field>
+              <Field label="ID do Agente (Tenant)" required>
+                {(f) => (
+                  <Input
+                    id={f.id}
+                    disabled={!editing.isNew}
+                    value={editing.form.id}
+                    onChange={(e) =>
+                      setEditing({
+                        ...editing,
+                        idManual: e.target.value.trim().length > 0,
+                        form: { ...editing.form, id: e.target.value },
+                      })
+                    }
+                    placeholder="ex: vendas-vip"
                   />
                 )}
               </Field>
@@ -561,18 +578,7 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
               </button>
               {showDsp && (
                 <div className="space-y-3 border-t border-slate-200 p-4">
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <Field label="ID do Tenant" required>
-                      {(f) => (
-                        <Input
-                          id={f.id}
-                          disabled={!editing.isNew}
-                          value={editing.form.id}
-                          onChange={(e) => setEditing({ ...editing, form: { ...editing.form, id: e.target.value } })}
-                          placeholder="ex: vendas-vip"
-                        />
-                      )}
-                    </Field>
+                  <div className="grid gap-3 sm:grid-cols-2">
                     <Field label="Ramal Interno (ex: 9000)">
                       {(f) => (
                         <Input

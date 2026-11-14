@@ -1,13 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { AlertCircle, Check, Pencil, Plus, RotateCcw, Save } from 'lucide-react';
+import { AlertCircle, Check, Pencil, Plus, RotateCcw, Save, Trash2 } from 'lucide-react';
 import { CHANNEL_LABEL, type ChannelType } from '@voll/shared';
 import { clsx } from 'clsx';
 
-import { errorMessage, get, patch, post } from '../lib/api';
+import { del, errorMessage, get, patch, post } from '../lib/api';
 import type { Tabulation } from '../lib/types';
 import { useAuth } from '../lib/auth';
-import { Badge, Button, Card, Checkbox, ErrorState, Field, InfoTooltip, Input, Loading, Modal, PageHeader, TableWrap, useToast, ViewModeToggle, type ViewMode } from '../components/ui';
+import { Badge, Button, Card, Checkbox, ConfirmDialog, ErrorState, Field, InfoTooltip, Input, Loading, Modal, PageHeader, TableWrap, useToast, ViewModeToggle, type ViewMode } from '../components/ui';
 
 /** Aceita array ou literal de array do Postgres ("{VOICE,SMS}"). */
 function channelList(v: unknown): ChannelType[] {
@@ -61,9 +61,27 @@ export function TabulationsSection({
   viewMode?: ViewMode;
   onViewModeChange?: (v: ViewMode) => void;
 } = {}) {
+  const { can } = useAuth();
+  const canWrite = can('strategies.write');
   const qc = useQueryClient();
   const toast = useToast();
   const q = useQuery({ queryKey: ['tabulations'], queryFn: () => get<{ items: Tabulation[] }>('/tabulations') });
+  const [deletingTab, setDeletingTab] = useState<Tabulation | null>(null);
+  const deleteM = useMutation({
+    mutationFn: (id: string) => del<{ deleted: boolean; id: string }>(`/tabulations/${id}`),
+    onSuccess: (_r, id) => {
+      toast('success', 'Tabulação excluída.');
+      setDeletingTab(null);
+      setEdits((prev) => {
+        if (!prev[id]) return prev;
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      qc.invalidateQueries({ queryKey: ['tabulations'] });
+    },
+    onError: (e) => toast('error', errorMessage(e)),
+  });
 
   const [localViewMode, setLocalViewMode] = useState<ViewMode>(() => {
     try {
@@ -279,7 +297,7 @@ export function TabulationsSection({
                       {currentChannels.length} canal(is) habilitado(s) · clique nos indicadores abaixo para alterar
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <Button
                       size="sm"
                       variant="secondary"
@@ -288,6 +306,17 @@ export function TabulationsSection({
                     >
                       Editar nome
                     </Button>
+                    {canWrite && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                        icon={<Trash2 className="size-3.5" />}
+                        onClick={() => setDeletingTab(t)}
+                        title="Excluir tabulação"
+                        aria-label="Excluir tabulação"
+                      />
+                    )}
                   </div>
                 </div>
 
@@ -368,6 +397,7 @@ export function TabulationsSection({
                   <th className="w-64">Nome</th>
                   <th>Indicadores</th>
                   <th>Canais</th>
+                  {canWrite && <th className="text-right">Ações</th>}
                 </tr>
               </thead>
               <tbody>
@@ -498,6 +528,19 @@ export function TabulationsSection({
                           })}
                         </div>
                       </td>
+                      {canWrite && (
+                        <td className="text-right">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                            icon={<Trash2 className="size-3.5" />}
+                            onClick={() => setDeletingTab(t)}
+                            title="Excluir tabulação"
+                            aria-label="Excluir tabulação"
+                          />
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -506,6 +549,20 @@ export function TabulationsSection({
           </TableWrap>
         </Card>
       )}
+
+      <ConfirmDialog
+        open={Boolean(deletingTab)}
+        onOpenChange={(o) => !o && setDeletingTab(null)}
+        title={`Excluir tabulação "${deletingTab?.name}"?`}
+        confirmLabel="Excluir"
+        danger
+        loading={deleteM.isPending}
+        onConfirm={() => deletingTab && deleteM.mutate(deletingTab.id)}
+      >
+        <p className="text-sm text-slate-600">
+          Tabulações já registradas em tentativas de acionamento não podem ser excluídas.
+        </p>
+      </ConfirmDialog>
     </div>
   );
 }

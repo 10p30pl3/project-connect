@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Archive, ArrowRight, Bookmark, Database, ListFilter, Megaphone, Pause, Play, Rocket, Sparkles, Square, Users } from 'lucide-react';
+import { Archive, ArchiveRestore, ArrowRight, Bookmark, Database, ListFilter, Megaphone, Pause, Play, Rocket, Sparkles, Square, Users } from 'lucide-react';
 import { CAMPAIGN_STATUS, CAMPAIGN_STATUS_LABEL, isSuperAdminRole, type CampaignStatus } from '@voll/shared';
 import { errorMessage, get, post, qs } from '../lib/api';
 import type { CampaignSummary, Overview } from '../lib/types';
@@ -37,7 +37,7 @@ export function CampaignsPage() {
   });
 
   const actionM = useMutation({
-    mutationFn: ({ id, action, body }: { id: string; action: 'start' | 'pause' | 'resume' | 'close' | 'archive'; body?: unknown }) =>
+    mutationFn: ({ id, action, body }: { id: string; action: 'start' | 'pause' | 'resume' | 'close' | 'archive' | 'unarchive'; body?: unknown }) =>
       post(`/campaigns/${id}/${action}`, body),
     onSuccess: (_d, vars) => {
       const msg: Record<string, string> = {
@@ -46,6 +46,7 @@ export function CampaignsPage() {
         pause: 'Campanha pausada.',
         close: 'Campanha encerrada.',
         archive: 'Campanha arquivada.',
+        unarchive: 'Campanha desarquivada.',
       };
       toast('success', msg[vars.action] ?? 'Ação executada.');
       qc.invalidateQueries({ queryKey: ['campaigns'] });
@@ -296,7 +297,8 @@ export function CampaignsPage() {
                   const canStart = c.status === 'READY' || c.status === 'SCHEDULED' || c.status === 'PAUSED';
                   const canPause = c.status === 'RUNNING';
                   const canStop = ['RUNNING', 'PAUSED', 'READY', 'SCHEDULED'].includes(c.status);
-                  const canArchive = c.status !== 'ARCHIVED';
+                  const isArchived = c.status === 'ARCHIVED';
+                  const canArchive = !isArchived && c.status !== 'RUNNING';
                   const busy = actionM.isPending && actionM.variables?.id === c.id;
 
                   return (
@@ -356,17 +358,30 @@ export function CampaignsPage() {
                               Encerrar
                             </Button>
 
-                            {/* Arquivar */}
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              disabled={!canArchive || busy}
-                              title="Arquivar campanha"
-                              icon={<Archive className="size-3.5" aria-hidden />}
-                              onClick={() => actionM.mutate({ id: c.id, action: 'archive', body: { reason: 'Arquivada na listagem' } })}
-                            >
-                              Arquivar
-                            </Button>
+                            {/* Arquivar / Desarquivar */}
+                            {isArchived ? (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={busy}
+                                title="Desarquivar campanha"
+                                icon={<ArchiveRestore className="size-3.5" aria-hidden />}
+                                onClick={() => actionM.mutate({ id: c.id, action: 'unarchive' })}
+                              >
+                                Desarquivar
+                              </Button>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={!canArchive || busy}
+                                title={c.status === 'RUNNING' ? 'Pause ou encerre a campanha antes de arquivar' : 'Arquivar campanha'}
+                                icon={<Archive className="size-3.5" aria-hidden />}
+                                onClick={() => actionM.mutate({ id: c.id, action: 'archive', body: { reason: 'Arquivada na listagem' } })}
+                              >
+                                Arquivar
+                              </Button>
+                            )}
 
                             {/* Salvar como modelo */}
                             <Button

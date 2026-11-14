@@ -307,6 +307,8 @@ export function ExtensionsTab({ onDialExtension }: { onDialExtension?: () => voi
                                 size="sm"
                                 variant="secondary"
                                 icon={<Edit className="size-3.5" aria-hidden />}
+                                title="Editar ramal"
+                                aria-label="Editar ramal"
                                 onClick={() =>
                                   setEditing({
                                     isNew: false,
@@ -327,6 +329,8 @@ export function ExtensionsTab({ onDialExtension }: { onDialExtension?: () => voi
                                 variant="ghost"
                                 className="text-red-600 hover:bg-red-50"
                                 icon={<Trash2 className="size-3.5" aria-hidden />}
+                                title="Excluir ramal"
+                                aria-label="Excluir ramal"
                                 onClick={() => setDeleting(ext)}
                               />
                             </>

@@ -76,6 +76,7 @@ export function operational(r: any, now = new Date()): { state: string; explanat
     SCHEDULED: `Agendada para ${r.scheduled_at ? new Date(r.scheduled_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '—'} (horário de São Paulo).`,
     CLOSED: 'Encerrada: novas entregas impedidas; tentativas já aceitas permanecem rastreadas.',
     COMPLETED: 'Concluída: não há inscrições acionáveis nem tentativas pendentes.',
+    ARCHIVED: 'Arquivada: histórico e indicadores preservados; não aparece na operação ativa.',
   };
   return { state: 'IDLE', explanation: text[r.status] ?? '' };
 }
@@ -97,6 +98,8 @@ function summary(r: any) {
     strategyVersion: r.strategy_version,
     createdAt: r.created_at,
     startedAt: r.started_at,
+    archivedAt: r.archived_at ?? null,
+    archivedReason: r.archived_reason ?? null,
     progress: { members: r.members, finished: r.finished, active: r.active_attempts },
   };
 }
@@ -299,10 +302,11 @@ export async function campaignRoutes(app: FastifyInstance) {
   // ---------------------------------------------------------------- consulta
   app.get<{ Querystring: { status?: string } }>('/campaigns', async (req) => {
     const a = actor(req);
+    const st = req.query.status?.trim() || null;
     const rows = await q(
       getPool(),
-      `${SUMMARY_SQL} WHERE c.workspace_id=$1 AND ($2::text IS NULL OR c.status::text = $2) ORDER BY c.created_at DESC`,
-      [a.workspaceId, req.query.status ?? null],
+      `${SUMMARY_SQL} WHERE c.workspace_id=$1 AND (CASE WHEN $2::text IS NOT NULL THEN c.status::text = $2 ELSE c.status::text <> 'ARCHIVED' END) ORDER BY c.created_at DESC`,
+      [a.workspaceId, st],
     );
     return { items: rows.map(summary) };
   });
@@ -353,6 +357,61 @@ export async function campaignRoutes(app: FastifyInstance) {
     await cancelUnsent(c, `campaign_id=$1`, [id], 'CAMPAIGN_CLOSED');
     await c.query(`UPDATE enrollments SET state='CANCELLED', terminal_reason='CAMPAIGN_CLOSED', updated_at=now() WHERE campaign_id=$1 AND state='ACTIVE'`, [id]);
   });
+
+  app.post<{ Params: { id: string }; Body: { reason?: string } }>(
+    '/campaigns/:id/archive',
+    { preHandler: requireRoles(...CAN.operate) },
+    async (req) => {
+      const a = actor(req);
+      await tx(async (c) => {
+        const cur = await one(c, `SELECT id, status FROM campaigns WHERE id=$1 AND workspace_id=$2 FOR UPDATE`, [req.params.id, a.workspaceId]);
+        if (!cur) throw notFound('Campanha');
+        if (cur.status === 'ARCHIVED') throw conflict('Campanha já está arquivada.');
+        if (cur.status === 'RUNNING') throw conflict('Pause ou encerre a campanha antes de arquivá-la.');
+        const reason = typeof req.body?.reason === 'string' && req.body.reason.trim() ? req.body.reason.trim() : null;
+        await c.query(
+          `UPDATE campaigns
+              SET previous_status = status,
+                  status = 'ARCHIVED'::campaign_status,
+                  archived_at = now(),
+                  archived_reason = $2
+            WHERE id=$1`,
+          [cur.id, reason],
+        );
+        await audit(c, a, 'campaign.archive', 'campaign', cur.id, { before: { status: cur.status }, after: { status: 'ARCHIVED' }, reason });
+      });
+      return detail(await loadCampaignRow(getPool(), req.params.id, a.workspaceId));
+    },
+  );
+
+  app.post<{ Params: { id: string } }>(
+    '/campaigns/:id/unarchive',
+    { preHandler: requireRoles(...CAN.operate) },
+    async (req) => {
+      const a = actor(req);
+      await tx(async (c) => {
+        const cur = await one(
+          c,
+          `SELECT id, status, previous_status, finished_at FROM campaigns WHERE id=$1 AND workspace_id=$2 FOR UPDATE`,
+          [req.params.id, a.workspaceId],
+        );
+        if (!cur) throw notFound('Campanha');
+        if (cur.status !== 'ARCHIVED') throw conflict('Esta campanha não está arquivada.');
+        const restoredStatus: CampaignStatus = cur.previous_status || (cur.finished_at ? 'COMPLETED' : 'READY');
+        await c.query(
+          `UPDATE campaigns
+              SET status = $2::campaign_status,
+                  archived_at = NULL,
+                  archived_reason = NULL,
+                  previous_status = NULL
+            WHERE id=$1`,
+          [cur.id, restoredStatus],
+        );
+        await audit(c, a, 'campaign.unarchive', 'campaign', cur.id, { before: { status: 'ARCHIVED' }, after: { status: restoredStatus } });
+      });
+      return detail(await loadCampaignRow(getPool(), req.params.id, a.workspaceId));
+    },
+  );
 
   // ---------------------------------------------------------------- tentativas da campanha
   app.get<{ Params: { id: string }; Querystring: { state?: string; cursor?: string; limit?: string } }>(

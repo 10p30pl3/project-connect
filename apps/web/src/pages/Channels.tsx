@@ -23,6 +23,7 @@ import {
   SlidersHorizontal,
   Smartphone,
   Sparkles,
+  Trash2,
   Zap,
 } from 'lucide-react';
 import {
@@ -32,7 +33,7 @@ import {
   type ChannelEndpointConfig,
   type ChannelType,
 } from '@voll/shared';
-import { ApiError, errorMessage, get, patch, post } from '../lib/api';
+import { ApiError, del, errorMessage, get, patch, post } from '../lib/api';
 import type { Connection, Simulation, Tabulation } from '../lib/types';
 import { fmtDateTime, fmtMoney } from '../lib/format';
 import { useAuth } from '../lib/auth';
@@ -42,6 +43,7 @@ import {
   Button,
   Card,
   Checkbox,
+  ConfirmDialog,
   Empty,
   ErrorState,
   Field,
@@ -90,8 +92,19 @@ export function ChannelsPage() {
     retry: false,
   });
   const [edit, setEdit] = useState<Connection | null>(null);
+  const [deletingConn, setDeletingConn] = useState<Connection | null>(null);
   const [agentFor, setAgentFor] = useState<Connection | null>(null);
   const [openNew, setOpenNew] = useState(false);
+
+  const deleteConnM = useMutation({
+    mutationFn: (id: string) => del<{ deleted: boolean; id: string }>(`/connections/${id}`),
+    onSuccess: () => {
+      toast('success', 'Canal excluído com sucesso.');
+      setDeletingConn(null);
+      qc.invalidateQueries({ queryKey: ['connections'] });
+    },
+    onError: (e) => toast('error', errorMessage(e)),
+  });
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     try {
       const saved = localStorage.getItem('channels_view_mode');
@@ -268,6 +281,15 @@ export function ChannelsPage() {
                                   >
                                     Editar canal
                                   </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                                    icon={<Trash2 className="size-3.5" />}
+                                    onClick={() => setDeletingConn(c)}
+                                    title="Excluir canal"
+                                    aria-label="Excluir canal"
+                                  />
                                 </>
                               )}
                             </div>
@@ -492,6 +514,15 @@ export function ChannelsPage() {
                                         >
                                           Parâmetros avançados
                                         </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                                          icon={<Trash2 className="size-3.5" />}
+                                          onClick={() => setDeletingConn(c)}
+                                          title="Excluir canal"
+                                          aria-label="Excluir canal"
+                                        />
                                       </>
                                     )}
                                   </div>
@@ -530,6 +561,19 @@ export function ChannelsPage() {
         />
       )}
       <NewConnectionDialog open={openNew} onOpenChange={setOpenNew} isSuper={isSuper} tenants={tenantsQ.data?.tenants ?? []} />
+      <ConfirmDialog
+        open={Boolean(deletingConn)}
+        onOpenChange={(o) => !o && setDeletingConn(null)}
+        title={`Excluir canal "${deletingConn?.name}"?`}
+        confirmLabel="Excluir"
+        danger
+        loading={deleteConnM.isPending}
+        onConfirm={() => deletingConn && deleteConnM.mutate(deletingConn.id)}
+      >
+        <p className="text-sm text-slate-600">
+          Conexões em uso por jornadas ou com histórico de tentativas não podem ser excluídas (use Desabilitar nesse caso).
+        </p>
+      </ConfirmDialog>
     </div>
   );
 }

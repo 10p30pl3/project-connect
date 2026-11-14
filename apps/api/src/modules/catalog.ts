@@ -137,6 +137,26 @@ export async function catalogRoutes(app: FastifyInstance) {
     return updated;
   });
 
+  app.delete<{ Params: { id: string } }>('/tabulations/:id', { preHandler: requireRoles(...CAN.manageData) }, async (req) => {
+    const a = actor(req);
+    const { id } = req.params;
+    const current = await one(getPool(), `SELECT id, code, name FROM tabulations WHERE workspace_id=$1 AND id=$2`, [a.workspaceId, id]);
+    if (!current) throw notFound('Tabulação não encontrada');
+    const inUse = await one(
+      getPool(),
+      `SELECT id FROM attempts WHERE workspace_id=$1 AND tabulation_code=$2 LIMIT 1`,
+      [a.workspaceId, current.code],
+    );
+    if (inUse) {
+      throw conflict('Esta tabulação já possui histórico de tentativas e não pode ser excluída.');
+    }
+    await tx(async (c) => {
+      await c.query(`DELETE FROM tabulations WHERE workspace_id=$1 AND id=$2`, [a.workspaceId, id]);
+      await audit(c, a, 'tabulation.delete', 'tabulation', id, { before: current });
+    });
+    return { deleted: true, id };
+  });
+
   app.get('/connections', async (req) => {
     const a = actor(req);
     const isSuper = isSuperAdminRole(a.role);
@@ -211,6 +231,31 @@ export async function catalogRoutes(app: FastifyInstance) {
       });
       return connectionDto(after, isSuper);
     });
+  });
+
+  app.delete<{ Params: { id: string } }>('/connections/:id', { preHandler: requireRoles(...CAN.admin) }, async (req) => {
+    const a = actor(req);
+    const { id } = req.params;
+    const current = await one(getPool(), `SELECT id, name, channel_type FROM connections WHERE id=$1 AND workspace_id=$2`, [id, a.workspaceId]);
+    if (!current) throw notFound('Conexão');
+    const usedInAttempts = await one(getPool(), `SELECT id FROM attempts WHERE connection_id=$1 LIMIT 1`, [id]);
+    if (usedInAttempts) {
+      throw conflict('Este canal já possui histórico de tentativas e não pode ser excluído. Desabilite-o para interromper novos envios.');
+    }
+    const usedInJourney = await one(
+      getPool(),
+      `SELECT j.name FROM journey_versions jv JOIN journeys j ON j.id=jv.journey_id
+        WHERE j.workspace_id=$1 AND jv.steps::text LIKE '%' || $2 || '%' LIMIT 1`,
+      [a.workspaceId, id],
+    );
+    if (usedInJourney) {
+      throw conflict(`Este canal está vinculado à jornada "${usedInJourney.name}". Remova ou substitua a etapa antes de excluir.`);
+    }
+    await tx(async (c) => {
+      await c.query(`DELETE FROM connections WHERE id=$1 AND workspace_id=$2`, [id, a.workspaceId]);
+      await audit(c, a, 'connection.delete', 'connection', id, { before: { name: current.name, channelType: current.channel_type } });
+    });
+    return { deleted: true, id };
   });
 
   app.get('/channels/technical-endpoints', async (req) => {
@@ -402,6 +447,35 @@ export async function catalogRoutes(app: FastifyInstance) {
     return reply.code(201).send((await loadJourneys(a.workspaceId, id))[0]);
   });
 
+  app.delete<{ Params: { id: string } }>('/journeys/:id', { preHandler: requireRoles(...CAN.manageData) }, async (req) => {
+    const a = actor(req);
+    const { id } = req.params;
+    const j = await one(getPool(), `SELECT id, name FROM journeys WHERE id=$1 AND workspace_id=$2`, [id, a.workspaceId]);
+    if (!j) throw notFound('Jornada');
+    const inCampaign = await one(
+      getPool(),
+      `SELECT c.name FROM campaigns c JOIN journey_versions jv ON jv.id=c.journey_version_id WHERE jv.journey_id=$1 LIMIT 1`,
+      [id],
+    );
+    if (inCampaign) {
+      throw conflict(`Esta jornada está vinculada à campanha "${inCampaign.name}" e não pode ser excluída.`);
+    }
+    const inTemplate = await one(
+      getPool(),
+      `SELECT name FROM campaign_templates WHERE workspace_id=$1 AND journey_id=$2 LIMIT 1`,
+      [a.workspaceId, id],
+    ).catch(() => null);
+    if (inTemplate) {
+      throw conflict(`Esta jornada está vinculada ao modelo "${inTemplate.name}" e não pode ser excluída.`);
+    }
+    await tx(async (c) => {
+      await c.query(`DELETE FROM journey_versions WHERE journey_id=$1`, [id]);
+      await c.query(`DELETE FROM journeys WHERE id=$1 AND workspace_id=$2`, [id, a.workspaceId]);
+      await audit(c, a, 'journey.delete', 'journey', id, { before: { name: j.name } });
+    });
+    return { deleted: true, id };
+  });
+
   const loadStrategies = async (workspaceId: string, id?: string) =>
     (
       await q(
@@ -458,15 +532,49 @@ export async function catalogRoutes(app: FastifyInstance) {
       // Permite editar e publicar nova versão mesmo em templates predefinidos
       const body = parse(StrategyPublishSchema, req.body);
       const prev = await one(c, `SELECT version, config FROM strategy_versions WHERE strategy_id=$1 ORDER BY version DESC LIMIT 1`, [s.id]);
-      if (prev && JSON.stringify(prev.config) === JSON.stringify(body.config)) {
+      const nameChanged = body.name !== undefined && body.name.trim() !== String(s.name).trim();
+      const configChanged = !prev || JSON.stringify(prev.config) !== JSON.stringify(body.config);
+      if (!nameChanged && !configChanged) {
         throw badRequest('Nenhuma alteração detectada na configuração; uma nova versão só é criada se houver mudanças.');
+      }
+      if (nameChanged && body.name) {
+        await c.query(`UPDATE strategies SET name=$1 WHERE id=$2`, [body.name.trim(), s.id]);
       }
       const v = (prev?.version ?? 0) + 1;
       await c.query(`INSERT INTO strategy_versions (strategy_id, version, config, published_by) VALUES ($1,$2,$3,$4)`, [
         s.id, v, JSON.stringify(body.config), a.userId,
       ]);
-      await audit(c, a, 'strategy.publish', 'strategy', s.id, { before: prev, after: { version: v, config: body.config } });
+      await audit(c, a, 'strategy.publish', 'strategy', s.id, { before: { name: s.name, ...(prev ?? {}) }, after: { name: body.name ?? s.name, version: v, config: body.config } });
     });
     return reply.code(201).send((await loadStrategies(a.workspaceId, req.params.id))[0]);
+  });
+
+  app.delete<{ Params: { id: string } }>('/strategies/:id', { preHandler: requireRoles(...CAN.manageData) }, async (req) => {
+    const a = actor(req);
+    const { id } = req.params;
+    const s = await one(getPool(), `SELECT id, name FROM strategies WHERE id=$1 AND workspace_id=$2`, [id, a.workspaceId]);
+    if (!s) throw notFound('Estratégia');
+    const inCampaign = await one(
+      getPool(),
+      `SELECT c.name FROM campaigns c JOIN strategy_versions sv ON sv.id=c.strategy_version_id WHERE sv.strategy_id=$1 LIMIT 1`,
+      [id],
+    );
+    if (inCampaign) {
+      throw conflict(`Esta estratégia está vinculada à campanha "${inCampaign.name}" e não pode ser excluída.`);
+    }
+    const inTemplate = await one(
+      getPool(),
+      `SELECT name FROM campaign_templates WHERE workspace_id=$1 AND strategy_id=$2 LIMIT 1`,
+      [a.workspaceId, id],
+    ).catch(() => null);
+    if (inTemplate) {
+      throw conflict(`Esta estratégia está vinculada ao modelo "${inTemplate.name}" e não pode ser excluída.`);
+    }
+    await tx(async (c) => {
+      await c.query(`DELETE FROM strategy_versions WHERE strategy_id=$1`, [id]);
+      await c.query(`DELETE FROM strategies WHERE id=$1 AND workspace_id=$2`, [id, a.workspaceId]);
+      await audit(c, a, 'strategy.delete', 'strategy', id, { before: { name: s.name } });
+    });
+    return { deleted: true, id };
   });
 }

@@ -38,7 +38,7 @@ export async function overviewRoutes(app: FastifyInstance) {
          camp.running, camp.paused, camp.ready, camp.scheduled, camp.completed,
          att.active, att.reconciliation, att.sent_today, att.total_attempts, att.cpc_attempts, att.total_cost_brl,
          (SELECT count(*)::int FROM contacts WHERE workspace_id=$1) AS contacts,
-         (SELECT count(*)::int FROM mailings WHERE workspace_id=$1) AS mailings,
+         (SELECT count(*)::int FROM mailings WHERE workspace_id=$1 AND archived_at IS NULL) AS mailings,
          (SELECT avg(brute_force_cpc_brl)::float FROM contact_cpc_plans WHERE workspace_id=$1) AS baseline_cpc_brl
        FROM camp, att`,
       [a.workspaceId, day],

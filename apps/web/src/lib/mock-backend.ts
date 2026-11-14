@@ -1277,6 +1277,88 @@ function buildImportPreview(body: any): ImportPreview {
 
 const MOCK_VOICE_AGENTS: Record<string, any> = {};
 
+const MOCK_TELEPHONY = {
+  crosstalkMode: 'atual',
+  tenants: [
+    {
+      id: 'default',
+      name: 'Default Tenant',
+      extension: '9000',
+      dids: ['*'],
+      stsEngine: 'openai',
+      voice: 'marin',
+      openaiModel: 'gpt-realtime-2.1-mini',
+      elevenlabsModel: 'eleven_turbo_v2_5',
+      elevenlabsVoiceId: 'Rachel',
+      instructions:
+        'Você é o assistente virtual oficial da Voll Solutions. Seja cordial, claro e objetivo. Responda em português do Brasil.',
+      greetingInstructions:
+        "Diga cordialmente de forma curta e amigável: 'Olá! Sou o assistente virtual da Voll Solutions. Como posso ajudar você hoje?'",
+      maxConcurrentCalls: 200,
+      maxCallsPerSecond: 30,
+      maxDurationSec: 180,
+      audioCodec: 'pcmu',
+      dtmf: { enabled: true, debounceMs: 1200 },
+      active: true,
+      amd: { enabled: true, mode: 'active' },
+      stt: { enabled: true },
+      crosstalkFilter: { mode: 'atual', ratio: 0.45, threshold: null },
+    },
+    {
+      id: 'eleven1',
+      name: 'eleven1',
+      extension: '9001',
+      dids: ['5511989785888'],
+      stsEngine: 'elevenlabs',
+      voice: 'marin',
+      openaiModel: 'gpt-realtime-2.1-mini',
+      elevenlabsModel: 'eleven_turbo_v2_5',
+      elevenlabsVoiceId: 'Rachel',
+      instructions:
+        'Você é o assistente virtual oficial da Voll Solutions. Seja cordial, claro e objetivo. Responda em português do Brasil.',
+      greetingInstructions:
+        "Diga cordialmente de forma curta e amigável: 'Olá! Sou o assistente virtual da Voll Solutions. Como posso ajudar você hoje?'",
+      maxConcurrentCalls: 200,
+      maxCallsPerSecond: 30,
+      maxDurationSec: 180,
+      audioCodec: 'pcmu',
+      dtmf: { enabled: true, debounceMs: 1200 },
+      active: true,
+      amd: { enabled: false, mode: 'active' },
+      stt: { enabled: true },
+      crosstalkFilter: { mode: 'ecapa', ratio: 0.45, threshold: null },
+    },
+  ] as any[],
+  extensions: [
+    { id: '1000', name: 'Ramal 1000', password: '1234', effectiveCallerIdName: 'Ramal 1000', context: 'default', callgroup: 'default', enabled: true, registered: false },
+    { id: '1001', name: 'Ramal 1001', password: '1234', effectiveCallerIdName: 'Ramal 1001', context: 'default', callgroup: 'default', enabled: true, registered: false },
+  ] as any[],
+  trunks: [
+    { id: 'directcall', name: 'DirectCall SIP', providerId: 'sip_directcall', proxy: 'sip.directcall.com.br', port: 5060, register: true, username: 'voll_trunk', direction: 'both', maxChannels: 30, pingFreq: 25, codecs: 'PCMU,PCMA', active: true, isGlobalDefault: true, live: { state: 'REGED', pingMs: 18, calls: 0 } },
+  ] as any[],
+  providers: [
+    { id: 'sip_directcall', name: 'DirectCall VoIP', type: 'sip' },
+  ] as any[],
+  routes: [
+    { id: 'rule-default', name: 'Atendimento Geral', trunkId: 'directcall', didPattern: '*', callerPattern: '*', tenantId: 'default', maxChannels: null, amdMode: 'tenant_default', bargeinGraceSec: null, recordingEnabled: 'tenant_default', crosstalkFilterMode: 'tenant_default', active: true },
+  ] as any[],
+  outboundRoutes: [
+    { id: 'out-br', name: 'Brasil PSTN', trunkId: 'directcall', pattern: '^(\\d{10,15})$', prepend: '', callerIdNumber: '5511989785888', callerIdName: 'Voll Connect', active: true },
+  ] as any[],
+  aiProviders: [
+    { id: 'openai', name: 'OpenAI Realtime', active: true, defaultModel: 'gpt-realtime-2.1-mini', defaultVoice: 'marin', audioCodec: 'pcm24k', models: ['gpt-realtime-2.1-mini', 'gpt-realtime-2.1'], hasApiKey: true, maskedApiKey: 'sk-pro...demo', byokConfigured: false, maskedByokKey: '', monthUsd: 0, allTimeUsd: 0, monthTokens: 0, monthCallsCount: 0 },
+    { id: 'elevenlabs', name: 'ElevenLabs STS', active: true, defaultModel: 'eleven_turbo_v2_5', defaultVoice: 'Rachel', audioCodec: 'pcm24k', models: ['eleven_turbo_v2_5', 'eleven_flash_v2_5'], hasApiKey: true, maskedApiKey: 'xi-...demo', byokConfigured: false, maskedByokKey: '', monthUsd: 0, allTimeUsd: 0, monthTokens: 0, monthCallsCount: 0 },
+  ] as any[],
+  recordings: [] as any[],
+  features: [
+    { id: 'sonar_calibration', name: 'Sonda Sonar 425Hz & EnergyManager', category: 'Acústica', description: 'Calibração de eco e piso de ruído (SILENCE/OFFICE/STREET/TV).', active: true },
+    { id: 'crosstalk_filter', name: 'Filtro de Voz (YIN / WeSpeaker / ECAPA)', category: 'Biometria', description: 'Bloqueio dinâmico de vozes externas e crosstalk.', active: true },
+    { id: 'bargein_grace', name: 'Proteção Saudação (bargeinGraceSec)', category: 'Controle', description: 'Mute de leitura dinâmico durante a saudação inicial.', active: true },
+    { id: 'stereo_recording', name: 'Gravação Estéreo Dual-Stream', category: 'Mídia', description: 'Captura WAV estéreo + transcrição em tempo real.', active: true },
+    { id: 'whisper_amd', name: 'AMD Whisper Local', category: 'AMD', description: 'Detecção de caixa postal em modo active/shadow.', active: true },
+  ] as any[],
+};
+
 export async function handleMockApi<T = unknown>(
   rawPath: string,
   opts: { method?: string; body?: unknown; headers?: Record<string, string> } = {},
@@ -1516,17 +1598,35 @@ export async function handleMockApi<T = unknown>(
 
   // Mailings & Import
   if (pathname === '/mailings' && method === 'GET') {
-    const items: MailingSummary[] = MAILINGS.map((m) => {
+    const archived = searchParams.get('archived') ?? 'false';
+    const items: MailingSummary[] = MAILINGS.filter((m) =>
+      archived === 'all' ? true : archived === 'true' ? Boolean(m.detail.archivedAt) : !m.detail.archivedAt,
+    ).map((m) => {
       const lv = m.detail.versions[m.detail.versions.length - 1] ?? null;
       return {
         id: m.detail.id,
         name: m.detail.name,
         createdAt: m.detail.createdAt,
+        archivedAt: m.detail.archivedAt ?? null,
+        archivedReason: m.detail.archivedReason ?? null,
         recordCount: m.detail.recordCount,
         lastVersion: lv ? { version: lv.version, validRows: lv.validRows, rejectedRows: lv.rejectedRows, createdAt: lv.createdAt } : null,
       };
     });
     return { items } as T;
+  }
+  const mailingArchiveMatch = pathname.match(/^\/mailings\/([^/]+)\/(archive|unarchive)$/);
+  if (mailingArchiveMatch && method === 'POST') {
+    const found = MAILINGS.find((m) => m.detail.id === mailingArchiveMatch[1]);
+    if (!found) throw new ApiError({ type: 'not_found', title: 'Mailing não encontrado', status: 404 });
+    if (mailingArchiveMatch[2] === 'archive') {
+      found.detail.archivedAt = new Date().toISOString();
+      found.detail.archivedReason = body?.reason ?? 'Arquivado pelo usuário';
+      return { archived: true, id: found.detail.id } as T;
+    }
+    found.detail.archivedAt = null;
+    found.detail.archivedReason = null;
+    return { archived: false, id: found.detail.id } as T;
   }
   const mailingMatch = pathname.match(/^\/mailings\/([^/]+)$/);
   if (mailingMatch && method === 'GET') {
@@ -1828,6 +1928,12 @@ export async function handleMockApi<T = unknown>(
     if (b.channelTypes !== undefined) tab.channelTypes = b.channelTypes;
     return tab as T;
   }
+  if (tabPatchMatch && method === 'DELETE') {
+    const idx = TABULATIONS.findIndex((x) => x.id === tabPatchMatch[1]);
+    if (idx < 0) throw new ApiError({ type: 'not_found', title: 'Tabulação não encontrada', status: 404 });
+    const [removed] = TABULATIONS.splice(idx, 1);
+    return { deleted: true, id: removed.id } as T;
+  }
   // Agente de voz (fase 3) e Telefonia (fase 4) na demonstração: sem gateway real
   const agentMatch = pathname.match(/^\/connections\/([^/]+)\/voice-agent(\/sync)?$/);
   if (agentMatch) {
@@ -1849,12 +1955,238 @@ export async function handleMockApi<T = unknown>(
     return { ...st } as T;
   }
   if (pathname.startsWith('/telephony/')) {
-    throw new ApiError({
-      type: 'conflict',
-      title: 'Gateway de voz não configurado',
-      status: 409,
-      detail: 'Na demonstração não há gateway de voz conectado. Informe o endereço em Canais > Endereços técnicos.',
-    });
+    if (pathname === '/telephony/status' && method === 'GET') {
+      return { status: 'ok', uptimeSec: 3600, activeCalls: 0, drachtioConnected: true, freeSwitchCluster: { totalNodes: 1, healthyNodes: 1 }, whisperCluster: { totalNodes: 1, healthyNodes: 1 } } as T;
+    }
+    if (pathname === '/telephony/calls' && method === 'GET') return { calls: [], count: 0 } as T;
+    if (pathname === '/telephony/calls/history' && method === 'GET') return { history: [], count: 0 } as T;
+    if (pathname === '/telephony/features' && method === 'GET') {
+      return { count: MOCK_TELEPHONY.features.length, activeCount: MOCK_TELEPHONY.features.filter((f) => f.active).length, features: MOCK_TELEPHONY.features } as T;
+    }
+    if (pathname === '/telephony/features/test' && method === 'POST') {
+      const testedAt = new Date().toISOString();
+      MOCK_TELEPHONY.features.forEach((f) => { f.test = { passed: true, latencyMs: 12, testedAt, message: 'OK (Demo)' }; });
+      return { testedAt, totalDurationMs: 42, features: MOCK_TELEPHONY.features } as T;
+    }
+    const featTestMatch = pathname.match(/^\/telephony\/features\/([^/]+)\/test$/);
+    if (featTestMatch && method === 'POST') {
+      const f = MOCK_TELEPHONY.features.find((x) => x.id === decodeURIComponent(featTestMatch[1]));
+      if (f) f.test = { passed: true, latencyMs: 9, testedAt: new Date().toISOString(), message: 'OK (Demo)' };
+      return { ok: true, feature: f } as T;
+    }
+    if (pathname === '/telephony/features/crosstalk/mode') {
+      if (method === 'GET') return { mode: MOCK_TELEPHONY.crosstalkMode } as T;
+      MOCK_TELEPHONY.crosstalkMode = body.mode || 'atual';
+      return { ok: true, mode: MOCK_TELEPHONY.crosstalkMode } as T;
+    }
+
+    if (pathname === '/telephony/recordings' && method === 'GET') return { count: MOCK_TELEPHONY.recordings.length, recordings: MOCK_TELEPHONY.recordings } as T;
+    if (pathname === '/telephony/recordings/batch-delete' && method === 'POST') {
+      const ids = new Set<string>(Array.isArray(body.ids) ? body.ids : []);
+      MOCK_TELEPHONY.recordings = MOCK_TELEPHONY.recordings.filter((r) => !ids.has(r.id));
+      return { deleted: ids.size } as T;
+    }
+    const recMatch = pathname.match(/^\/telephony\/recordings\/([^/]+)$/);
+    if (recMatch && method === 'DELETE') {
+      const id = decodeURIComponent(recMatch[1]);
+      MOCK_TELEPHONY.recordings = MOCK_TELEPHONY.recordings.filter((r) => r.id !== id);
+      return { deleted: true, id } as T;
+    }
+
+    if (pathname === '/telephony/tenants' && method === 'GET') return { count: MOCK_TELEPHONY.tenants.length, tenants: MOCK_TELEPHONY.tenants } as T;
+    if (pathname === '/telephony/tenants' && method === 'POST') {
+      const id = String(body.id || '').trim();
+      if (!id || !/^[a-z0-9][a-z0-9_-]{2,48}$/i.test(id)) {
+        throw new ApiError({ type: 'bad_request', title: 'ID inválido', status: 400, detail: 'Use entre 3 e 48 caracteres alfanuméricos, "-" ou "_".' });
+      }
+      const idx = MOCK_TELEPHONY.tenants.findIndex((t) => t.id === id);
+      const item = { ...body, id };
+      if (idx >= 0) MOCK_TELEPHONY.tenants[idx] = item;
+      else MOCK_TELEPHONY.tenants.push(item);
+      return { ok: true, tenant: item } as T;
+    }
+    const telTenantMatch = pathname.match(/^\/telephony\/tenants\/([^/]+)$/);
+    if (telTenantMatch) {
+      const id = decodeURIComponent(telTenantMatch[1]);
+      if (method === 'PUT') {
+        const idx = MOCK_TELEPHONY.tenants.findIndex((t) => t.id === id);
+        if (idx < 0) throw new ApiError({ type: 'not_found', title: 'Agente não encontrado', status: 404 });
+        MOCK_TELEPHONY.tenants[idx] = { ...MOCK_TELEPHONY.tenants[idx], ...body, id };
+        return { ok: true, tenant: MOCK_TELEPHONY.tenants[idx] } as T;
+      }
+      if (method === 'DELETE') {
+        MOCK_TELEPHONY.tenants = MOCK_TELEPHONY.tenants.filter((t) => t.id !== id);
+        return { deleted: true, id } as T;
+      }
+    }
+
+    if (pathname === '/telephony/extensions/config' && method === 'GET') return { server: '127.0.0.1', domain: 'localhost', port: 5060, transport: 'UDP' } as T;
+    if (pathname === '/telephony/extensions/generate-range' && method === 'POST') {
+      const start = Number(body.start ?? 1000);
+      const end = Number(body.end ?? 1010);
+      for (let i = start; i <= end; i++) {
+        if (!MOCK_TELEPHONY.extensions.some((e) => e.id === String(i))) {
+          MOCK_TELEPHONY.extensions.push({ id: String(i), name: `Ramal ${i}`, password: body.password || '1234', effectiveCallerIdName: `Ramal ${i}`, context: 'default', callgroup: 'default', enabled: true, registered: false });
+        }
+      }
+      return { ok: true, count: MOCK_TELEPHONY.extensions.length } as T;
+    }
+    if (pathname === '/telephony/extensions/sync' && method === 'POST') return { ok: true } as T;
+    if (pathname === '/telephony/extensions' && method === 'GET') return { count: MOCK_TELEPHONY.extensions.length, extensions: MOCK_TELEPHONY.extensions } as T;
+    if (pathname === '/telephony/extensions' && method === 'POST') {
+      const id = String(body.id || '').trim();
+      const idx = MOCK_TELEPHONY.extensions.findIndex((e) => e.id === id);
+      const item = { ...body, id, registered: false };
+      if (idx >= 0) MOCK_TELEPHONY.extensions[idx] = item;
+      else MOCK_TELEPHONY.extensions.push(item);
+      return { ok: true, extension: item } as T;
+    }
+    const extTestMatch = pathname.match(/^\/telephony\/extensions\/([^/]+)\/test-call$/);
+    if (extTestMatch && method === 'POST') return { ok: true, message: 'Chamada simulada em modo demo.' } as T;
+    const extMatch = pathname.match(/^\/telephony\/extensions\/([^/]+)$/);
+    if (extMatch && method === 'DELETE') {
+      const id = decodeURIComponent(extMatch[1]);
+      MOCK_TELEPHONY.extensions = MOCK_TELEPHONY.extensions.filter((e) => e.id !== id);
+      return { deleted: true, id } as T;
+    }
+
+    if (pathname === '/telephony/trunks' && method === 'GET') return { trunks: MOCK_TELEPHONY.trunks } as T;
+    if (pathname === '/telephony/trunks' && method === 'POST') {
+      const id = String(body.id || nextUuid().slice(0, 8)).trim();
+      const idx = MOCK_TELEPHONY.trunks.findIndex((t) => t.id === id);
+      const item = { ...body, id, live: { state: 'REGED', pingMs: 20, calls: 0 } };
+      if (idx >= 0) MOCK_TELEPHONY.trunks[idx] = { ...MOCK_TELEPHONY.trunks[idx], ...item };
+      else MOCK_TELEPHONY.trunks.push(item);
+      return { ok: true, trunk: item } as T;
+    }
+    const trunkActMatch = pathname.match(/^\/telephony\/trunks\/([^/]+)\/(register|toggle)$/);
+    if (trunkActMatch && method === 'POST') {
+      const id = decodeURIComponent(trunkActMatch[1]);
+      const t = MOCK_TELEPHONY.trunks.find((x) => x.id === id);
+      if (t && trunkActMatch[2] === 'toggle') t.active = body.active !== undefined ? Boolean(body.active) : t.active === false;
+      return { ok: true, trunk: t } as T;
+    }
+    const trunkMatch = pathname.match(/^\/telephony\/trunks\/([^/]+)$/);
+    if (trunkMatch && method === 'DELETE') {
+      const id = decodeURIComponent(trunkMatch[1]);
+      MOCK_TELEPHONY.trunks = MOCK_TELEPHONY.trunks.filter((t) => t.id !== id);
+      return { deleted: true, id } as T;
+    }
+
+    if (pathname === '/telephony/providers' && method === 'GET') return { providers: MOCK_TELEPHONY.providers } as T;
+    if (pathname === '/telephony/providers' && method === 'POST') {
+      const id = String(body.id || '').trim().toLowerCase();
+      const idx = MOCK_TELEPHONY.providers.findIndex((p) => p.id === id);
+      const item = { ...body, id };
+      if (idx >= 0) MOCK_TELEPHONY.providers[idx] = item;
+      else MOCK_TELEPHONY.providers.push(item);
+      return { ok: true, provider: item } as T;
+    }
+    const provMatch = pathname.match(/^\/telephony\/providers\/([^/]+)$/);
+    if (provMatch) {
+      const id = decodeURIComponent(provMatch[1]);
+      if (method === 'PUT') {
+        const idx = MOCK_TELEPHONY.providers.findIndex((p) => p.id === id);
+        if (idx >= 0) MOCK_TELEPHONY.providers[idx] = { ...MOCK_TELEPHONY.providers[idx], ...body, id };
+        return { ok: true, provider: MOCK_TELEPHONY.providers[idx] } as T;
+      }
+      if (method === 'DELETE') {
+        MOCK_TELEPHONY.providers = MOCK_TELEPHONY.providers.filter((p) => p.id !== id);
+        return { deleted: true, id } as T;
+      }
+    }
+
+    if (pathname === '/telephony/routes' && method === 'GET') return { routes: MOCK_TELEPHONY.routes } as T;
+    if (pathname === '/telephony/routes/reorder' && method === 'POST') {
+      const ids: string[] = Array.isArray(body.ids) ? body.ids : [];
+      MOCK_TELEPHONY.routes.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+      return { ok: true } as T;
+    }
+    if (pathname === '/telephony/routes/simulate' && method === 'POST') return { matched: true, rule: MOCK_TELEPHONY.routes[0] ?? null } as T;
+    if (pathname === '/telephony/routes/test-call' && method === 'POST') return { ok: true, message: 'Teste de rota simulado em modo demo.' } as T;
+    if (pathname === '/telephony/routes' && method === 'POST') {
+      const item = { ...body, id: body.id || `rule-${nextUuid().slice(0, 6)}` };
+      MOCK_TELEPHONY.routes.push(item);
+      return { ok: true, route: item } as T;
+    }
+    const routeMatch = pathname.match(/^\/telephony\/routes\/([^/]+)$/);
+    if (routeMatch) {
+      const id = decodeURIComponent(routeMatch[1]);
+      if (method === 'PUT') {
+        const idx = MOCK_TELEPHONY.routes.findIndex((r) => r.id === id);
+        if (idx >= 0) MOCK_TELEPHONY.routes[idx] = { ...MOCK_TELEPHONY.routes[idx], ...body, id };
+        return { ok: true, route: MOCK_TELEPHONY.routes[idx] } as T;
+      }
+      if (method === 'DELETE') {
+        MOCK_TELEPHONY.routes = MOCK_TELEPHONY.routes.filter((r) => r.id !== id);
+        return { deleted: true, id } as T;
+      }
+    }
+
+    if (pathname === '/telephony/outbound-routes' && method === 'GET') return { routes: MOCK_TELEPHONY.outboundRoutes } as T;
+    if (pathname === '/telephony/outbound-routes/sync' && method === 'POST') return { ok: true } as T;
+    if (pathname === '/telephony/outbound-routes/reorder' && method === 'POST') {
+      const ids: string[] = Array.isArray(body.ids) ? body.ids : [];
+      MOCK_TELEPHONY.outboundRoutes.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+      return { ok: true } as T;
+    }
+    if (pathname === '/telephony/outbound-routes' && method === 'POST') {
+      const item = { ...body, id: body.id || `out-${nextUuid().slice(0, 6)}` };
+      MOCK_TELEPHONY.outboundRoutes.push(item);
+      return { ok: true, route: item } as T;
+    }
+    const outToggleMatch = pathname.match(/^\/telephony\/outbound-routes\/([^/]+)\/toggle$/);
+    if (outToggleMatch && method === 'POST') {
+      const id = decodeURIComponent(outToggleMatch[1]);
+      const r = MOCK_TELEPHONY.outboundRoutes.find((x) => x.id === id);
+      if (r) r.active = r.active === false;
+      return { ok: true, route: r } as T;
+    }
+    const outMatch = pathname.match(/^\/telephony\/outbound-routes\/([^/]+)$/);
+    if (outMatch) {
+      const id = decodeURIComponent(outMatch[1]);
+      if (method === 'PUT') {
+        const idx = MOCK_TELEPHONY.outboundRoutes.findIndex((r) => r.id === id);
+        if (idx >= 0) MOCK_TELEPHONY.outboundRoutes[idx] = { ...MOCK_TELEPHONY.outboundRoutes[idx], ...body, id };
+        return { ok: true, route: MOCK_TELEPHONY.outboundRoutes[idx] } as T;
+      }
+      if (method === 'DELETE') {
+        MOCK_TELEPHONY.outboundRoutes = MOCK_TELEPHONY.outboundRoutes.filter((r) => r.id !== id);
+        return { deleted: true, id } as T;
+      }
+    }
+
+    if (pathname === '/telephony/ai-providers' && method === 'GET') {
+      return { viewMode: me.role === 'SUPER_ADMIN' ? 'SUPER_ADMIN_FULL' : 'CLIENT_TIME_ONLY', providers: MOCK_TELEPHONY.aiProviders, monthCostTotalUsd: 0, monthCostTotalBrl: 0, monthDurationSec: 0, monthCallsCount: 0 } as T;
+    }
+    if (pathname === '/telephony/ai-providers' && method === 'POST') {
+      const id = String(body.id || '').trim().toLowerCase();
+      const item = { ...body, id, hasApiKey: Boolean(body.apiKey), maskedApiKey: body.apiKey ? 'sk-...demo' : '', monthUsd: 0, allTimeUsd: 0 };
+      MOCK_TELEPHONY.aiProviders.push(item);
+      return { ok: true, provider: item } as T;
+    }
+    const aiProvMatch = pathname.match(/^\/telephony\/ai-providers\/([^/]+)$/);
+    if (aiProvMatch) {
+      const id = decodeURIComponent(aiProvMatch[1]);
+      if (method === 'PUT' || method === 'POST') {
+        const idx = MOCK_TELEPHONY.aiProviders.findIndex((p) => p.id === id);
+        if (idx >= 0) {
+          MOCK_TELEPHONY.aiProviders[idx] = {
+            ...MOCK_TELEPHONY.aiProviders[idx],
+            ...body,
+            ...(body.apiKey ? { hasApiKey: true, maskedApiKey: 'sk-...demo', byokConfigured: true, maskedByokKey: 'sk-...demo' } : {}),
+          };
+        }
+        return { ok: true, provider: MOCK_TELEPHONY.aiProviders[idx] } as T;
+      }
+      if (method === 'DELETE') {
+        MOCK_TELEPHONY.aiProviders = MOCK_TELEPHONY.aiProviders.filter((p) => p.id !== id);
+        return { deleted: true, id } as T;
+      }
+    }
+    if (pathname === '/telephony/ai-costs/statement' && method === 'GET') return { statement: [], summary: {} } as T;
+
+    return {} as T;
   }
   if (pathname === '/connections' && method === 'GET') return { items: CONNECTIONS } as T;
   if (pathname === '/connections' && method === 'POST') {
@@ -1913,6 +2245,16 @@ export async function handleMockApi<T = unknown>(
       if (body.simulation !== undefined) c.simulation = body.simulation;
     }
     return (c ?? CONNECTIONS[0]) as T;
+  }
+  if (connMatch && method === 'DELETE') {
+    const idx = CONNECTIONS.findIndex((x) => x.id === connMatch[1]);
+    if (idx < 0) throw new ApiError({ type: 'not_found', title: 'Conexão não encontrada', status: 404 });
+    const used = JOURNEYS.find((j) => j.latestVersion?.steps.some((s) => s.connectionId === connMatch[1]));
+    if (used) {
+      throw new ApiError({ type: 'conflict', title: 'Conexão em uso', status: 409, detail: `Esta conexão está vinculada à jornada "${used.name}".` });
+    }
+    CONNECTIONS.splice(idx, 1);
+    return { deleted: true, id: connMatch[1] } as T;
   }
 
   // ---------------------------------------------------------------- Endereços Técnicos dos Canais
@@ -2008,6 +2350,13 @@ export async function handleMockApi<T = unknown>(
     };
     return j as T;
   }
+  const journeyMatch = pathname.match(/^\/journeys\/([^/]+)$/);
+  if (journeyMatch && method === 'DELETE') {
+    const idx = JOURNEYS.findIndex((x) => x.id === journeyMatch[1]);
+    if (idx < 0) throw new ApiError({ type: 'not_found', title: 'Jornada não encontrada', status: 404 });
+    JOURNEYS.splice(idx, 1);
+    return { deleted: true, id: journeyMatch[1] } as T;
+  }
   if (pathname === '/strategies' && method === 'GET') {
     const items: Strategy[] = STRATEGIES.map(({ versions: _v, ...rest }) => rest);
     return { items } as T;
@@ -2022,12 +2371,23 @@ export async function handleMockApi<T = unknown>(
   if (stratMatch && method === 'GET') {
     return (STRATEGIES.find((s) => s.id === stratMatch[1]) ?? STRATEGIES[0]) as T;
   }
+  if (stratMatch && method === 'DELETE') {
+    const idx = STRATEGIES.findIndex((s) => s.id === stratMatch[1]);
+    if (idx < 0) throw new ApiError({ type: 'not_found', title: 'Estratégia não encontrada', status: 404 });
+    STRATEGIES.splice(idx, 1);
+    return { deleted: true, id: stratMatch[1] } as T;
+  }
   const stratVerMatch = pathname.match(/^\/strategies\/([^/]+)\/versions$/);
   if (stratVerMatch && method === 'POST') {
     const s = STRATEGIES.find((x) => x.id === stratVerMatch[1]) ?? STRATEGIES[0];
     const prev = s.latestVersion;
-    if (prev && JSON.stringify(prev.config) === JSON.stringify(body.config)) {
+    const nameChanged = body.name !== undefined && body.name.trim() !== s.name.trim();
+    const configChanged = !prev || JSON.stringify(prev.config) !== JSON.stringify(body.config);
+    if (!nameChanged && !configChanged) {
       throw new Error('Nenhuma alteração detectada na configuração; uma nova versão só é criada se houver mudanças.');
+    }
+    if (nameChanged && body.name?.trim()) {
+      s.name = body.name.trim();
     }
     const v: StrategyVersion = {
       id: nextUuid(),
@@ -2323,7 +2683,7 @@ export async function handleMockApi<T = unknown>(
     }
     return camp as T;
   }
-  const campActionMatch = pathname.match(/^\/campaigns\/([^/]+)\/(start|pause|resume|close|archive)$/);
+  const campActionMatch = pathname.match(/^\/campaigns\/([^/]+)\/(start|pause|resume|close|archive|unarchive)$/);
   if (campActionMatch && method === 'POST') {
     const c = CAMPAIGNS.find((x) => x.id === campActionMatch[1]);
     if (!c) throw new ApiError({ type: 'not_found', title: 'Campanha não encontrada', status: 404 });
@@ -2348,10 +2708,20 @@ export async function handleMockApi<T = unknown>(
       c.operationalState = 'IDLE';
       c.operationalExplanation = `Campanha encerrada (${body?.reason ?? 'parada pelo usuário'}).`;
     } else if (act === 'archive') {
+      if (c.status === 'RUNNING') {
+        throw new ApiError({ type: 'conflict', title: 'Campanha em execução', status: 409, detail: 'Pause ou encerre a campanha antes de arquivar.' });
+      }
+      (c as CampaignDetail & { previousStatus?: CampaignStatus }).previousStatus = c.status;
       c.status = 'ARCHIVED';
       c.statusLabel = CAMPAIGN_STATUS_LABEL.ARCHIVED;
       c.operationalState = 'IDLE';
       c.operationalExplanation = 'Campanha arquivada (histórico preservado).';
+    } else if (act === 'unarchive') {
+      const prev = (c as CampaignDetail & { previousStatus?: CampaignStatus }).previousStatus ?? 'READY';
+      c.status = prev === 'ARCHIVED' ? 'READY' : prev;
+      c.statusLabel = CAMPAIGN_STATUS_LABEL[c.status];
+      c.operationalState = 'IDLE';
+      c.operationalExplanation = 'Campanha desarquivada.';
     }
     AUDITS.unshift({
       id: AUDITS.length + 1,

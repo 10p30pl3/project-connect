@@ -99,7 +99,8 @@ function TrunksAndProvidersPanel() {
   });
 
   const saveProvM = useMutation({
-    mutationFn: (payload: any) => post('/telephony/providers', payload),
+    mutationFn: ({ isNew, ...payload }: any) =>
+      isNew ? post('/telephony/providers', payload) : put(`/telephony/providers/${encodeURIComponent(payload.id)}`, payload),
     onSuccess: () => {
       toast('success', 'Provedor salvo com sucesso.');
       setEditingProv(null);
@@ -315,13 +316,30 @@ function TrunksAndProvidersPanel() {
                     <td><Badge tone="gray">{p.type || 'sip'}</Badge></td>
                     <td className="text-right">
                       {canGlobalTrunks && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-red-600 hover:bg-red-50"
-                          icon={<Trash2 className="size-3.5" aria-hidden />}
-                          onClick={() => setDeletingProv(p)}
-                        />
+                        <div className="inline-flex items-center justify-end gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            icon={<Edit className="size-3.5" aria-hidden />}
+                            onClick={() =>
+                              setEditingProv({
+                                isNew: false,
+                                id: p.id,
+                                name: p.name || p.id,
+                                type: p.type || 'sip',
+                              })
+                            }
+                            title="Editar provedor"
+                          />
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-red-600 hover:bg-red-50"
+                            icon={<Trash2 className="size-3.5" aria-hidden />}
+                            onClick={() => setDeletingProv(p)}
+                            title="Excluir provedor"
+                          />
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -513,7 +531,7 @@ function TrunksAndProvidersPanel() {
       <Modal
         open={!!editingProv}
         onOpenChange={(o) => !o && setEditingProv(null)}
-        title="Novo Provedor"
+        title={editingProv?.isNew ? 'Novo Provedor' : `Editar Provedor: ${editingProv?.id}`}
         footer={
           <>
             <Button variant="secondary" onClick={() => setEditingProv(null)}>Cancelar</Button>
@@ -523,6 +541,7 @@ function TrunksAndProvidersPanel() {
               disabled={!editingProv?.id?.trim()}
               onClick={() =>
                 saveProvM.mutate({
+                  isNew: Boolean(editingProv.isNew),
                   id: editingProv.id.trim().toLowerCase(),
                   name: editingProv.name.trim() || editingProv.id.trim(),
                   type: editingProv.type || 'sip',
@@ -537,7 +556,14 @@ function TrunksAndProvidersPanel() {
         {editingProv && (
           <div className="space-y-3">
             <Field label="ID" required>
-              {(f) => <Input id={f.id} value={editingProv.id} onChange={(e) => setEditingProv({ ...editingProv, id: e.target.value })} />}
+              {(f) => (
+                <Input
+                  id={f.id}
+                  disabled={!editingProv.isNew}
+                  value={editingProv.id}
+                  onChange={(e) => setEditingProv({ ...editingProv, id: e.target.value })}
+                />
+              )}
             </Field>
             <Field label="Nome" required>
               {(f) => <Input id={f.id} value={editingProv.name} onChange={(e) => setEditingProv({ ...editingProv, name: e.target.value })} />}
@@ -1248,6 +1274,7 @@ function AiProvidersAndCostsPanel() {
   const canSeeCosts = isSuperAdminRole(me?.role);
 
   const [editingProv, setEditingProv] = useState<any>(null);
+  const [deletingProv, setDeletingProv] = useState<AiProvider | null>(null);
   const [statementProvider, setStatementProvider] = useState<string>('openai');
 
   const provQ = useQuery({
@@ -1275,10 +1302,28 @@ function AiProvidersAndCostsPanel() {
   });
 
   const saveM = useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: any }) => put(`/telephony/ai-providers/${encodeURIComponent(id)}`, payload),
-    onSuccess: () => {
-      toast('success', canSeeCosts ? 'Provedor de IA atualizado no gateway local!' : 'Credencial BYOK da empresa salva com criptografia AES-256.');
+    mutationFn: ({ isNew, id, payload }: { isNew?: boolean; id: string; payload: any }) =>
+      isNew ? post('/telephony/ai-providers', { ...payload, id }) : put(`/telephony/ai-providers/${encodeURIComponent(id)}`, payload),
+    onSuccess: (_r, vars) => {
+      toast(
+        'success',
+        vars.isNew
+          ? 'Provedor de IA cadastrado no gateway local!'
+          : canSeeCosts
+            ? 'Provedor de IA atualizado no gateway local!'
+            : 'Credencial BYOK da empresa salva com criptografia AES-256.',
+      );
       setEditingProv(null);
+      qc.invalidateQueries({ queryKey: ['telephony', 'ai-providers'] });
+    },
+    onError: (e) => toast('error', errorMessage(e)),
+  });
+
+  const delAiProvM = useMutation({
+    mutationFn: (id: string) => del(`/telephony/ai-providers/${encodeURIComponent(id)}`),
+    onSuccess: () => {
+      toast('success', canSeeCosts ? 'Provedor de IA excluído.' : 'Credencial BYOK removida.');
+      setDeletingProv(null);
       qc.invalidateQueries({ queryKey: ['telephony', 'ai-providers'] });
     },
     onError: (e) => toast('error', errorMessage(e)),
@@ -1313,7 +1358,34 @@ function AiProvidersAndCostsPanel() {
         </div>
       )}
 
-      <Card title={canSeeCosts ? 'Motores & Credenciais de IA (Cluster Local)' : 'Motores & Chaves BYOK da Empresa'} padded={false}>
+      <Card
+        title={canSeeCosts ? 'Motores & Credenciais de IA (Cluster Local)' : 'Motores & Chaves BYOK da Empresa'}
+        actions={
+          canSeeCosts && canManage && (
+            <Button
+              size="sm"
+              variant="primary"
+              icon={<Plus className="size-3.5" aria-hidden />}
+              onClick={() =>
+                setEditingProv({
+                  isNew: true,
+                  id: '',
+                  name: '',
+                  active: true,
+                  apiKey: '',
+                  defaultModel: '',
+                  defaultVoice: '',
+                  audioCodec: 'g711_ulaw',
+                  models: '',
+                })
+              }
+            >
+              Novo Provedor IA
+            </Button>
+          )
+        }
+        padded={false}
+      >
         <TableWrap label="Provedores de IA">
           <table className="data w-full">
             <thead>
@@ -1365,24 +1437,44 @@ function AiProvidersAndCostsPanel() {
                         </Button>
                       )}
                       {canManage && (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          icon={<Edit className="size-3.5" aria-hidden />}
-                          onClick={() =>
-                            setEditingProv({
-                              id: p.id,
-                              active: p.active !== false,
-                              apiKey: '',
-                              defaultModel: p.defaultModel || '',
-                              defaultVoice: p.defaultVoice || '',
-                              audioCodec: p.audioCodec || 'g711_ulaw',
-                              models: (p.models ?? []).join(', '),
-                            })
-                          }
-                        >
-                          {canSeeCosts ? 'Configurar' : 'Chave BYOK'}
-                        </Button>
+                        <>
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            icon={<Edit className="size-3.5" aria-hidden />}
+                            onClick={() =>
+                              setEditingProv({
+                                isNew: false,
+                                id: p.id,
+                                name: p.name || p.id,
+                                active: p.active !== false,
+                                apiKey: '',
+                                defaultModel: p.defaultModel || '',
+                                defaultVoice: p.defaultVoice || '',
+                                audioCodec: p.audioCodec || 'g711_ulaw',
+                                models: (p.models ?? []).join(', '),
+                              })
+                            }
+                          >
+                            {canSeeCosts ? 'Configurar' : 'Chave BYOK'}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={!canSeeCosts && !p.byokConfigured}
+                            className="text-red-600 hover:bg-red-50"
+                            icon={<Trash2 className="size-3.5" aria-hidden />}
+                            onClick={() => setDeletingProv(p)}
+                            title={
+                              canSeeCosts
+                                ? 'Excluir provedor de IA'
+                                : p.byokConfigured
+                                  ? 'Remover credencial BYOK'
+                                  : 'Nenhuma credencial BYOK configurada'
+                            }
+                            aria-label="Excluir provedor de IA"
+                          />
+                        </>
                       )}
                     </div>
                   </td>
@@ -1439,15 +1531,17 @@ function AiProvidersAndCostsPanel() {
       <Modal
         open={!!editingProv}
         onOpenChange={(o) => !o && setEditingProv(null)}
-        title={`Configurar Provedor IA: ${editingProv?.id}`}
+        title={editingProv?.isNew ? 'Novo Provedor de IA' : `Configurar Provedor IA: ${editingProv?.id}`}
         footer={
           <>
             <Button variant="secondary" onClick={() => setEditingProv(null)}>Cancelar</Button>
             <Button
               variant="primary"
               loading={saveM.isPending}
+              disabled={!editingProv?.id?.trim()}
               onClick={() => {
                 const payload: any = {
+                  ...(editingProv.name?.trim() ? { name: editingProv.name.trim() } : {}),
                   active: Boolean(editingProv.active),
                   defaultModel: editingProv.defaultModel.trim(),
                   defaultVoice: editingProv.defaultVoice.trim(),
@@ -1455,7 +1549,7 @@ function AiProvidersAndCostsPanel() {
                   models: editingProv.models.split(',').map((s: string) => s.trim()).filter(Boolean),
                 };
                 if (editingProv.apiKey.trim()) payload.apiKey = editingProv.apiKey.trim();
-                saveM.mutate({ id: editingProv.id, payload });
+                saveM.mutate({ isNew: Boolean(editingProv.isNew), id: editingProv.id.trim().toLowerCase(), payload });
               }}
             >
               Salvar Configurações
@@ -1465,6 +1559,30 @@ function AiProvidersAndCostsPanel() {
       >
         {editingProv && (
           <div className="space-y-3">
+            {editingProv.isNew && (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="ID do Provedor" required>
+                  {(p) => (
+                    <Input
+                      id={p.id}
+                      value={editingProv.id}
+                      onChange={(e) => setEditingProv({ ...editingProv, id: e.target.value })}
+                      placeholder="ex: gemini-live"
+                    />
+                  )}
+                </Field>
+                <Field label="Nome de Exibição" required>
+                  {(p) => (
+                    <Input
+                      id={p.id}
+                      value={editingProv.name}
+                      onChange={(e) => setEditingProv({ ...editingProv, name: e.target.value })}
+                      placeholder="ex: Gemini Live API"
+                    />
+                  )}
+                </Field>
+              </div>
+            )}
             <Checkbox label="Provedor ativo" checked={editingProv.active} onChange={(e) => setEditingProv({ ...editingProv, active: e.target.checked })} />
             <Field label={canSeeCosts ? 'Nova API Key Global (deixe em branco para manter)' : 'Sua API Key BYOK (criptografada AES-256-GCM)'}>
               {(p) => <Input id={p.id} type="password" value={editingProv.apiKey} onChange={(e) => setEditingProv({ ...editingProv, apiKey: e.target.value })} placeholder="sk-..." />}
@@ -1486,6 +1604,26 @@ function AiProvidersAndCostsPanel() {
           </div>
         )}
       </Modal>
+
+      <ConfirmDialog
+        open={!!deletingProv}
+        onOpenChange={(o) => !o && setDeletingProv(null)}
+        title={
+          canSeeCosts
+            ? `Excluir provedor IA "${deletingProv?.name || deletingProv?.id}"?`
+            : `Remover chave BYOK de "${deletingProv?.name || deletingProv?.id}"?`
+        }
+        confirmLabel={canSeeCosts ? 'Excluir' : 'Remover Chave'}
+        danger
+        loading={delAiProvM.isPending}
+        onConfirm={() => deletingProv && delAiProvM.mutate(deletingProv.id)}
+      >
+        <p className="text-sm text-slate-600">
+          {canSeeCosts
+            ? 'O provedor será removido do catálogo do gateway de voz.'
+            : 'Sua credencial própria será apagada e o workspace voltará a utilizar o padrão da plataforma.'}
+        </p>
+      </ConfirmDialog>
     </div>
   );
 }

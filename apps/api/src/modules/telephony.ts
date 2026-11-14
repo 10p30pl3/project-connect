@@ -907,6 +907,14 @@ export async function telephonyRoutes(app: FastifyInstance) {
     }
     return proxyJson(a.workspaceId, '/v1/providers', jsonInit('POST', req.body ?? {}));
   });
+  app.put<{ Params: { id: string } }>('/telephony/providers/:id', manageGuard, async (req) => {
+    const a = actor(req);
+    if (!isSuperAdminRole(a.role)) {
+      throw new HttpError(403, 'Acesso restrito ao Super Admin', 'Somente Super Admin gerencia provedores SIP de catálogo global.');
+    }
+    const body = (req.body && typeof req.body === 'object' ? req.body : {}) as Record<string, unknown>;
+    return proxyJson(a.workspaceId, '/v1/providers', jsonInit('POST', { ...body, id: req.params.id }));
+  });
   app.delete<{ Params: { id: string } }>('/telephony/providers/:id', manageGuard, async (req) => {
     const a = actor(req);
     if (!isSuperAdminRole(a.role)) {
@@ -1152,8 +1160,48 @@ export async function telephonyRoutes(app: FastifyInstance) {
     };
   };
 
+  app.post('/telephony/ai-providers', manageGuard, async (req) => {
+    const a = actor(req);
+    if (!isSuperAdminRole(a.role)) {
+      throw new HttpError(403, 'Acesso restrito ao Super Admin', 'Somente Super Admin cadastra novos provedores de IA.');
+    }
+    const body = (req.body ?? {}) as Record<string, any>;
+    const rid = String(body.id || '').trim().toLowerCase();
+    if (!rid || !/^[a-z0-9][a-z0-9_-]{1,48}$/.test(rid)) {
+      throw new HttpError(400, 'ID de provedor inválido', 'Use de 2 a 49 caracteres alfanuméricos, "-" ou "_".');
+    }
+    const r = await proxyJson(a.workspaceId, '/v1/ai-providers', jsonInit('POST', { ...body, id: rid }));
+    await audit(getPool(), a, 'telephony.ai_provider_create', 'ai_provider', rid);
+    return r;
+  });
+
   app.put<{ Params: { id: string } }>('/telephony/ai-providers/:id', manageGuard, handleAiProvUpdate);
   app.post<{ Params: { id: string } }>('/telephony/ai-providers/:id', manageGuard, handleAiProvUpdate);
+
+  app.delete<{ Params: { id: string } }>('/telephony/ai-providers/:id', manageGuard, async (req) => {
+    const a = actor(req);
+    const providerId = String(req.params.id || '').trim();
+    if (isSuperAdminRole(a.role)) {
+      const r = await proxyJson(a.workspaceId, `/v1/ai-providers/${enc(providerId)}`, { method: 'DELETE' });
+      await audit(getPool(), a, 'telephony.ai_provider_delete', 'ai_provider', providerId);
+      return r;
+    }
+
+    await getPool().query(
+      `UPDATE workspace_channel_endpoints
+          SET config = jsonb_set(
+                COALESCE(config, '{}'::jsonb),
+                '{byokAi}',
+                COALESCE(config->'byokAi', '{}'::jsonb) - $2::text,
+                true
+              ),
+              updated_at = now()
+        WHERE workspace_id = $1`,
+      [a.workspaceId, providerId],
+    );
+    await audit(getPool(), a, 'telephony.ai_provider_byok_delete', 'ai_provider', providerId);
+    return { deleted: true, id: providerId, mode: 'TENANT_BYOK' };
+  });
 
   app.get('/telephony/ai-costs', async (req) => {
     const a = actor(req);

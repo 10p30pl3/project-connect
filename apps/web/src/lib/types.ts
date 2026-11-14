@@ -84,11 +84,22 @@ export type MailingSummary = {
   id: string;
   name: string;
   createdAt: string;
+  archivedAt?: string | null;
+  archivedReason?: string | null;
   recordCount: number;
   lastVersion: { version: number; validRows: number; rejectedRows: number; createdAt: string } | null;
 };
 export type MailingVersion = { id: string; version: number; totalRows: number; validRows: number; rejectedRows: number; createdAt: string };
-export type MailingDetail = { id: string; name: string; createdAt: string; recordCount: number; versions: MailingVersion[]; columns: string[] };
+export type MailingDetail = {
+  id: string;
+  name: string;
+  createdAt: string;
+  archivedAt?: string | null;
+  archivedReason?: string | null;
+  recordCount: number;
+  versions: MailingVersion[];
+  columns: string[];
+};
 export type MailingRecord = {
   id: string;
   rowNumber: number;
@@ -188,6 +199,8 @@ export type CampaignSummary = {
   strategyVersion: number;
   createdAt: string;
   startedAt: string | null;
+  archivedAt?: string | null;
+  archivedReason?: string | null;
   progress: { members: number; finished: number; active: number };
 };
 export type CampaignDetail = CampaignSummary & {

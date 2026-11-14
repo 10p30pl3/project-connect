@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useState } from 'react';
-import { ArrowLeft, Archive, Bookmark, Download, Pause, Play, Square } from 'lucide-react';
+import { ArrowLeft, Archive, ArchiveRestore, Bookmark, Download, Pause, Play, Square } from 'lucide-react';
 import {
   ATTEMPT_STATES,
   ATTEMPT_STATE_LABEL,
@@ -98,7 +98,7 @@ function CampaignActions({ c }: { c: CampaignDetail }) {
   const toast = useToast();
   const [closeOpen, setCloseOpen] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
-  const [confirm, setConfirm] = useState<null | 'start' | 'pause' | 'resume' | 'archive'>(null);
+  const [confirm, setConfirm] = useState<null | 'start' | 'pause' | 'resume' | 'archive' | 'unarchive'>(null);
   const [reason, setReason] = useState('');
   const [reasonErr, setReasonErr] = useState<string | null>(null);
   const act = useMutation({
@@ -110,6 +110,7 @@ function CampaignActions({ c }: { c: CampaignDetail }) {
         resume: 'Campanha retomada.',
         close: 'Campanha encerrada. Reservas não enviadas foram canceladas.',
         archive: 'Campanha arquivada.',
+        unarchive: 'Campanha desarquivada.',
       };
       toast('success', msg[v.action] ?? 'Feito.');
       qc.invalidateQueries({ queryKey: ['campaign', c.id] });
@@ -126,6 +127,7 @@ function CampaignActions({ c }: { c: CampaignDetail }) {
     pause: ['Pausar campanha?', 'Interrompe novas reservas e envios, mantendo o processamento dos retornos já enviados.', 'Pausar'],
     resume: ['Retomar campanha?', 'Novas reservas voltam a ser feitas, sujeitas a elegibilidade e calendário.', 'Retomar'],
     archive: ['Arquivar campanha?', 'A campanha sairá da listagem principal e ficará disponível no filtro "Arquivada", preservando todo o histórico e indicadores.', 'Arquivar'],
+    unarchive: ['Desarquivar campanha?', 'A campanha voltará para a listagem principal no seu status anterior.', 'Desarquivar'],
   } as const;
   return (
     <>
@@ -149,8 +151,18 @@ function CampaignActions({ c }: { c: CampaignDetail }) {
           Encerrar
         </Button>
       )}
-      {s !== 'ARCHIVED' && (
-        <Button variant="secondary" icon={<Archive className="size-4" aria-hidden />} onClick={() => setConfirm('archive')}>
+      {s === 'ARCHIVED' ? (
+        <Button variant="secondary" icon={<ArchiveRestore className="size-4" aria-hidden />} onClick={() => setConfirm('unarchive')}>
+          Desarquivar
+        </Button>
+      ) : (
+        <Button
+          variant="secondary"
+          disabled={s === 'RUNNING'}
+          title={s === 'RUNNING' ? 'Pause ou encerre a campanha antes de arquivar' : 'Arquivar campanha'}
+          icon={<Archive className="size-4" aria-hidden />}
+          onClick={() => setConfirm('archive')}
+        >
           Arquivar
         </Button>
       )}
