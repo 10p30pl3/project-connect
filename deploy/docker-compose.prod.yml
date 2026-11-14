@@ -114,6 +114,7 @@ services:
     network_mode: host
     volumes:
       - recordings:/recordings
+      - ./freeswitch-conf:/usr/local/freeswitch/conf
 
   whisper:
     profiles: ["whisper"]
