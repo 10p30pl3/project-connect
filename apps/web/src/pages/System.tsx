@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircle2,
@@ -14,14 +14,17 @@ import {
   XCircle,
   Database,
 } from 'lucide-react';
-import { get, post, errorMessage } from '../lib/api';
+import { errorMessage, get, post } from '../lib/api';
+import { useAuth } from '../lib/auth';
 import {
+  Alert,
   Badge,
   Button,
   Card,
   Field,
   InfoTooltip,
   Input,
+  Modal,
   PageHeader,
   Select,
   useToast,
@@ -33,6 +36,11 @@ type AiStatusResponse = {
   model: string;
 };
 
+type AiConfigResponse = AiStatusResponse & {
+  orgId?: string;
+  maskedApiKey?: string;
+};
+
 type AiTestResponse = {
   ok: boolean;
   status?: number;
@@ -42,50 +50,45 @@ type AiTestResponse = {
 };
 
 export function SystemPage() {
+  const { can } = useAuth();
   const qc = useQueryClient();
   const toast = useToast();
+  const canControlSystem = can('control.write');
 
   const [showKey, setShowKey] = useState(false);
-  const [apiKey, setApiKey] = useState<string>(() => {
-    try {
-      return localStorage.getItem('vc_openai_api_key') ?? '';
-    } catch {
-      return '';
-    }
-  });
-
-  const [model, setModel] = useState<string>(() => {
-    try {
-      return localStorage.getItem('vc_openai_model') || 'gpt-4o-mini';
-    } catch {
-      return 'gpt-4o-mini';
-    }
-  });
-
-  const [orgId, setOrgId] = useState<string>(() => {
-    try {
-      return localStorage.getItem('vc_openai_org_id') ?? '';
-    } catch {
-      return '';
-    }
-  });
+  const [apiKey, setApiKey] = useState<string>('');
+  const [model, setModel] = useState<string>('gpt-4o-mini');
+  const [orgId, setOrgId] = useState<string>('');
 
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState('');
   const [isSeedingDemo, setIsSeedingDemo] = useState(false);
   const [testResult, setTestResult] = useState<AiTestResponse | null>(null);
 
-  // Consulta do status atual do motor
+  // Consulta do status atual e configuração persistida no PostgreSQL
   const statusQ = useQuery({
     queryKey: ['ai-status'],
     queryFn: () => get<AiStatusResponse>('/ai/status'),
   });
 
-  const isConfigured = Boolean(apiKey.trim() || statusQ.data?.configured);
-  const activeModel = statusQ.data?.model || model;
+  const configQ = useQuery({
+    queryKey: ['ai-config'],
+    queryFn: () => get<AiConfigResponse>('/ai/config'),
+  });
 
-  // Salvar token e parâmetros
+  useEffect(() => {
+    if (!configQ.data) return;
+    if (configQ.data.model) setModel(configQ.data.model);
+    if (typeof configQ.data.orgId === 'string') setOrgId(configQ.data.orgId);
+  }, [configQ.data]);
+
+  const isConfigured = Boolean(apiKey.trim() || configQ.data?.configured || statusQ.data?.configured);
+  const activeModel = configQ.data?.model || statusQ.data?.model || model;
+
+  // Salvar token e parâmetros no PostgreSQL
   const handleSave = async () => {
     setIsSaving(true);
     try {
@@ -93,26 +96,23 @@ export function SystemPage() {
       const cleanModel = model.trim() || 'gpt-4o-mini';
       const cleanOrg = orgId.trim();
 
-      localStorage.setItem('vc_openai_api_key', cleanKey);
-      localStorage.setItem('vc_openai_model', cleanModel);
-      if (cleanOrg) {
-        localStorage.setItem('vc_openai_org_id', cleanOrg);
-      } else {
-        localStorage.removeItem('vc_openai_org_id');
-      }
-
-      await post('/ai/config', {
-        apiKey: cleanKey,
+      const res = await post<AiConfigResponse>('/ai/config', {
+        ...(cleanKey ? { apiKey: cleanKey } : {}),
         model: cleanModel,
+        orgId: cleanOrg,
       });
 
-      await qc.invalidateQueries({ queryKey: ['ai-status'] });
+      setApiKey('');
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['ai-status'] }),
+        qc.invalidateQueries({ queryKey: ['ai-config'] }),
+      ]);
 
       toast(
         'success',
-        cleanKey
-          ? `Token da OpenAI e modelo (${cleanModel}) salvos com sucesso!`
-          : 'Token removido. Assistente utilizando o motor interativo padrão local.',
+        res.configured
+          ? `Configuração da OpenAI e modelo (${cleanModel}) salvos no banco PostgreSQL!`
+          : `Preferências (${cleanModel}) salvas. Sem chave ativa: usando assistente local.`,
       );
     } catch (err) {
       toast('error', `Falha ao salvar configurações: ${errorMessage(err)}`);
@@ -124,7 +124,7 @@ export function SystemPage() {
   // Testar conexão em tempo real
   const handleTestConnection = async () => {
     const keyToTest = apiKey.trim();
-    if (!keyToTest) {
+    if (!keyToTest && !configQ.data?.configured) {
       toast('info', 'Informe o token da OpenAI para realizar o teste de conectividade.');
       return;
     }
@@ -134,7 +134,7 @@ export function SystemPage() {
 
     try {
       const res = await post<AiTestResponse>('/ai/test', {
-        apiKey: keyToTest,
+        ...(keyToTest ? { apiKey: keyToTest } : {}),
         model: model.trim() || 'gpt-4o-mini',
       });
       setTestResult(res);
@@ -161,28 +161,35 @@ export function SystemPage() {
     setApiKey('');
     setTestResult(null);
     try {
-      localStorage.removeItem('vc_openai_api_key');
-      localStorage.removeItem('vc_openai_org_id');
       await post('/ai/config', {
         apiKey: '',
         model: model || 'gpt-4o-mini',
+        orgId,
       });
-      await qc.invalidateQueries({ queryKey: ['ai-status'] });
-      toast('info', 'Token da OpenAI removido. O sistema agora utiliza o assistente local integrado.');
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['ai-status'] }),
+        qc.invalidateQueries({ queryKey: ['ai-config'] }),
+      ]);
+      toast('info', 'Token da OpenAI removido do banco. O sistema agora utiliza o assistente local integrado.');
     } catch (err) {
       toast('error', `Falha ao remover chave: ${errorMessage(err)}`);
     }
   };
 
-  const handleResetToZero = async () => {
-    if (!window.confirm('Tem certeza que deseja zerar a base de dados? Todos os contatos, mailings, listas, campanhas e tentativas serão removidos para iniciar do zero.')) {
-      return;
-    }
+  const handleResetToZero = () => {
+    setResetConfirmText('');
+    setConfirmResetOpen(true);
+  };
+
+  const executeResetToZero = async () => {
+    if (resetConfirmText.trim().toUpperCase() !== 'ZERAR') return;
     setIsResetting(true);
     try {
       await post('/system/reset');
       await qc.invalidateQueries();
-      toast('success', 'Base de dados zerada com sucesso! Você está pronto para começar do zero.');
+      setConfirmResetOpen(false);
+      setResetConfirmText('');
+      toast('success', 'Base de dados zerada com sucesso! Recursos de Telefonia e Agentes IA foram preservados.');
     } catch (e) {
       toast('error', errorMessage(e));
     } finally {
@@ -195,7 +202,7 @@ export function SystemPage() {
     try {
       await post('/system/seed-demo');
       await qc.invalidateQueries();
-      toast('success', 'Base de demonstração com 1.000 contatos carregada com sucesso.');
+      toast('success', 'Dados de exemplo (1.000 contatos) carregados com sucesso.');
     } catch (e) {
       toast('error', errorMessage(e));
     } finally {
@@ -236,8 +243,11 @@ export function SystemPage() {
               {/* Campo API Key / Token */}
               <Field
                 label="OpenAI API Token"
-                required
-                tooltip="Chave secreta iniciada com 'sk-...'. Armazenada com segurança no navegador para acionamento das rotas de inteligência artificial. Obtenha em platform.openai.com."
+                tooltip={
+                  configQ.data?.maskedApiKey
+                    ? `Chave atual salva no banco PostgreSQL: ${configQ.data.maskedApiKey}. Preencha apenas se desejar substituir.`
+                    : "Chave secreta iniciada com 'sk-...'. Persistida no banco PostgreSQL do servidor para acionamento das rotas de inteligência artificial."
+                }
               >
                 {(ids) => (
                   <div className="relative">
@@ -250,7 +260,7 @@ export function SystemPage() {
                       type={showKey ? 'text' : 'password'}
                       value={apiKey}
                       onChange={(e) => setApiKey(e.target.value)}
-                      placeholder="sk-proj-..."
+                      placeholder={configQ.data?.maskedApiKey ? `Configurada (${configQ.data.maskedApiKey}) — digite para alterar` : 'sk-proj-...'}
                       className="pl-9 pr-24 font-mono text-sm"
                     />
                     <div className="absolute inset-y-0 right-0 flex items-center pr-1.5 gap-1">
@@ -353,6 +363,11 @@ export function SystemPage() {
               )}
 
               {/* Botões de Ação */}
+              {!canControlSystem && (
+                <Alert tone="warn" title="Somente leitura">
+                  Seu perfil não tem permissão para alterar tokens da OpenAI ou zerar dados do sistema.
+                </Alert>
+              )}
               <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
                 <div className="flex items-center gap-2">
                   <Button
@@ -360,6 +375,7 @@ export function SystemPage() {
                     variant="primary"
                     onClick={handleSave}
                     loading={isSaving}
+                    disabled={!canControlSystem}
                     icon={<Sparkles className="size-4" />}
                   >
                     Salvar Configurações
@@ -370,7 +386,7 @@ export function SystemPage() {
                     variant="secondary"
                     onClick={handleTestConnection}
                     loading={isTesting}
-                    disabled={!apiKey.trim()}
+                    disabled={!canControlSystem || !apiKey.trim()}
                     icon={<RefreshCw className={`size-4 ${isTesting ? 'animate-spin' : ''}`} />}
                   >
                     Testar Conexão
@@ -381,6 +397,7 @@ export function SystemPage() {
                   <Button
                     type="button"
                     variant="ghost"
+                    disabled={!canControlSystem}
                     onClick={handleClearKey}
                     className="text-rose-600 hover:text-rose-700 hover:bg-rose-50"
                     icon={<Trash2 className="size-4" />}
@@ -404,7 +421,7 @@ export function SystemPage() {
           >
             <div className="space-y-3 text-sm">
               <p className="text-slate-600">
-                Gerencie o estado da base entre ambiente limpo para produção e dados de demonstração.
+                Gerencie o estado da base entre ambiente limpo para testes reais (preservando Telefonia e Agentes de IA) e dados de exemplo.
               </p>
               <div className="flex flex-wrap items-center gap-3 pt-1">
                 <Button
@@ -412,22 +429,68 @@ export function SystemPage() {
                   variant="danger"
                   onClick={handleResetToZero}
                   loading={isResetting}
+                  disabled={!canControlSystem}
                   icon={<Trash2 className="size-4" />}
                 >
-                  Zerar base de dados (Começar do zero)
+                  Zerar base de dados (Preservar Telefonia & IA)
                 </Button>
                 <Button
                   type="button"
                   variant="secondary"
                   onClick={handleSeedDemo}
                   loading={isSeedingDemo}
+                  disabled={!canControlSystem}
                   icon={<RefreshCw className={`size-4 ${isSeedingDemo ? 'animate-spin' : ''}`} />}
                 >
-                  Carregar base demo (1.000 contatos)
+                  Carregar dados de exemplo (1.000 contatos)
                 </Button>
               </div>
             </div>
           </Card>
+
+          <Modal
+            open={confirmResetOpen}
+            onOpenChange={(o) => {
+              if (!isResetting) setConfirmResetOpen(o);
+            }}
+            title="Zerar Base de Dados Operacional"
+            footer={
+              <>
+                <Button
+                  variant="secondary"
+                  disabled={isResetting}
+                  onClick={() => setConfirmResetOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  variant="danger"
+                  loading={isResetting}
+                  disabled={resetConfirmText.trim().toUpperCase() !== 'ZERAR'}
+                  onClick={executeResetToZero}
+                >
+                  Confirmar Reset Definitivo
+                </Button>
+              </>
+            }
+          >
+            <div className="space-y-3 text-xs text-slate-600">
+              <Alert tone="error" title="Atenção: operação irreversível">
+                Todos os <strong>contatos, mailings, listas, campanhas, jornadas, estratégias e tentativas</strong> deste workspace serão apagados permanentemente. Recursos de <strong>Telefonia, Troncos, Ramais, Rotas, Billing e Agentes de IA</strong> serão preservados.
+              </Alert>
+              <Field label='Digite "ZERAR" para confirmar'>
+                {(f) => (
+                  <Input
+                    id={f.id}
+                    placeholder="ZERAR"
+                    value={resetConfirmText}
+                    onChange={(e) => setResetConfirmText(e.target.value)}
+                    autoFocus
+                  />
+                )}
+              </Field>
+            </div>
+          </Modal>
         </div>
 
         {/* Coluna da Direita (1 col): Status do Sistema e Conectividade */}

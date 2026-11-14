@@ -3,15 +3,15 @@ import { useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
-import { CHANNEL_LABEL, ResolveReconciliationSchema } from '@voll/shared';
+import { CHANNEL_LABEL, ResolveReconciliationSchema, isSuperAdminRole } from '@voll/shared';
 import type { z } from 'zod';
-import { applyFieldErrors, errorMessage, get, post } from '../lib/api';
+import { API_BASE, applyFieldErrors, errorMessage, get, post } from '../lib/api';
 import type { AttemptDetail, Tabulation } from '../lib/types';
 import { fmtDateTimeSec, fmtMoney } from '../lib/format';
 import { useAuth } from '../lib/auth';
 import { Alert, AttemptStateBadge, Badge, Button, ErrorState, Field, KeyValue, Loading, Modal, Select, Input, useToast } from './ui';
 import { Link } from 'react-router-dom';
-import { Copy, Repeat, Wrench } from 'lucide-react';
+import { Copy, Disc, Repeat, Wrench } from 'lucide-react';
 
 /** Abre o detalhe de uma tentativa em qualquer tela via ?tentativa=<id> (§26.7). */
 export function useOpenAttempt() {
@@ -39,10 +39,33 @@ export function AttemptDrawer() {
 }
 
 function AttemptBody({ id }: { id: string }) {
-  const { can } = useAuth();
+  const { me, can } = useAuth();
+  const isSuper = isSuperAdminRole(me?.role);
   const toast = useToast();
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['attempt', id], queryFn: () => get<AttemptDetail>(`/attempts/${id}`), refetchInterval: 3000 });
+  const a0 = q.data?.attempt;
+  const recsQ = useQuery({
+    queryKey: ['telephony', 'recordings'],
+    queryFn: () => get<{ recordings: { id: string }[] }>('/telephony/recordings'),
+    enabled: a0?.channelType === 'VOICE' && !!a0?.providerAttemptId,
+    retry: false,
+  });
+  const matchingRecordingId =
+    a0?.channelType === 'VOICE' && a0?.providerAttemptId
+      ? recsQ.data?.recordings.find(
+          (r) => r.id === a0.providerAttemptId || r.id.includes(a0.providerAttemptId!),
+        )?.id ?? a0.providerAttemptId
+      : null;
+  const transcriptQ = useQuery({
+    queryKey: ['telephony', 'recording-transcript', matchingRecordingId],
+    queryFn: () =>
+      get<{ formatted?: string; text?: string }>(
+        `/telephony/recordings/${encodeURIComponent(matchingRecordingId!)}/transcript`,
+      ),
+    enabled: !!matchingRecordingId,
+    retry: false,
+  });
   const [reconcileOpen, setReconcileOpen] = useState(false);
   const [forceOpen, setForceOpen] = useState(false);
   const [showTech, setShowTech] = useState(false);
@@ -152,6 +175,35 @@ function AttemptBody({ id }: { id: string }) {
         )}
       </section>
 
+      {a.channelType === 'VOICE' && matchingRecordingId && (
+        <section aria-labelledby="voice-rec-title" className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-2.5">
+          <h3 id="voice-rec-title" className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
+            <Disc className="size-4 text-brand-700" aria-hidden />
+            Gravação &amp; Transcrição da Ligação
+          </h3>
+          <audio
+            key={matchingRecordingId}
+            controls
+            preload="none"
+            className="w-full"
+            src={`${API_BASE}/telephony/recordings/${encodeURIComponent(matchingRecordingId)}/audio`}
+          >
+            Seu navegador não reproduz áudio.
+          </audio>
+          {transcriptQ.data && (transcriptQ.data.formatted || transcriptQ.data.text) ? (
+            <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-lg border border-slate-200 bg-white p-2.5 text-xs text-slate-700">
+              {transcriptQ.data.formatted ?? transcriptQ.data.text}
+            </pre>
+          ) : (
+            <p className="text-[11px] text-slate-500">
+              {transcriptQ.isLoading
+                ? 'Carregando transcrição...'
+                : 'Transcrição não localizada ou chamada sem diálogo gravado.'}
+            </p>
+          )}
+        </section>
+      )}
+
       <section>
         <button
           type="button"
@@ -172,8 +224,12 @@ function AttemptBody({ id }: { id: string }) {
                 ['Versão da estratégia', <Mono v={a.strategyVersionId} />],
                 ['Versão da jornada', <Mono v={a.journeyVersionId} />],
                 ['Etapa', a.stage + 1],
-                ['Tarifa preservada', a.tariffSnapshot === null ? 'não informada' : fmtMoney(a.tariffSnapshot, 4)],
-                ['Custo confirmado', a.costConfirmed === null ? '—' : fmtMoney(a.costConfirmed, 4)],
+                ...(isSuper
+                  ? ([
+                      ['Tarifa preservada', a.tariffSnapshot === null ? 'não informada' : fmtMoney(a.tariffSnapshot, 4)],
+                      ['Custo confirmado', a.costConfirmed === null ? '—' : fmtMoney(a.costConfirmed, 4)],
+                    ] as [string, React.ReactNode][])
+                  : []),
                 ['Reserva válida até', fmtDateTimeSec(a.leaseUntil)],
                 ['Prazo de feedback', fmtDateTimeSec(a.feedbackDeadline)],
                 ['Criada', fmtDateTimeSec(a.createdAt)],

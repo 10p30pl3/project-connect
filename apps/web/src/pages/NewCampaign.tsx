@@ -18,6 +18,7 @@ import {
   Loader2,
   Megaphone,
   Pencil,
+  PhoneCall,
   Plus,
   Rocket,
   Save,
@@ -53,6 +54,7 @@ import {
   Badge,
   Button,
   Card,
+  ConfirmDialog,
   Empty,
   Field,
   InfoTooltip,
@@ -109,6 +111,9 @@ export function NewCampaignPage() {
   const toast = useToast();
   const [sp] = useSearchParams();
   const modeloId = sp.get('modeloId');
+  const listaId = sp.get('lista');
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const listaAppliedRef = useRef(false);
 
   const draftQ = useQuery({
     queryKey: ['campaign-draft'],
@@ -229,6 +234,30 @@ export function NewCampaignPage() {
     queryFn: () => get<{ items: ListSummary[] }>('/lists'),
   });
 
+  useEffect(() => {
+    if (!listaId || listaAppliedRef.current || !listsQ.data?.items || draft === null) return;
+    const found = listsQ.data.items.find((l) => l.id === listaId);
+    if (!found) return;
+    listaAppliedRef.current = true;
+    update(
+      {
+        mailingId: found.mailing.id,
+        audienceMode: found.latestVersion ? 'LIST' : 'ALL',
+        listVersionId: found.latestVersion?.id,
+        step: 'AUDIENCE',
+      },
+      {
+        mailingSource: 'MAILING',
+        mailingName: found.mailing.name,
+        listId: found.id,
+        listName: found.name,
+        listVersion: found.latestVersion?.version,
+        audienceCount: found.latestVersion?.memberCount ?? undefined,
+      },
+    );
+    toast('info', `Lista "${found.name}" pré-selecionada para a campanha.`);
+  }, [listaId, listsQ.data, draft, update, toast]);
+
   const journeysQ = useQuery({
     queryKey: ['journeys'],
     queryFn: () => get<{ items: Journey[] }>('/journeys'),
@@ -318,15 +347,7 @@ export function NewCampaignPage() {
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => {
-                if (window.confirm('Deseja descartar este rascunho e recomeçar do zero?')) {
-                  del('/campaign-draft').then(() => {
-                    setDraft({ ...EMPTY });
-                    setRevision(0);
-                    toast('info', 'Rascunho descartado.');
-                  });
-                }
-              }}
+              onClick={() => setConfirmDiscard(true)}
             >
               Descartar rascunho
             </Button>
@@ -424,6 +445,7 @@ export function NewCampaignPage() {
             draft={draft}
             extra={extra}
             mailing={selectedMailing}
+            lists={listsQ.data?.items}
             update={update}
             onBack={() => goStep('MAILING')}
             onNext={() => goStep('ACTIVATION')}
@@ -461,6 +483,24 @@ export function NewCampaignPage() {
           />
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmDiscard}
+        onOpenChange={setConfirmDiscard}
+        title="Descartar rascunho?"
+        confirmLabel="Descartar"
+        danger
+        onConfirm={() => {
+          del('/campaign-draft').then(() => {
+            setDraft({ ...EMPTY });
+            setRevision(0);
+            setConfirmDiscard(false);
+            toast('info', 'Rascunho descartado.');
+          });
+        }}
+      >
+        Este rascunho será descartado e a configuração recomeçará do zero.
+      </ConfirmDialog>
     </div>
   );
 }
@@ -610,6 +650,7 @@ function AudienceStep({
   draft,
   extra,
   mailing,
+  lists,
   update,
   onBack,
   onNext,
@@ -617,6 +658,7 @@ function AudienceStep({
   draft: CampaignDraft;
   extra: Extra;
   mailing?: MailingSummary;
+  lists?: ListSummary[];
   update: UpdateFn;
   onBack: () => void;
   onNext: () => void;
@@ -625,6 +667,11 @@ function AudienceStep({
   const publishRef = useRef<(() => Promise<boolean>) | null>(null);
   const [editorState, setEditorState] = useState<{ s: ListEditorState; pending: boolean; selected: number | null } | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const savedListsForMailing = useMemo(
+    () => (lists ?? []).filter((l) => l.mailing.id === draft.mailingId && l.latestVersion),
+    [lists, draft.mailingId],
+  );
 
   const hasCustomFilters =
     (editorState?.s.filters.length ?? 0) > 0 || (editorState?.s.sort.length ?? 0) > 0;
@@ -679,6 +726,46 @@ function AudienceStep({
           {hasCustomFilters ? 'Filtro personalizado ativo' : 'Base completa (100%)'}
         </Badge>
       </div>
+
+      {/* Seletor rápido de listas já publicadas para este mailing */}
+      {draft.mailingId && savedListsForMailing.length > 0 && (
+        <Card
+          title="Listas já salvas neste mailing (opcional)"
+          tooltip="Selecione uma lista já segmentada para reutilizá-la diretamente ou continue usando os filtros personalizados abaixo."
+        >
+          <div className="flex flex-wrap gap-2">
+            {savedListsForMailing.map((l) => {
+              const selected = draft.listVersionId && l.latestVersion?.id === draft.listVersionId;
+              return (
+                <button
+                  key={l.id}
+                  type="button"
+                  onClick={() => {
+                    if (!l.latestVersion) return;
+                    update(
+                      { audienceMode: 'LIST', listVersionId: l.latestVersion.id },
+                      {
+                        listId: l.id,
+                        listName: l.name,
+                        listVersion: l.latestVersion.version,
+                        audienceCount: l.latestVersion.memberCount,
+                      },
+                    );
+                  }}
+                  className={clsx(
+                    'rounded-lg border px-3 py-1.5 text-xs font-medium transition cursor-pointer',
+                    selected
+                      ? 'border-brand-700 bg-brand-50 text-brand-900 font-semibold'
+                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+                  )}
+                >
+                  {l.name} ({fmtNumber(l.latestVersion?.memberCount ?? 0)} contatos · v{l.latestVersion?.version})
+                </button>
+              );
+            })}
+          </div>
+        </Card>
+      )}
 
       {/* Editor direto de filtros e ordenação */}
       {draft.mailingId && (
@@ -762,7 +849,10 @@ function ActivationStep({
   // Auto-seleciona defaults se nenhum tiver sido escolhido
   useEffect(() => {
     if (!draft.journeyVersionId && journeys && journeys.length > 0) {
-      const defJ = journeys.find((j) => j.name.includes('WhatsApp')) ?? journeys[0];
+      const defJ =
+        journeys.find((j) => j.latestVersion?.steps.some((s) => s.channelType === 'VOICE')) ??
+        journeys.find((j) => j.name.includes('WhatsApp')) ??
+        journeys[0];
       if (defJ.latestVersion) update({ journeyVersionId: defJ.latestVersion.id });
     }
     if (!draft.strategyVersionId && strategies && strategies.length > 0) {
@@ -1065,6 +1155,9 @@ function ActivationStep({
         )}
       </Card>
 
+      {/* Integração de Voz IA (Telefonia como fonte única) */}
+      <VoiceReadinessCard journey={selectedJourney} showTrunksPreflight={false} />
+
       {/* Rodapé de navegação */}
       <div className="flex items-center justify-between pt-2">
         <Button variant="secondary" onClick={onBack}>
@@ -1075,6 +1168,157 @@ function ActivationStep({
         </Button>
       </div>
     </div>
+  );
+}
+
+function VoiceReadinessCard({
+  journey,
+  showTrunksPreflight,
+}: {
+  journey?: Journey;
+  showTrunksPreflight: boolean;
+}) {
+  const hasVoice = Boolean(journey?.latestVersion?.steps.some((s) => s.channelType === 'VOICE'));
+
+  const connsQ = useQuery({
+    queryKey: ['connections'],
+    queryFn: () =>
+      get<{
+        items: Array<{
+          id: string;
+          channelType: string;
+          name: string;
+          status?: string;
+          config?: Record<string, unknown>;
+        }>;
+      }>('/connections'),
+    enabled: hasVoice,
+  });
+
+  const tenantsQ = useQuery({
+    queryKey: ['telephony', 'tenants'],
+    queryFn: () =>
+      get<{
+        tenants: Array<{
+          id: string;
+          name: string;
+          stsEngine?: string;
+          openaiModel?: string;
+          elevenlabsModel?: string;
+          elevenlabsVoiceId?: string;
+        }>;
+      }>('/telephony/tenants'),
+    enabled: hasVoice,
+    retry: false,
+  });
+
+  const statusQ = useQuery({
+    queryKey: ['telephony', 'status'],
+    queryFn: () => get<{ status?: string }>('/telephony/status'),
+    enabled: hasVoice && showTrunksPreflight,
+    retry: false,
+  });
+
+  const trunksQ = useQuery({
+    queryKey: ['telephony', 'trunks'],
+    queryFn: () =>
+      get<{ trunks: Array<{ id: string; name?: string; active?: boolean }> }>('/telephony/trunks'),
+    enabled: hasVoice && showTrunksPreflight,
+    retry: false,
+  });
+
+  if (!hasVoice) return null;
+
+  const voiceConn =
+    connsQ.data?.items.find((c) => c.channelType === 'VOICE_APP' && c.status === 'ACTIVE') ??
+    connsQ.data?.items.find((c) => c.channelType === 'VOICE_APP');
+  const boundTenantId =
+    voiceConn?.config && typeof voiceConn.config.tenantId === 'string'
+      ? voiceConn.config.tenantId
+      : '';
+  const boundTenant = tenantsQ.data?.tenants.find((t) => t.id === boundTenantId);
+
+  const activeTrunks = (trunksQ.data?.trunks ?? []).filter((t) => t.active !== false);
+  const gatewayOffline =
+    showTrunksPreflight &&
+    (statusQ.isError || (statusQ.data !== undefined && statusQ.data.status !== 'ok'));
+  const noActiveTrunk = showTrunksPreflight && trunksQ.isSuccess && activeTrunks.length === 0;
+
+  return (
+    <Card
+      title={
+        <span className="flex items-center gap-2">
+          <PhoneCall className="size-4 text-brand-700" />
+          Agente de Voz & Preflight de Telefonia
+        </span>
+      }
+      actions={
+        <Link to="/agentes-de-voz" className="text-xs font-medium text-brand-700 hover:underline">
+          Gerenciar Agentes de Voz →
+        </Link>
+      }
+    >
+      <div className="space-y-3 text-xs">
+        {boundTenant ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2">
+            <div>
+              <span className="font-semibold text-emerald-950">
+                Agente Vinculado ({voiceConn?.name ?? 'Canal Voz'}): {boundTenant.name}
+              </span>
+              <span className="ml-2 font-mono text-[11px] text-emerald-800">
+                {[
+                  boundTenant.stsEngine,
+                  boundTenant.stsEngine === 'elevenlabs'
+                    ? boundTenant.elevenlabsModel
+                    : boundTenant.openaiModel,
+                  boundTenant.stsEngine === 'elevenlabs' ? boundTenant.elevenlabsVoiceId : undefined,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </span>
+            </div>
+            <Badge tone="green">Pronto (Fonte: Telefonia)</Badge>
+          </div>
+        ) : (
+          <Alert tone="warn" title="Nenhum Agente IA vinculado ao canal Voice-App">
+            Vincule um agente de Telefonia em{' '}
+            <Link to="/canais" className="font-semibold underline">
+              Canais
+            </Link>{' '}
+            ou configure um agente em{' '}
+            <Link to="/agentes-de-voz" className="font-semibold underline">
+              Agentes de Voz
+            </Link>{' '}
+            antes de iniciar disparos de voz.
+          </Alert>
+        )}
+
+        {showTrunksPreflight && (
+          <>
+            {gatewayOffline ? (
+              <Alert tone="error" title="Gateway Voice-App offline">
+                O gateway de voz não respondeu no momento. Verifique o servidor de telefonia antes de iniciar a campanha.
+              </Alert>
+            ) : noActiveTrunk ? (
+              <Alert tone="warn" title="Nenhum tronco SIP ativo encontrado">
+                Todos os troncos estão pausados ou nenhum tronco foi cadastrado em{' '}
+                <Link to="/telefonia?tab=settings" className="font-semibold underline">
+                  Telefonia → Configurações
+                </Link>
+                .
+              </Alert>
+            ) : trunksQ.isSuccess ? (
+              <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-slate-700">
+                <span>
+                  Gateway online · <strong>{activeTrunks.length}</strong> tronco(s) SIP ativo(s) prontos para discagem
+                </span>
+                <Badge tone="green">Preflight OK</Badge>
+              </div>
+            ) : null}
+          </>
+        )}
+      </div>
+    </Card>
   );
 }
 
@@ -1251,6 +1495,9 @@ function ReviewStep({
           </div>
         </div>
       </Card>
+
+      {/* Preflight de Voz IA & Troncos */}
+      <VoiceReadinessCard journey={selectedJourney} showTrunksPreflight />
 
       {/* Quando Iniciar */}
       <Card title="Agendamento do Disparo">

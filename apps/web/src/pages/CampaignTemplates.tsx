@@ -1,32 +1,23 @@
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import clsx from 'clsx';
 import {
+  ArrowRight,
   Bookmark,
-  CheckCircle2,
-  Copy,
-  Edit,
-  ExternalLink,
   Layers,
-  Megaphone,
-  MoreVertical,
-  Plus,
-  Rocket,
+  Lock,
   Search,
   SlidersHorizontal,
-  Sparkles,
-  Trash2,
 } from 'lucide-react';
 import {
   CHANNEL_LABEL,
-  OPERATION_PURPOSES,
   type ChannelType,
   type OperationPurpose,
 } from '@voll/shared';
-import { del, get, post, put } from '../lib/api';
+import { get } from '../lib/api';
 import type { CampaignTemplate, Journey, Strategy } from '../lib/types';
-import { fmtDateTime, fmtNumber } from '../lib/format';
+import { fmtNumber } from '../lib/format';
 import {
   Alert,
   Badge,
@@ -34,17 +25,10 @@ import {
   Card,
   Empty,
   ErrorState,
-  Field,
-  InfoTooltip,
-  Input,
   Loading,
-  Modal,
   PageHeader,
-  Select,
   Stat,
   TableWrap,
-  Textarea,
-  useToast,
 } from '../components/ui';
 
 const PURPOSE_INFO: Record<string, { label: string; tone: 'amber' | 'brand' | 'green' | 'blue' | 'gray' }> = {
@@ -65,15 +49,8 @@ const CATEGORIES: { id: string; label: string; purposes?: OperationPurpose[] }[]
 ];
 
 export function CampaignTemplatesPage() {
-  const qc = useQueryClient();
-  const nav = useNavigate();
-  const toast = useToast();
-
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('ALL');
-  const [editTarget, setEditTarget] = useState<CampaignTemplate | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<CampaignTemplate | null>(null);
 
   // Queries
   const q = useQuery({
@@ -89,37 +66,6 @@ export function CampaignTemplatesPage() {
   const stratQ = useQuery({
     queryKey: ['strategies'],
     queryFn: () => get<{ items: Strategy[] }>('/strategies'),
-  });
-
-  // Mutação para deletar
-  const deleteM = useMutation({
-    mutationFn: (id: string) => del(`/campaign-templates/${id}`),
-    onSuccess: () => {
-      toast('success', 'Modelo excluído com sucesso.');
-      qc.invalidateQueries({ queryKey: ['campaign-templates'] });
-      setDeleteTarget(null);
-    },
-    onError: (e: any) => toast('error', e?.message || 'Falha ao excluir o modelo.'),
-  });
-
-  // Mutação para duplicar
-  const duplicateM = useMutation({
-    mutationFn: (tmpl: CampaignTemplate) =>
-      post<CampaignTemplate>('/campaign-templates', {
-        name: `${tmpl.name} (Cópia)`,
-        description: tmpl.description,
-        journeyId: tmpl.journeyId,
-        journeyVersionId: tmpl.journeyVersionId,
-        strategyId: tmpl.strategyId,
-        strategyVersionId: tmpl.strategyVersionId,
-        purposeCode: tmpl.purposeCode,
-        startMode: tmpl.startMode,
-      }),
-    onSuccess: (data) => {
-      toast('success', `Cópia "${data.name}" criada com sucesso.`);
-      qc.invalidateQueries({ queryKey: ['campaign-templates'] });
-    },
-    onError: (e: any) => toast('error', e?.message || 'Falha ao duplicar o modelo.'),
   });
 
   const items = q.data?.items ?? [];
@@ -198,26 +144,19 @@ export function CampaignTemplatesPage() {
     <div className="space-y-4">
       <PageHeader
         title="Modelos de Campanhas"
-        tooltip="Modelos reutilizáveis contendo configurações predefinidas de jornadas, estratégias e acionamento. Aplique a qualquer mailing com 1 clique."
+        tooltip="Catálogo oficial de modelos pré-configurados do Voll Plan (somente leitura)."
         actions={
-          <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => setCreateOpen(true)}
-              icon={<Plus className="size-3.5" />}
-            >
-              Novo modelo
-            </Button>
-            <Button
-              variant="primary"
-              onClick={() => nav('/campanhas/nova')}
-              icon={<Rocket className="size-3.5" />}
-            >
-              Nova campanha
-            </Button>
-          </div>
+          <Badge tone="amber" icon={<Lock className="size-3.5" />}>
+            Somente Leitura
+          </Badge>
         }
       />
+
+      <Alert tone="warn" title="Catálogo Oficial (Edição Somente Leitura)">
+        <span>
+          Estes modelos pré-configurados são mantidos para padronização e auditoria (não editáveis aqui). Para lançar uma campanha usando qualquer modelo, clique em <strong>Usar modelo</strong> ou acesse <Link to="/campanhas/nova" className="font-semibold underline">Nova campanha</Link>.
+        </span>
+      </Alert>
 
       {/* Explicação de como funciona o modelo */}
       <div className="flex flex-col gap-3 rounded-xl border border-brand-100 bg-brand-50/50 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -343,7 +282,7 @@ export function CampaignTemplatesPage() {
                   <th>Finalidade</th>
                   <th>Uso</th>
                   <th>Origem</th>
-                  <th className="text-right">Ações</th>
+                  <th className="text-right">Ação</th>
                 </tr>
               </thead>
               <tbody>
@@ -441,53 +380,11 @@ export function CampaignTemplatesPage() {
                         </div>
                       </td>
                       <td className="text-right whitespace-nowrap">
-                        <div className="inline-flex items-center gap-1.5">
-                          {/* Botão Usar Modelo: Redireciona para /campanhas/nova?modeloId=... */}
-                          <Button
-                            size="sm"
-                            variant="primary"
-                            icon={<Rocket className="size-3.5" />}
-                            onClick={() => nav(`/campanhas/nova?modeloId=${t.id}`)}
-                            title="Iniciar criação de campanha com este modelo pré-selecionado"
-                          >
+                        <Link to={`/campanhas/nova?modeloId=${encodeURIComponent(t.id)}`}>
+                          <Button size="sm" variant="secondary" icon={<ArrowRight className="size-3.5" aria-hidden />}>
                             Usar modelo
                           </Button>
-
-                          {/* Duplicar */}
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            icon={<Copy className="size-3.5" />}
-                            onClick={() => duplicateM.mutate(t)}
-                            disabled={duplicateM.isPending}
-                            title="Duplicar modelo"
-                          >
-                            Duplicar
-                          </Button>
-
-                          {/* Editar */}
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            icon={<Edit className="size-3.5" />}
-                            onClick={() => setEditTarget(t)}
-                            title="Editar modelo"
-                          >
-                            Editar
-                          </Button>
-
-                          {/* Excluir */}
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-red-700 hover:bg-red-50"
-                            icon={<Trash2 className="size-3.5" />}
-                            onClick={() => setDeleteTarget(t)}
-                            title="Excluir modelo"
-                          >
-                            Excluir
-                          </Button>
-                        </div>
+                        </Link>
                       </td>
                     </tr>
                   );
@@ -497,214 +394,6 @@ export function CampaignTemplatesPage() {
           </TableWrap>
         </Card>
       )}
-
-      {/* Modal Criar/Editar Modelo */}
-      {(createOpen || editTarget) && (
-        <TemplateFormModal
-          open={createOpen || !!editTarget}
-          target={editTarget}
-          journeys={journeysQ.data?.items ?? []}
-          strategies={stratQ.data?.items ?? []}
-          onClose={() => {
-            setCreateOpen(false);
-            setEditTarget(null);
-          }}
-          onSaved={() => {
-            setCreateOpen(false);
-            setEditTarget(null);
-            qc.invalidateQueries({ queryKey: ['campaign-templates'] });
-          }}
-        />
-      )}
-
-      {/* Modal Confirmar Exclusão */}
-      {deleteTarget && (
-        <Modal
-          open={!!deleteTarget}
-          onOpenChange={(o) => !o && setDeleteTarget(null)}
-          title="Excluir modelo de campanha"
-        >
-          <div className="space-y-3">
-            <p className="text-xs text-slate-600">
-              Tem certeza que deseja excluir o modelo <strong>{deleteTarget.name}</strong>?
-            </p>
-            <p className="text-[11px] text-slate-500">
-              As campanhas já criadas a partir deste modelo não serão afetadas.
-            </p>
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-              <Button variant="secondary" onClick={() => setDeleteTarget(null)}>
-                Cancelar
-              </Button>
-              <Button
-                variant="danger"
-                onClick={() => deleteM.mutate(deleteTarget.id)}
-                disabled={deleteM.isPending}
-              >
-                {deleteM.isPending ? 'Excluindo...' : 'Sim, excluir'}
-              </Button>
-            </div>
-          </div>
-        </Modal>
-      )}
     </div>
-  );
-}
-
-// Sub-componente do Modal de Criação / Edição de Modelo
-function TemplateFormModal({
-  open,
-  target,
-  journeys,
-  strategies,
-  onClose,
-  onSaved,
-}: {
-  open: boolean;
-  target: CampaignTemplate | null;
-  journeys: Journey[];
-  strategies: Strategy[];
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const toast = useToast();
-  const [name, setName] = useState(target?.name ?? '');
-  const [description, setDescription] = useState(target?.description ?? '');
-  const [purposeCode, setPurposeCode] = useState<OperationPurpose>(target?.purposeCode ?? 'COBRANCA');
-  const [journeyId, setJourneyId] = useState(target?.journeyId ?? (journeys[0]?.id || ''));
-  const [strategyId, setStrategyId] = useState(target?.strategyId ?? (strategies[0]?.id || ''));
-  const [error, setError] = useState<string | null>(null);
-
-  const saveM = useMutation({
-    mutationFn: async () => {
-      if (!name.trim()) throw new Error('Informe o nome do modelo.');
-      const selJourney = journeys.find((j) => j.id === journeyId);
-      const selStrat = strategies.find((s) => s.id === strategyId);
-
-      const payload = {
-        name: name.trim(),
-        description: description.trim() || undefined,
-        purposeCode,
-        journeyId,
-        journeyVersionId: selJourney?.latestVersion?.id,
-        strategyId,
-        strategyVersionId: selStrat?.latestVersion?.id,
-      };
-
-      if (target) {
-        return put(`/campaign-templates/${target.id}`, payload);
-      }
-      return post('/campaign-templates', payload);
-    },
-    onSuccess: () => {
-      toast('success', target ? 'Modelo atualizado com sucesso!' : 'Modelo criado com sucesso!');
-      onSaved();
-    },
-    onError: (e: any) => setError(e?.message || 'Falha ao salvar modelo.'),
-  });
-
-  return (
-    <Modal
-      open={open}
-      onOpenChange={(o) => !o && onClose()}
-      title={target ? 'Editar modelo de campanha' : 'Novo modelo de campanha'}
-    >
-      <div className="space-y-4">
-        <Alert tone="info" title="Configuração reutilizável">
-          <span>
-            Este modelo armazena a combinação de Jornada e Estratégia. Bases de contatos e filtros serão vinculados quando o modelo for utilizado.
-          </span>
-        </Alert>
-
-        <Field label="Nome do modelo" required error={error ?? undefined}>
-          {(f) => (
-            <Input
-              id={f.id}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ex: Cobrança Digital 30d (WhatsApp + Voz)"
-              autoFocus
-            />
-          )}
-        </Field>
-
-        <Field label="Descrição (opcional)">
-          {(f) => (
-            <Textarea
-              id={f.id}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-              placeholder="Objetivo operacional e boas práticas para utilização deste modelo..."
-            />
-          )}
-        </Field>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Field label="Jornada (Caminho dos canais)" required>
-            {(f) => (
-              <select
-                id={f.id}
-                value={journeyId}
-                onChange={(e) => setJourneyId(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 bg-white py-1.5 px-3 text-xs text-slate-800 focus:border-brand-500 focus:outline-hidden"
-              >
-                {journeys.map((j) => (
-                  <option key={j.id} value={j.id}>
-                    {j.name}
-                  </option>
-                ))}
-              </select>
-            )}
-          </Field>
-
-          <Field label="Estratégia (Cadência e regras)" required>
-            {(f) => (
-              <select
-                id={f.id}
-                value={strategyId}
-                onChange={(e) => setStrategyId(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 bg-white py-1.5 px-3 text-xs text-slate-800 focus:border-brand-500 focus:outline-hidden"
-              >
-                {strategies.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            )}
-          </Field>
-        </div>
-
-        <Field label="Finalidade da operação">
-          {(f) => (
-            <select
-              id={f.id}
-              value={purposeCode}
-              onChange={(e) => setPurposeCode(e.target.value as OperationPurpose)}
-              className="w-full rounded-lg border border-slate-300 bg-white py-1.5 px-3 text-xs text-slate-800 focus:border-brand-500 focus:outline-hidden"
-            >
-              {OPERATION_PURPOSES.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          )}
-        </Field>
-
-        <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-          <Button variant="secondary" onClick={onClose} disabled={saveM.isPending}>
-            Cancelar
-          </Button>
-          <Button
-            variant="primary"
-            onClick={() => saveM.mutate()}
-            disabled={saveM.isPending || !name.trim()}
-          >
-            {saveM.isPending ? 'Salvando...' : target ? 'Atualizar modelo' : 'Salvar modelo'}
-          </Button>
-        </div>
-      </div>
-    </Modal>
   );
 }

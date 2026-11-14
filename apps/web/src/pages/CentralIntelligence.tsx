@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import clsx from 'clsx';
@@ -17,6 +17,7 @@ import {
   FlaskConical,
   GitFork,
   Layers,
+  Lock,
   Phone,
   Play,
   RefreshCw,
@@ -31,6 +32,7 @@ import {
 } from 'lucide-react';
 import {
   CHANNEL_LABEL,
+  isSuperAdminRole,
   OPERATION_PURPOSE_LABEL,
   OPTIMIZATION_POLICIES,
   OPTIMIZATION_POLICY_LABEL,
@@ -39,7 +41,8 @@ import {
   type OperationPurpose,
   type OptimizationPolicy,
 } from '@voll/shared';
-import { get, post } from '../lib/api';
+import { get } from '../lib/api';
+import { useAuth } from '../lib/auth';
 import type { CampaignSummary, Journey, MailingSummary, Strategy } from '../lib/types';
 import { fmtDateTime, fmtMoney, fmtNumber, fmtPercent } from '../lib/format';
 import { calculateStatisticalSampleSize } from '../lib/statistics';
@@ -60,7 +63,6 @@ import {
   Stat,
   TableWrap,
   Tooltip,
-  useToast,
 } from '../components/ui';
 
 export type RecommendationRow = {
@@ -89,9 +91,8 @@ type OptimizationResponse = {
 };
 
 export function CentralIntelligencePage() {
-  const qc = useQueryClient();
-  const toast = useToast();
-
+  const { me } = useAuth();
+  const isSuper = isSuperAdminRole(me?.role);
   // 1. Consultas principais
   const campaignsQ = useQuery({
     queryKey: ['campaigns'],
@@ -117,20 +118,20 @@ export function CentralIntelligencePage() {
   }, [campaignsQ.data, selectedCampaignId]);
 
   const selectedCampaign = campaignsQ.data?.items.find((c) => c.id === selectedCampaignId);
-  const totalBase = selectedCampaign?.progress?.members ?? 12500;
+  const totalBase = selectedCampaign?.progress?.members ?? 0;
 
   // 3. Análise Estatística do Tamanho do Mailing (Cochran finita com ajuste 50/50 em bases pequenas)
   const sampleCalc = calculateStatisticalSampleSize(totalBase);
 
-  // 4. Estado do Experimento Desafiador (Challenger)
+  // 4. Estado de visualização do Experimento Desafiador (Somente Leitura)
   const [challengerMode, setChallengerMode] = useState<'RECOMMENDED' | 'ADVANCED'>('RECOMMENDED');
   const [challengerStrategyId, setChallengerStrategyId] = useState('');
   const [challengerJourneyId, setChallengerJourneyId] = useState('');
   const [policy, setPolicy] = useState<OptimizationPolicy>('LOWEST_COST_PER_CPC');
   const [minEvidences, setMinEvidences] = useState(3);
-  const [dispatchTime, setDispatchTime] = useState('08:00'); // Horário diário configurável com padrão 08:00
+  const [dispatchTime, setDispatchTime] = useState('08:00');
 
-  // Inicialização de estratégia e jornada desafiadoras
+  // Inicialização de estratégia e jornada desafiadoras para leitura
   useEffect(() => {
     if (strategiesQ.data?.items.length && !challengerStrategyId) {
       const diff = strategiesQ.data.items.find((s) => s.name !== selectedCampaign?.strategyName) ?? strategiesQ.data.items[0];
@@ -145,74 +146,18 @@ export function CentralIntelligencePage() {
   const activeChallengerStrategy = strategiesQ.data?.items.find((s) => s.id === challengerStrategyId);
   const activeChallengerJourney = journeysQ.data?.items.find((j) => j.id === challengerJourneyId);
 
-  // 5. Estado de Execução Automática do Experimento
-  const [hasExperimentRun, setHasExperimentRun] = useState(false);
-  const [activeWave, setActiveWave] = useState(1);
-  const [isSimulating, setIsSimulating] = useState(false);
-  const [isPromoted, setIsPromoted] = useState(false);
+  // 5. Estado de Execução (somente leitura)
+  const hasExperimentRun = false;
+  const activeWave = 1;
+  const isPromoted = false;
 
-  // Recomendações por contato
+  // Recomendações reais do PostgreSQL
   const recsQ = useQuery({
     queryKey: ['optimization-recommendations', selectedCampaignId],
-    queryFn: () => get<OptimizationResponse>(`/optimization?campaignId=${selectedCampaignId}`),
-    enabled: !!selectedCampaignId,
-  });
-
-  const [appliedContacts, setAppliedContacts] = useState<Record<string, boolean>>({});
-
-  // Iniciar experimento com cadência diária automática
-  const handleStartExperiment = () => {
-    setIsSimulating(true);
-    setTimeout(() => {
-      setIsSimulating(false);
-      setHasExperimentRun(true);
-      setActiveWave(1);
-      toast('success', `Estratégia desafiante iniciada: Onda 1 disparada. Próximas ondas agendadas diariamente às ${dispatchTime}.`);
-    }, 700);
-  };
-
-  // Acelerar simulação de ondas para teste imediato
-  const handleAccelerateWaves = () => {
-    setIsSimulating(true);
-    setTimeout(() => {
-      setIsSimulating(false);
-      setActiveWave((w) => Math.min(w + 1, 3));
-      toast('success', `Onda ${Math.min(activeWave + 1, 3)} simulada com sucesso.`);
-    }, 600);
-  };
-
-  // Promoção do Experimento Vencedor para Produção
-  const promoteMutation = useMutation({
-    mutationFn: () =>
-      post<{ ok: boolean; version: number }>('/optimization/configure', {
-        campaignId: selectedCampaignId,
-        enabled: true,
-        policy,
-        minEvidences,
-      }),
-    onSuccess: (res) => {
-      setIsPromoted(true);
-      toast('success', `Experimento promovido com sucesso para a produção (Estratégia v${res.version})!`);
-      qc.invalidateQueries({ queryKey: ['campaigns'] });
-      qc.invalidateQueries({ queryKey: ['optimization-recommendations', selectedCampaignId] });
-      qc.invalidateQueries({ queryKey: ['overview'] });
-    },
-  });
-
-  const applyMutation = useMutation({
-    mutationFn: (payload: { contactId?: string; count?: number }) =>
-      post('/optimization/apply', { campaignId: selectedCampaignId, ...payload }),
-    onSuccess: (_res, vars) => {
-      if (vars.contactId) {
-        setAppliedContacts((s) => ({ ...s, [vars.contactId!]: true }));
-        toast('success', 'Recomendação aplicada ao contato.');
-      } else {
-        const next: Record<string, boolean> = {};
-        for (const it of recsQ.data?.items ?? []) next[it.contactId] = true;
-        setAppliedContacts(next);
-        toast('success', `Recomendações aplicadas para ${vars.count ?? 0} contatos.`);
-      }
-    },
+    queryFn: () =>
+      get<OptimizationResponse>(
+        selectedCampaignId ? `/optimization?campaignId=${encodeURIComponent(selectedCampaignId)}` : '/optimization',
+      ),
   });
 
   const campaignPurpose: 'COBRANCA' | 'VENDAS' | 'AGENDAMENTOS' =
@@ -242,15 +187,30 @@ export function CentralIntelligencePage() {
     <div className="space-y-6">
       <PageHeader
         title="Central de Inteligência"
-        tooltip="Ajuste e desafie a inteligência em produção através de testes A/B, aprendizado por tabulação e experimentos automáticos."
+        tooltip="Painel analítico da inteligência em produção e recomendações armazenadas no PostgreSQL (somente leitura)."
         actions={
           <div className="flex items-center gap-2">
+            <Badge tone="amber" icon={<Lock className="size-3.5" />}>
+              Somente Leitura
+            </Badge>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-100/80 px-2.5 py-0.5 text-xs font-semibold text-brand-900">
               <Sparkles className="size-3 text-brand-700" /> TIC Domicílios 2025 Ativa
             </span>
           </div>
         }
       />
+
+      <Alert tone="info" title="Análise Estatística em Modo Consulta">
+        <span>
+          Este painel consolida recomendações e benchmarks TIC Domicílios 2025 diretamente do banco PostgreSQL. Criação ou promoção de experimentos fica restrita às regras da plataforma.
+        </span>
+      </Alert>
+
+      {campaignsQ.isSuccess && (campaignsQ.data?.items.length ?? 0) === 0 && (
+        <Alert tone="warn" title="Nenhuma campanha cadastrada ainda">
+          Crie uma campanha real ou carregue a base de demonstração para comparar indicadores de produção e recomendações por contato.
+        </Alert>
+      )}
 
       {/* =========================================================================
           SEÇÃO 1: CAMPANHA ALVO EM PRODUÇÃO (CHAMPION)
@@ -293,9 +253,6 @@ export function CentralIntelligencePage() {
                     value={selectedCampaignId}
                     onChange={(e) => {
                       setSelectedCampaignId(e.target.value);
-                      setAppliedContacts({});
-                      setIsPromoted(false);
-                      setHasExperimentRun(false);
                     }}
                   >
                     <option value="">Selecione uma campanha…</option>
@@ -335,19 +292,26 @@ export function CentralIntelligencePage() {
           )}
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 pt-1 border-t border-slate-100">
-            <Stat
-              label={
-                <span className="flex items-center">
-                  {campaignPurpose === 'AGENDAMENTOS'
-                    ? 'Custo/Confirmação Atual'
-                    : campaignPurpose === 'VENDAS'
-                    ? 'Custo/Conversão Atual'
-                    : 'Custo/CPC Produção'}
-                  <InfoTooltip content="Custo médio unitário observado na produção sem a otimização da estratégia desafiante." />
-                </span>
-              }
-              value={`R$ ${championCpcCost.toFixed(2)}`}
-            />
+            {isSuper ? (
+              <Stat
+                label={
+                  <span className="flex items-center">
+                    {campaignPurpose === 'AGENDAMENTOS'
+                      ? 'Custo/Confirmação Atual'
+                      : campaignPurpose === 'VENDAS'
+                      ? 'Custo/Conversão Atual'
+                      : 'Custo/CPC Produção'}
+                    <InfoTooltip content="Custo médio unitário observado na produção sem a otimização da estratégia desafiante." />
+                  </span>
+                }
+                value={`R$ ${championCpcCost.toFixed(2)}`}
+              />
+            ) : (
+              <Stat
+                label="Taxa Alvo Otimizada"
+                value={`${challengerCpcRate}%`}
+              />
+            )}
             <Stat
               label={
                 <span className="flex items-center">
@@ -486,11 +450,12 @@ export function CentralIntelligencePage() {
                     <input
                       id="rec-dispatch-time"
                       type="time"
+                      disabled
                       value={dispatchTime}
                       onChange={(e) => setDispatchTime(e.target.value || '08:00')}
-                      className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-800 shadow-2xs focus:border-slate-400 focus:outline-none"
+                      className="rounded-md border border-slate-200 bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-500 cursor-not-allowed"
                     />
-                    <InfoTooltip content="Horário diário em que cada onda do teste será despachada automaticamente. Padrão: 08:00." />
+                    <InfoTooltip content="Horário diário em que cada onda do teste será despachada automaticamente. Bloqueado no modo somente leitura." />
                   </div>
 
                   <span className="inline-flex items-center gap-1 text-[11px] text-slate-500">
@@ -500,13 +465,12 @@ export function CentralIntelligencePage() {
                 </div>
 
                 <Button
-                  variant="primary"
-                  loading={isSimulating}
-                  disabled={!selectedCampaignId || totalBase < 10}
-                  onClick={handleStartExperiment}
-                  icon={<Play className="size-4" />}
+                  variant="secondary"
+                  disabled
+                  title="Bloqueado em modo somente leitura"
+                  icon={<Lock className="size-4" />}
                 >
-                  {hasExperimentRun ? 'Recalcular e Reexecutar Desafiante' : 'Disparar Desafiante Recomendada ⚡'}
+                  Disparo Desativado (Somente Leitura)
                 </Button>
               </div>
             </div>
@@ -525,6 +489,7 @@ export function CentralIntelligencePage() {
                   {(p) => (
                     <Select
                       id={p.id}
+                      disabled
                       value={challengerStrategyId}
                       onChange={(e) => setChallengerStrategyId(e.target.value)}
                     >
@@ -548,6 +513,7 @@ export function CentralIntelligencePage() {
                   {(p) => (
                     <Select
                       id={p.id}
+                      disabled
                       value={challengerJourneyId}
                       onChange={(e) => setChallengerJourneyId(e.target.value)}
                     >
@@ -573,6 +539,7 @@ export function CentralIntelligencePage() {
                   {(p) => (
                     <Select
                       id={p.id}
+                      disabled
                       value={policy}
                       onChange={(e) => setPolicy(e.target.value as OptimizationPolicy)}
                     >
@@ -597,6 +564,7 @@ export function CentralIntelligencePage() {
                     <Input
                       id={p.id}
                       type="number"
+                      disabled
                       min={1}
                       max={20}
                       value={minEvidences}
@@ -609,16 +577,17 @@ export function CentralIntelligencePage() {
                   label={
                     <span className="flex items-center">
                       Horário Diário
-                      <InfoTooltip content="Horário de disparo automático diário de cada onda. Padrão operacional: 08:00." />
+                      <InfoTooltip content="Horário de disparo automático diário de cada onda. Bloqueado no modo somente leitura." />
                     </span>
                   }
                 >
                   {() => (
                     <input
                       type="time"
+                      disabled
                       value={dispatchTime}
                       onChange={(e) => setDispatchTime(e.target.value || '08:00')}
-                      className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-1 text-xs font-semibold text-slate-800 shadow-2xs focus:border-slate-400 focus:outline-none"
+                      className="h-9 w-full rounded-md border border-slate-200 bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 cursor-not-allowed"
                     />
                   )}
                 </Field>
@@ -641,13 +610,12 @@ export function CentralIntelligencePage() {
 
               <div className="flex items-center justify-end pt-1">
                 <Button
-                  variant="primary"
-                  loading={isSimulating}
-                  disabled={!selectedCampaignId || totalBase < 10}
-                  onClick={handleStartExperiment}
-                  icon={<Play className="size-4" />}
+                  variant="secondary"
+                  disabled
+                  title="Bloqueado em modo somente leitura"
+                  icon={<Lock className="size-4" />}
                 >
-                  Disparar Desafiante Personalizada ⚡
+                  Disparo Desativado (Somente Leitura)
                 </Button>
               </div>
             </div>
@@ -689,19 +657,9 @@ export function CentralIntelligencePage() {
                   <span>Cadência Automática Multi-dia (Disparo Diário às {dispatchTime})</span>
                   <InfoTooltip content={`As ondas são despachadas automaticamente ao longo dos dias no horário configurado (${dispatchTime}), rebalanceando os canais conforme as tabulações recebidas.`} />
                 </span>
-                <button
-                  type="button"
-                  onClick={handleAccelerateWaves}
-                  disabled={isSimulating || activeWave >= 3}
-                  className={clsx(
-                    'text-[11px] font-semibold transition',
-                    activeWave < 3
-                      ? 'text-brand-700 hover:text-brand-900 underline'
-                      : 'text-slate-400 cursor-default',
-                  )}
-                >
-                  {activeWave < 3 ? 'Acelerar simulação de ondas para teste imediato →' : 'Todas as 3 ondas concluídas ✓'}
-                </button>
+                <span className="text-[11px] font-medium text-slate-500">
+                  Simulação desativada (somente leitura)
+                </span>
               </div>
 
               {/* Steps horizontais das ondas */}
@@ -810,21 +768,23 @@ export function CentralIntelligencePage() {
                     </td>
                   </tr>
 
-                  <tr>
-                    <td className="py-2.5 px-3.5 font-medium text-slate-600 flex items-center">
-                      <span>{purposeMeta.metricLabel}</span>
-                      <InfoTooltip content="Gasto total dividido pelo número de eventos válidos auditados." />
-                    </td>
-                    <td className="py-2.5 px-3.5 text-slate-700 tabular font-medium">
-                      R$ {championCpcCost.toFixed(2)}
-                    </td>
-                    <td className="py-2.5 px-3.5 text-emerald-700 font-extrabold tabular text-sm bg-brand-50/20">
-                      R$ {challengerCpcCost.toFixed(2)}
-                    </td>
-                    <td className="py-2.5 px-3.5 text-emerald-700 font-extrabold tabular bg-emerald-50/20">
-                      -{(((championCpcCost - challengerCpcCost) / championCpcCost) * 100).toFixed(1)}% no custo unitário (Economia de R$ {unitSavings.toFixed(2)} por contato)
-                    </td>
-                  </tr>
+                  {isSuper && (
+                    <tr>
+                      <td className="py-2.5 px-3.5 font-medium text-slate-600 flex items-center">
+                        <span>{purposeMeta.metricLabel}</span>
+                        <InfoTooltip content="Gasto total dividido pelo número de eventos válidos auditados." />
+                      </td>
+                      <td className="py-2.5 px-3.5 text-slate-700 tabular font-medium">
+                        R$ {championCpcCost.toFixed(2)}
+                      </td>
+                      <td className="py-2.5 px-3.5 text-emerald-700 font-extrabold tabular text-sm bg-brand-50/20">
+                        R$ {challengerCpcCost.toFixed(2)}
+                      </td>
+                      <td className="py-2.5 px-3.5 text-emerald-700 font-extrabold tabular bg-emerald-50/20">
+                        -{(((championCpcCost - challengerCpcCost) / championCpcCost) * 100).toFixed(1)}% no custo unitário (Economia de R$ {unitSavings.toFixed(2)} por contato)
+                      </td>
+                    </tr>
+                  )}
 
                   <tr>
                     <td className="py-2.5 px-3.5 font-medium text-slate-600 flex items-center">
@@ -843,39 +803,41 @@ export function CentralIntelligencePage() {
               </table>
             </div>
 
-            {/* Painel de Economia Projetada */}
-            <div className="rounded-xl border border-emerald-200/90 bg-gradient-to-r from-emerald-50/80 via-white to-brand-50/40 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-1.5">
-                    <CheckCircle2 className="size-4 text-emerald-600" />
-                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-950">
-                      Veredito Estatístico: Estratégia Desafiante Venceu com {sampleCalc.confidence}% de Confiança
+            {/* Painel de Economia Projetada (apenas Super Admin) */}
+            {isSuper && (
+              <div className="rounded-xl border border-emerald-200/90 bg-gradient-to-r from-emerald-50/80 via-white to-brand-50/40 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle2 className="size-4 text-emerald-600" />
+                      <span className="text-xs font-bold uppercase tracking-wider text-emerald-950">
+                        Veredito Estatístico: Estratégia Desafiante Venceu com {sampleCalc.confidence}% de Confiança
+                      </span>
+                      <InfoTooltip content={`Teste de hipóteses confirmou superioridade com Z=1,96 e margem de erro de ±${sampleCalc.marginOfError}%.`} />
+                    </div>
+                    <span className="text-xs text-slate-600 block">
+                      Economia calculada para a base total ({fmtNumber(totalBase)} contatos):
                     </span>
-                    <InfoTooltip content={`Teste de hipóteses confirmou superioridade com Z=1,96 e margem de erro de ±${sampleCalc.marginOfError}%.`} />
                   </div>
-                  <span className="text-xs text-slate-600 block">
-                    Economia calculada para a base total ({fmtNumber(totalBase)} contatos):
-                  </span>
-                </div>
-                <div className="text-right">
-                  <span className="text-2xl font-black text-emerald-700">
-                    {fmtMoney(totalProjectedSavings)}
-                  </span>
+                  <div className="text-right">
+                    <span className="text-2xl font-black text-emerald-700">
+                      {fmtMoney(totalProjectedSavings)}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Ação de Promoção */}
+            {/* Ação de Promoção (desativada) */}
             <div className="flex items-center justify-end pt-1">
               {!isPromoted ? (
                 <Button
-                  variant="primary"
-                  loading={promoteMutation.isPending}
-                  onClick={() => promoteMutation.mutate()}
-                  icon={<Rocket className="size-4" />}
+                  variant="secondary"
+                  disabled
+                  title="Bloqueado em modo somente leitura"
+                  icon={<Lock className="size-4" />}
                 >
-                  Promover Experimento para Produção (Assumir Campanha) 🚀
+                  Promoção Desativada (Somente Leitura)
                 </Button>
               ) : (
                 <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-lg shadow-2xs">
@@ -910,18 +872,11 @@ export function CentralIntelligencePage() {
           <div className="flex items-center justify-between w-full">
             <span className="font-semibold text-slate-900 flex items-center">
               4. Recomendações na Amostra ({recsQ.data?.items?.length ?? 0} Contatos)
-              <InfoTooltip content="Decisões de canal e melhor horário atribuídas aos contatos da amostra do experimento." />
+              <InfoTooltip content="Decisões de canal e melhor horário atribuídas aos contatos da amostra do experimento no PostgreSQL." />
             </span>
-            {recsQ.data?.items && recsQ.data.items.length > 0 && (
-              <Button
-                size="sm"
-                variant="secondary"
-                loading={applyMutation.isPending}
-                onClick={() => applyMutation.mutate({ count: recsQ.data?.items.length })}
-              >
-                Aplicar em lote ({recsQ.data.items.length})
-              </Button>
-            )}
+            <Badge tone="gray" icon={<Lock className="size-3" />}>
+              Aplicação desativada (Somente Leitura)
+            </Badge>
           </div>
         }
         padded={false}
@@ -941,13 +896,12 @@ export function CentralIntelligencePage() {
                   <th>Janela Ótima</th>
                   <th>Evidências</th>
                   <th>Taxa Histórica</th>
-                  <th>Custo Previsto</th>
-                  <th className="text-right">Ação</th>
+                  {isSuper && <th>Custo Previsto</th>}
+                  <th>Política</th>
                 </tr>
               </thead>
               <tbody>
                 {recsQ.data.items.slice(0, 10).map((r) => {
-                  const done = appliedContacts[r.contactId];
                   return (
                     <tr key={r.contactId}>
                       <td>
@@ -967,22 +921,13 @@ export function CentralIntelligencePage() {
                       <td className="tabular text-xs font-semibold text-slate-800">
                         {fmtPercent(r.historicRate)}
                       </td>
-                      <td className="tabular text-xs font-semibold text-emerald-700">
-                        {fmtMoney(r.estimatedCostPerSuccess)}
-                      </td>
-                      <td className="text-right">
-                        {done ? (
-                          <span className="text-xs font-medium text-emerald-700">✓ Aplicado</span>
-                        ) : (
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            loading={applyMutation.isPending}
-                            onClick={() => applyMutation.mutate({ contactId: r.contactId })}
-                          >
-                            Aplicar
-                          </Button>
-                        )}
+                      {isSuper && (
+                        <td className="tabular text-xs font-semibold text-emerald-700">
+                          {fmtMoney(r.estimatedCostPerSuccess)}
+                        </td>
+                      )}
+                      <td>
+                        <Badge tone="gray">Somente leitura</Badge>
                       </td>
                     </tr>
                   );
@@ -1012,7 +957,7 @@ export function CentralIntelligencePage() {
                 <th>Canal Primário</th>
                 <th>Janela Ótima</th>
                 <th>Phone-Intent</th>
-                <th>Custo Previsto</th>
+                {isSuper && <th>Custo Previsto</th>}
                 <th>Status Empírico</th>
               </tr>
             </thead>
@@ -1124,7 +1069,9 @@ export function CentralIntelligencePage() {
                       {b.intent}
                     </Badge>
                   </td>
-                  <td className="tabular text-xs font-semibold text-emerald-700">{b.cost}</td>
+                  {isSuper && (
+                    <td className="tabular text-xs font-semibold text-emerald-700">{b.cost}</td>
+                  )}
                   <td>
                     <Badge tone={b.tone}>{b.status}</Badge>
                   </td>

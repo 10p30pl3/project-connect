@@ -2,16 +2,19 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Archive, ArrowRight, Bookmark, Database, ListFilter, Megaphone, Pause, Play, Rocket, Sparkles, Square, Users } from 'lucide-react';
-import { CAMPAIGN_STATUS, CAMPAIGN_STATUS_LABEL, type CampaignStatus } from '@voll/shared';
+import { CAMPAIGN_STATUS, CAMPAIGN_STATUS_LABEL, isSuperAdminRole, type CampaignStatus } from '@voll/shared';
 import { errorMessage, get, post, qs } from '../lib/api';
 import type { CampaignSummary, Overview } from '../lib/types';
-import { fmtDateTime, fmtNumber } from '../lib/format';
+import { fmtDateTime, fmtMoney, fmtNumber } from '../lib/format';
 import { useAuth } from '../lib/auth';
+import { useExperienceMode } from '../lib/experience-mode';
 import { Button, btnClass, CampaignStatusBadge, Card, Empty, ErrorState, Field, Input, Loading, Modal, PageHeader, Stat, TableWrap, useToast } from '../components/ui';
 import { SaveAsTemplateModal } from '../components/SaveAsTemplateModal';
 
 export function CampaignsPage() {
-  const { can } = useAuth();
+  const { me, can } = useAuth();
+  const { isAtLeast } = useExperienceMode();
+  const isSuper = isSuperAdminRole(me?.role);
   const qc = useQueryClient();
   const toast = useToast();
   const [sp, setSp] = useSearchParams();
@@ -38,10 +41,10 @@ export function CampaignsPage() {
       post(`/campaigns/${id}/${action}`, body),
     onSuccess: (_d, vars) => {
       const msg: Record<string, string> = {
-        start: 'Campanha iniciada (Start).',
-        resume: 'Campanha retomada (Start).',
-        pause: 'Campanha pausada (Pause).',
-        close: 'Campanha encerrada (Stop).',
+        start: 'Campanha iniciada.',
+        resume: 'Campanha retomada.',
+        pause: 'Campanha pausada.',
+        close: 'Campanha encerrada.',
         archive: 'Campanha arquivada.',
       };
       toast('success', msg[vars.action] ?? 'Ação executada.');
@@ -108,6 +111,66 @@ export function CampaignsPage() {
           ) : null,
         )}
       </div>
+
+      {/* KPIs de Inteligência de CPC e Golden Record (Avançado) */}
+      {isAtLeast('advanced') && ovQ.data && (() => {
+        const k = ovQ.data.kpis;
+        const cpcRateLabel = k?.cpcRatePct != null ? `${k.cpcRatePct.toFixed(1).replace('.', ',')}%` : '—';
+        const costPerCpcLabel = k?.costPerCpcBrl != null ? fmtMoney(k.costPerCpcBrl) : '—';
+        const savingsLabel = k?.savingsPct != null ? `${k.savingsPct.toFixed(1).replace('.', ',')}%` : '—';
+        return (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Stat
+              label="Taxa de CPC (Pessoa Certa)"
+              value={cpcRateLabel}
+              tone={k?.cpcRatePct != null ? 'good' : undefined}
+              hint={k?.cpcRatePct != null ? `${fmtNumber(k.cpcAttempts)} CPC(s) / ${fmtNumber(k.totalAttempts)}` : 'aguardando acionamentos'}
+              tooltip="CPC = Contato com a Pessoa Certa confirmado por tabulação auditável."
+            />
+            {isSuper ? (
+              <Stat
+                label="Custo por CPC Otimizado"
+                value={costPerCpcLabel}
+                tone={k?.costPerCpcBrl != null ? 'good' : undefined}
+                hint={k?.costPerCpcBrl != null ? 'apurado nas tentativas' : 'sem histórico de acionamentos'}
+                tooltip="Custo médio real por CPC efetivo apurado sobre as tentativas disparadas."
+              />
+            ) : (
+              <Stat
+                label="Acionamentos Hoje"
+                value={fmtNumber(ovQ.data.attempts.sentToday)}
+                tone={ovQ.data.attempts.sentToday > 0 ? 'good' : undefined}
+                hint={`${fmtNumber(ovQ.data.attempts.active)} ativos no momento`}
+                tooltip="Quantidade de chamadas ou mensagens iniciadas hoje neste workspace."
+              />
+            )}
+            {isSuper ? (
+              <Stat
+                label="Economia Conquistada"
+                value={savingsLabel}
+                tone={k?.savingsPct != null && k.savingsPct > 0 ? 'good' : undefined}
+                hint={k?.savingsPct != null ? 'sobre linha base sem otimização' : 'inicia com as campanhas'}
+                tooltip="Redução percentual real de custo por CPC comparada à linha base do planejamento."
+              />
+            ) : (
+              <Stat
+                label="Campanhas Ativas"
+                value={fmtNumber(ovQ.data.campaigns.running)}
+                tone={ovQ.data.campaigns.running > 0 ? 'good' : undefined}
+                hint={`${fmtNumber(ovQ.data.campaigns.ready)} prontas · ${fmtNumber(ovQ.data.campaigns.paused)} pausadas`}
+                tooltip="Campanhas atualmente em execução e em fila neste workspace."
+              />
+            )}
+            <Stat
+              label="Contatos no Golden Record"
+              value={fmtNumber(ovQ.data.contacts)}
+              tone={ovQ.data.contacts > 0 ? 'good' : undefined}
+              hint={ovQ.data.contacts === 0 ? 'base zerada' : `${fmtNumber(ovQ.data.mailings)} base(s) importada(s)`}
+              tooltip="Contatos higienizados disponíveis para acionamento nas listas e campanhas."
+            />
+          </div>
+        );
+      })()}
 
       {/* Métricas Consolidadas de Campanhas e Tentativas */}
       <div className="grid gap-4 lg:grid-cols-2">
@@ -252,7 +315,7 @@ export function CampaignsPage() {
                               size="sm"
                               variant={canStart ? 'primary' : 'secondary'}
                               disabled={!canStart || busy}
-                              title={c.status === 'PAUSED' ? 'Retomar campanha (Start)' : 'Iniciar campanha (Start)'}
+                              title={c.status === 'PAUSED' ? 'Retomar campanha' : 'Iniciar campanha'}
                               icon={<Play className="size-3.5" aria-hidden />}
                               onClick={() =>
                                 actionM.mutate({
@@ -261,7 +324,7 @@ export function CampaignsPage() {
                                 })
                               }
                             >
-                              Start
+                              {c.status === 'PAUSED' ? 'Retomar' : 'Iniciar'}
                             </Button>
 
                             {/* Pause */}
@@ -269,11 +332,11 @@ export function CampaignsPage() {
                               size="sm"
                               variant="secondary"
                               disabled={!canPause || busy}
-                              title="Pausar campanha (Pause)"
+                              title="Pausar campanha"
                               icon={<Pause className="size-3.5" aria-hidden />}
                               onClick={() => actionM.mutate({ id: c.id, action: 'pause' })}
                             >
-                              Pause
+                              Pausar
                             </Button>
 
                             {/* Stop (Encerrar) */}
@@ -281,7 +344,7 @@ export function CampaignsPage() {
                               size="sm"
                               variant="secondary"
                               disabled={!canStop || busy}
-                              title="Parar / encerrar campanha (Stop)"
+                              title="Encerrar campanha definitivamente"
                               className="text-red-700 hover:bg-red-50 hover:border-red-200"
                               icon={<Square className="size-3.5" aria-hidden />}
                               onClick={() => {
@@ -290,7 +353,7 @@ export function CampaignsPage() {
                                 setStopErr(null);
                               }}
                             >
-                              Stop
+                              Encerrar
                             </Button>
 
                             {/* Arquivar */}

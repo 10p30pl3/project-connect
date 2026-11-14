@@ -7,6 +7,7 @@ import {
   ATTEMPT_STATE_LABEL,
   CHANNEL_LABEL,
   ENROLLMENT_STATE_LABEL,
+  isSuperAdminRole,
   REASON_LABEL,
   type ReasonCode,
 } from '@voll/shared';
@@ -104,10 +105,10 @@ function CampaignActions({ c }: { c: CampaignDetail }) {
     mutationFn: ({ action, body }: { action: string; body?: unknown }) => post(`/campaigns/${c.id}/${action}`, body),
     onSuccess: (_d, v) => {
       const msg: Record<string, string> = {
-        start: 'Campanha iniciada (Start).',
-        pause: 'Campanha pausada (Pause). Retornos em andamento continuam sendo processados.',
-        resume: 'Campanha retomada (Start).',
-        close: 'Campanha encerrada (Stop). Reservas não enviadas foram canceladas.',
+        start: 'Campanha iniciada.',
+        pause: 'Campanha pausada. Retornos em andamento continuam sendo processados.',
+        resume: 'Campanha retomada.',
+        close: 'Campanha encerrada. Reservas não enviadas foram canceladas.',
         archive: 'Campanha arquivada.',
       };
       toast('success', msg[v.action] ?? 'Feito.');
@@ -121,31 +122,31 @@ function CampaignActions({ c }: { c: CampaignDetail }) {
   if (!can('campaigns.operate')) return null;
   const s = c.status;
   const texts = {
-    start: ['Iniciar campanha (Start)?', 'As reservas e envios começam na próxima janela permitida pelo calendário da estratégia.', 'Start'],
-    pause: ['Pausar campanha (Pause)?', 'Interrompe novas reservas e envios, mantendo o processamento dos retornos já enviados.', 'Pause'],
-    resume: ['Retomar campanha (Start)?', 'Novas reservas voltam a ser feitas, sujeitas a elegibilidade e calendário.', 'Start'],
+    start: ['Iniciar campanha?', 'As reservas e envios começam na próxima janela permitida pelo calendário da estratégia.', 'Iniciar'],
+    pause: ['Pausar campanha?', 'Interrompe novas reservas e envios, mantendo o processamento dos retornos já enviados.', 'Pausar'],
+    resume: ['Retomar campanha?', 'Novas reservas voltam a ser feitas, sujeitas a elegibilidade e calendário.', 'Retomar'],
     archive: ['Arquivar campanha?', 'A campanha sairá da listagem principal e ficará disponível no filtro "Arquivada", preservando todo o histórico e indicadores.', 'Arquivar'],
   } as const;
   return (
     <>
       {(s === 'READY' || s === 'SCHEDULED') && (
         <Button variant="primary" icon={<Play className="size-4" aria-hidden />} onClick={() => setConfirm('start')}>
-          Start
+          Iniciar
         </Button>
       )}
       {s === 'RUNNING' && (
         <Button icon={<Pause className="size-4" aria-hidden />} onClick={() => setConfirm('pause')}>
-          Pause
+          Pausar
         </Button>
       )}
       {s === 'PAUSED' && (
         <Button variant="primary" icon={<Play className="size-4" aria-hidden />} onClick={() => setConfirm('resume')}>
-          Start
+          Retomar
         </Button>
       )}
       {['RUNNING', 'PAUSED', 'READY', 'SCHEDULED'].includes(s) && (
         <Button variant="danger" icon={<Square className="size-4" aria-hidden />} onClick={() => setCloseOpen(true)}>
-          Stop
+          Encerrar
         </Button>
       )}
       {s !== 'ARCHIVED' && (
@@ -446,11 +447,13 @@ function EligibilityTab({ id }: { id: string }) {
 }
 
 function IndicatorsTab({ id }: { id: string }) {
+  const { me } = useAuth();
+  const isSuper = isSuperAdminRole(me?.role);
   const q = useQuery({ queryKey: ['campaign-indicators', id], queryFn: () => get<Indicators>(`/campaigns/${id}/indicators`), refetchInterval: 5000 });
   if (q.isLoading) return <Loading rows={5} />;
   if (q.error) return <ErrorState error={q.error} onRetry={() => q.refetch()} />;
   const i = q.data!;
-  const partial = i.cost.partial;
+  const partial = isSuper && i.cost.partial;
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
@@ -458,23 +461,27 @@ function IndicatorsTab({ id }: { id: string }) {
           <Download className="size-4" aria-hidden /> Exportar CSV
         </a>
       </div>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
+      <div className={`grid grid-cols-2 gap-3 md:grid-cols-4 ${isSuper ? 'xl:grid-cols-7' : 'xl:grid-cols-5'}`}>
         <Stat label="Tentativas enviadas" value={fmtNumber(i.sent)} />
         <Stat label="Clientes trabalhados" value={fmtNumber(i.contactsWorked)} />
         <Stat label="Clientes CPC" value={fmtNumber(i.cpcContacts)} />
         <Stat label="Taxa de CPC" value={<Maybe value={i.cpcRate === null ? null : fmtPercent(i.cpcRate)} />} />
         <Stat label="Conversões" value={fmtNumber(i.conversions)} tone="good" />
-        <Stat
-          label="Custo conhecido"
-          value={i.cost.coverage.withCost === 0 && i.cost.coverage.total > 0 ? <Maybe value={null} hint="Nenhum envio com tarifa conhecida" /> : fmtMoney(i.cost.known)}
-          hint={`Cobertura: ${fmtNumber(i.cost.coverage.withCost)} de ${fmtNumber(i.cost.coverage.total)} envios${partial ? ' · parcial' : ''}`}
-          tone={partial ? 'warn' : undefined}
-        />
-        <Stat
-          label="Custo por CPC"
-          value={<Maybe value={i.costPerCpc === null ? null : fmtMoney(i.costPerCpc)} hint={partial ? 'Cobertura de custo incompleta' : 'Sem CPC no recorte'} />}
-          hint={i.costPerConversion !== null ? `Por conversão: ${fmtMoney(i.costPerConversion)}` : 'Por conversão: —'}
-        />
+        {isSuper && (
+          <>
+            <Stat
+              label="Custo conhecido"
+              value={i.cost.coverage.withCost === 0 && i.cost.coverage.total > 0 ? <Maybe value={null} hint="Nenhum envio com tarifa conhecida" /> : fmtMoney(i.cost.known)}
+              hint={`Cobertura: ${fmtNumber(i.cost.coverage.withCost)} de ${fmtNumber(i.cost.coverage.total)} envios${partial ? ' · parcial' : ''}`}
+              tone={partial ? 'warn' : undefined}
+            />
+            <Stat
+              label="Custo por CPC"
+              value={<Maybe value={i.costPerCpc === null ? null : fmtMoney(i.costPerCpc)} hint={partial ? 'Cobertura de custo incompleta' : 'Sem CPC no recorte'} />}
+              hint={i.costPerConversion !== null ? `Por conversão: ${fmtMoney(i.costPerConversion)}` : 'Por conversão: —'}
+            />
+          </>
+        )}
       </div>
       {partial && (
         <Alert tone="warn">

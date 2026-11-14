@@ -1,10 +1,14 @@
 import type { ApiProblem } from '@voll/shared';
 import type { FieldValues, Path, UseFormSetError, UseFormSetFocus } from 'react-hook-form';
-import { handleMockApi } from './mock-backend';
 
 export const API_BASE = '/api';
 
 let clientMockActive = import.meta.env.VITE_DEMO_MOCK === 'true';
+if (typeof localStorage !== 'undefined' && !clientMockActive) {
+  for (const k of ['vc_openai_api_key', 'vc_openai_model', 'vc_openai_org_id', 'vc_channel_endpoints']) {
+    localStorage.removeItem(k);
+  }
+}
 export function isClientMockActive() {
   return clientMockActive;
 }
@@ -30,6 +34,8 @@ export function setUnauthorizedHandler(fn: () => void) {
 }
 
 const DEMO_ROLE_KEY = 'vc_demo_role';
+const ACTIVE_WORKSPACE_KEY = 'vc_workspace_id';
+
 /** Modo mockup: perfil simulado enviado em X-Demo-Role (a API ignora quando o login está ativo). */
 export function getDemoRole(): string | null {
   try {
@@ -46,11 +52,35 @@ export function setDemoRole(role: string) {
   }
 }
 
+export function getActiveWorkspaceId(): string | null {
+  try {
+    return localStorage.getItem(ACTIVE_WORKSPACE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setActiveWorkspaceId(workspaceId: string | null) {
+  try {
+    if (workspaceId) localStorage.setItem(ACTIVE_WORKSPACE_KEY, workspaceId);
+    else localStorage.removeItem(ACTIVE_WORKSPACE_KEY);
+  } catch {
+    /* noop */
+  }
+}
+
 export async function api<T = unknown>(path: string, opts: Opts = {}): Promise<T> {
+  const method = (opts.method ?? (opts.body !== undefined ? 'POST' : 'GET')).toUpperCase();
   const headers: Record<string, string> = { Accept: 'application/json', ...opts.headers };
   const demoRole = getDemoRole();
   if (demoRole) headers['X-Demo-Role'] = demoRole;
+  const activeWs = getActiveWorkspaceId();
+  if (activeWs && !headers['X-Workspace-Id']) headers['X-Workspace-Id'] = activeWs;
+  if ((method === 'POST' || method === 'PUT' || method === 'PATCH') && !headers['Idempotency-Key']) {
+    headers['Idempotency-Key'] = newIdempotencyKey();
+  }
   if (clientMockActive) {
+    const { handleMockApi } = await import('./mock-backend');
     return handleMockApi<T>(path, { method: opts.method, body: opts.body, headers });
   }
   let body: BodyInit | undefined;
@@ -69,20 +99,22 @@ export async function api<T = unknown>(path: string, opts: Opts = {}): Promise<T
     });
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e;
-    clientMockActive = true;
-    return handleMockApi<T>(path, { method: opts.method, body: opts.body, headers });
+    if (clientMockActive) {
+      const { handleMockApi } = await import('./mock-backend');
+      return handleMockApi<T>(path, { method: opts.method, body: opts.body, headers });
+    }
+    throw new ApiError({
+      type: 'about:blank',
+      title: 'Falha de conexão',
+      status: 0,
+      detail: 'Falha de conexão com o servidor da API.',
+    });
   }
   if (res.status === 204) return undefined as T;
   const ct = res.headers.get('content-type') ?? '';
-  // Quando implantado na Vercel sem banco/backend configurado, /api/* devolve HTML, 404/405/500/502/503/504 ou 401 em /auth/me
   const isProblemJson = ct.includes('problem+json');
-  if (
-    ct.includes('text/html') ||
-    res.status >= 500 ||
-    (!res.ok && !isProblemJson && [404, 405, 502, 503, 504].includes(res.status)) ||
-    (res.status === 401 && path === '/auth/me')
-  ) {
-    clientMockActive = true;
+  if (clientMockActive && (ct.includes('text/html') || res.status >= 500 || (res.status === 401 && path === '/auth/me'))) {
+    const { handleMockApi } = await import('./mock-backend');
     return handleMockApi<T>(path, { method: opts.method, body: opts.body, headers });
   }
   const data = ct.includes('json') ? await res.json().catch(() => null) : await res.text();

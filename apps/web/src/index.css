@@ -94,3 +94,57 @@ table.data tbody tr:last-child td { @apply border-b-0; }
 table.data tbody tr:hover { @apply bg-brand-50/50; }
 
 .skeleton { @apply animate-pulse rounded bg-slate-200; }
+
+/* Dark mode overrides for semantic contrast across Tailwind utility surfaces */
+[data-theme="dark"] aside,
+[data-theme="dark"] header {
+  background-color: var(--sidebar-bg) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="dark"] nav[data-testid="mobile-nav"] {
+  background-color: var(--sidebar-bg) !important;
+  border-color: var(--border) !important;
+}
+[data-theme="dark"] .bg-white {
+  background-color: var(--bg-card) !important;
+  color: var(--text-main);
+}
+[data-theme="dark"] .bg-white\/95 {
+  background-color: rgba(15, 23, 42, 0.95) !important;
+}
+[data-theme="dark"] .bg-slate-50,
+[data-theme="dark"] .bg-slate-50\/70,
+[data-theme="dark"] .bg-slate-50\/60,
+[data-theme="dark"] .bg-slate-50\/95 {
+  background-color: var(--bg-surface) !important;
+}
+[data-theme="dark"] .bg-slate-100,
+[data-theme="dark"] .bg-slate-100\/80 {
+  background-color: #1a2640 !important;
+}
+[data-theme="dark"] .border-slate-200,
+[data-theme="dark"] .border-slate-200\/90,
+[data-theme="dark"] .border-slate-200\/80,
+[data-theme="dark"] .border-slate-100 {
+  border-color: var(--border) !important;
+}
+[data-theme="dark"] .text-slate-900 { color: #f8fafc !important; }
+[data-theme="dark"] .text-slate-800 { color: #e2e8f0 !important; }
+[data-theme="dark"] .text-slate-700 { color: #cbd5e1 !important; }
+[data-theme="dark"] .text-slate-600 { color: #94a3b8 !important; }
+[data-theme="dark"] .text-slate-500 { color: #94a3b8 !important; }
+[data-theme="dark"] .text-slate-400 { color: #64748b !important; }
+[data-theme="dark"] table.data th {
+  background-color: var(--table-header-bg) !important;
+  border-color: var(--border) !important;
+  color: #94a3b8 !important;
+}
+[data-theme="dark"] table.data td {
+  border-color: var(--border) !important;
+}
+[data-theme="dark"] table.data tbody tr:hover {
+  background-color: var(--table-row-hover) !important;
+}
+[data-theme="dark"] .skeleton {
+  background-color: #1e293b !important;
+}

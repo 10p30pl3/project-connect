@@ -7,12 +7,14 @@ import type { MailingDetail, MailingRecord, MailingSummary, Paginated } from '..
 import { fmtDateTime, fmtNumber } from '../lib/format';
 import { useCursorPager, useDebounced } from '../lib/hooks';
 import { useAuth } from '../lib/auth';
+import { useExperienceMode } from '../lib/experience-mode';
 import { Badge, btnClass, Card, Empty, ErrorState, Field, InfoTooltip, Input, Loading, PageHeader, Pager, TableWrap, useToast } from '../components/ui';
 import { ImportFlow } from '../components/ImportFlow';
 import { formatCell } from '../components/ListEditor';
 
 export function MailingsSection() {
   const { can } = useAuth();
+  const { isAtLeast } = useExperienceMode();
   const q = useQuery({ queryKey: ['mailings'], queryFn: () => get<{ items: MailingSummary[] }>('/mailings') });
   return (
     <div className="space-y-3">
@@ -70,9 +72,11 @@ export function MailingsSection() {
                         <Link to={`/campanhas/nova?mailing=${m.id}`} className="text-xs font-semibold text-brand-700 hover:underline">
                           Nova campanha →
                         </Link>
-                        <Link to={`/listas/nova?mailing=${m.id}`} className="text-xs font-medium text-slate-600 hover:underline">
-                          Criar lista →
-                        </Link>
+                        {isAtLeast('advanced') && (
+                          <Link to={`/listas/nova?mailing=${m.id}`} className="text-xs font-medium text-slate-600 hover:underline">
+                            Criar lista →
+                          </Link>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -147,6 +151,7 @@ export function MailingImportPage() {
 
 export function MailingDetailPage() {
   const { id = '' } = useParams();
+  const { isAtLeast } = useExperienceMode();
   const q = useQuery({ queryKey: ['mailing', id], queryFn: () => get<MailingDetail>(`/mailings/${id}`) });
   const [text, setText] = useState('');
   const search = useDebounced(text, 300);
@@ -175,9 +180,11 @@ export function MailingDetailPage() {
             <Link to={`/campanhas/nova?mailing=${m.id}`} className={btnClass('primary')}>
               Criar campanha com esta base
             </Link>
-            <Link to={`/listas/nova?mailing=${m.id}`} className={btnClass('secondary')}>
-              Preparar lista
-            </Link>
+            {isAtLeast('advanced') && (
+              <Link to={`/listas/nova?mailing=${m.id}`} className={btnClass('secondary')}>
+                Preparar lista
+              </Link>
+            )}
           </div>
         }
       />

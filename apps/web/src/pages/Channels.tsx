@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   ArrowRight,
   Bot,
@@ -27,6 +28,7 @@ import {
 import {
   CHANNEL_LABEL,
   DEFAULT_CHANNEL_ENDPOINTS,
+  isSuperAdminRole,
   type ChannelEndpointConfig,
   type ChannelType,
 } from '@voll/shared';
@@ -34,7 +36,6 @@ import { ApiError, errorMessage, get, patch, post } from '../lib/api';
 import type { Connection, Simulation, Tabulation } from '../lib/types';
 import { fmtDateTime, fmtMoney } from '../lib/format';
 import { useAuth } from '../lib/auth';
-import { VoiceAgentPanel } from '../components/VoiceAgentPanel';
 import {
   Alert,
   Badge,
@@ -78,10 +79,16 @@ export const PROVIDER_SHORT_LABEL: Record<string, string> = {
 };
 
 export function ChannelsPage() {
-  const { can } = useAuth();
+  const { me, can } = useAuth();
+  const isSuper = isSuperAdminRole(me?.role);
   const qc = useQueryClient();
   const toast = useToast();
   const q = useQuery({ queryKey: ['connections'], queryFn: () => get<{ items: Connection[] }>('/connections') });
+  const tenantsQ = useQuery({
+    queryKey: ['telephony', 'tenants'],
+    queryFn: () => get<{ tenants: { id: string; name: string; voice?: string }[] }>('/telephony/tenants'),
+    retry: false,
+  });
   const [edit, setEdit] = useState<Connection | null>(null);
   const [agentFor, setAgentFor] = useState<Connection | null>(null);
   const [openNew, setOpenNew] = useState(false);
@@ -222,7 +229,17 @@ export function ChannelsPage() {
                               </div>
                               <span className="text-[11px] text-slate-500">
                                 Provedor: {PROVIDER_SHORT_LABEL[c.provider] || c.provider}
-                                {c.tariffUpdatedAt ? ` · atualizado em ${fmtDateTime(c.tariffUpdatedAt)}` : ''}
+                                {c.provider === 'VOICE_APP' && (
+                                  <>
+                                    {' · '}Agente:{' '}
+                                    <strong>
+                                      {tenantsQ.data?.tenants.find((t) => t.id === c.tenantId)?.name ??
+                                        c.tenantId ??
+                                        'Padrão da Telefonia'}
+                                    </strong>
+                                  </>
+                                )}
+                                {isSuper && c.tariffUpdatedAt ? ` · atualizado em ${fmtDateTime(c.tariffUpdatedAt)}` : ''}
                               </span>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
@@ -273,24 +290,26 @@ export function ChannelsPage() {
                                     </span>
                                   </span>
                                 </li>
-                                <li className="flex items-center gap-2">
-                                  <ArrowRight className="size-4 text-slate-400" aria-hidden />
-                                  <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs">
-                                    <strong>2. Tarifa por Tentativa</strong>
-                                    <span className="text-slate-500">
-                                      {' '}
-                                      · {c.tariff === null ? 'Desconhecida' : c.tariff === 0 ? 'Gratuito (R$ 0,00)' : fmtMoney(c.tariff, 4)}
+                                {isSuper && (
+                                  <li className="flex items-center gap-2">
+                                    <ArrowRight className="size-4 text-slate-400" aria-hidden />
+                                    <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs">
+                                      <strong>2. Tarifa por Tentativa</strong>
+                                      <span className="text-slate-500">
+                                        {' '}
+                                        · {c.tariff === null ? 'Desconhecida' : c.tariff === 0 ? 'Gratuito (R$ 0,00)' : fmtMoney(c.tariff, 4)}
+                                      </span>
+                                      <span className="block text-slate-500">
+                                        {c.tariffUpdatedAt ? `Desde ${fmtDateTime(c.tariffUpdatedAt)}` : 'Valor de referência'}
+                                      </span>
                                     </span>
-                                    <span className="block text-slate-500">
-                                      {c.tariffUpdatedAt ? `Desde ${fmtDateTime(c.tariffUpdatedAt)}` : 'Valor de referência'}
-                                    </span>
-                                  </span>
-                                </li>
+                                  </li>
+                                )}
                                 <li className="flex items-center gap-2">
                                   <ArrowRight className="size-4 text-slate-400" aria-hidden />
                                   {!isSimulated ? (
                                     <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs">
-                                      <strong>3. Endpoint &amp; Origem</strong>
+                                      <strong>{isSuper ? '3.' : '2.'} Endpoint &amp; Origem</strong>
                                       <span className="text-slate-500 block truncate max-w-[210px]" title={c.endpointUrl || 'Padrão do Workspace'}>
                                         {c.endpointUrl || 'Padrão do Workspace'}
                                       </span>
@@ -364,7 +383,7 @@ export function ChannelsPage() {
                             <th>Canal</th>
                             <th>Provedor &amp; Tipo</th>
                             <th>Endpoint &amp; BINA</th>
-                            <th>Tarifa por tentativa</th>
+                            {isSuper && <th>Tarifa por tentativa</th>}
                             <th>Situação</th>
                             <th className="text-right">Ações</th>
                           </tr>
@@ -401,17 +420,24 @@ export function ChannelsPage() {
                                     <span className="text-slate-400">Padrão Workspace</span>
                                   )}
                                   {c.callerId && <div className="text-[11px] text-slate-400 font-sans">BINA: {c.callerId}</div>}
-                                </td>
-                                <td>
-                                  {c.tariff === null ? (
-                                    <span className="text-slate-500">desconhecida</span>
-                                  ) : c.tariff === 0 ? (
-                                    <span className="text-emerald-600 font-medium">Gratuita</span>
-                                  ) : (
-                                    fmtMoney(c.tariff, 4)
+                                  {c.provider === 'VOICE_APP' && (
+                                    <div className="text-[11px] text-brand-700 font-sans">
+                                      Agente: {tenantsQ.data?.tenants.find((t) => t.id === c.tenantId)?.name ?? c.tenantId ?? 'Padrão'}
+                                    </div>
                                   )}
-                                  {c.tariffUpdatedAt && <div className="text-xs text-slate-500">desde {fmtDateTime(c.tariffUpdatedAt)}</div>}
                                 </td>
+                                {isSuper && (
+                                  <td>
+                                    {c.tariff === null ? (
+                                      <span className="text-slate-500">desconhecida</span>
+                                    ) : c.tariff === 0 ? (
+                                      <span className="text-emerald-600 font-medium">Gratuita</span>
+                                    ) : (
+                                      fmtMoney(c.tariff, 4)
+                                    )}
+                                    {c.tariffUpdatedAt && <div className="text-xs text-slate-500">desde {fmtDateTime(c.tariffUpdatedAt)}</div>}
+                                  </td>
+                                )}
                                 <td>
                                   {canEdit ? (
                                     <button
@@ -494,17 +520,16 @@ export function ChannelsPage() {
         ]}
       />
 
-      {edit && <EditConnection c={edit} onClose={() => setEdit(null)} />}
+      {edit && <EditConnection c={edit} onClose={() => setEdit(null)} isSuper={isSuper} tenants={tenantsQ.data?.tenants ?? []} />}
       {agentFor && (
-        <VoiceAgentPanel
-          connectionId={agentFor.id}
-          connectionName={agentFor.name}
-          open
-          onOpenChange={(o) => !o && setAgentFor(null)}
-          canEdit={can('voiceAgent.write')}
+        <BindVoiceAgentModal
+          connection={agentFor}
+          tenants={tenantsQ.data?.tenants ?? []}
+          canEdit={canEdit}
+          onClose={() => setAgentFor(null)}
         />
       )}
-      <NewConnectionDialog open={openNew} onOpenChange={setOpenNew} />
+      <NewConnectionDialog open={openNew} onOpenChange={setOpenNew} isSuper={isSuper} tenants={tenantsQ.data?.tenants ?? []} />
     </div>
   );
 }
@@ -557,9 +582,6 @@ function TechnicalEndpointsTab({ canEdit }: { canEdit: boolean }) {
     setIsSaving(true);
     try {
       await post('/channels/technical-endpoints', form);
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('vc_channel_endpoints', JSON.stringify(form));
-      }
       await qc.invalidateQueries({ queryKey: ['technical-endpoints'] });
       toast('success', 'Endereços técnicos dos canais salvos com sucesso!');
     } catch (err) {
@@ -751,90 +773,31 @@ function TechnicalEndpointsTab({ canEdit }: { canEdit: boolean }) {
           }
         >
           <div className="space-y-3.5">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="sm:col-span-2">
-                <Field
-                  label="Host / Servidor SIP Primário"
-                  required
-                  tooltip="Endereço FQDN ou IP do servidor PBX/SBC para envio de chamadas via discador preditivo."
-                >
-                  {(ids) => (
-                    <Input
-                      id={ids.id}
-                      value={form.voice.sipServer}
-                      disabled={!canEdit}
-                      onChange={(e) =>
-                        setForm({ ...form, voice: { ...form.voice, sipServer: e.target.value } })
-                      }
-                      className="font-mono text-xs"
-                    />
-                  )}
-                </Field>
-              </div>
-
-              <Field
-                label="Porta SIP"
-                required
-                tooltip="Porta padrão de sinalização SIP (5060 para UDP/TCP, 5061 para TLS criptografado)."
-              >
-                {(ids) => (
-                  <Input
-                    id={ids.id}
-                    type="number"
-                    value={form.voice.sipPort}
-                    disabled={!canEdit}
-                    onChange={(e) =>
-                      setForm({ ...form, voice: { ...form.voice, sipPort: Number(e.target.value) } })
-                    }
-                    className="font-mono text-xs"
-                  />
-                )}
-              </Field>
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-blue-200 bg-blue-50/60 p-3 text-xs text-slate-700">
+              <span>
+                Os parâmetros de rede SIP (host, porta, codecs, Direct Call e rotas de saída) são centralizados em{' '}
+                <strong>Telefonia → Troncos SIP</strong>.
+              </span>
+              <Link to="/telefonia?tab=settings" className="font-semibold text-brand-700 hover:underline whitespace-nowrap">
+                Abrir Troncos SIP →
+              </Link>
             </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Field
-                label="Transporte SIP"
-                required
-                tooltip="Protocolo de transporte para controle e sinalização das chamadas telefônicas."
-              >
-                {(ids) => (
-                  <Select
-                    id={ids.id}
-                    value={form.voice.sipTransport}
-                    disabled={!canEdit}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        voice: { ...form.voice, sipTransport: e.target.value as 'UDP' | 'TCP' | 'TLS' },
-                      })
-                    }
-                    className="text-xs"
-                  >
-                    <option value="TLS">TLS (Criptografado · Recomendado)</option>
-                    <option value="TCP">TCP</option>
-                    <option value="UDP">UDP</option>
-                  </Select>
-                )}
-              </Field>
-
-              <Field
-                label="BINA Padrão (Caller ID)"
-                tooltip="Número de telefone apresentado na tela do destinatário (com código de área)."
-              >
-                {(ids) => (
-                  <Input
-                    id={ids.id}
-                    value={form.voice.defaultCallerId}
-                    disabled={!canEdit}
-                    onChange={(e) =>
-                      setForm({ ...form, voice: { ...form.voice, defaultCallerId: e.target.value } })
-                    }
-                    className="font-mono text-xs"
-                  />
-                )}
-              </Field>
-            </div>
+            <Field
+              label="BINA Padrão (Caller ID)"
+              tooltip="Número de telefone apresentado na tela do destinatário (com código de área)."
+            >
+              {(ids) => (
+                <Input
+                  id={ids.id}
+                  value={form.voice.defaultCallerId}
+                  disabled={!canEdit}
+                  onChange={(e) =>
+                    setForm({ ...form, voice: { ...form.voice, defaultCallerId: e.target.value } })
+                  }
+                  className="font-mono text-xs"
+                />
+              )}
+            </Field>
 
             <Field
               label="Gateway WebRTC (WSS)"
@@ -1315,12 +1278,23 @@ function TechnicalEndpointsTab({ canEdit }: { canEdit: boolean }) {
   );
 }
 
-function NewConnectionDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+function NewConnectionDialog({
+  open,
+  onOpenChange,
+  isSuper,
+  tenants,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  isSuper: boolean;
+  tenants: { id: string; name: string }[];
+}) {
   const qc = useQueryClient();
   const toast = useToast();
   const [name, setName] = useState('Discador IA · Tronco Direct Call');
   const [channelType, setChannelType] = useState<ChannelType>('VOICE');
   const [provider, setProvider] = useState('VOICE_APP');
+  const [tenantId, setTenantId] = useState(tenants[0]?.id ?? '');
   const [endpointUrl, setEndpointUrl] = useState('http://192.168.15.36:8090/v1/calls');
   const [callerId, setCallerId] = useState('+5511989785888');
   const [authToken, setAuthToken] = useState('');
@@ -1375,7 +1349,8 @@ function NewConnectionDialog({ open, onOpenChange }: { open: boolean; onOpenChan
         endpointUrl: endpointUrl.trim() || null,
         callerId: callerId.trim() || null,
         authToken: authToken.trim() || null,
-        tariff: tariff === '' ? null : Number(tariff),
+        ...(isSuper ? { tariff: tariff === '' ? null : Number(tariff) } : {}),
+        ...(provider === 'VOICE_APP' && tenantId ? { tenantId } : {}),
         simulation:
           provider === 'SIMULATED' || showAdvanced
             ? {
@@ -1458,20 +1433,36 @@ function NewConnectionDialog({ open, onOpenChange }: { open: boolean; onOpenChan
                 </Select>
               )}
             </Field>
-            <Field label="Tarifa de referência por tentativa (R$)" tooltip="Custo estimado por envio para fins de cálculo de CPC. Deixe em branco se for desconhecido ou 0 para gratuito.">
+            {isSuper && (
+              <Field label="Tarifa de referência por tentativa (R$)" tooltip="Custo estimado por envio para fins de cálculo de CPC. Deixe em branco se for desconhecido ou 0 para gratuito.">
+                {(p) => (
+                  <Input
+                    id={p.id}
+                    type="number"
+                    step="0.0001"
+                    min="0"
+                    value={tariff}
+                    onChange={(e) => setTariff(e.target.value)}
+                    placeholder="0,0800"
+                  />
+                )}
+              </Field>
+            )}
+          </div>
+          {provider === 'VOICE_APP' && (
+            <Field label="Agente IA responsável (Telefonia)" hint="Gerenciado na aba Telefonia → Agentes IA.">
               {(p) => (
-                <Input
-                  id={p.id}
-                  type="number"
-                  step="0.0001"
-                  min="0"
-                  value={tariff}
-                  onChange={(e) => setTariff(e.target.value)}
-                  placeholder="0,0800"
-                />
+                <Select id={p.id} value={tenantId} onChange={(e) => setTenantId(e.target.value)}>
+                  <option value="">Padrão da Telefonia</option>
+                  {tenants.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </Select>
               )}
             </Field>
-          </div>
+          )}
         </fieldset>
 
         <fieldset className="space-y-3.5 rounded-xl border border-slate-200/90 bg-white p-4">
@@ -1571,12 +1562,23 @@ function NewConnectionDialog({ open, onOpenChange }: { open: boolean; onOpenChan
   );
 }
 
-function EditConnection({ c, onClose }: { c: Connection; onClose: () => void }) {
+function EditConnection({
+  c,
+  onClose,
+  isSuper,
+  tenants,
+}: {
+  c: Connection;
+  onClose: () => void;
+  isSuper: boolean;
+  tenants: { id: string; name: string }[];
+}) {
   const qc = useQueryClient();
   const toast = useToast();
   const tabs = useQuery({ queryKey: ['tabulations'], queryFn: () => get<{ items: Tabulation[] }>('/tabulations') });
   const [name, setName] = useState(c.name);
   const [provider, setProvider] = useState(c.provider);
+  const [tenantId, setTenantId] = useState(c.tenantId || '');
   const [endpointUrl, setEndpointUrl] = useState(c.endpointUrl || '');
   const [callerId, setCallerId] = useState(c.callerId || '');
   const [authToken, setAuthToken] = useState(c.authToken || '');
@@ -1599,7 +1601,7 @@ function EditConnection({ c, onClose }: { c: Connection; onClose: () => void }) 
   function save() {
     const e: Record<string, string> = {};
     let t: number | null = null;
-    if (tariff.trim() !== '') {
+    if (isSuper && tariff.trim() !== '') {
       const norm = tariff.replace(/\./g, '').replace(',', '.');
       if (!/^\d+(\.\d{1,4})?$/.test(norm)) e.tariff = 'Valor não negativo com até 4 casas decimais (ex.: 0,0850)';
       else t = Number(norm);
@@ -1614,7 +1616,8 @@ function EditConnection({ c, onClose }: { c: Connection; onClose: () => void }) 
       endpointUrl: endpointUrl.trim() || null,
       callerId: callerId.trim() || null,
       authToken: authToken.trim() || null,
-      tariff: t,
+      ...(isSuper ? { tariff: t } : {}),
+      ...(provider === 'VOICE_APP' ? { tenantId: tenantId || null } : {}),
       active,
       simulation: sim,
     });
@@ -1667,19 +1670,35 @@ function EditConnection({ c, onClose }: { c: Connection; onClose: () => void }) 
           </div>
 
           <div className="grid items-start gap-4 sm:grid-cols-2">
-            <Field label="Tarifa por tentativa enviada (R$)" error={errors.tariff} hint="Vazio = desconhecida · 0 = gratuita · até 4 casas decimais">
-              {(p) => (
-                <Input
-                  id={p.id}
-                  inputMode="decimal"
-                  placeholder="desconhecida"
-                  value={tariff}
-                  aria-invalid={p.invalid}
-                  aria-describedby={p.describedBy}
-                  onChange={(e) => setTariff(e.target.value)}
-                />
-              )}
-            </Field>
+            {isSuper && (
+              <Field label="Tarifa por tentativa enviada (R$)" error={errors.tariff} hint="Vazio = desconhecida · 0 = gratuita · até 4 casas decimais">
+                {(p) => (
+                  <Input
+                    id={p.id}
+                    inputMode="decimal"
+                    placeholder="desconhecida"
+                    value={tariff}
+                    aria-invalid={p.invalid}
+                    aria-describedby={p.describedBy}
+                    onChange={(e) => setTariff(e.target.value)}
+                  />
+                )}
+              </Field>
+            )}
+            {provider === 'VOICE_APP' && (
+              <Field label="Agente IA vinculado (Telefonia)" hint="Edite voz e prompt na área de Telefonia.">
+                {(p) => (
+                  <Select id={p.id} value={tenantId} onChange={(e) => setTenantId(e.target.value)}>
+                    <option value="">Padrão da Telefonia</option>
+                    {tenants.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </Field>
+            )}
             <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 h-[58px] self-end">
               <div>
                 <div className="text-sm font-medium text-slate-800">Disponibilidade</div>
@@ -1848,6 +1867,74 @@ function EditConnection({ c, onClose }: { c: Connection; onClose: () => void }) 
               )}
             </div>
           )}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function BindVoiceAgentModal({
+  connection,
+  tenants,
+  canEdit,
+  onClose,
+}: {
+  connection: Connection;
+  tenants: { id: string; name: string; voice?: string }[];
+  canEdit: boolean;
+  onClose: () => void;
+}) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [tenantId, setTenantId] = useState(connection.tenantId || '');
+
+  const saveM = useMutation({
+    mutationFn: () => patch(`/connections/${connection.id}`, { tenantId: tenantId || null }),
+    onSuccess: () => {
+      toast('success', 'Agente de voz vinculado ao canal com sucesso.');
+      qc.invalidateQueries({ queryKey: ['connections'] });
+      onClose();
+    },
+    onError: (e) => toast('error', errorMessage(e)),
+  });
+
+  return (
+    <Modal
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title={`Agente de Voz · ${connection.name}`}
+      description="Os agentes IA de voz têm fonte única de verdade em Telefonia → Agentes IA (Tenants)."
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
+            Fechar
+          </Button>
+          {canEdit && (
+            <Button variant="primary" loading={saveM.isPending} onClick={() => saveM.mutate()}>
+              Salvar vínculo
+            </Button>
+          )}
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <Field label="Agente IA que atenderá esta conexão" hint="Altera voz, saudação e roteiro editados na Telefonia.">
+          {(p) => (
+            <Select id={p.id} disabled={!canEdit} value={tenantId} onChange={(e) => setTenantId(e.target.value)}>
+              <option value="">Padrão da Telefonia</option>
+              {tenants.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} {t.voice ? `(${t.voice})` : ''}
+                </option>
+              ))}
+            </Select>
+          )}
+        </Field>
+        <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-600">
+          <span>Quer criar ou editar o prompt, voz ou filtros deste agente?</span>
+          <Link to="/agentes-de-voz" className="font-semibold text-brand-700 hover:underline whitespace-nowrap">
+            Abrir Agentes de Voz →
+          </Link>
         </div>
       </div>
     </Modal>

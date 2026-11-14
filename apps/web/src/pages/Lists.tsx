@@ -166,10 +166,16 @@ export function ListDetailPage() {
         title={l.name}
         subtitle={`Mailing ${l.mailing.name}`}
         actions={
-          can('lists.write') &&
-          !editing && (
-            <Button onClick={() => setEditing(true)}>Editar e publicar nova versão</Button>
-          )
+          <div className="flex flex-wrap items-center gap-2">
+            {can('campaigns.create') && (
+              <Link to={`/campanhas/nova?lista=${l.id}`} className={btnClass('primary')}>
+                Criar campanha com esta lista
+              </Link>
+            )}
+            {can('lists.write') && !editing && (
+              <Button variant="secondary" onClick={() => setEditing(true)}>Editar e publicar nova versão</Button>
+            )}
+          </div>
         }
       />
       {editing && (

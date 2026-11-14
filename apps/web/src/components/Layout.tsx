@@ -1,25 +1,30 @@
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { useQueryClient } from '@tanstack/react-query';
-import { ROLES } from '@voll/shared';
-import { setDemoRole } from '../lib/api';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { ROLE_LABEL, ROLES, isSuperAdminRole } from '@voll/shared';
+import { errorMessage, post, setActiveWorkspaceId, setDemoRole } from '../lib/api';
 import clsx from 'clsx';
 import {
   Activity,
   BarChart3,
   Bookmark,
   BookMarked,
+  Bot,
   BrainCircuit,
+  Building2,
   Cable,
   PhoneCall,
   ChevronDown,
+  Clock,
   Compass,
   Database,
+  DollarSign,
   Home,
   ListFilter,
   LogOut,
   Megaphone,
   Menu,
+  Plus,
   Settings,
   Settings2,
   ShieldAlert,
@@ -28,10 +33,14 @@ import {
   Moon,
   Users,
 } from 'lucide-react';
-import { ROLE_LABEL } from '@voll/shared';
 import { useAuth } from '../lib/auth';
+import {
+  EXPERIENCE_MODE_META,
+  useExperienceMode,
+  type ExperienceMode,
+} from '../lib/experience-mode';
 import { AttemptDrawer } from './AttemptDrawer';
-import { BrandLogo } from './ui';
+import { Alert, BrandLogo, Button, Field, Input, Modal, Select, useToast } from './ui';
 import { type ReactNode, useState } from 'react';
 
 export type SubNavItem = { to: string; label: string; end?: boolean };
@@ -40,6 +49,7 @@ export type NavItem = {
   label: string;
   icon: ReactNode;
   end?: boolean;
+  minMode?: ExperienceMode;
   matchPrefixes?: string[];
   subItems?: SubNavItem[];
 };
@@ -69,24 +79,28 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
         label: 'Visão geral',
         icon: <Home className={ico} aria-hidden />,
         end: true,
+        minMode: 'basic',
       },
       {
         to: '/campanhas',
         label: 'Campanhas',
         icon: <Megaphone className={ico} aria-hidden />,
         end: true,
+        minMode: 'basic',
       },
       {
         to: '/campanhas/modelos',
         label: 'Modelos de campanhas',
         icon: <Bookmark className={ico} aria-hidden />,
         matchPrefixes: ['/campanhas/modelos', '/modelos'],
+        minMode: 'advanced',
       },
       {
         to: '/inteligencia',
         label: 'Central de inteligência',
         icon: <BrainCircuit className={ico} aria-hidden />,
         matchPrefixes: ['/inteligencia'],
+        minMode: 'advanced',
       },
     ],
   },
@@ -98,18 +112,21 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
         label: 'Contatos',
         icon: <Users className={ico} aria-hidden />,
         matchPrefixes: ['/contatos'],
+        minMode: 'basic',
       },
       {
         to: '/mailings',
         label: 'Mailings',
         icon: <Database className={ico} aria-hidden />,
         matchPrefixes: ['/mailings'],
+        minMode: 'basic',
       },
       {
         to: '/listas',
         label: 'Listas',
         icon: <ListFilter className={ico} aria-hidden />,
         matchPrefixes: ['/listas'],
+        minMode: 'advanced',
       },
     ],
   },
@@ -121,30 +138,42 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
         label: 'Jornadas',
         icon: <Compass className={ico} aria-hidden />,
         matchPrefixes: ['/jornadas'],
+        minMode: 'advanced',
       },
       {
         to: '/estrategias',
         label: 'Estratégias',
         icon: <SlidersHorizontal className={ico} aria-hidden />,
         matchPrefixes: ['/estrategias'],
+        minMode: 'advanced',
       },
       {
         to: '/tabulacoes',
         label: 'Tabulação',
         icon: <BookMarked className={ico} aria-hidden />,
         matchPrefixes: ['/tabulacoes'],
+        minMode: 'advanced',
       },
       {
         to: '/canais',
         label: 'Canais',
         icon: <Cable className={ico} aria-hidden />,
         matchPrefixes: ['/canais'],
+        minMode: 'advanced',
+      },
+      {
+        to: '/agentes-de-voz',
+        label: 'Agentes de Voz',
+        icon: <Bot className={ico} aria-hidden />,
+        matchPrefixes: ['/agentes-de-voz'],
+        minMode: 'basic',
       },
       {
         to: '/telefonia',
         label: 'Telefonia',
         icon: <PhoneCall className={ico} aria-hidden />,
         matchPrefixes: ['/telefonia'],
+        minMode: 'basic',
       },
     ],
   },
@@ -156,6 +185,14 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
         label: 'Relatórios',
         icon: <BarChart3 className={ico} aria-hidden />,
         matchPrefixes: ['/relatorios'],
+        minMode: 'advanced',
+      },
+      {
+        to: '/consumo',
+        label: 'Billing & Consumo',
+        icon: <DollarSign className={ico} aria-hidden />,
+        matchPrefixes: ['/consumo', '/billing'],
+        minMode: 'basic',
       },
     ],
   },
@@ -167,12 +204,14 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
         label: 'Limites',
         icon: <ShieldAlert className={ico} aria-hidden />,
         matchPrefixes: ['/limites', '/controle'],
+        minMode: 'advanced',
       },
       {
         to: '/observabilidade',
         label: 'Observabilidade',
         icon: <Activity className={ico} aria-hidden />,
         matchPrefixes: ['/observabilidade', '/audit'],
+        minMode: 'advanced',
       },
     ],
   },
@@ -184,6 +223,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
         label: 'Sistema',
         icon: <Settings className={ico} aria-hidden />,
         matchPrefixes: ['/sistema'],
+        minMode: 'advanced',
       },
     ],
   },
@@ -292,8 +332,185 @@ function UserMenu({ sidebar = false }: { sidebar?: boolean } = {}) {
   );
 }
 
+function WorkspaceSwitcher() {
+  const { me, can } = useAuth();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [createOpen, setCreateOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [planName, setPlanName] = useState('Voll Client Standard');
+  const [includedMinutes, setIncludedMinutes] = useState('1000');
+  const [ratePerMin, setRatePerMin] = useState('0.25');
+
+  const selectWsM = useMutation({
+    mutationFn: (workspaceId: string) => post('/auth/select-workspace', { workspaceId }),
+    onSuccess: (_res, workspaceId) => {
+      setActiveWorkspaceId(workspaceId);
+      qc.clear();
+    },
+    onError: (e) => toast('error', errorMessage(e)),
+  });
+
+  const createWsM = useMutation({
+    mutationFn: () =>
+      post<{ workspace: { id: string; name: string } }>('/auth/workspaces', {
+        name: name.trim(),
+        planName: planName.trim() || 'Voll Client Standard',
+        monthlyIncludedMinutes: Number(includedMinutes) || 1000,
+        ...(isSuperAdminRole(me?.role) ? { voiceRateClientPerMinBrl: Number(ratePerMin) || 0.25 } : {}),
+      }),
+    onSuccess: (res) => {
+      toast('success', `Empresa "${res.workspace.name}" provisionada com isolamento multi-tenant.`);
+      setCreateOpen(false);
+      setName('');
+      setActiveWorkspaceId(res.workspace.id);
+      qc.clear();
+    },
+    onError: (e) => toast('error', errorMessage(e)),
+  });
+
+  if (!me) return null;
+  const workspaces = me.workspaces ?? [
+    {
+      id: me.workspace.id,
+      name: me.workspace.name,
+      timezone: me.workspace.timezone,
+      organizationId: me.organization.id,
+      isMaster: Boolean(me.workspace.isMaster),
+      planCode: me.workspace.planCode ?? 'GROWTH',
+      role: me.role,
+    },
+  ];
+  const canCreateWs = can('workspace.provision') || (Boolean(me.demoMode) && me.role === 'ADMIN');
+
+  return (
+    <>
+      <div className="rounded-lg border border-slate-200/80 bg-slate-50/70 p-2 space-y-1.5">
+        <div className="flex items-center justify-between text-[10.5px] font-bold uppercase tracking-wider text-slate-500">
+          <span className="inline-flex items-center gap-1">
+            <Building2 className="size-3 text-brand-700" aria-hidden />
+            Empresa Ativa
+          </span>
+          {canCreateWs && (
+            <button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold text-brand-700 hover:bg-brand-50 cursor-pointer"
+              title="Provisionar nova empresa (Tenant)"
+            >
+              <Plus className="size-3" aria-hidden />
+              Nova
+            </button>
+          )}
+        </div>
+        <Select
+          value={me.workspace.id}
+          disabled={selectWsM.isPending}
+          onChange={(e) => {
+            const nextId = e.target.value;
+            if (!nextId || nextId === me.workspace.id) return;
+            setActiveWorkspaceId(nextId);
+            selectWsM.mutate(nextId);
+          }}
+          aria-label="Selecionar empresa ativa"
+          className="h-8 text-xs font-medium"
+        >
+          {workspaces.map((w) => (
+            <option key={w.id} value={w.id}>
+              {w.name}
+              {w.isMaster ? ' (Master)' : ''}
+            </option>
+          ))}
+        </Select>
+      </div>
+
+      <Modal
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        title="Provisionar Nova Empresa (Tenant)"
+        description="Cria um novo workspace isolado com plano comercial, franquia de minutos e tabulações padrão."
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setCreateOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="primary"
+              loading={createWsM.isPending}
+              disabled={name.trim().length < 2}
+              onClick={() => createWsM.mutate()}
+            >
+              Criar Empresa
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <Field label="Nome da Empresa / Tenant" required>
+            {(f) => (
+              <Input
+                id={f.id}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Ex.: Empresa Alpha Cobranças"
+              />
+            )}
+          </Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Nome do Plano">
+              {(f) => (
+                <Input id={f.id} value={planName} onChange={(e) => setPlanName(e.target.value)} />
+              )}
+            </Field>
+            <Field label="Franquia Mensal (min)">
+              {(f) => (
+                <Input
+                  id={f.id}
+                  type="number"
+                  value={includedMinutes}
+                  onChange={(e) => setIncludedMinutes(e.target.value)}
+                />
+              )}
+            </Field>
+          </div>
+          {isSuperAdminRole(me?.role) && (
+            <Field label="Tarifa Venda PSTN (R$/min — visível apenas ao Super Admin)">
+              {(f) => (
+                <Input
+                  id={f.id}
+                  type="number"
+                  step="0.01"
+                  value={ratePerMin}
+                  onChange={(e) => setRatePerMin(e.target.value)}
+                />
+              )}
+            </Field>
+          )}
+        </div>
+      </Modal>
+    </>
+  );
+}
+
 export function Layout() {
+  const { me } = useAuth();
   const loc = useLocation();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const { mode, setMode, isAtLeast } = useExperienceMode();
+  const isSuper = isSuperAdminRole(me?.role);
+  const masterWorkspace = me?.workspaces?.find((w) => w.isMaster);
+  const isImpersonating = Boolean(isSuper && me?.workspace && !me.workspace.isMaster && masterWorkspace);
+
+  const backToMasterM = useMutation({
+    mutationFn: (workspaceId: string) => post('/auth/select-workspace', { workspaceId }),
+    onSuccess: (_res, workspaceId) => {
+      setActiveWorkspaceId(workspaceId);
+      qc.clear();
+    },
+    onError: (e) => toast('error', errorMessage(e)),
+  });
+
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     if (typeof document !== 'undefined') {
       return (document.documentElement.getAttribute('data-theme') as 'light' | 'dark') || 'light';
@@ -322,73 +539,103 @@ export function Layout() {
         <div className="flex h-[62px] items-center border-b border-slate-100 px-[18px]">
           <BrandLogo showTagline />
         </div>
-        <div className="border-b border-slate-100 p-3">
+        <div className="border-b border-slate-100 p-3 space-y-2">
+          <WorkspaceSwitcher />
           <UserMenu sidebar />
+          <div className="rounded-lg border border-slate-200/80 bg-slate-50/70 p-1.5" title={EXPERIENCE_MODE_META[mode].description}>
+            <div className="mb-1 flex items-center justify-between px-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              <span>Nível da interface</span>
+              <span className="font-semibold text-brand-700">{EXPERIENCE_MODE_META[mode].label}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1" role="group" aria-label="Nível de complexidade da interface">
+              {(['basic', 'advanced'] as const).map((lvl) => (
+                <button
+                  key={lvl}
+                  type="button"
+                  onClick={() => setMode(lvl)}
+                  className={clsx(
+                    'rounded-md px-1.5 py-1 text-[11px] font-semibold transition-colors cursor-pointer',
+                    mode === lvl
+                      ? 'bg-brand-700 text-white shadow-2xs'
+                      : 'text-slate-600 hover:bg-slate-200/60 hover:text-slate-900',
+                  )}
+                >
+                  {EXPERIENCE_MODE_META[lvl].shortLabel}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
         <nav aria-label="Navegação principal" className="flex-1 overflow-y-auto px-3 py-3">
-          {NAV_GROUPS.map((g) => (
-            <div key={g.title} className="mb-3.5">
-              <div className="px-2.5 pb-1 pt-1.5 text-[10.5px] font-bold uppercase tracking-[0.6px] text-slate-400">{g.title}</div>
-              <ul className="space-y-1">
-                {g.items.map((it) => {
-                  const isAnySubActive = it.subItems?.some((sub) => isRouteActive(sub.to, loc.pathname, loc.search, sub.end)) ?? false;
-                  const isParentDirectActive = isRouteActive(it.to, loc.pathname, loc.search, it.end);
-                  const isPrefixMatched = it.matchPrefixes?.some((p) => loc.pathname === p || loc.pathname.startsWith(p + '/')) ?? false;
-                  const isParentActive = isParentDirectActive || isAnySubActive || isPrefixMatched;
+          {NAV_GROUPS.map((g) => {
+            const visibleItems = g.items.filter((it) => isAtLeast(it.minMode ?? 'basic'));
+            if (visibleItems.length === 0) return null;
+            return (
+              <div key={g.title} className="mb-3.5">
+                <div className="px-2.5 pb-1 pt-1.5 text-[10.5px] font-bold uppercase tracking-[0.6px] text-slate-400">{g.title}</div>
+                <ul className="space-y-1">
+                  {visibleItems.map((it) => {
+                    const isAnySubActive = it.subItems?.some((sub) => isRouteActive(sub.to, loc.pathname, loc.search, sub.end)) ?? false;
+                    const isParentDirectActive = isRouteActive(it.to, loc.pathname, loc.search, it.end);
+                    const isPrefixMatched = it.matchPrefixes?.some((p) => loc.pathname === p || loc.pathname.startsWith(p + '/')) ?? false;
+                    const isParentActive = isParentDirectActive || isAnySubActive || isPrefixMatched;
+                    const itemLabel = it.to === '/consumo' && !isSuper ? 'Consumo de Tempo' : it.label;
+                    const itemIcon = it.to === '/consumo' && !isSuper ? <Clock className={ico} aria-hidden /> : it.icon;
 
-                  return (
-                    <li key={it.to} className="space-y-0.5">
-                      <Link
-                        to={it.to}
-                        className={clsx(
-                          'flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] transition-colors',
-                          isParentActive
-                            ? 'bg-brand-50/80 font-semibold text-brand-900 ring-1 ring-inset ring-brand-200/60'
-                            : 'font-medium text-slate-600 hover:bg-slate-100/80 hover:text-slate-900',
-                        )}
-                      >
-                        <span className={clsx(isParentActive ? 'text-brand-700' : 'text-slate-500')}>
-                          {it.icon}
-                        </span>
-                        <span className="truncate">{it.label}</span>
-                      </Link>
+                    return (
+                      <li key={it.to} className="space-y-0.5">
+                        <Link
+                          to={it.to}
+                          className={clsx(
+                            'flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] transition-colors',
+                            isParentActive
+                              ? 'bg-brand-50/80 font-semibold text-brand-900 ring-1 ring-inset ring-brand-200/60'
+                              : 'font-medium text-slate-600 hover:bg-slate-100/80 hover:text-slate-900',
+                          )}
+                        >
+                          <span className={clsx(isParentActive ? 'text-brand-700' : 'text-slate-500')}>
+                            {itemIcon}
+                          </span>
+                          <span className="truncate">{itemLabel}</span>
+                        </Link>
 
-                      {/* Submenu links: sempre abertos, sem botão de recolher */}
-                      {it.subItems && it.subItems.length > 0 && (
-                        <ul className="ml-4 mt-0.5 space-y-0.5 border-l border-slate-200 pl-2.5 py-0.5">
-                          {it.subItems.map((sub) => {
-                            const isSubActive = isRouteActive(sub.to, loc.pathname, loc.search, sub.end);
-                            return (
-                              <li key={sub.to}>
-                                <Link
-                                  to={sub.to}
-                                  className={clsx(
-                                    'flex items-center gap-2 rounded-md px-2 py-1 text-xs transition-colors',
-                                    isSubActive
-                                      ? 'bg-brand-100/80 font-semibold text-brand-900 shadow-2xs'
-                                      : 'font-medium text-slate-500 hover:bg-slate-100/80 hover:text-slate-900',
-                                  )}
-                                >
-                                  <span
+                        {/* Submenu links: sempre abertos, sem botão de recolher */}
+                        {it.subItems && it.subItems.length > 0 && (
+                          <ul className="ml-4 mt-0.5 space-y-0.5 border-l border-slate-200 pl-2.5 py-0.5">
+                            {it.subItems.map((sub) => {
+                              const isSubActive = isRouteActive(sub.to, loc.pathname, loc.search, sub.end);
+                              return (
+                                <li key={sub.to}>
+                                  <Link
+                                    to={sub.to}
                                     className={clsx(
-                                      'size-1.5 shrink-0 rounded-full transition-colors',
-                                      isSubActive ? 'bg-brand-700' : 'bg-slate-300',
+                                      'flex items-center gap-2 rounded-md px-2 py-1 text-xs transition-colors',
+                                      isSubActive
+                                        ? 'bg-brand-100/80 font-semibold text-brand-900 shadow-2xs'
+                                        : 'font-medium text-slate-500 hover:bg-slate-100/80 hover:text-slate-900',
                                     )}
-                                    aria-hidden
-                                  />
-                                  <span className="truncate">{sub.label}</span>
-                                </Link>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ))}
+                                  >
+                                    <span
+                                      className={clsx(
+                                        'size-1.5 shrink-0 rounded-full transition-colors',
+                                        isSubActive ? 'bg-brand-700' : 'bg-slate-300',
+                                      )}
+                                      aria-hidden
+                                    />
+                                    <span className="truncate">{sub.label}</span>
+                                  </Link>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            );
+          })}
         </nav>
         <div className="border-t border-slate-100 bg-slate-50/60 p-3 flex flex-col gap-2">
           <button
@@ -431,6 +678,35 @@ export function Layout() {
           className="w-full flex-1 px-7 py-6 focus:outline-none md:pb-10"
           key={loc.pathname}
         >
+          {me?.readOnlyMode && (
+            <div className="mb-4">
+              <Alert tone="warn" title="Modo Suporte Somente-Leitura (SUPER_ADMIN_VIEWER)">
+                Você está navegando em modo auditoria/suporte sem permissão de escrita. Todas as criações, edições e
+                disparos são recusados pelo servidor (HTTP 403).
+              </Alert>
+            </div>
+          )}
+          {isImpersonating && masterWorkspace && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50/90 px-4 py-2.5 text-xs text-amber-950 shadow-2xs">
+              <div className="flex items-center gap-2">
+                <Building2 className="size-4 shrink-0 text-amber-700" aria-hidden />
+                <span>
+                  Você está operando no tenant cliente <strong>{me?.workspace.name}</strong> em modo multi-empresa.
+                </span>
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                loading={backToMasterM.isPending}
+                onClick={() => {
+                  setActiveWorkspaceId(masterWorkspace.id);
+                  backToMasterM.mutate(masterWorkspace.id);
+                }}
+              >
+                Voltar para {masterWorkspace.name}
+              </Button>
+            </div>
+          )}
           <Outlet />
         </main>
       </div>
@@ -438,20 +714,26 @@ export function Layout() {
       {/* Barra móvel: 5 destinos fixos (§26.11) */}
       <nav aria-label="Navegação móvel" className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white md:hidden" data-testid="mobile-nav">
         <ul className="grid grid-cols-5">
-          {MOBILE.map((it) => (
-            <li key={it.to}>
-              <NavLink
-                to={it.to}
-                end={it.end}
-                className={({ isActive }) =>
-                  clsx('flex h-14 flex-col items-center justify-center gap-0.5 text-[11px]', isActive ? 'font-semibold text-brand-800' : 'text-slate-600')
-                }
-              >
-                {it.icon}
-                {it.label}
-              </NavLink>
-            </li>
-          ))}
+          {MOBILE.map((it) => {
+            const m =
+              it.to === '/inteligencia' && !isAtLeast('advanced')
+                ? { to: '/telefonia', label: 'Telefonia', icon: <PhoneCall className="size-5" aria-hidden /> }
+                : it;
+            return (
+              <li key={m.to}>
+                <NavLink
+                  to={m.to}
+                  end={'end' in m ? m.end : undefined}
+                  className={({ isActive }) =>
+                    clsx('flex h-14 flex-col items-center justify-center gap-0.5 text-[11px]', isActive ? 'font-semibold text-brand-800' : 'text-slate-600')
+                  }
+                >
+                  {m.icon}
+                  {m.label}
+                </NavLink>
+              </li>
+            );
+          })}
         </ul>
       </nav>
       <AttemptDrawer />

@@ -641,7 +641,12 @@ export function Pager({ page, hasNext, onPrev, onNext, total }: { page: number; 
 
 export function TableWrap({ children, label }: { children: ReactNode; label?: string }) {
   return (
-    <div className="overflow-x-auto" role="region" aria-label={label} tabIndex={label ? 0 : undefined}>
+    <div
+      className="max-h-[560px] overflow-auto [&_thead_th]:sticky [&_thead_th]:top-0 [&_thead_th]:z-10 [&_thead_th]:bg-slate-50/95 [&_thead_th]:backdrop-blur"
+      role="region"
+      aria-label={label}
+      tabIndex={label ? 0 : undefined}
+    >
       {children}
     </div>
   );

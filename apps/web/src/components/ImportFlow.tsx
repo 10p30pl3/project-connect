@@ -128,16 +128,44 @@ export function ImportFlow({ onImported, initialName = '' }: { onImported: (r: I
 
   async function goReview() {
     const e: Record<string, string> = {};
-    if (!mapping.some((m) => m.target === 'external_id')) e.mapping = 'Mapeie uma coluna para "Identificador do cliente".';
-    const dup = mapping.filter((m) => !['attribute', 'ignore'].includes(m.target)).map((m) => m.target);
+    let effectiveContent = content;
+    let effectiveMapping = mapping;
+    if (!effectiveMapping.some((m) => m.target === 'external_id')) {
+      const hasContactField = effectiveMapping.some((m) => m.target !== 'ignore');
+      if (!hasContactField) {
+        e.mapping = 'Mapeie ao menos uma coluna (nome ou telefone) para importar.';
+      } else {
+        // Gera identificador automático (id_cliente) para planilhas simples sem coluna de ID/CPF
+        const lines = content.replace(/\r\n/g, '\n').split('\n').filter((l) => l.trim() !== '');
+        const sep = delimiter === 'auto' ? (lines[0]?.includes(';') ? ';' : ',') : delimiter;
+        let rowSeq = 1;
+        const enriched = lines.map((line, idx) => {
+          if (idx === 0 && hasHeader) return `id_cliente${sep}${line}`;
+          const code = `AUTO-${String(rowSeq++).padStart(5, '0')}`;
+          return `${code}${sep}${line}`;
+        });
+        effectiveContent = enriched.join('\n');
+        effectiveMapping = [{ column: 'id_cliente', target: 'external_id', type: 'text', required: true }, ...effectiveMapping];
+        setContent(effectiveContent);
+        setMapping(effectiveMapping);
+      }
+    }
+    const dup = effectiveMapping.filter((m) => !['attribute', 'ignore'].includes(m.target)).map((m) => m.target);
     const d = dup.find((t, i) => dup.indexOf(t) !== i);
     if (d) e.mapping = `O destino "${TARGET_LABEL[d]}" foi usado em mais de uma coluna.`;
-    if (mapping.some((m) => m.target === 'attribute' && !m.attributeName?.trim())) e.mapping = 'Informe o nome de cada campo adicional.';
-    if (mapping.some((m) => m.target.startsWith('digital') && !m.digitalType)) e.mapping = 'Identifique o tipo (WhatsApp ou SMS) de cada destino digital.';
+    if (effectiveMapping.some((m) => m.target === 'attribute' && !m.attributeName?.trim())) e.mapping = 'Informe o nome de cada campo adicional.';
+    if (effectiveMapping.some((m) => m.target.startsWith('digital') && !m.digitalType)) e.mapping = 'Identifique o tipo (WhatsApp ou SMS) de cada destino digital.';
     setErrors(e);
     if (e.mapping) return;
     try {
-      const p = await previewM.mutateAsync(true);
+      const p = await post<ImportPreview>('/imports/preview', {
+        content: effectiveContent,
+        delimiter,
+        hasHeader,
+        mapping: effectiveMapping,
+        defaultTimezone,
+        defaultWindowDurationMinutes: defaultDurationMinutes ? Number(defaultDurationMinutes) : undefined,
+      });
       setPreview(p);
       setSub('REVIEW');
     } catch (err) {
@@ -278,46 +306,48 @@ export function ImportFlow({ onImported, initialName = '' }: { onImported: (r: I
                 }}
               />
 
-              <div className="pt-2 border-t border-slate-200/80 space-y-2.5">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 block">
-                  Preferência Horária (BTTC)
-                </span>
-                <Field
-                  label="Fuso horário padrão"
-                  tooltip="Fuso civil de referência para interpretar as janelas BTTC caso o arquivo não especifique fuso por linha."
-                >
-                  {(p) => (
-                    <Select id={p.id} value={defaultTimezone} onChange={(e) => setDefaultTimezone(e.target.value)} className="text-xs">
-                      <option value="America/Sao_Paulo">America/Sao_Paulo (Brasília · Padrão)</option>
-                      <option value="America/Manaus">America/Manaus (Amazonas)</option>
-                      <option value="America/Cuiaba">America/Cuiaba (Mato Grosso)</option>
-                      <option value="America/Belem">America/Belem (Pará)</option>
-                      <option value="America/Fortaleza">America/Fortaleza (Nordeste)</option>
-                      <option value="America/Recife">America/Recife (Pernambuco)</option>
-                      <option value="America/Rio_Branco">America/Rio_Branco (Acre)</option>
-                      <option value="America/Noronha">America/Noronha (Fernando de Noronha)</option>
-                      <option value="UTC">UTC (Universal)</option>
-                    </Select>
-                  )}
-                </Field>
-                <Field
-                  label="Duração da janela (minutos)"
-                  tooltip="Duração padrão aplicada quando a base trouxer apenas horário de início (ex: 14:00 + 120min = término 16:00)."
-                >
-                  {(p) => (
-                    <Input
-                      id={p.id}
-                      type="number"
-                      min={15}
-                      max={720}
-                      placeholder="Opcional (ex: 120)"
-                      value={defaultDurationMinutes}
-                      onChange={(e) => setDefaultDurationMinutes(e.target.value)}
-                      className="text-xs font-mono"
-                    />
-                  )}
-                </Field>
-              </div>
+              <details className="pt-2 border-t border-slate-200/80">
+                <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-wider text-slate-600 hover:text-slate-900">
+                  Melhor Horário para Ligar (opcional)
+                </summary>
+                <div className="mt-2.5 space-y-2.5">
+                  <Field
+                    label="Fuso horário padrão"
+                    tooltip="Fuso civil de referência para interpretar as janelas BTTC caso o arquivo não especifique fuso por linha."
+                  >
+                    {(p) => (
+                      <Select id={p.id} value={defaultTimezone} onChange={(e) => setDefaultTimezone(e.target.value)} className="text-xs">
+                        <option value="America/Sao_Paulo">America/Sao_Paulo (Brasília · Padrão)</option>
+                        <option value="America/Manaus">America/Manaus (Amazonas)</option>
+                        <option value="America/Cuiaba">America/Cuiaba (Mato Grosso)</option>
+                        <option value="America/Belem">America/Belem (Pará)</option>
+                        <option value="America/Fortaleza">America/Fortaleza (Nordeste)</option>
+                        <option value="America/Recife">America/Recife (Pernambuco)</option>
+                        <option value="America/Rio_Branco">America/Rio_Branco (Acre)</option>
+                        <option value="America/Noronha">America/Noronha (Fernando de Noronha)</option>
+                        <option value="UTC">UTC (Universal)</option>
+                      </Select>
+                    )}
+                  </Field>
+                  <Field
+                    label="Duração da janela (minutos)"
+                    tooltip="Duração padrão aplicada quando a base trouxer apenas horário de início (ex: 14:00 + 120min = término 16:00)."
+                  >
+                    {(p) => (
+                      <Input
+                        id={p.id}
+                        type="number"
+                        min={15}
+                        max={720}
+                        placeholder="Opcional (ex: 120)"
+                        value={defaultDurationMinutes}
+                        onChange={(e) => setDefaultDurationMinutes(e.target.value)}
+                        className="text-xs font-mono"
+                      />
+                    )}
+                  </Field>
+                </div>
+              </details>
             </div>
           </div>
           <div className="flex justify-end">

@@ -1,51 +1,75 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Activity,
-  Calendar,
-  CheckCircle2,
   ChevronDown,
   ChevronUp,
-  Clock,
-  Eye,
-  FileCheck2,
-  FileText,
+  Database,
   Filter,
   ShieldCheck,
   User,
 } from 'lucide-react';
-import { get, qs } from '../lib/api';
+import { errorMessage, get, post, qs } from '../lib/api';
+import { useAuth } from '../lib/auth';
 import type { AuditRow, Paginated } from '../lib/types';
 import { fmtDateTimeSec } from '../lib/format';
 import { useCursorPager } from '../lib/hooks';
 import {
-  Alert,
   Badge,
+  Button,
   Card,
   ErrorState,
   Loading,
   PageHeader,
   Pager,
   TableWrap,
+  useToast,
 } from '../components/ui';
 
 export function ObservabilityPage() {
+  const { can } = useAuth();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const canSeePartitions = can('billing.costs');
+  const canEnsurePartitions = can('workspace.provision');
+
   const pager = useCursorPager();
   const [selectedEntityFilter, setSelectedEntityFilter] = useState<string>('ALL');
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
 
+  const partitionsQ = useQuery({
+    queryKey: ['observability', 'partitions'],
+    queryFn: () =>
+      get<{
+        parent: string;
+        partitionCount: number;
+        defaultPartitionRows: number;
+        partitions: { name: string; bounds: string; estimatedRows: number; sizePretty: string; isDefault: boolean }[];
+      }>('/observability/partitions'),
+    enabled: canSeePartitions,
+    retry: false,
+  });
+
+  const ensurePartM = useMutation({
+    mutationFn: () => post<{ created: string[] }>('/observability/partitions/ensure', {}),
+    onSuccess: (res) => {
+      toast('success', res.created.length ? `Partições criadas: ${res.created.join(', ')}` : 'Partições futuras já provisionadas.');
+      qc.invalidateQueries({ queryKey: ['observability', 'partitions'] });
+    },
+    onError: (e) => toast('error', errorMessage(e)),
+  });
+
+  const entityParam = selectedEntityFilter !== 'ALL' ? selectedEntityFilter : undefined;
+
   const q = useQuery({
-    queryKey: ['audit', pager.cursor],
-    queryFn: () => get<Paginated<AuditRow>>(`/audit${qs({ cursor: pager.cursor })}`),
+    queryKey: ['audit', pager.cursor, selectedEntityFilter],
+    queryFn: () => get<Paginated<AuditRow>>(`/audit${qs({ cursor: pager.cursor, entity: entityParam })}`),
     placeholderData: keepPreviousData,
   });
 
   const items = q.data?.items ?? [];
-  const filteredItems =
-    selectedEntityFilter === 'ALL'
-      ? items
-      : items.filter((it) => it.entity.toLowerCase().includes(selectedEntityFilter.toLowerCase()));
+  const filteredItems = items;
 
   return (
     <div className="space-y-6">
@@ -74,13 +98,20 @@ export function ObservabilityPage() {
                 { key: 'campaign', label: 'Campanhas' },
                 { key: 'contact', label: 'Contatos & Bloqueios' },
                 { key: 'mailing', label: 'Mailings' },
+                { key: 'connection', label: 'Canais' },
+                { key: 'voice_agent', label: 'Agentes Voz' },
+                { key: 'telephony', label: 'Telefonia' },
+                { key: 'billing', label: 'Billing' },
                 { key: 'workspace', label: 'Controle Institucional' },
                 { key: 'cpc_hypothesis', label: 'Hipóteses CPC' },
               ].map((f) => (
                 <button
                   key={f.key}
                   type="button"
-                  onClick={() => setSelectedEntityFilter(f.key)}
+                  onClick={() => {
+                    setSelectedEntityFilter(f.key);
+                    pager.reset();
+                  }}
                   className={`px-2 py-0.5 rounded-full text-xs transition font-medium ${
                     selectedEntityFilter === f.key
                       ? 'bg-brand-700 text-white font-semibold'
@@ -195,6 +226,53 @@ export function ObservabilityPage() {
           </>
         )}
       </Card>
+
+      {canSeePartitions && partitionsQ.data && (
+        <Card
+          title={
+            <span className="inline-flex items-center gap-2">
+              <Database className="size-4 text-brand-700" aria-hidden />
+              <span>Partições Mensais PostgreSQL ({partitionsQ.data.parent})</span>
+              <Badge tone={partitionsQ.data.defaultPartitionRows > 0 ? 'amber' : 'green'}>
+                {partitionsQ.data.partitionCount} partições · {partitionsQ.data.defaultPartitionRows} em default
+              </Badge>
+            </span>
+          }
+          actions={
+            canEnsurePartitions && (
+              <Button size="sm" variant="secondary" loading={ensurePartM.isPending} onClick={() => ensurePartM.mutate()}>
+                Provisionar Próximos Meses
+              </Button>
+            )
+          }
+          padded={false}
+        >
+          <TableWrap label="Partições de ledger">
+            <table className="data w-full">
+              <thead>
+                <tr>
+                  <th>Partição</th>
+                  <th>Limites Temporais (UTC)</th>
+                  <th className="text-right">Linhas Estimadas</th>
+                  <th className="text-right">Tamanho</th>
+                </tr>
+              </thead>
+              <tbody>
+                {partitionsQ.data.partitions.map((p) => (
+                  <tr key={p.name}>
+                    <td className="font-mono text-xs font-semibold">
+                      {p.name} {p.isDefault && <Badge tone="gray">DEFAULT</Badge>}
+                    </td>
+                    <td className="font-mono text-[11px] text-slate-600">{p.bounds}</td>
+                    <td className="text-right tabular-nums text-xs">{p.estimatedRows.toLocaleString('pt-BR')}</td>
+                    <td className="text-right tabular-nums text-xs">{p.sizePretty}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableWrap>
+        </Card>
+      )}
     </div>
   );
 }

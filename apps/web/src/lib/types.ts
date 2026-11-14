@@ -19,13 +19,28 @@ import type { ContactIntelligenceRationale } from './intelligence-rationale';
 
 export type { ContactIntelligenceRationale, CampaignTemplate, CampaignTemplateCreate };
 
+export type WorkspaceOption = {
+  id: string;
+  name: string;
+  timezone: string;
+  organizationId: string;
+  organizationName?: string;
+  isMaster: boolean;
+  planCode: string;
+  role: Role;
+};
+
 export type Me = {
   id: string;
   email: string;
   name: string;
   role: Role;
+  globalRole?: Role | null;
+  isSuperAdmin?: boolean;
+  readOnlyMode?: boolean;
   organization: { id: string; name: string };
-  workspace: { id: string; name: string; timezone: string };
+  workspace: { id: string; name: string; timezone: string; isMaster?: boolean; planCode?: string };
+  workspaces?: WorkspaceOption[];
   /** true quando a API roda sem login (mockup) */
   demoMode?: boolean;
 };
@@ -48,11 +63,19 @@ export type OverviewQueueItem = {
 };
 
 export type Overview = {
+  viewMode?: 'CLIENT_OPERATIONAL' | 'SUPER_ADMIN_FULL';
   campaigns: { running: number; paused: number; ready: number; scheduled: number; completed: number };
   attempts: { active: number; reconciliation: number; sentToday: number };
   contacts: number;
   mailings: number;
   globalSuspension: boolean;
+  kpis?: {
+    totalAttempts: number;
+    cpcAttempts: number;
+    cpcRatePct: number | null;
+    costPerCpcBrl: number | null;
+    savingsPct: number | null;
+  };
   workingRecords?: AttemptRow[];
   nextInQueue?: OverviewQueueItem[];
 };
@@ -126,6 +149,7 @@ export type Connection = {
   provider: string;
   tariff: number | null;
   tariffUpdatedAt: string | null;
+  tenantId?: string | null;
   active: boolean;
   endpointUrl?: string | null;
   callerId?: string | null;

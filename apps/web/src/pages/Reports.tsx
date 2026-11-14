@@ -24,7 +24,9 @@ import {
   TrendingUp,
   Users,
 } from 'lucide-react';
+import { isSuperAdminRole } from '@voll/shared';
 import { get } from '../lib/api';
+import { useAuth } from '../lib/auth';
 import { fmtMoney, fmtNumber, fmtPercent } from '../lib/format';
 import { Alert, Badge, Button, Card, Empty, ErrorState, Field, InfoTooltip, Loading, PageHeader, Select, TableWrap } from '../components/ui';
 
@@ -85,7 +87,7 @@ interface ReportData {
         cpcRate: number;
         conversions: number;
         convRate: number;
-        costPerCpc: number;
+        costPerCpc: number | null;
         cumulativeConvPct: number;
       }>;
       optimalCutoffStep: number;
@@ -122,6 +124,8 @@ interface ReportData {
 }
 
 export function ReportsPage() {
+  const { me } = useAuth();
+  const isSuper = isSuperAdminRole(me?.role);
   const [activeTab, setActiveTab] = useState<ReportTab>('penetration');
   const [selectedCampaign, setSelectedCampaign] = useState<string>('all');
   const [selectedChannel, setSelectedChannel] = useState<string>('all');
@@ -145,45 +149,62 @@ export function ReportsPage() {
   const handleExportCsv = () => {
     if (!reportQuery.data) return;
     const r = reportQuery.data.reports;
-    let csvContent = 'data:text/csv;charset=utf-8,';
+    const esc = (v: unknown) => {
+      const s = String(v ?? '');
+      return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const row = (...cols: unknown[]) => cols.map(esc).join(';');
+    const lines: string[] = [];
 
     if (activeTab === 'penetration') {
-      csvContent += 'Métrica,Valor,Percentual\n';
-      csvContent += `Base Total Carregada,${r.penetration.totalRecords},100%\n`;
-      csvContent += `Base Trabalhada,${r.penetration.workedRecords},${r.penetration.penetrationRate}%\n`;
-      csvContent += `Saldo Virgem Disponível,${r.penetration.availableRecords},${(100 - r.penetration.penetrationRate).toFixed(1)}%\n`;
-      csvContent += `Concluído com Sucesso,${r.penetration.completedSuccess},${((r.penetration.completedSuccess / r.penetration.totalRecords) * 100).toFixed(1)}%\n`;
-      csvContent += `Esgotado por Limite de Tentativas,${r.penetration.exhaustedMaxAttempts},${((r.penetration.exhaustedMaxAttempts / r.penetration.totalRecords) * 100).toFixed(1)}%\n`;
-      csvContent += `Bloqueados por DNC / Opt-Out,${r.penetration.dncExcluded},${r.penetration.churnRate}%\n`;
+      const den = Math.max(1, r.penetration.totalRecords);
+      lines.push(row('Métrica', 'Valor', 'Percentual'));
+      lines.push(row('Base Total Carregada', r.penetration.totalRecords, '100%'));
+      lines.push(row('Base Trabalhada', r.penetration.workedRecords, `${r.penetration.penetrationRate}%`));
+      lines.push(row('Saldo Virgem Disponível', r.penetration.availableRecords, `${((r.penetration.availableRecords / den) * 100).toFixed(1)}%`));
+      lines.push(row('Concluído com Sucesso', r.penetration.completedSuccess, `${((r.penetration.completedSuccess / den) * 100).toFixed(1)}%`));
+      lines.push(row('Esgotado por Limite de Tentativas', r.penetration.exhaustedMaxAttempts, `${((r.penetration.exhaustedMaxAttempts / den) * 100).toFixed(1)}%`));
+      lines.push(row('Bloqueados por DNC / Opt-Out', r.penetration.dncExcluded, `${r.penetration.churnRate}%`));
     } else if (activeTab === 'connectFunnel') {
-      csvContent += 'Canal,Discadas,Taxa Conexão,Atendimento Humano,Taxa AMD,Taxa CPC,Taxa Conversão\n';
+      lines.push(row('Canal', 'Discadas', 'Taxa Conexão', 'Atendimento Humano', 'Taxa AMD', 'Taxa CPC', 'Taxa Conversão'));
       r.connectFunnel.byChannel.forEach((c) => {
-        csvContent += `${c.label},${c.attempts},${c.connectRate}%,${c.humanAnswerRate}%,${c.amdRate}%,${c.cpcRate}%,${c.conversionRate}%\n`;
+        lines.push(row(c.label, c.attempts, `${c.connectRate}%`, `${c.humanAnswerRate}%`, `${c.amdRate}%`, `${c.cpcRate}%`, `${c.conversionRate}%`));
       });
     } else if (activeTab === 'retryEffectiveness') {
-      csvContent += 'Tentativa,Volume Discado,CPCs,Taxa CPC,Conversões,Taxa Conv,Custo/CPC,Conversão Acumulada\n';
+      lines.push(
+        isSuper
+          ? row('Tentativa', 'Volume Discado', 'CPCs', 'Taxa CPC', 'Conversões', 'Taxa Conv', 'Custo/CPC', 'Conversão Acumulada')
+          : row('Tentativa', 'Volume Discado', 'CPCs', 'Taxa CPC', 'Conversões', 'Taxa Conv', 'Conversão Acumulada'),
+      );
       r.retryEffectiveness.steps.forEach((s) => {
-        csvContent += `${s.step}ª tentativa,${s.attempts},${s.cpc},${s.cpcRate}%,${s.conversions},${s.convRate}%,R$ ${s.costPerCpc.toFixed(2)},${s.cumulativeConvPct}%\n`;
+        const baseCols = [`${s.step}ª tentativa`, s.attempts, s.cpc, `${s.cpcRate}%`, s.conversions, `${s.convRate}%`];
+        if (isSuper) {
+          baseCols.push(s.costPerCpc != null ? `R$ ${s.costPerCpc.toFixed(2)}` : '—');
+        }
+        baseCols.push(`${s.cumulativeConvPct}%`);
+        lines.push(row(...baseCols));
       });
     } else if (activeTab === 'dispositions') {
-      csvContent += 'Código,Descrição,Categoria,Volume,Percentual,É CPC,É Conversão\n';
+      lines.push(row('Código', 'Descrição', 'Categoria', 'Volume', 'Percentual', 'É CPC', 'É Conversão'));
       r.dispositions.items.forEach((d) => {
-        csvContent += `${d.code},${d.name},${d.category},${d.count},${d.pct}%,${d.isCpc ? 'SIM' : 'NÃO'},${d.isConversion ? 'SIM' : 'NÃO'}\n`;
+        lines.push(row(d.code, d.name, d.category, d.count, `${d.pct}%`, d.isCpc ? 'SIM' : 'NÃO', d.isConversion ? 'SIM' : 'NÃO'));
       });
     } else {
-      csvContent += 'Dia,08h,09h,10h,11h,12h,13h,14h,15h,16h,17h,18h,19h\n';
+      lines.push(row('Dia', '08h', '09h', '10h', '11h', '12h', '13h', '14h', '15h', '16h', '17h', '18h', '19h'));
       r.bestTime.weekdays.forEach((w) => {
-        csvContent += `${w.day},${w.cpcHourly.join(',')}\n`;
+        lines.push(row(w.day, ...w.cpcHourly));
       });
     }
 
-    const encodedUri = encodeURI(csvContent);
+    const blob = new Blob([`\uFEFF${lines.join('\n')}`], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `relatorio_${activeTab}_voll_connect.csv`);
+    link.href = url;
+    link.download = `relatorio_${activeTab}_voll_connect.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const tabs: Array<{ id: ReportTab; title: string; subtitle: string; tooltip: string; icon: any }> = [
@@ -366,7 +387,7 @@ export function ReportsPage() {
           )}
 
           {activeTab === 'retryEffectiveness' && (
-            <RetryEffectivenessReport report={reportQuery.data.reports.retryEffectiveness} />
+            <RetryEffectivenessReport report={reportQuery.data.reports.retryEffectiveness} isSuper={isSuper} />
           )}
 
           {activeTab === 'bestTime' && (
@@ -465,31 +486,38 @@ function PenetrationReport({
       <Card title="Composição do Inventário do Mailing">
         <div className="space-y-3">
           <div className="h-6 w-full rounded-xl bg-slate-100 flex overflow-hidden p-0.5 border border-slate-200">
-            <div
-              style={{ width: `${(report.completedSuccess / report.totalRecords) * 100}%` }}
-              className="bg-emerald-500 rounded-l-lg transition-all"
-              title={`Sucesso: ${report.completedSuccess}`}
-            />
-            <div
-              style={{ width: `${(report.exhaustedMaxAttempts / report.totalRecords) * 100}%` }}
-              className="bg-amber-500 transition-all"
-              title={`Esgotados por Limite: ${report.exhaustedMaxAttempts}`}
-            />
-            <div
-              style={{ width: `${(report.inRetryRecords / report.totalRecords) * 100}%` }}
-              className="bg-brand-500 transition-all"
-              title={`Em Ciclo de Retentativa: ${report.inRetryRecords}`}
-            />
-            <div
-              style={{ width: `${(report.availableRecords / report.totalRecords) * 100}%` }}
-              className="bg-slate-300 transition-all"
-              title={`Disponível Virgem: ${report.availableRecords}`}
-            />
-            <div
-              style={{ width: `${(report.dncExcluded / report.totalRecords) * 100}%` }}
-              className="bg-rose-500 rounded-r-lg transition-all"
-              title={`Opt-Out / DNC: ${report.dncExcluded}`}
-            />
+            {(() => {
+              const den = Math.max(1, report.totalRecords);
+              return (
+                <>
+                  <div
+                    style={{ width: `${(report.completedSuccess / den) * 100}%` }}
+                    className="bg-emerald-500 rounded-l-lg transition-all"
+                    title={`Sucesso: ${report.completedSuccess}`}
+                  />
+                  <div
+                    style={{ width: `${(report.exhaustedMaxAttempts / den) * 100}%` }}
+                    className="bg-amber-500 transition-all"
+                    title={`Esgotados por Limite: ${report.exhaustedMaxAttempts}`}
+                  />
+                  <div
+                    style={{ width: `${(report.inRetryRecords / den) * 100}%` }}
+                    className="bg-brand-500 transition-all"
+                    title={`Em Ciclo de Retentativa: ${report.inRetryRecords}`}
+                  />
+                  <div
+                    style={{ width: `${(report.availableRecords / den) * 100}%` }}
+                    className="bg-slate-300 transition-all"
+                    title={`Disponível Virgem: ${report.availableRecords}`}
+                  />
+                  <div
+                    style={{ width: `${(report.dncExcluded / den) * 100}%` }}
+                    className="bg-rose-500 rounded-r-lg transition-all"
+                    title={`Opt-Out / DNC: ${report.dncExcluded}`}
+                  />
+                </>
+              );
+            })()}
           </div>
 
           <div className="flex flex-wrap items-center gap-4 text-xs">
@@ -732,8 +760,10 @@ function ConnectFunnelReport({
 // ============================================================================
 function RetryEffectivenessReport({
   report,
+  isSuper,
 }: {
   report: ReportData['reports']['retryEffectiveness'];
+  isSuper: boolean;
 }) {
   return (
     <div className="space-y-4">
@@ -756,7 +786,9 @@ function RetryEffectivenessReport({
               <span>Ponto de Corte Ótimo</span>
               <InfoTooltip content="Teto de tentativas recomendado a partir do qual a conversão marginal cai abaixo de 3% e o custo por CPC triplica." />
             </div>
-            <div className="text-xl font-black text-amber-600">Até {report.optimalCutoffStep}ª tent.</div>
+            <div className="text-xl font-black text-amber-600">
+              {report.optimalCutoffStep > 0 ? `Até ${report.optimalCutoffStep}ª tent.` : '—'}
+            </div>
           </div>
         </div>
       </div>
@@ -783,13 +815,20 @@ function RetryEffectivenessReport({
                 <th>Taxa CPC</th>
                 <th>Conversões</th>
                 <th>Taxa Conv. Incremental</th>
-                <th>Custo Médio / CPC</th>
+                {isSuper && <th>Custo Médio / CPC</th>}
                 <th>% Acumulado Conversões</th>
                 <th>Classificação de Eficiência</th>
               </tr>
             </thead>
             <tbody>
-              {report.steps.map((s) => {
+              {report.steps.length === 0 ? (
+                <tr>
+                  <td colSpan={isSuper ? 9 : 8} className="py-8 text-center text-xs text-slate-500">
+                    Nenhuma tentativa registrada no período selecionado.
+                  </td>
+                </tr>
+              ) : (
+                report.steps.map((s) => {
                 const isPastCutoff = s.step > report.optimalCutoffStep;
                 return (
                   <tr key={s.step} className={clsx(isPastCutoff && 'bg-amber-50/40')}>
@@ -801,7 +840,11 @@ function RetryEffectivenessReport({
                     </td>
                     <td className="font-bold text-emerald-700">{fmtNumber(s.conversions)}</td>
                     <td>{s.convRate}%</td>
-                    <td className="font-mono text-slate-700">R$ {s.costPerCpc.toFixed(2)}</td>
+                    {isSuper && (
+                      <td className="font-mono text-slate-700">
+                        {s.costPerCpc != null ? `R$ ${s.costPerCpc.toFixed(2)}` : '—'}
+                      </td>
+                    )}
                     <td>
                       <div className="flex items-center gap-2">
                         <div className="w-16 h-2 rounded bg-slate-100 overflow-hidden">
@@ -826,7 +869,8 @@ function RetryEffectivenessReport({
                     </td>
                   </tr>
                 );
-              })}
+              })
+              )}
             </tbody>
           </table>
         </TableWrap>
@@ -871,9 +915,9 @@ function BestTimeReport({
           <div className="rounded-xl bg-slate-50 border border-slate-200/80 px-3.5 py-1.5 text-right">
             <div className="text-xs font-medium text-slate-500 flex items-center justify-end gap-1">
               <span>Janela de Pico</span>
-              <InfoTooltip content="Períodos semanais com maior taxa de atendimento humano e fechamento de acordos." />
+              <InfoTooltip content="Período semanal com maior taxa de atendimento humano e CPC no histórico real." />
             </div>
-            <div className="text-sm font-bold text-emerald-700">Ter–Qui · 10h–12h / 16h–18h</div>
+            <div className="text-sm font-bold text-emerald-700">{report.peakWindowWeekdays}</div>
           </div>
         </div>
       </div>
@@ -892,7 +936,7 @@ function BestTimeReport({
             {report.peakWindowWeekdays}
           </div>
           <div className="text-[11px] text-emerald-700 mt-1">
-            Taxa de CPC média de 48% a 53%
+            Faixa com maior taxa de CPC apurada
           </div>
         </div>
 

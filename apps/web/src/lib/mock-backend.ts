@@ -74,6 +74,8 @@ const ORG = { id: uuid(1), name: 'Voll Solutions' };
 const WS = { id: uuid(2), name: 'Principal', timezone: 'America/Sao_Paulo' };
 
 const DEMO_USERS: Record<Role, User & { id: string }> = {
+  SUPER_ADMIN: { id: uuid(8), email: 'superadmin@vollsolutions.com.br', name: 'Super Admin (Voll SaaS)', role: 'SUPER_ADMIN', active: true, createdAt: '2026-10-01T12:00:00Z' },
+  SUPER_ADMIN_VIEWER: { id: uuid(9), email: 'suporte@vollsolutions.com.br', name: 'Suporte Auditor (Leitura)', role: 'SUPER_ADMIN_VIEWER', active: true, createdAt: '2026-10-01T12:00:00Z' },
   ADMIN: { id: uuid(10), email: 'ricardo@vollsolutions.com.br', name: 'Ricardo (Voll Solutions)', role: 'ADMIN', active: true, createdAt: '2026-10-01T12:00:00Z' },
   MANAGER: { id: uuid(11), email: 'gestor@voll.local', name: 'Gestora Exemplo', role: 'MANAGER', active: true, createdAt: '2026-10-01T12:00:00Z' },
   SUPERVISOR: { id: uuid(12), email: 'supervisor@voll.local', name: 'Supervisor Exemplo', role: 'SUPERVISOR', active: true, createdAt: '2026-10-01T12:00:00Z' },
