@@ -10,3 +10,4 @@ apps/web/playwright-report/
 services/whisper/models/
 __pycache__/
 *.pyc
+*.bak

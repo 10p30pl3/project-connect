@@ -98,6 +98,14 @@ for i in $(seq 1 60); do
   [[ $i == 60 ]] && fail "Postgres não respondeu."
 done
 
+say "Backup pré-migração (rotação automática das 3 últimas cópias)"
+BACKUP_DIR="$DEPLOY_DIR/backups"
+mkdir -p "$BACKUP_DIR"
+BACKUP_FILE="$BACKUP_DIR/voll_plan_$(date +%Y%m%d_%H%M%S).sql.gz"
+"${COMPOSE[@]}" exec -T db pg_dump -U voll -d voll_plan | gzip -c > "$BACKUP_FILE"
+ls -1t "$BACKUP_DIR"/voll_plan_*.sql.gz 2>/dev/null | tail -n +4 | xargs -r rm -f
+ls -lh "$BACKUP_FILE"
+
 say "Aplicando migrações"
 "${COMPOSE[@]}" run --rm --no-deps api node dist/db/migrate.js
 
@@ -129,6 +137,9 @@ if command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q "Status: active
     echo "Libere também a faixa RTP do FreeSWITCH para o IP da operadora (ex.: ufw allow from <IP do tronco> to any port 16384:32768 proto udp)."
   fi
 fi
+
+say "Limpando cache antigo do Docker Builder"
+docker builder prune -af >/dev/null 2>&1 || true
 
 say "Verificando"
 for i in $(seq 1 30); do
