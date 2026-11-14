@@ -1,0 +1,16 @@
+[
+  {
+    "id": "directcall",
+    "name": "DirectCall",
+    "providerId": "directcall",
+    "direction": "both",
+    "realm": "sip.example.com.br",
+    "proxy": "sip.example.com.br",
+    "username": "YOUR_SIP_USERNAME",
+    "password": "YOUR_PASSWORD",
+    "register": true,
+    "maxChannels": 30,
+    "active": false,
+    "external": false
+  }
+]

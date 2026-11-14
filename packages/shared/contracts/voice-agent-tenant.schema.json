@@ -105,6 +105,18 @@
       },
       "maxItems": 0
     },
+    "publicWidgetKey": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "allowedOrigins": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "active": {
       "type": "boolean"
     }

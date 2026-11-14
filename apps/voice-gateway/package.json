@@ -17,6 +17,8 @@
     "dotenv": "^17.3.1",
     "drachtio-fsmrf": "4.1.2",
     "drachtio-srf": "^5.0.6",
+    "opusscript": "^0.1.1",
+    "werift": "^0.27.0",
     "ws": "^8.19.0"
   },
   "devDependencies": {

@@ -216,6 +216,10 @@ class OutboundRouteManager {
           return `    <!-- Rota de Saída: ${escXml(r.name)} -->
     <extension name="${escXml(r.id)}">
       <condition field="destination_number" expression="${escXml(matchPattern)}">
+        <!-- Jitter buffer adaptativo (60ms a 140ms) para amortecer latência e variações de jitter transatlântico Brasil-Europa -->
+        <action application="set" data="jitterbuffer_msec=60:140:20"/>
+        <action application="set" data="rtp_jitter_buffer_during_bridge=true"/>
+        <action application="set" data="rtp_audio_in_level=-3"/>
         <!-- Normalizacao de BINA: se o caller_id for ramal interno (< 10 digitos) ou vazio, usa o DID homologado da rota para evitar 603 Decline da operadora -->
         <action application="set" data="effective_caller_id_number=\${cond(\${regex(\${caller_id_number}|^[0-9]{10,13}$)} == true ? \${caller_id_number} : '${escXml(cidNum)}')}"/>
         <action application="set" data="effective_caller_id_name=\${cond(\${caller_id_name} == '' ? '${escXml(cidName)}' : \${caller_id_name})}"/>
@@ -234,7 +238,7 @@ class OutboundRouteManager {
   <context name="default">
     <!-- Teste de Eco / Loopback de Audio (*99 ou echo) -->
     <extension name="echo_test">
-      <condition field="destination_number" expression="^(\\*99|echo|test)$">
+      <condition field="destination_number" expression="^(\\*?99|echo|test)$">
         <action application="answer"/>
         <action application="set" data="playback_terminators=none"/>
         <action application="sleep" data="500"/>
@@ -297,7 +301,7 @@ ${renderRoutesXml()}
 
     <!-- Teste de Eco (*99 ou echo) -->
     <extension name="test_echo">
-      <condition field="destination_number" expression="^(\\*99|test|echo)$">
+      <condition field="destination_number" expression="^(\\*?99|test|echo)$">
         <action application="answer"/>
         <action application="set" data="playback_terminators=none"/>
         <action application="sleep" data="500"/>

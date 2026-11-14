@@ -2377,7 +2377,16 @@
           <span class="nav-label">Agentes IA</span>
         </button>
 
-        <div class="nav-section-label">TELEFONIA & GESTÃO</div>
+        <div class="nav-section-label">TELEFONIA</div>
+        <button class="nav-item" id="nav-item-extensions" onclick="switchMainSection('extensions')">
+          <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+          </svg>
+          <span class="nav-label">Ramais SIP</span>
+          <span class="nav-badge zero" id="badge-nav-extensions">0</span>
+        </button>
+
+        <div class="nav-section-label">GESTÃO & CONFIGURAÇÃO</div>
         <button class="nav-item" id="nav-item-settings" onclick="switchSettingsSubtab('trunks')">
           <svg class="nav-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
@@ -2394,7 +2403,7 @@
             </svg>
             <span>TELEFONIA</span>
           </div>
-          <button class="sidebar-subitem" id="subitem-extensions" onclick="switchSettingsSubtab('extensions')">
+          <button class="sidebar-subitem" id="subitem-extensions" onclick="switchMainSection('extensions')">
             <span class="sidebar-subitem-dot"></span>
             <span class="sidebar-subitem-label">Ramais SIP</span>
             <span class="sidebar-subitem-badge" id="badge-extensions-count">11</span>
@@ -2583,6 +2592,7 @@
                     <span id="txt-refresh">Ao Vivo (1.5s)</span>
                   </button>
                   <button class="btn btn-sm" onclick="fetchCallsData()">Atualizar</button>
+                  <button class="btn btn-sm" onclick="openWebRtcTestWidget()">🌐 WebRTC Navegador</button>
                   <button class="btn btn-primary btn-sm" onclick="openOriginateModal()">
                     <span>+ Chamada de Teste</span>
                   </button>
@@ -2744,7 +2754,142 @@
           </div>
         </section>
 
-        <!-- MÓDULO 4: CONFIGURAÇÕES -->
+        <!-- MÓDULO 4: RAMAIS SIP & TELEFONIA INTERNA -->
+        <section id="sec-extensions" class="main-section">
+          <div class="calls-header">
+            <div class="section-title">
+              <span>Ramais SIP & Telefonia Interna</span>
+              <span style="font-size: 13px; font-weight: normal; color: var(--text-muted);" id="lbl-extensions-summary">Carregando status dos ramais...</span>
+            </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <button class="btn btn-sm" onclick="loadExtensionsTab()">🔄 Recarregar</button>
+              <button class="btn btn-sm" onclick="syncExtensionsFreeSwitch()" title="Sincroniza os arquivos XML no diretório e recarrega o FreeSWITCH (reloadxml)">🔄 Sincronizar FreeSWITCH</button>
+              <button class="btn btn-sm" onclick="generateExtensionsRange()" title="Garante que todos os ramais de 1000 a 1010 estão criados">⚡ Gerar 1000-1010</button>
+              <button class="btn btn-sm" onclick="openSipConfigModal()">ℹ️ Conexão SIP</button>
+              <button class="btn btn-sm" onclick="openSoftphoneModal()">📱 Softphone de Teste</button>
+              <button class="btn btn-sm btn-primary" onclick="openExtensionModal()">+ Novo Ramal</button>
+            </div>
+          </div>
+
+          <!-- Métricas e KPIs no topo -->
+          <div class="metric-grid" style="margin-bottom: 20px;">
+            <div class="metric-card">
+              <div>
+                <div class="metric-label">Servidor SIP FreeSWITCH</div>
+                <div class="metric-value" style="font-size: 18px; font-family: monospace;" id="ext-kpi-server">192.168.15.36:5080</div>
+                <div style="font-size: 11px; color: var(--text-dim); margin-top: 3px;">Perfil Sofia drachtio_mrf (UDP/TCP)</div>
+              </div>
+              <div class="metric-icon">🌐</div>
+            </div>
+            <div class="metric-card">
+              <div>
+                <div class="metric-label">Ramais Registrados (Online)</div>
+                <div class="metric-value" style="color: var(--success);" id="ext-kpi-online">0</div>
+                <div style="font-size: 11px; color: var(--text-dim); margin-top: 3px;">Softphones conectados ao vivo</div>
+              </div>
+              <div class="metric-icon" style="color: var(--success);">🟢</div>
+            </div>
+            <div class="metric-card">
+              <div>
+                <div class="metric-label">Total de Ramais</div>
+                <div class="metric-value" id="ext-kpi-total">11</div>
+                <div style="font-size: 11px; color: var(--text-dim); margin-top: 3px;" id="ext-kpi-offline">11 offline (aguardando registro)</div>
+              </div>
+              <div class="metric-icon">☎️</div>
+            </div>
+            <div class="metric-card">
+              <div>
+                <div class="metric-label">Agente IA & Teste de Eco</div>
+                <div class="metric-value" style="font-size: 18px; font-family: monospace;">9000 & *99</div>
+                <div style="font-size: 11px; color: var(--text-dim); margin-top: 3px;">9000 = IA Voll Connect • *99 = Eco Loopback</div>
+              </div>
+              <div class="metric-icon">🤖</div>
+            </div>
+          </div>
+
+          <!-- Banner Informativo com Instruções de Telefonia Local e Configuração de Softphone -->
+          <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;">
+              <div style="display: flex; align-items: center; gap: 14px;">
+                <div style="width: 44px; height: 44px; border-radius: 10px; background: var(--bg-card-hover); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">
+                  📞
+                </div>
+                <div>
+                  <div style="font-size: 14px; font-weight: 700; color: var(--text-main);">
+                    Guia Rápido de Conexão SIP (MicroSIP / Zoiper / Linphone / Telefones IP)
+                  </div>
+                  <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px; line-height: 1.5;">
+                    Servidor / SIP Domain: <strong id="ext-quick-server" style="color: var(--text-main);">192.168.15.36:5080</strong> &bull;
+                    Usuário: <code style="padding: 1px 5px;">1000..1010</code> &bull;
+                    Senha padrão: <code style="padding: 1px 5px;">1234</code> &bull;
+                    Transporte: <strong>UDP</strong> &bull;
+                    Codecs: <strong>PCMU, PCMA, OPUS, G.722</strong>
+                  </div>
+                </div>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                <button class="btn btn-sm" onclick="copyAllSipConfig()">📋 Copiar Dados Gerais</button>
+                <button class="btn btn-sm" onclick="openSipConfigModal()">📖 Ver Guia Passo a Passo</button>
+                <button class="btn btn-sm" onclick="openSoftphoneModal()">📱 Testar no Softphone</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Seção Especial: Ramais de Atendimento IA (Configurados nos Agentes) -->
+          <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 20px;">🤖</span>
+                <div>
+                  <strong style="font-size: 14px; color: var(--text-main);">Ramais de Atendimento da IA (Agentes Conectados)</strong>
+                  <div style="font-size: 12px; color: var(--text-muted);">Disque estes ramais do seu softphone para falar diretamente com cada agente/persona</div>
+                </div>
+              </div>
+              <button class="btn btn-sm" onclick="switchMainSection('agents')" style="font-size: 11px;">⚙️ Gerenciar Agentes</button>
+            </div>
+            <div id="ai-extensions-cards" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px;">
+              <!-- Preenchido dinamicamente via JS -->
+            </div>
+          </div>
+
+          <!-- Filtro de Busca e Tabela de Ramais SIP -->
+          <div style="background: var(--bg-surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; margin-bottom: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <h4 style="font-size: 14px; font-weight: 700; color: var(--text-main);">Lista de Ramais SIP Cadastrados</h4>
+                <span class="tag" id="ext-filter-count" style="font-size: 11px;">11 ramais</span>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <input type="text" id="ext-search-input" placeholder="🔍 Filtrar por ramal ou nome..." oninput="filterExtensions(this.value)" style="width: 240px; padding: 6px 12px; font-size: 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-main);">
+              </div>
+            </div>
+
+            <div class="table-container" style="margin: 0;">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Ramal</th>
+                    <th>Identificador / Nome & Caller ID</th>
+                    <th>Contexto & Grupo</th>
+                    <th>Status de Registro Sofia</th>
+                    <th>Senha SIP</th>
+                    <th>Endereço / User-Agent</th>
+                    <th style="text-align: right; min-width: 250px;">Ações</th>
+                  </tr>
+                </thead>
+                <tbody id="extensions-table-body">
+                  <tr>
+                    <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                      Carregando ramais SIP...
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- MÓDULO 5: CONFIGURAÇÕES -->
         <section id="sec-settings" class="main-section">
 
           <!-- Barra de Navegação Superior Agrupada: Telefonia & Inteligência Artificial -->
@@ -2903,7 +3048,8 @@
               </div>
               <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                 <button class="btn btn-sm" onclick="loadAiProvidersTab()">🔄 Atualizar Custos</button>
-                <button class="btn btn-sm btn-primary" onclick="openAiCostModal()">📊 Extrato de Uso Detalhado</button>
+                <button class="btn btn-sm" onclick="openAiCostModal()">📊 Extrato de Uso Detalhado</button>
+                <button class="btn btn-sm btn-primary" onclick="openAiProviderConfigModal()">➕ Novo Provedor IA</button>
               </div>
             </div>
 
@@ -3160,16 +3306,26 @@
         <button class="btn btn-sm" onclick="closeModal('modal-originate')">✕</button>
       </div>
       <div class="modal-body">
-        <div class="form-group">
+        <!-- SELETOR DE MODO DE TESTE -->
+        <div style="display: flex; gap: 8px; margin-bottom: 14px; background: var(--bg-hover); padding: 4px; border-radius: 8px;">
+          <button type="button" id="tab-orig-echo" class="btn btn-sm" style="flex: 1; font-weight: 600; background: var(--primary); color: #fff;" onclick="selectOriginateMode('echo')">
+            🔊 Teste de Eco (*99)
+          </button>
+          <button type="button" id="tab-orig-phone" class="btn btn-sm" style="flex: 1; font-weight: 600; background: transparent; color: var(--text-main);" onclick="selectOriginateMode('phone')">
+            📱 Celular / Tronco
+          </button>
+        </div>
+
+        <div class="form-group" id="group-orig-to">
           <label>Destino SIP / Telefone (To)</label>
-          <input type="text" id="orig-to" value="" placeholder="ex: 11999998888 ou 1000">
+          <input type="text" id="orig-to" value="*99" placeholder="ex: *99, 11999998888 ou 1000">
           <div style="display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap;">
+            <button type="button" class="btn btn-xs" onclick="selectOriginateMode('echo')">Echo Test (*99)</button>
+            <button type="button" class="btn btn-xs" onclick="selectOriginateMode('phone')">Digitar Celular</button>
             <button type="button" class="btn btn-xs" onclick="document.getElementById('orig-to').value='1000'">Ramal 1000</button>
-            <button type="button" class="btn btn-xs" onclick="document.getElementById('orig-to').value='*99'">Echo Test (*99)</button>
           </div>
-          <div style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">
-            Digite seu <strong>número celular com DDD</strong> (ex: <code>11999998888</code>) para receber a ligação real via Directcall, ou um <strong>ramal registrado</strong> (ex: <code>1000</code>).<br>
-            <span style="color: var(--primary);">Nota: Não disque 9000 aqui. O ramal 9000 é o número de entrada da IA.</span>
+          <div id="orig-to-hint" style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">
+            <strong>Modo Echo Test (*99) selecionado:</strong> Teste acústico local direto no FreeSWITCH (sem custo de operadora). Testa áudio da IA, microfone, transcrição Whisper e detecção de voz em tempo real.
           </div>
         </div>
         <div class="form-group">
@@ -3287,7 +3443,17 @@
         <button class="btn btn-sm" onclick="closeModal('modal-ai-provider-config')">✕</button>
       </div>
       <div class="modal-body" style="padding: 20px; display: flex; flex-direction: column; gap: 14px;">
-        <input type="hidden" id="aiprov-id">
+        <input type="hidden" id="aiprov-is-new" value="0">
+        <div id="group-aiprov-identity" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="form-group" style="margin: 0;">
+            <label>ID do Provedor *</label>
+            <input type="text" id="aiprov-id" placeholder="ex: gemini-live">
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <label>Nome de Exibição</label>
+            <input type="text" id="aiprov-name" placeholder="ex: Gemini Live API">
+          </div>
+        </div>
 
         <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 8px;">
           <div>
@@ -3897,6 +4063,38 @@
               <input type="number" step="0.05" min="0.1" max="1" id="tenant-crosstalk-ratio" placeholder="0.45" value="0.45">
               <small style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">Somente modo "Atual (DSP)". Padrão 0.45.</small>
             </div>
+          </div>
+        </div>
+
+        <!-- Seção 6: Canal WebRTC / Widget Web -->
+        <div style="border-top: 1px solid var(--border); padding-top: 16px;">
+          <h4 style="font-size: 13px; font-weight: 700; color: var(--text-muted); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+            <span>🌐 Canal WebRTC / Widget na Página Web</span>
+          </h4>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+            <div class="form-group">
+              <label>Chave Pública do Widget (<code>publicWidgetKey</code>)</label>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" id="tenant-public-widget-key" placeholder="Opcional (ex: pk_live_...)" oninput="updateWebRtcSnippet()">
+                <button type="button" class="btn btn-sm" onclick="generateWidgetKey()" style="white-space: nowrap;">🎲 Gerar Chave</button>
+              </div>
+              <small style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">Para embutir em sites estáticos sem backend. Em apps logados, prefira Token Efêmero (<code>POST /v1/webrtc/token</code>).</small>
+            </div>
+            <div class="form-group">
+              <label>Origens Permitidas (CORS / Widget)</label>
+              <input type="text" id="tenant-allowed-origins" placeholder="Ex: https://meusite.com, http://127.0.0.1:8090 ou *">
+              <small style="font-size: 11px; color: var(--text-dim); margin-top: 2px;">Separe por vírgula. Vazio ou <code>*</code> aceita qualquer domínio.</small>
+            </div>
+          </div>
+          <div class="form-group" style="margin-top: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <label style="margin-bottom: 0;">Código HTML para Embutir na Página Web</label>
+              <div style="display: flex; gap: 6px;">
+                <button type="button" class="btn btn-sm" onclick="copyWebRtcSnippet()">📋 Copiar Código</button>
+                <button type="button" class="btn btn-sm btn-primary" onclick="testCurrentModalAgentWebRtc()">🎙️ Testar no Navegador</button>
+              </div>
+            </div>
+            <textarea id="tenant-webrtc-snippet" rows="3" readonly style="font-family: monospace; font-size: 11.5px; background: var(--bg-soft);"></textarea>
           </div>
         </div>
       </div>
@@ -5010,6 +5208,35 @@
     }
 
     // Modal Originate
+    function selectOriginateMode(mode) {
+      const tabEcho = document.getElementById('tab-orig-echo');
+      const tabPhone = document.getElementById('tab-orig-phone');
+      const inputTo = document.getElementById('orig-to');
+      const hint = document.getElementById('orig-to-hint');
+      const errBox = document.getElementById('orig-error-box');
+      if (errBox) errBox.style.display = 'none';
+
+      if (mode === 'echo') {
+        if (tabEcho) { tabEcho.style.background = 'var(--primary)'; tabEcho.style.color = '#fff'; }
+        if (tabPhone) { tabPhone.style.background = 'transparent'; tabPhone.style.color = 'var(--text-main)'; }
+        if (inputTo) inputTo.value = '*99';
+        if (hint) {
+          hint.innerHTML = '<strong>Modo Echo Test (*99) selecionado:</strong> Teste acústico local direto no FreeSWITCH (sem custo de operadora). Testa áudio da IA, microfone, transcrição Whisper e detecção de voz em tempo real.';
+        }
+      } else {
+        if (tabEcho) { tabEcho.style.background = 'transparent'; tabEcho.style.color = 'var(--text-main)'; }
+        if (tabPhone) { tabPhone.style.background = 'var(--primary)'; tabPhone.style.color = '#fff'; }
+        if (inputTo) {
+          if (inputTo.value === '*99') inputTo.value = '';
+          inputTo.placeholder = 'ex: 11999998888';
+          inputTo.focus();
+        }
+        if (hint) {
+          hint.innerHTML = 'Digite seu <strong>número celular com DDD</strong> (ex: <code>11999998888</code>) para receber a ligação real via Directcall. <span style="color:var(--text-muted);">(Requer senha configurada no tronco SIP).</span>';
+        }
+      }
+    }
+
     function openOriginateModal() {
       fetchTenantsData(); // Para garantir dropdown atualizado
       const errBox = document.getElementById('orig-error-box');
@@ -5021,6 +5248,7 @@
         btnSubmit.innerHTML = '<span>📞</span> <span>Chamada de Teste</span>';
       }
       if (btnCancel) btnCancel.disabled = false;
+      selectOriginateMode('echo');
       openModal('modal-originate');
     }
 
@@ -5093,6 +5321,10 @@
             explanation = 'Serviço Indisponível (SIP 503). O cluster FreeSWITCH não conseguiu alocar o canal SIP ou rota.';
           } else if (rawMsg.includes('404')) {
             explanation = 'Destino Não Encontrado (SIP 404). Verifique o número ou ramal digitado.';
+          } else if (rawMsg.includes('484')) {
+            explanation = 'Destino Incompleto (SIP 484). Verifique se o número possui DDD (ex: 11999998888) ou utilize *99 para teste de eco.';
+          } else if (rawMsg.includes('500')) {
+            explanation = 'Erro no Tronco SIP (SIP 500 Server Internal Error). A operadora DirectCall rejeitou a chamada externa. Isso acontece quando o tronco SIP exige a senha da conta DirectCall (WTVNM) ou liberação de IP no portal da operadora. Dica: Para validar o áudio, IA e transcrição imediatamente sem custo, selecione a aba "Teste de Eco (*99)".';
           }
 
           showToast(`Erro ao originar: ${rawMsg}`, 'error');
@@ -6706,6 +6938,8 @@ Para mais detalhes, acesse: vollsolutions.com.br/planos-e-precos
         document.getElementById('tenant-crosstalk-mode').value = xtalkMode;
         document.getElementById('tenant-crosstalk-threshold').value = t.crosstalkFilter?.threshold ?? '';
         document.getElementById('tenant-crosstalk-ratio').value = t.crosstalkFilter?.ratio ?? 0.45;
+        document.getElementById('tenant-public-widget-key').value = t.publicWidgetKey || '';
+        document.getElementById('tenant-allowed-origins').value = Array.isArray(t.allowedOrigins) ? t.allowedOrigins.join(', ') : '';
       } else {
         titleEl.innerHTML = '<span>🧠 + Novo Tenant / Configurar Prompt da IA</span>';
         idInput.disabled = false;
@@ -6735,11 +6969,52 @@ Para mais detalhes, acesse: vollsolutions.com.br/planos-e-precos
         document.getElementById('tenant-crosstalk-mode').value = 'atual';
         document.getElementById('tenant-crosstalk-threshold').value = '';
         document.getElementById('tenant-crosstalk-ratio').value = 0.45;
+        document.getElementById('tenant-public-widget-key').value = '';
+        document.getElementById('tenant-allowed-origins').value = '';
       }
 
       toggleStsEngineFields();
       updateCharCount();
+      updateWebRtcSnippet();
       openModal('modal-tenant-editor');
+    }
+
+    function generateWidgetKey() {
+      const rand = Array.from(crypto.getRandomValues(new Uint8Array(12))).map(b => b.toString(16).padStart(2, '0')).join('');
+      const el = document.getElementById('tenant-public-widget-key');
+      if (el) {
+        el.value = `pk_live_${rand}`;
+        updateWebRtcSnippet();
+      }
+    }
+
+    function updateWebRtcSnippet() {
+      const id = (document.getElementById('tenant-id')?.value || 'default').trim() || 'default';
+      const name = (document.getElementById('tenant-name')?.value || 'Atendente IA').trim() || 'Atendente IA';
+      const key = (document.getElementById('tenant-public-widget-key')?.value || '').trim();
+      const snippetEl = document.getElementById('tenant-webrtc-snippet');
+      if (!snippetEl) return;
+      const origin = window.location.origin;
+      const keyAttr = key ? ` data-widget-key="${key}"` : ' data-widget-key="SUA_PUBLIC_WIDGET_KEY"';
+      snippetEl.value = `<script src="${origin}/voll-voice-widget.js" data-voll-auto="true" data-agent-id="${id}"${keyAttr} data-title="${name}"></` + `script>`;
+    }
+
+    async function copyWebRtcSnippet() {
+      const snippetEl = document.getElementById('tenant-webrtc-snippet');
+      if (!snippetEl) return;
+      try {
+        await navigator.clipboard.writeText(snippetEl.value);
+        alert('Código HTML do widget WebRTC copiado!');
+      } catch {
+        snippetEl.select();
+        document.execCommand('copy');
+      }
+    }
+
+    function testCurrentModalAgentWebRtc() {
+      const id = (document.getElementById('tenant-id')?.value || 'default').trim() || 'default';
+      const name = (document.getElementById('tenant-name')?.value || id).trim();
+      openWebRtcTestWidget(id, name);
     }
 
     async function saveTenantFromModal() {
@@ -6772,6 +7047,9 @@ Para mais detalhes, acesse: vollsolutions.com.br/planos-e-precos
       const rawThreshold = document.getElementById('tenant-crosstalk-threshold').value.trim();
       const crosstalkThreshold = rawThreshold === '' ? null : parseFloat(rawThreshold);
       const crosstalkRatio = parseFloat(document.getElementById('tenant-crosstalk-ratio').value) || 0.45;
+      const publicWidgetKey = document.getElementById('tenant-public-widget-key')?.value.trim() || null;
+      const rawOrigins = document.getElementById('tenant-allowed-origins')?.value.trim() || '';
+      const allowedOrigins = rawOrigins ? rawOrigins.split(',').map(s => s.trim()).filter(Boolean) : [];
 
       const payload = {
         id,
@@ -6797,7 +7075,9 @@ Para mais detalhes, acesse: vollsolutions.com.br/planos-e-precos
           mode: crosstalkMode,
           ratio: crosstalkRatio,
           threshold: crosstalkThreshold
-        }
+        },
+        publicWidgetKey,
+        allowedOrigins
       };
 
       const btn = document.getElementById('btn-save-tenant');
@@ -6923,6 +7203,7 @@ Para mais detalhes, acesse: vollsolutions.com.br/planos-e-precos
                 <div style="display: flex; gap: 4px; flex-wrap: wrap; align-items: center;">
                   ${t.amd?.enabled ? '<span class="tag">AMD</span>' : ''}
                   ${t.stt?.enabled ? '<span class="tag">STT</span>' : ''}
+                  ${t.publicWidgetKey ? '<span class="tag tag-success" title="Widget WebRTC Público Ativo">🌐 WebRTC</span>' : ''}
                   ${(t.crosstalkFilter?.mode || t.crosstalkMode) === 'wespeaker' ? '<span class="tag">🧬 WeSpeaker</span>'
                     : (t.crosstalkFilter?.mode || t.crosstalkMode) === 'ecapa' ? '<span class="tag">🧠 ECAPA</span>'
                     : (t.crosstalkFilter?.mode || t.crosstalkMode) === 'none' ? '<span class="tag" style="color: var(--text-dim);">Filtro Off</span>'
@@ -6930,6 +7211,7 @@ Para mais detalhes, acesse: vollsolutions.com.br/planos-e-precos
                 </div>
               </td>
               <td style="text-align: right; white-space: nowrap;">
+                <button class="btn btn-sm" title="Testar Agente via WebRTC no Navegador" onclick="openWebRtcTestWidget('${escapeHtml(t.id)}', '${escapeHtml(t.name || t.id)}')">🌐</button>
                 <button class="btn btn-sm" onclick="openTenantModal('${escapeHtml(t.id)}')">✏️ Editar</button>
                 ${t.id !== 'default' ? `<button class="btn btn-sm btn-danger" style="margin-left: 4px;" title="Remover Tenant" onclick="deleteTenantPrompt('${escapeHtml(t.id)}')">🗑️</button>` : ''}
               </td>
@@ -8460,6 +8742,9 @@ Para mais detalhes, acesse: vollsolutions.com.br/planos-e-precos
             <button class="btn btn-sm" style="margin-left: 6px;" onclick="openAiProviderConfigModal('${escapeHtml(p.id)}')">
               ⚙️ Configurar
             </button>
+            <button class="btn btn-sm btn-danger" style="margin-left: 6px;" title="Excluir Provedor" onclick="deleteAiProvider('${escapeHtml(p.id)}')">
+              🗑️
+            </button>
           </td>
         </tr>`;
       }).join('');
@@ -8470,12 +8755,18 @@ Para mais detalhes, acesse: vollsolutions.com.br/planos-e-precos
       if (bCalls) bCalls.textContent = totalCalls.toLocaleString('pt-BR');
     }
 
-    function openAiProviderConfigModal(providerId) {
-      const p = aiProvidersCache.find(x => x.id === providerId) || {};
-      document.getElementById('aiprov-id').value = providerId;
-      document.getElementById('aiprov-modal-title').textContent = `Configurar ${p.name || providerId}`;
-      document.getElementById('aiprov-modal-icon').textContent = p.icon || '⚙️';
-      document.getElementById('aiprov-active').checked = p.active !== false;
+    function openAiProviderConfigModal(providerId = null) {
+      const isNew = !providerId;
+      const p = providerId ? (aiProvidersCache.find(x => x.id === providerId) || {}) : {};
+      document.getElementById('aiprov-is-new').value = isNew ? '1' : '0';
+      const idEl = document.getElementById('aiprov-id');
+      const nameEl = document.getElementById('aiprov-name');
+      idEl.value = providerId || '';
+      idEl.disabled = !isNew;
+      if (nameEl) nameEl.value = p.name || '';
+      document.getElementById('aiprov-modal-title').textContent = isNew ? 'Novo Provedor de IA' : `Configurar ${p.name || providerId}`;
+      document.getElementById('aiprov-modal-icon').textContent = isNew ? '➕' : (p.icon || '⚙️');
+      document.getElementById('aiprov-active').checked = isNew ? true : p.active !== false;
       document.getElementById('aiprov-apikey').value = '';
       document.getElementById('aiprov-apikey').placeholder = p.apiKey ? p.apiKey : 'Informe a API Key';
 
@@ -8487,13 +8778,13 @@ Para mais detalhes, acesse: vollsolutions.com.br/planos-e-precos
         codecSelect.value = p.audioCodec || 'g711_ulaw';
       }
 
-      const models = p.models || [];
+      const models = isNew ? ['default-realtime'] : (p.models || []);
       modelSelect.innerHTML = models.map(m => `<option value="${escapeHtml(m)}" ${m === p.defaultModel ? 'selected' : ''}>${escapeHtml(m)}</option>`).join('');
       if (!models.length && p.defaultModel) {
         modelSelect.innerHTML = `<option value="${escapeHtml(p.defaultModel)}" selected>${escapeHtml(p.defaultModel)}</option>`;
       }
 
-      const voices = p.voices || [];
+      const voices = isNew ? ['alloy'] : (p.voices || []);
       voiceSelect.innerHTML = voices.map(v => `<option value="${escapeHtml(v)}" ${v === p.defaultVoice ? 'selected' : ''}>${escapeHtml(v)}</option>`).join('');
       if (!voices.length && p.defaultVoice) {
         voiceSelect.innerHTML = `<option value="${escapeHtml(p.defaultVoice)}" selected>${escapeHtml(p.defaultVoice)}</option>`;
@@ -8548,8 +8839,12 @@ Para mais detalhes, acesse: vollsolutions.com.br/planos-e-precos
     }
 
     async function saveAiProviderConfig() {
-      const id = document.getElementById('aiprov-id').value;
-      if (!id) return;
+      const isNew = document.getElementById('aiprov-is-new')?.value === '1';
+      const id = document.getElementById('aiprov-id').value.trim().toLowerCase();
+      const name = document.getElementById('aiprov-name')?.value.trim() || id;
+      if (!id) {
+        return showToast('Informe o ID do provedor de IA.', 'error');
+      }
 
       const active = document.getElementById('aiprov-active').checked;
       const apiKey = document.getElementById('aiprov-apikey').value.trim();
@@ -8557,9 +8852,10 @@ Para mais detalhes, acesse: vollsolutions.com.br/planos-e-precos
       const defaultVoice = document.getElementById('aiprov-default-voice').value;
       const audioCodec = document.getElementById('aiprov-codec')?.value || 'g711_ulaw';
       const p = aiProvidersCache.find(x => x.id === id);
-      const models = p && p.models ? p.models : [];
+      const models = p && p.models ? p.models : (defaultModel ? [defaultModel] : []);
 
       const payload = {
+        ...(isNew ? { id, name } : { name }),
         active,
         defaultModel,
         defaultVoice,
@@ -8575,15 +8871,15 @@ Para mais detalhes, acesse: vollsolutions.com.br/planos-e-precos
       btn.innerHTML = 'Salvando...';
 
       try {
-        const res = await apiFetch(`/v1/ai-providers/${encodeURIComponent(id)}`, {
-          method: 'PUT',
+        const res = await apiFetch(isNew ? '/v1/ai-providers' : `/v1/ai-providers/${encodeURIComponent(id)}`, {
+          method: isNew ? 'POST' : 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || 'Falha ao salvar provedor');
 
-        showToast(`✅ Provedor "${data.provider?.name || id}" atualizado com sucesso!`, 'success');
+        showToast(`✅ Provedor "${data.provider?.name || id}" ${isNew ? 'criado' : 'atualizado'} com sucesso!`, 'success');
         closeModal('modal-ai-provider-config');
         await loadAiProvidersTab();
       } catch (err) {
@@ -8591,6 +8887,19 @@ Para mais detalhes, acesse: vollsolutions.com.br/planos-e-precos
       } finally {
         btn.disabled = false;
         btn.innerHTML = origText;
+      }
+    }
+
+    async function deleteAiProvider(id) {
+      if (!confirm(`Deseja realmente excluir o provedor de IA "${id}"?`)) return;
+      try {
+        const res = await apiFetch(`/v1/ai-providers/${encodeURIComponent(id)}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Falha ao excluir provedor');
+        showToast(`Provedor "${id}" excluído.`, 'info');
+        await loadAiProvidersTab();
+      } catch (err) {
+        showToast(`Erro ao excluir: ${escapeHtml(err.message)}`, 'error');
       }
     }
 
@@ -8730,6 +9039,25 @@ Para mais detalhes, acesse: vollsolutions.com.br/planos-e-precos
     fetchVoiceFeatures();
     startAutoRefresh();
     initHistorySSE();
+  </script>
+  <script src="/voll-voice-widget.js"></script>
+  <script>
+    let _vollWidgetInstance = null;
+    function openWebRtcTestWidget(tenantId = 'default', tenantName = '') {
+      if (!window.VollVoiceWidget) return;
+      if (_vollWidgetInstance && _vollWidgetInstance.host) {
+        try { _vollWidgetInstance.client?.stop(); } catch {}
+        _vollWidgetInstance.host.remove();
+      }
+      const token = (typeof getSavedApiToken === 'function' ? getSavedApiToken() : localStorage.getItem('VOLL_API_TOKEN')) || '';
+      _vollWidgetInstance = window.VollVoiceWidget.mount({
+        serverUrl: window.location.origin,
+        tenantId: tenantId || 'default',
+        apiToken: token || undefined,
+        title: `WebRTC · ${tenantName || tenantId || 'Voll Connect'}`,
+        autoOpen: true
+      });
+    }
   </script>
 </body>
 </html>

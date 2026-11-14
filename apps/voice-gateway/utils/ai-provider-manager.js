@@ -1,3 +1,4 @@
+const fs = require('fs');
 const path = require('path');
 const { readJsonList, writeJsonList } = require('./json-store');
 
@@ -73,8 +74,9 @@ class AiProviderManager {
   }
 
   init() {
+    const fileExists = fs.existsSync(this.filePath);
     let list = readJsonList(this.filePath);
-    if (!list || list.length === 0) {
+    if (!fileExists) {
       list = DEFAULT_AI_PROVIDERS;
       // Preenche com variáveis de ambiente se disponíveis
       if (process.env.OPENAI_API_KEY) {
@@ -199,6 +201,59 @@ class AiProviderManager {
     this.providers.set(id, updated);
     this.persist();
     return this.mask(updated);
+  }
+
+  create(data = {}) {
+    const id = String(data.id || '').trim().toLowerCase();
+    if (!id || !/^[a-z0-9][a-z0-9_-]{1,48}$/.test(id)) {
+      throw new Error('ID do provedor inválido. Use 2 a 49 caracteres alfanuméricos, "-" ou "_".');
+    }
+    if (this.providers.has(id)) {
+      throw new Error(`Provedor de IA "${id}" já existe.`);
+    }
+    const models = Array.isArray(data.models)
+      ? data.models.map((m) => String(m).trim()).filter(Boolean)
+      : typeof data.models === 'string'
+        ? data.models.split(',').map((m) => m.trim()).filter(Boolean)
+        : [];
+    const defaultModel = String(data.defaultModel || models[0] || '').trim();
+    if (defaultModel && !models.includes(defaultModel)) {
+      models.unshift(defaultModel);
+    }
+    const voices = Array.isArray(data.voices)
+      ? data.voices.map((v) => String(v).trim()).filter(Boolean)
+      : [];
+    const defaultVoice = String(data.defaultVoice || voices[0] || '').trim();
+    if (defaultVoice && !voices.includes(defaultVoice)) {
+      voices.unshift(defaultVoice);
+    }
+    const entry = {
+      id,
+      name: String(data.name || id).trim(),
+      icon: String(data.icon || '🤖').trim(),
+      type: String(data.type || 'realtime_speech').trim(),
+      active: data.active !== undefined ? Boolean(data.active) : true,
+      defaultModel,
+      models,
+      defaultVoice,
+      voices,
+      apiKey: typeof data.apiKey === 'string' ? data.apiKey.trim() : '',
+      audioCodec: String(data.audioCodec || process.env.AUDIO_CODEC_MODE || 'g711_ulaw').trim(),
+      pricingDescription: String(data.pricingDescription || '').trim(),
+    };
+    this.providers.set(id, entry);
+    this.persist();
+    return this.mask(entry);
+  }
+
+  delete(id) {
+    const cleanId = String(id || '').trim();
+    if (!this.providers.has(cleanId)) {
+      throw new Error(`Provedor de IA desconhecido: "${cleanId}"`);
+    }
+    this.providers.delete(cleanId);
+    this.persist();
+    return { deleted: true, id: cleanId };
   }
 }
 

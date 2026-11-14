@@ -37,11 +37,12 @@ class TrunkManager {
         direction: 'both',
         realm: 'sip1.directdial.com.br',
         proxy: 'sip1.directdial.com.br',
-        username: 'WTVNM',
-        register: true,
+        username: process.env.DIRECTCALL_USERNAME || 'WTVNM',
+        password: process.env.DIRECTCALL_PASSWORD || undefined,
+        register: Boolean(process.env.DIRECTCALL_REGISTER === 'true'),
         maxChannels: 30,
         active: true,
-        external: true
+        external: false
       });
       this.persist();
     }
@@ -108,7 +109,7 @@ class TrunkManager {
       add('retry-seconds', 30);
     } else {
       add('username', t.username || 'none');
-      add('password', t.password || 'none');
+      add('password', t.password || (t.id === 'directcall' ? process.env.DIRECTCALL_PASSWORD : null) || 'none');
       add('realm', t.realm || host);
       add('register', 'false');
     }
@@ -123,7 +124,7 @@ class TrunkManager {
     // Idempotente: garante que mrf.xml inclua mrf/*.xml dentro de <gateways>
     const cmd =
       `system grep -q 'mrf/\\*.xml' ${PROFILE_FILE} || ` +
-      `sed -i 's|<gateways>|<gateways>\\n      <X-PRE-PROCESS cmd="include" data="mrf/*.xml"/>|' ${PROFILE_FILE}`;
+      `sed -i 's|</profile>|    <gateways>\\n      <X-PRE-PROCESS cmd=\\"include\\" data=\\"mrf/*.xml\\"/>\\n    </gateways>\\n  </profile>|' ${PROFILE_FILE}`;
     await this._apiAll(cmd);
   }
 

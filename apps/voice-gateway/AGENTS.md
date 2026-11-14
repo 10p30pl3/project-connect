@@ -4,10 +4,10 @@
 
 Todo motor de IA conversacional integrado ao gateway (como [`OpenAIS2SBridge`](file:///Users/macm/Library/CloudStorage/OneDrive-VollSolutions/Documents/code/voice-app/index.js) e [`ElevenLabsS2SBridge`](file:///Users/macm/Library/CloudStorage/OneDrive-VollSolutions/Documents/code/voice-app/media/elevenlabs-s2s-bridge.js), ou qualquer futuro provedor como Gemini Live, Ultravox, Deepgram, etc.) **DEVE obrigatoriamente implementar o pipeline acústico e de controle In-Call completo abaixo**, mantendo 100% de paridade funcional:
 
-1. **Tom Inicial Sonar (`425Hz` por `700ms`) & Calibração Acústica (`EnergyManager`)**:
-   - Antes de iniciar/liberar a fala do agente (quando o AMD ativo não tiver sido executado previamente), emitir a sonda `tone_stream://v=0;%(700,0,425)` com `isToneProbe = true`.
+1. **Tom Inicial Sonar (`425Hz` por `500ms` a `-16dB`) & Calibração Acústica (`EnergyManager`)**:
+   - Antes de iniciar/liberar a fala do agente (quando o AMD ativo não tiver sido executado previamente), emitir a sonda suave `tone_stream://v=-16;%(500,0,425)` por `500ms` com `isToneProbe = true`, além de `noise_suppression false` e `rtp_audio_in_level -3`.
    - Medir amostras de eco e piso de ruído via [`EnergyManager`](file:///Users/macm/Library/CloudStorage/OneDrive-VollSolutions/Documents/code/voice-app/utils/energy-manager.js).
-   - Detectar automaticamente o modo do dispositivo (`viva_voz` vs `fone_ouvido`) e alternar o `echo_cancellation` no FreeSWITCH (`true` para viva-voz, `false` para fone).
+   - Detectar automaticamente o modo do dispositivo (`viva_voz` vs `fone_ouvido`) e alternar o `echo_cancellation` no FreeSWITCH (`true` para `viva_voz` em `softphone`; `false` para `fone_ouvido` ou tronco celular com AEC nativo de hardware).
    - Classificar o perfil de ruído ambiente em `SILENCE`, `OFFICE`, `STREET` ou `TV` e ajustar os limiares de VAD e silêncio.
    - Iniciar a saudação da IA somente após o término da sonda Sonar para evitar colisão de áudio ou perda de pacotes.
 

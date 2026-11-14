@@ -293,7 +293,10 @@ export const StrategyCreateSchema = z.object({
   /** criar como cópia de outra estratégia */
   copyOf: z.string().uuid().optional(),
 });
-export const StrategyPublishSchema = z.object({ config: StrategyConfigSchema });
+export const StrategyPublishSchema = z.object({
+  name: z.string().min(1).optional(),
+  config: StrategyConfigSchema,
+});
 
 export const JourneyCreateSchema = z.object({
   name: z.string().min(1),
@@ -614,6 +617,8 @@ export const VoiceAgentTenantSchema = z
     /** tenant de campanha: não atende ramal nem DID de entrada */
     extension: z.null(),
     dids: z.array(z.string()).max(0),
+    publicWidgetKey: z.string().nullable().optional(),
+    allowedOrigins: z.array(z.string()).optional(),
     active: z.boolean(),
   })
   .strict();

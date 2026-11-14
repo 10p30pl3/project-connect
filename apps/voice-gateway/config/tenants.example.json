@@ -1,0 +1,45 @@
+[
+  {
+    "id": "cliente-clinica-saude",
+    "name": "Clínica Saúde & Vida",
+    "dids": ["551140041234", "1001"],
+    "active": true,
+    "openaiApiKey": "sk-proj-chave-especifica-do-cliente-se-tiver",
+    "openaiModel": "gpt-realtime-mini",
+    "openaiPromptId": "pmpt_prompt_da_clinica",
+    "instructions": "Você é a secretária virtual da Clínica Saúde. Agende consultas de forma acolhedora.",
+    "greetingInstructions": "Diga cordialmente: 'Olá! Sou a secretária virtual da Clínica Saúde, como posso te ajudar hoje?'",
+    "voice": "shimmer",
+    "audioCodec": "pcm24k",
+    "maxDurationSec": 600,
+    "maxConcurrentCalls": 50,
+    "maxCallsPerSecond": 10,
+    "amd": {
+      "enabled": false,
+      "mode": "active"
+    },
+    "stt": {
+      "enabled": false
+    }
+  },
+  {
+    "id": "cliente-imobiliaria",
+    "name": "Imobiliária Prime",
+    "dids": ["551140049999", "1002"],
+    "active": true,
+    "openaiModel": "gpt-realtime-mini",
+    "instructions": "Você é o assistente virtual da Imobiliária Prime. Ajude o cliente a encontrar imóveis para locação ou venda.",
+    "voice": "alloy",
+    "audioCodec": "g711_ulaw",
+    "maxDurationSec": 900,
+    "maxConcurrentCalls": 100,
+    "maxCallsPerSecond": 20,
+    "amd": {
+      "enabled": true,
+      "mode": "active"
+    },
+    "stt": {
+      "enabled": true
+    }
+  }
+]

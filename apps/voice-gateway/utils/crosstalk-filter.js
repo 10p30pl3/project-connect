@@ -11,12 +11,12 @@
  */
 class CrosstalkFilter {
   constructor({
-    ratio = 0.35,               // Vozes de fundo abaixo de ~35% do envelope de voz do usuário são bloqueadas
+    ratio = 0.25,               // Vozes de fundo abaixo de ~25% do envelope de voz do usuário são bloqueadas
     initialUserRms = 1600,      // Estimativa inicial do envelope de fala do usuário principal (Int16 PCM 8kHz)
-    minUserRms = 800,           // Limite inferior para a referência de voz principal
+    minUserRms = 600,           // Limite inferior para a referência de voz principal
     maxUserRms = 8000,          // Limite superior de volume
     maxThresholdRms = 3500,     // Teto máximo do gate proporcional a vozes próximas ao microfone
-    minFloorRms = 350,          // Piso mínimo absoluto para rejeitar vozes de fundo antes da 1ª fala
+    minFloorRms = 180,          // Piso mínimo absoluto para rejeitar ruído de fundo sem cortar voz suave
     attackFrames = 2,           // 2 frames consecutivos (40ms) acima do limiar para abrir o gate
     hangoverMs = 500,           // Janela de sustentação (500ms) para não picotar finais de palavras e pausas naturais
     frameDurationMs = 20        // Duração de cada chunk RTP (20ms = 160 samples a 8kHz)
@@ -265,7 +265,9 @@ class CrosstalkFilter {
   isActivelySpeaking(isAgentTalking = false) {
     if (!this.isGateOpen || this.consecutiveAbove === 0) return false;
     if (isAgentTalking) {
-      return this.consecutiveAbove >= 2 && this.lastRms >= 700;
+      // Quando o agente fala, exige energia de voz intencional e sustentada (100ms) para rejeitar eco acústico do microfone
+      const minBargeinRms = Math.max(1500, Math.round(this.userVoiceRms * 0.70));
+      return this.consecutiveAbove >= 5 && this.lastRms >= minBargeinRms;
     }
     return true;
   }

@@ -1,7 +1,7 @@
 const WebSocket = require('ws');
 const { EventEmitter } = require('events');
 const WsMediaBridge = require('./ws-media-bridge');
-const { WhisperSession } = require('./whisper-client');
+const { WhisperSession, whisperPool } = require('./whisper-client');
 const { CallRecorder, formatDateTime } = require('../utils/call-recorder');
 const EnergyManager = require('../utils/energy-manager');
 const CrosstalkFilter = require('../utils/crosstalk-filter');
@@ -767,6 +767,18 @@ class ElevenLabsS2SBridge extends EventEmitter {
       }
     } catch {}
 
+    try {
+      if (this.mediaBridge && typeof this.mediaBridge.sendEvent === 'function') {
+        this.mediaBridge.sendEvent({
+          type: 'transcript',
+          speaker: role,
+          text: cleanText,
+          timestamp,
+          delayLabel
+        });
+      }
+    } catch {}
+
     return entry;
   }
 
@@ -790,12 +802,15 @@ class ElevenLabsS2SBridge extends EventEmitter {
     return 'trunk_sip';
   }
 
-  async start({ callId, endpoint, dialog, caller = null, called = null }) {
+  async start({ callId, endpoint, dialog, caller = null, called = null, mediaBridge = null }) {
     this.callId = callId;
     this.endpoint = endpoint;
     this.dialog = dialog;
     this.caller = caller;
     this.called = called;
+    if (mediaBridge) {
+      this.mediaBridge = mediaBridge;
+    }
     this.startedAt = new Date();
     this.channelUuid = getChannelUuid(endpoint);
 
@@ -803,7 +818,7 @@ class ElevenLabsS2SBridge extends EventEmitter {
       throw new Error('Não consegui identificar o UUID do canal FreeSWITCH');
     }
 
-    this.lineType = this.detectLineType();
+    this.lineType = endpoint?.isWebRtc ? 'softphone' : this.detectLineType();
     this.profiles = this.profilesByLine[this.lineType] || this.profilesByLine.trunk_sip;
     console.log(
       `[${this.callId}] 📞 Linha Detectada: [${this.lineType === 'trunk_sip' ? 'TRONCO SIP / TELEFONIA PÚBLICA' : 'SOFTPHONE INTERNO / TESTE'}] (De: ${this.caller || '--'} | Para: ${this.called || '--'})`
@@ -968,7 +983,10 @@ class ElevenLabsS2SBridge extends EventEmitter {
     }
 
     this.safeApi(`uuid_setvar ${this.channelUuid} echo_cancellation false`);
-    this.safeApi(`uuid_setvar ${this.channelUuid} noise_suppression true`);
+    // Desativa supressao Speex no FreeSWITCH para evitar voz metalica/abafada em G.711/PCM
+    this.safeApi(`uuid_setvar ${this.channelUuid} noise_suppression false`);
+    // Ajuste de ganho de entrada (-3dB) para evitar saturação analógica/clipping digital (pico > 32000)
+    this.safeApi(`uuid_setvar ${this.channelUuid} rtp_audio_in_level -3`);
 
     let vadThreshold = 0.45;
     let silenceDurationMs = 280;
@@ -1145,10 +1163,11 @@ class ElevenLabsS2SBridge extends EventEmitter {
 
       this.isToneProbe = true;
       if (this.endpoint && typeof this.endpoint.play === 'function') {
-        this.endpoint.play('tone_stream://v=0;%(700,0,425)').catch(() => {});
+        // Sonda suave (-16dB) para calibracao sem saturar ou estourar no ouvido do cliente
+        this.endpoint.play('tone_stream://v=-16;%(500,0,425)').catch(() => {});
       }
       const startSamples = this.energyManager.echoSamplesCount;
-      await wait(700);
+      await wait(500);
       if (this.isTerminated || !this.endpoint) return;
 
       this.isToneProbe = false;
@@ -1161,11 +1180,11 @@ class ElevenLabsS2SBridge extends EventEmitter {
       this.deviceMode = this.energyManager.detectDeviceMode(this.callId);
       this.calibrationActive = false;
 
-      if (this.deviceMode === 'viva_voz') {
-        console.log(`[${this.callId}] 🛡️ Ativando AEC para proteção de Viva-voz.`);
+      if (this.deviceMode === 'viva_voz' && this.lineType === 'softphone') {
+        console.log(`[${this.callId}] 🛡️ Ativando AEC para proteção de Viva-voz em Softphone.`);
         this.safeApi(`uuid_setvar ${this.channelUuid} echo_cancellation true`);
       } else {
-        console.log(`[${this.callId}] 🎧 Mantendo AEC desligado para máxima fluidez no Fone.`);
+        console.log(`[${this.callId}] 🎧 Mantendo AEC desligado (modo fone ou tronco celular com AEC nativo de hardware).`);
         this.safeApi(`uuid_setvar ${this.channelUuid} echo_cancellation false`);
       }
 
@@ -1218,6 +1237,7 @@ class ElevenLabsS2SBridge extends EventEmitter {
     const targetMode = String(newMode || '').toLowerCase();
     if (!['atual', 'dsp', 'wespeaker', 'ecapa', 'none'].includes(targetMode)) return;
     if (this.crosstalkMode === targetMode) return;
+    if ((targetMode === 'ecapa' || targetMode === 'wespeaker') && whisperPool && typeof whisperPool.getStats === 'function' && whisperPool.getStats().healthyNodes === 0) return;
 
     const prevMode = this.crosstalkMode;
     this.crosstalkMode = targetMode;

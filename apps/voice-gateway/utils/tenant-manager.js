@@ -169,7 +169,7 @@ class TenantManager {
       elevenlabsAgentId: process.env.ELEVENLABS_AGENT_ID || 'agent_01jvsk3cr8ep3an7shbcnfvt8d',
       elevenlabsVoiceId: process.env.ELEVENLABS_VOICE_ID || 'Rachel',
       elevenlabsModel: process.env.ELEVENLABS_MODEL || 'eleven_turbo_v2_5',
-      elevenlabsApiKey: process.env.ELEVENLABS_API_KEY || '',
+      elevenlabsApiKey: process.env.ELEVENLABS_API_KEY || null,
       instructions: process.env.OPENAI_AGENT_INSTRUCTIONS || DEFAULT_VOLL_PROMPT,
       greetingInstructions: process.env.GREETING_INSTRUCTIONS || 'Diga cordialmente de forma curta e amigável: \'Olá! Sou o assistente virtual da Voll Solutions. Como posso ajudar você hoje?\'',
       voice: process.env.OPENAI_VOICE || 'marin',
@@ -294,7 +294,12 @@ class TenantManager {
       }
     }
 
-    return defaultTenant;
+    // Apenas retorna defaultTenant se a chamada for para o ramal da IA ou interna sem número especificado
+    if (!calledNumber || /^(9\d{3}|\*1000|ia|9000|9001|9002)$/.test(String(calledNumber).trim())) {
+      return defaultTenant;
+    }
+
+    return null;
   }
 
   /**
@@ -355,14 +360,13 @@ class TenantManager {
   }
 
   listTenants() {
+    const maskKey = (k) => (k ? `${String(k).slice(0, 7)}...${String(k).slice(-4)}` : null);
     const result = [];
     for (const [id, t] of this.tenants.entries()) {
-      const maskedKey = t.openaiApiKey
-        ? `${t.openaiApiKey.slice(0, 7)}...${t.openaiApiKey.slice(-4)}`
-        : null;
       result.push({
         ...t,
-        openaiApiKey: maskedKey,
+        openaiApiKey: maskKey(t.openaiApiKey),
+        elevenlabsApiKey: maskKey(t.elevenlabsApiKey),
         activeCalls: this.activeCallsPerTenant.get(id) || 0
       });
     }
@@ -375,13 +379,27 @@ class TenantManager {
     }
     const defaultTenant = this.getDefaultTenant();
     const existing = this.tenants.get(data.id) || defaultTenant;
+    const isMasked = (val) => typeof val === 'string' && val.includes('...');
+    const sanitizedData = { ...data };
+    if (isMasked(sanitizedData.openaiApiKey)) {
+      sanitizedData.openaiApiKey = existing.openaiApiKey;
+    }
+    if (isMasked(sanitizedData.elevenlabsApiKey)) {
+      sanitizedData.elevenlabsApiKey = existing.elevenlabsApiKey;
+    }
     const merged = {
       ...defaultTenant,
       ...existing,
-      ...data,
+      ...sanitizedData,
       extension: data.extension !== undefined
         ? (String(data.extension || '').trim() || null)
         : (existing.extension || (data.id === 'default' ? '9000' : null)),
+      publicWidgetKey: data.publicWidgetKey !== undefined
+        ? (String(data.publicWidgetKey || '').trim() || null)
+        : (existing.publicWidgetKey || null),
+      allowedOrigins: Array.isArray(data.allowedOrigins)
+        ? data.allowedOrigins.map((o) => String(o || '').trim()).filter(Boolean)
+        : (Array.isArray(existing.allowedOrigins) ? existing.allowedOrigins : []),
       greetingInstructions: data.greetingInstructions !== undefined
         ? (String(data.greetingInstructions || '').trim() || null)
         : (existing.greetingInstructions || defaultTenant.greetingInstructions),

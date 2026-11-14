@@ -142,9 +142,10 @@ say "Limpando cache antigo do Docker Builder"
 docker builder prune -af >/dev/null 2>&1 || true
 
 say "Verificando"
+HEALTH_PORT="${WEB_PORT:-8080}"
 for i in $(seq 1 30); do
-  if curl -fsS "http://127.0.0.1/api/health" >/dev/null 2>&1; then
-    echo "Voll Plan no ar: http://$SERVER_IP"
+  if curl -fsS "http://127.0.0.1:${HEALTH_PORT}/api/health" >/dev/null 2>&1; then
+    echo "Voll Plan no ar: http://$SERVER_IP:${HEALTH_PORT}"
     echo "Login: $SEED_ADMIN_EMAIL (senha em $ENV_FILE, SEED_ADMIN_PASSWORD; troque no primeiro acesso)"
     $VOICE && echo "Gateway de voz: em Canais > Agente de voz, cadastre o roteiro e clique em Publicar."
     exit 0
