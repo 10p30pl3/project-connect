@@ -22,6 +22,12 @@ import { reportRoutes } from './modules/reports.js';
 import { aiRoutes } from './modules/ai.js';
 import { voiceAgentRoutes } from './modules/voice-agent.js';
 import { telephonyRoutes } from './modules/telephony.js';
+import { billingRoutes } from './modules/billing.js';
+import { validateEnv } from './config/env-validator.js';
+import { ensureUpcomingPartitions } from './db/partition-service.js';
+import { registerIdempotencyHook } from './lib/idempotency.js';
+import { getPool, one } from './db/pool.js';
+import { audit } from './lib/audit.js';
 
 export type BuildOptions = { logger?: boolean; loginRateMax?: number };
 
@@ -32,6 +38,9 @@ declare module 'fastify' {
 }
 
 export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance> {
+  validateEnv();
+  void ensureUpcomingPartitions(1, 3).catch(() => {});
+
   const app = Fastify({
     logger: opts.logger
       ? {
@@ -79,7 +88,15 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     cookie: { cookieName: COOKIE_NAME, signed: false },
     sign: { expiresIn: '8h' },
   });
-  await app.register(rateLimit, { global: false });
+  await app.register(rateLimit, {
+    global: false,
+    keyGenerator: (req) => {
+      const fwd = req.headers['x-forwarded-for'];
+      const firstIp = typeof fwd === 'string' ? fwd.split(',')[0].trim() : '';
+      return firstIp || req.ip || '127.0.0.1';
+    },
+  });
+  registerIdempotencyHook(app);
 
   // Cabeçalhos de segurança HTTP padrão OWASP
   app.addHook('onSend', async (_req, reply) => {
@@ -97,6 +114,26 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     if (p.status >= 500) {
       req.log.error(err);
       if (!opts.logger) console.error(err);
+      const u = req.user as { sub?: string; org?: string; ws?: string } | undefined;
+      void (async () => {
+        const orgId =
+          u?.org ??
+          (await one<{ organization_id: string }>(getPool(), `SELECT organization_id FROM workspaces LIMIT 1`)
+            .then((r) => r?.organization_id)
+            .catch(() => null));
+        if (!orgId) return;
+        await audit(
+          getPool(),
+          { userId: u?.sub ?? null, organizationId: orgId, workspaceId: u?.ws ?? null },
+          'system.error_500',
+          'http_request',
+          (req.url || '').split('?')[0].slice(0, 200),
+          {
+            reason: String((err as Error)?.message ?? 'Erro interno').slice(0, 300),
+            after: { method: req.method, status: p.status },
+          },
+        );
+      })().catch(() => {});
     }
     return sendProblem(reply, p);
   });
@@ -125,6 +162,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
         await aiRoutes(p);
         await voiceAgentRoutes(p);
         await telephonyRoutes(p);
+        await billingRoutes(p);
         if (!config.isProduction) await simRoutes(p);
       });
     },

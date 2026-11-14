@@ -135,28 +135,81 @@ export function sampleCsv(n = 1000): string {
   return lines.join('\n');
 }
 
-async function ensureUser(c: Client, orgId: string, email: string, name: string, role: string, password: string) {
-  const u = await one(c, `SELECT id FROM users WHERE lower(email)=lower($1)`, [email]);
-  if (u) return u.id;
+async function ensureUser(
+  c: Client,
+  orgId: string,
+  email: string,
+  name: string,
+  role: string,
+  password: string,
+  globalRole: string | null = null,
+) {
+  const u = await one<{ id: string; global_role: string | null }>(
+    c,
+    `SELECT id, global_role FROM users WHERE lower(email)=lower($1)`,
+    [email],
+  );
+  if (u) {
+    if (globalRole && !u.global_role) {
+      await c.query(`UPDATE users SET global_role=$2::user_role WHERE id=$1`, [u.id, globalRole]);
+    }
+    return u.id;
+  }
   const hash = await bcrypt.hash(password, 10);
-  return (await one(c, `INSERT INTO users (organization_id, email, name, password_hash, role) VALUES ($1,$2,$3,$4,$5) RETURNING id`, [
-    orgId, email, name, hash, role,
-  ]))!.id;
+  return (await one(
+    c,
+    `INSERT INTO users (organization_id, email, name, password_hash, role, global_role)
+     VALUES ($1,$2,$3,$4,$5,$6::user_role) RETURNING id`,
+    [orgId, email, name, hash, role, globalRole],
+  ))!.id;
 }
 
 const DEMO = process.env.SEED_DEMO !== 'false';
 
-export async function seed(opts: { withSampleMailing?: boolean } = {}) {
+export async function seed(opts: { withSampleMailing?: boolean; workspaceId?: string } = {}) {
   const withSample = opts.withSampleMailing ?? DEMO;
   return tx(async (c) => {
-    let org = await one(c, `SELECT id FROM organizations WHERE name='Voll Solutions'`);
-    if (!org) org = await one(c, `INSERT INTO organizations (name) VALUES ('Voll Solutions') RETURNING id`);
-    let ws = await one(c, `SELECT id FROM workspaces WHERE organization_id=$1 ORDER BY created_at LIMIT 1`, [org!.id]);
-    if (!ws) ws = await one(c, `INSERT INTO workspaces (organization_id, name) VALUES ($1,'Principal') RETURNING id`, [org!.id]);
-    const orgId = org!.id as string;
-    const wsId = ws!.id as string;
+    await c.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`seed-demo:${opts.workspaceId ?? 'global'}`]);
+    let ws = opts.workspaceId
+      ? await one<{ id: string; organization_id: string }>(
+          c,
+          `SELECT id, organization_id FROM workspaces WHERE id=$1`,
+          [opts.workspaceId],
+        )
+      : null;
 
-    const adminId = await ensureUser(c, orgId, config.seedAdminEmail, 'Administrador Voll', 'ADMIN', config.seedAdminPassword);
+    let orgId: string;
+    let wsId: string;
+    if (ws) {
+      wsId = ws.id;
+      orgId = ws.organization_id;
+    } else {
+      let org = await one(c, `SELECT id FROM organizations WHERE name='Voll Solutions'`);
+      if (!org) org = await one(c, `INSERT INTO organizations (name) VALUES ('Voll Solutions') RETURNING id`);
+      let masterWs = await one(
+        c,
+        `SELECT id FROM workspaces WHERE organization_id=$1 ORDER BY is_master DESC, created_at LIMIT 1`,
+        [org!.id],
+      );
+      if (!masterWs)
+        masterWs = await one(
+          c,
+          `INSERT INTO workspaces (organization_id, name, is_master) VALUES ($1,'Principal',true) RETURNING id`,
+          [org!.id],
+        );
+      orgId = org!.id as string;
+      wsId = masterWs!.id as string;
+    }
+
+    const adminId = await ensureUser(
+      c,
+      orgId,
+      config.seedAdminEmail,
+      'Administrador Voll',
+      'ADMIN',
+      config.seedAdminPassword,
+      'SUPER_ADMIN',
+    );
     // usuários de demonstração (senha conhecida): desligados em produção com SEED_DEMO=false
     if (DEMO) {
       await ensureUser(c, orgId, 'ricardo@vollsolutions.com.br', 'Ricardo (Voll Solutions)', 'ADMIN', 'Voll@2026');
@@ -375,8 +428,10 @@ export async function seed(opts: { withSampleMailing?: boolean } = {}) {
       );
     }
 
+    let alreadySeeded = false;
     if (withSample) {
       let ex = await one(c, `SELECT id FROM mailings WHERE workspace_id=$1 AND name='Carteira exemplo'`, [wsId]);
+      alreadySeeded = Boolean(ex);
       if (!ex) {
         const preview = buildPreview(sampleCsv(), 'auto', true);
         const imported = await commitImport(c, { id: wsId }, adminId, 'Carteira exemplo', preview);
@@ -410,7 +465,7 @@ export async function seed(opts: { withSampleMailing?: boolean } = {}) {
         );
       }
     }
-    return { organizationId: orgId, workspaceId: wsId, adminId };
+    return { organizationId: orgId, workspaceId: wsId, adminId, alreadySeeded };
   });
 }
 

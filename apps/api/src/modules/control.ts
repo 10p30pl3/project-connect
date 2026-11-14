@@ -1,11 +1,13 @@
 import type { FastifyInstance } from 'fastify';
 import { BlockCreateSchema, BlockRevokeSchema, InstitutionalLimitsSchema } from '@voll/shared';
 import { getPool, one, q, tx } from '../db/pool.js';
-import { actor, requireRoles, CAN } from '../auth/context.js';
+import { actor, requireRoles, requireSuperAdmin, CAN } from '../auth/context.js';
 import { conflict, notFound, parse, unprocessable } from '../lib/problem.js';
 import { audit } from '../lib/audit.js';
 import { applyOptOut } from '../engine/results.js';
 import { cancelUnsent } from '../engine/events.js';
+import { seed } from '../db/seed.js';
+import { getPartitionStats, ensureUpcomingPartitions } from '../db/partition-service.js';
 
 export async function controlRoutes(app: FastifyInstance) {
   app.get('/control', async (req) => {
@@ -90,16 +92,20 @@ export async function controlRoutes(app: FastifyInstance) {
     });
   });
 
-  app.get<{ Querystring: { cursor?: string; limit?: string } }>('/audit', async (req) => {
+  app.get<{ Querystring: { cursor?: string; limit?: string; entity?: string } }>('/audit', async (req) => {
     const a = actor(req);
     const limit = Math.min(200, Math.max(1, Number(req.query.limit ?? 50)));
     const cursor = req.query.cursor ? Number(req.query.cursor) : null;
+    const entityFilter = req.query.entity && req.query.entity !== 'ALL' ? `%${req.query.entity.trim()}%` : null;
     const rows = await q(
       getPool(),
       `SELECT l.id, l.at, u.name AS user_name, l.action, l.entity, l.entity_id, l.reason, l.before, l.after
          FROM audit_log l LEFT JOIN users u ON u.id=l.user_id
-        WHERE l.organization_id=$1 AND ($2::bigint IS NULL OR l.id < $2) ORDER BY l.id DESC LIMIT $3`,
-      [a.organizationId, cursor, limit + 1],
+        WHERE l.organization_id=$1
+          AND ($2::bigint IS NULL OR l.id < $2)
+          AND ($3::text IS NULL OR l.entity ILIKE $3)
+        ORDER BY l.id DESC LIMIT $4`,
+      [a.organizationId, cursor, entityFilter, limit + 1],
     );
     const page = rows.slice(0, limit);
     return {
@@ -109,5 +115,86 @@ export async function controlRoutes(app: FastifyInstance) {
       })),
       nextCursor: rows.length > limit ? String(page[page.length - 1].id) : null,
     };
+  });
+
+  app.post('/system/reset', { preHandler: requireRoles(...CAN.admin) }, async (req) => {
+    const a = actor(req);
+    await tx(async (c) => {
+      await c.query(
+        `DELETE FROM sim_scheduled_events WHERE connection_id IN (SELECT id FROM connections WHERE workspace_id=$1)`,
+        [a.workspaceId],
+      );
+      await c.query(`DELETE FROM connector_inbox WHERE workspace_id=$1`, [a.workspaceId]);
+      await c.query(
+        `DELETE FROM outbox WHERE attempt_id IN (SELECT id FROM attempts WHERE workspace_id=$1)`,
+        [a.workspaceId],
+      );
+      await c.query(`DELETE FROM counter_consumptions WHERE workspace_id=$1`, [a.workspaceId]);
+      // Bypass transacional local sem lock exclusivo global na tabela attempt_events
+      await c.query(`SET LOCAL voll.allow_mutation = 'on'`);
+      await c.query(`DELETE FROM attempt_events WHERE workspace_id=$1`, [a.workspaceId]);
+      await c.query(`DELETE FROM attempts WHERE workspace_id=$1`, [a.workspaceId]);
+      await c.query(
+        `DELETE FROM enrollments WHERE campaign_id IN (SELECT id FROM campaigns WHERE workspace_id=$1)`,
+        [a.workspaceId],
+      );
+      await c.query(`DELETE FROM contact_cpc_plans WHERE workspace_id=$1`, [a.workspaceId]);
+      await c.query(
+        `DELETE FROM lab_experiment_waves WHERE run_id IN (SELECT id FROM mailing_intelligence_runs WHERE workspace_id=$1)`,
+        [a.workspaceId],
+      );
+      await c.query(`DELETE FROM mailing_intelligence_runs WHERE workspace_id=$1`, [a.workspaceId]);
+      await c.query(`DELETE FROM contact_intelligence_profiles WHERE workspace_id=$1`, [a.workspaceId]);
+      await c.query(`DELETE FROM campaign_drafts WHERE workspace_id=$1`, [a.workspaceId]);
+      await c.query(`DELETE FROM campaigns WHERE workspace_id=$1`, [a.workspaceId]);
+      await c.query(`DELETE FROM blocks WHERE workspace_id=$1`, [a.workspaceId]);
+      await c.query(
+        `DELETE FROM list_members WHERE list_version_id IN (
+          SELECT lv.id FROM list_versions lv JOIN lists l ON l.id=lv.list_id WHERE l.workspace_id=$1
+        )`,
+        [a.workspaceId],
+      );
+      await c.query(
+        `DELETE FROM list_versions WHERE list_id IN (SELECT id FROM lists WHERE workspace_id=$1)`,
+        [a.workspaceId],
+      );
+      await c.query(`DELETE FROM lists WHERE workspace_id=$1`, [a.workspaceId]);
+      await c.query(
+        `DELETE FROM mailing_records WHERE mailing_id IN (SELECT id FROM mailings WHERE workspace_id=$1)`,
+        [a.workspaceId],
+      );
+      await c.query(
+        `DELETE FROM mailing_versions WHERE mailing_id IN (SELECT id FROM mailings WHERE workspace_id=$1)`,
+        [a.workspaceId],
+      );
+      await c.query(`DELETE FROM mailings WHERE workspace_id=$1`, [a.workspaceId]);
+      await c.query(`DELETE FROM contact_destinations WHERE workspace_id=$1`, [a.workspaceId]);
+      await c.query(`DELETE FROM contacts WHERE workspace_id=$1`, [a.workspaceId]);
+
+      await audit(c, a, 'system.reset', 'workspace', a.workspaceId, {
+        reason: 'Reset operacional completo (Telefonia & Agentes IA preservados) executado via portal Sistema',
+      });
+    });
+    return { ok: true, reset: true, preservedTelephony: true };
+  });
+
+  app.post('/system/seed-demo', { preHandler: requireRoles(...CAN.admin) }, async (req) => {
+    const a = actor(req);
+    const result = await seed({ withSampleMailing: true, workspaceId: a.workspaceId });
+    await audit(getPool(), a, 'system.seed_demo', 'workspace', a.workspaceId, {
+      reason: 'Carga de dados de exemplo (1.000 contatos)',
+    });
+    return { ok: true, ...result };
+  });
+
+  app.get('/observability/partitions', { preHandler: requireSuperAdmin }, async () => {
+    return getPartitionStats();
+  });
+
+  app.post('/observability/partitions/ensure', { preHandler: requireSuperAdmin }, async (req) => {
+    const a = actor(req);
+    const res = await ensureUpcomingPartitions(1, 3);
+    await audit(getPool(), a, 'observability.partitions_ensure', 'partition', 'tenant_billing_ledger', { after: res });
+    return { ok: true, ...res };
   });
 }

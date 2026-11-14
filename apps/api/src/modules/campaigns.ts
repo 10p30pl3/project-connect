@@ -3,10 +3,10 @@ import { z } from 'zod';
 import {
   CAMPAIGN_STATUS_LABEL,
   CHANNEL_LABEL,
-  CampaignTemplateCreateSchema,
   CreateCampaignSchema,
   REASON_CODES,
   SaveDraftSchema,
+  isSuperAdminRole,
   maskAddress,
   type CampaignStatus,
   type ReasonCode,
@@ -235,8 +235,10 @@ export async function campaignRoutes(app: FastifyInstance) {
         if (n > 0) warnings.push(`${n} contato(s) sem histórico importado ficarão aguardando revisão (política de histórico incompleto).`);
       }
     }
+    const isSuper = isSuperAdminRole(a.role);
     const count = audience?.count ?? 0;
-    const costValue = firstTariff === null || firstTariff === undefined ? null : Math.round(count * firstTariff * 10000) / 10000;
+    const costValue =
+      !isSuper || firstTariff === null || firstTariff === undefined ? null : Math.round(count * firstTariff * 10000) / 10000;
     return {
       audience,
       journey,
@@ -244,8 +246,9 @@ export async function campaignRoutes(app: FastifyInstance) {
       nextWindow,
       costEstimate: {
         value: journey && audience ? costValue : null,
-        premise:
-          firstTariff === null && journey
+        premise: !isSuper
+          ? 'Visão do cliente exibe estritamente consumo de tempo e volume de acionamentos.'
+          : firstTariff === null && journey
             ? `Tarifa do primeiro canal (${firstChannel}) não informada — custo desconhecido, não zero.`
             : `Uma tentativa por contato disponível no primeiro canal (${firstChannel ?? '—'}), usando a tarifa cadastrada. Retentativas e canais seguintes não entram nesta estimativa.`,
       },
@@ -460,12 +463,22 @@ export async function campaignRoutes(app: FastifyInstance) {
 
   // ---------------------------------------------------------------- indicadores (§8)
   app.get<{ Params: { id: string } }>('/campaigns/:id/indicators', async (req) => {
-    await loadCampaignRow(getPool(), req.params.id, actor(req).workspaceId);
-    return campaignIndicators(getPool(), req.params.id);
+    const a = actor(req);
+    await loadCampaignRow(getPool(), req.params.id, a.workspaceId);
+    const ind = await campaignIndicators(getPool(), req.params.id);
+    if (isSuperAdminRole(a.role)) return ind;
+    return {
+      ...ind,
+      viewMode: 'CLIENT_TIME_ONLY',
+      cost: { known: null, coverage: ind.cost.coverage },
+      costPerCpc: null,
+      costPerConversion: null,
+    };
   });
 
   app.get<{ Params: { id: string } }>('/campaigns/:id/indicators.csv', async (req, reply) => {
     const a = actor(req);
+    const isSuper = isSuperAdminRole(a.role);
     const row = await loadCampaignRow(getPool(), req.params.id, a.workspaceId);
     const ind = await campaignIndicators(getPool(), req.params.id);
     const extractedAt = new Date().toISOString();
@@ -478,10 +491,14 @@ export async function campaignRoutes(app: FastifyInstance) {
       ['clientes_cpc', ind.cpcContacts],
       ['taxa_cpc', ind.cpcRate === null ? 'ausente' : ind.cpcRate.toFixed(4)],
       ['conversoes', ind.conversions],
-      ['custo_conhecido_brl', ind.cost.known.toFixed(4)],
-      ['cobertura_custo', `${ind.cost.coverage.withCost}/${ind.cost.coverage.total}`],
-      ['custo_por_cpc_brl', ind.costPerCpc === null ? 'ausente' : ind.costPerCpc.toFixed(4)],
-      ['custo_por_conversao_brl', ind.costPerConversion === null ? 'ausente' : ind.costPerConversion.toFixed(4)],
+      ...(isSuper
+        ? [
+            ['custo_conhecido_brl', ind.cost.known.toFixed(4)],
+            ['cobertura_custo', `${ind.cost.coverage.withCost}/${ind.cost.coverage.total}`],
+            ['custo_por_cpc_brl', ind.costPerCpc === null ? 'ausente' : ind.costPerCpc.toFixed(4)],
+            ['custo_por_conversao_brl', ind.costPerConversion === null ? 'ausente' : ind.costPerConversion.toFixed(4)],
+          ]
+        : []),
       ['pendentes_reservados', ind.pending.reserved],
       ['pendentes_enviados', ind.pending.sent],
       ['pendentes_aguardando_feedback', ind.pending.awaitingFeedback],
@@ -495,61 +512,18 @@ export async function campaignRoutes(app: FastifyInstance) {
   });
 
   // ---------------------------------------------------------------- modelos de campanha (templates)
+  const readOnlyTemplatesError = () =>
+    new HttpError(
+      403,
+      'Modo Somente Leitura',
+      'Modelos de Campanha está bloqueado em modo somente leitura para esta operação.',
+    );
+
   app.post<{ Params: { id: string }; Body: { name?: string; description?: string } }>(
     '/campaigns/:id/save-as-template',
     { preHandler: requireRoles(...CAN.operate) },
-    async (req) => {
-      const a = actor(req);
-      const row = await loadCampaignRow(getPool(), req.params.id, a.workspaceId);
-      const name = req.body?.name?.trim() || `Modelo - ${row.name}`;
-      const description = req.body?.description ?? row.description ?? `Modelo gerado a partir da campanha ${row.name}`;
-
-      const t = await one(
-        getPool(),
-        `INSERT INTO campaign_templates (
-          workspace_id, name, description, purpose_code,
-          journey_id, journey_version_id, strategy_id, strategy_version_id,
-          start_mode, source_campaign_id, source_campaign_name
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-        RETURNING *`,
-        [
-          a.workspaceId,
-          name,
-          description,
-          row.purpose_code ?? 'COBRANCA',
-          row.journey_id,
-          row.journey_version_id,
-          row.strategy_id,
-          row.strategy_version_id,
-          row.scheduled_at ? 'SCHEDULE' : 'NOW',
-          row.id,
-          row.name,
-        ],
-      );
-
-      await audit(getPool(), a, 'template.create_from_campaign', 'campaign_template', t.id, {
-        after: { name, sourceCampaignId: row.id },
-      });
-
-      return {
-        id: t.id,
-        name: t.name,
-        description: t.description,
-        purposeCode: t.purpose_code,
-        journeyId: t.journey_id,
-        journeyName: row.journey_name,
-        journeyVersionId: t.journey_version_id,
-        strategyId: t.strategy_id,
-        strategyName: row.strategy_name,
-        strategyVersionId: t.strategy_version_id,
-        strategyVersion: row.strategy_version,
-        startMode: t.start_mode,
-        sourceCampaignId: t.source_campaign_id,
-        sourceCampaignName: t.source_campaign_name,
-        createdAt: t.created_at,
-        updatedAt: t.updated_at,
-        usageCount: t.usage_count,
-      };
+    async () => {
+      throw readOnlyTemplatesError();
     },
   );
 
@@ -622,36 +596,15 @@ export async function campaignRoutes(app: FastifyInstance) {
     };
   });
 
-  app.post('/campaign-templates', { preHandler: requireRoles(...CAN.manageData) }, async (req) => {
-    const a = actor(req);
-    const body = parse(CampaignTemplateCreateSchema, req.body);
-    const r = await one(
-      getPool(),
-      `INSERT INTO campaign_templates (
-        workspace_id, name, description, purpose_code,
-        journey_id, journey_version_id, strategy_id, strategy_version_id,
-        start_mode, source_campaign_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-      RETURNING *`,
-      [
-        a.workspaceId,
-        body.name,
-        body.description ?? null,
-        body.purposeCode ?? 'COBRANCA',
-        body.journeyId ?? null,
-        body.journeyVersionId ?? null,
-        body.strategyId ?? null,
-        body.strategyVersionId ?? null,
-        body.startMode ?? 'NOW',
-        body.sourceCampaignId ?? null,
-      ],
-    );
-    return r;
+  app.post('/campaign-templates', { preHandler: requireRoles(...CAN.manageData) }, async () => {
+    throw readOnlyTemplatesError();
   });
 
-  app.delete<{ Params: { id: string } }>('/campaign-templates/:id', { preHandler: requireRoles(...CAN.manageData) }, async (req, reply) => {
-    const a = actor(req);
-    await getPool().query(`DELETE FROM campaign_templates WHERE workspace_id = $1 AND id = $2`, [a.workspaceId, req.params.id]);
-    return reply.code(204).send();
+  app.put<{ Params: { id: string } }>('/campaign-templates/:id', { preHandler: requireRoles(...CAN.manageData) }, async () => {
+    throw readOnlyTemplatesError();
+  });
+
+  app.delete<{ Params: { id: string } }>('/campaign-templates/:id', { preHandler: requireRoles(...CAN.manageData) }, async () => {
+    throw readOnlyTemplatesError();
   });
 }

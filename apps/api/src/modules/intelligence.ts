@@ -1,14 +1,8 @@
 import type { FastifyInstance } from 'fastify';
-import {
-  OverrideContactPlanSchema,
-  PromoteLabToProductionSchema,
-  StartIntelligenceRunSchema,
-  UpdateHypothesisSchema,
-} from '@voll/shared';
+import { maskAddress } from '@voll/shared';
 import { getPool, likePattern, one, q, tx } from '../db/pool.js';
 import { actor, CAN, requireRoles } from '../auth/context.js';
-import { notFound, parse } from '../lib/problem.js';
-import { audit } from '../lib/audit.js';
+import { HttpError, notFound } from '../lib/problem.js';
 import { toCsv } from '../lib/csv.js';
 import {
   BRAZIL_DDD_CATALOG,
@@ -18,19 +12,20 @@ import {
 } from '../intelligence/brazil-reference.js';
 import {
   ensureWorkspaceHypotheses,
-  executeNextLabWave,
-  promoteLabToProduction,
-  runIntelligencePipeline,
   type Contact8Blocks,
 } from '../intelligence/cpc-plan-engine.js';
+
+const readOnlyIntelError = () =>
+  new HttpError(
+    403,
+    'Modo Somente Leitura',
+    'A Central de Inteligência está bloqueada em modo somente leitura para esta operação.',
+  );
 
 export async function intelligenceRoutes(app: FastifyInstance) {
   app.get('/intelligence/study', async (req) => {
     const a = actor(req);
-    await tx(async (c) => {
-      await ensureWorkspaceHypotheses(c, a.workspaceId);
-    });
-    const hypotheses = await q(
+    let hypotheses = await q(
       getPool(),
       `SELECT id, code, family, title, description, public_evidence, candidate_variables,
               internal_test, allowed_decision, benchmark_tool, enabled,
@@ -40,6 +35,21 @@ export async function intelligenceRoutes(app: FastifyInstance) {
         ORDER BY family ASC, code ASC`,
       [a.workspaceId],
     );
+    if (hypotheses.length === 0) {
+      await tx(async (c) => {
+        await ensureWorkspaceHypotheses(c, a.workspaceId);
+      }).catch(() => {});
+      hypotheses = await q(
+        getPool(),
+        `SELECT id, code, family, title, description, public_evidence, candidate_variables,
+                internal_test, allowed_decision, benchmark_tool, enabled,
+                production_weight::float AS production_weight, lab_weight::float AS lab_weight, updated_at
+           FROM cpc_study_hypotheses
+          WHERE workspace_id = $1
+          ORDER BY family ASC, code ASC`,
+        [a.workspaceId],
+      );
+    }
     return {
       cpcDefinition:
         'Contato com a Pessoa Certa (CPC), confirmado exclusivamente por registro de tabulação auditável. A finalidade informada no prompt inicial altera hipóteses, canais e janelas, sem jamais alterar o significado de CPC.',
@@ -69,33 +79,8 @@ export async function intelligenceRoutes(app: FastifyInstance) {
   app.patch<{ Params: { code: string } }>(
     '/intelligence/hypotheses/:code',
     { preHandler: requireRoles(...CAN.manageData) },
-    async (req) => {
-      const a = actor(req);
-      const body = parse(UpdateHypothesisSchema, req.body);
-      return tx(async (c) => {
-        await ensureWorkspaceHypotheses(c, a.workspaceId);
-        const existing = await one(
-          c,
-          `SELECT * FROM cpc_study_hypotheses WHERE workspace_id=$1 AND code=$2`,
-          [a.workspaceId, req.params.code],
-        );
-        if (!existing) throw notFound('Hipótese de estudo');
-        const enabled = body.enabled ?? existing.enabled;
-        const prodW = body.productionWeight ?? Number(existing.production_weight);
-        const labW = body.labWeight ?? Number(existing.lab_weight);
-        await c.query(
-          `UPDATE cpc_study_hypotheses
-              SET enabled=$1, production_weight=$2, lab_weight=$3, updated_at=now()
-            WHERE id=$4`,
-          [enabled, prodW, labW, existing.id],
-        );
-        await audit(c, a, 'intelligence.hypothesis.update', 'cpc_hypothesis', existing.id, {
-          reason: body.reason ?? 'Calibração de hipótese da esteira de CPC',
-          before: { enabled: existing.enabled, productionWeight: existing.production_weight, labWeight: existing.lab_weight },
-          after: { enabled, productionWeight: prodW, labWeight: labW },
-        });
-        return { ok: true, code: existing.code, enabled, productionWeight: prodW, labWeight: labW };
-      });
+    async () => {
+      throw readOnlyIntelError();
     },
   );
 
@@ -155,63 +140,23 @@ export async function intelligenceRoutes(app: FastifyInstance) {
     };
   });
 
-  app.post('/intelligence/runs', { preHandler: requireRoles(...CAN.manageData) }, async (req, reply) => {
-    const a = actor(req);
-    const body = parse(StartIntelligenceRunSchema, req.body);
-    const mailing = await one(getPool(), `SELECT id, name FROM mailings WHERE id=$1 AND workspace_id=$2`, [
-      body.mailingId,
-      a.workspaceId,
-    ]);
-    if (!mailing) throw notFound('Mailing');
-
-    const runId = await tx(async (c) => {
-      const id = await runIntelligencePipeline(c, a.workspaceId, a.userId, body, {
-        preSimulateLabWaves: body.mode !== 'PRODUCTION' ? 1 : 0,
-      });
-      await audit(c, a, 'intelligence.run.start', 'mailing_intelligence_run', id, {
-        reason: body.purposePrompt,
-        after: { mailingId: body.mailingId, mode: body.mode, purposeCode: body.purposeCode },
-      });
-      return id;
-    });
-
-    const full = await one(
-      getPool(),
-      `SELECT r.*, m.name AS mailing_name FROM mailing_intelligence_runs r JOIN mailings m ON m.id=r.mailing_id WHERE r.id=$1`,
-      [runId],
-    );
-    return reply.code(201).send(formatRunRow(full));
+  app.post('/intelligence/runs', { preHandler: requireRoles(...CAN.manageData) }, async () => {
+    throw readOnlyIntelError();
   });
 
   app.post<{ Params: { id: string } }>(
     '/intelligence/runs/:id/lab/next-wave',
     { preHandler: requireRoles(...CAN.manageData) },
-    async (req) => {
-      const a = actor(req);
-      return tx(async (c) => {
-        const res = await executeNextLabWave(c, a.workspaceId, req.params.id);
-        await audit(c, a, 'intelligence.lab.next_wave', 'mailing_intelligence_run', req.params.id, {
-          after: res,
-        });
-        return res;
-      });
+    async () => {
+      throw readOnlyIntelError();
     },
   );
 
   app.post<{ Params: { id: string } }>(
     '/intelligence/runs/:id/lab/promote',
     { preHandler: requireRoles(...CAN.manageData) },
-    async (req) => {
-      const a = actor(req);
-      const body = parse(PromoteLabToProductionSchema, req.body ?? {});
-      return tx(async (c) => {
-        const res = await promoteLabToProduction(c, a.workspaceId, a.userId, req.params.id, body.reason);
-        await audit(c, a, 'intelligence.lab.promote_to_production', 'mailing_intelligence_run', req.params.id, {
-          reason: body.reason,
-          after: res,
-        });
-        return res;
-      });
+    async () => {
+      throw readOnlyIntelError();
     },
   );
 
@@ -284,57 +229,8 @@ export async function intelligenceRoutes(app: FastifyInstance) {
   app.post<{ Params: { id: string; contactId: string } }>(
     '/intelligence/runs/:id/plans/:contactId/override',
     { preHandler: requireRoles(...CAN.manageData) },
-    async (req) => {
-      const a = actor(req);
-      const body = parse(OverrideContactPlanSchema, req.body);
-      return tx(async (c) => {
-        const plan = await one(
-          c,
-          `SELECT * FROM contact_cpc_plans WHERE run_id=$1 AND contact_id=$2 AND workspace_id=$3`,
-          [req.params.id, req.params.contactId, a.workspaceId],
-        );
-        if (!plan) throw notFound('Plano do contato');
-        const blocks = plan.blocks as Contact8Blocks;
-        if (body.status) {
-          blocks.decision.status = body.status;
-          blocks.decision.reason = `Revisão humana: ${body.reason}`;
-        }
-        if (body.primaryChannel) {
-          blocks.channel.primaryChannel = body.primaryChannel;
-        }
-        if (body.localTimeWindow) {
-          blocks.schedule.localTimeWindow = body.localTimeWindow;
-        }
-        blocks.governance.reviewContestStatus = 'REVISADO_HUMANO';
-        blocks.governance.humanReviewReason = body.reason;
-
-        await c.query(
-          `UPDATE contact_cpc_plans
-              SET decision_status = $1,
-                  decision_reason = $2,
-                  primary_channel = $3,
-                  local_time_window = $4,
-                  human_reviewed = true,
-                  human_review_reason = $5,
-                  blocks = $6,
-                  updated_at = now()
-            WHERE id = $7`,
-          [
-            blocks.decision.status,
-            blocks.decision.reason,
-            blocks.channel.primaryChannel,
-            blocks.schedule.localTimeWindow,
-            body.reason,
-            JSON.stringify(blocks),
-            plan.id,
-          ],
-        );
-        await audit(c, a, 'intelligence.plan.human_override', 'contact_cpc_plan', plan.id, {
-          reason: body.reason,
-          after: { status: blocks.decision.status, primaryChannel: blocks.channel.primaryChannel, localTimeWindow: blocks.schedule.localTimeWindow },
-        });
-        return { ok: true, blocks };
-      });
+    async () => {
+      throw readOnlyIntelError();
     },
   );
 
@@ -477,6 +373,107 @@ export async function intelligenceRoutes(app: FastifyInstance) {
         blocks: p.blocks,
       })),
     };
+  });
+
+  app.get<{ Querystring: { campaignId?: string } }>('/optimization', async (req) => {
+    const a = actor(req);
+    const campaignId = req.query.campaignId || null;
+
+    const campaign = campaignId
+      ? await one(
+          getPool(),
+          `SELECT c.id, c.name, c.mailing_id, sv.strategy_id, sv.version AS strategy_version, s.name AS strategy_name
+             FROM campaigns c
+             LEFT JOIN strategy_versions sv ON sv.id = c.strategy_version_id
+             LEFT JOIN strategies s ON s.id = sv.strategy_id
+            WHERE c.id = $1 AND c.workspace_id = $2`,
+          [campaignId, a.workspaceId],
+        )
+      : await one(
+          getPool(),
+          `SELECT c.id, c.name, c.mailing_id, sv.strategy_id, sv.version AS strategy_version, s.name AS strategy_name
+             FROM campaigns c
+             LEFT JOIN strategy_versions sv ON sv.id = c.strategy_version_id
+             LEFT JOIN strategies s ON s.id = sv.strategy_id
+            WHERE c.workspace_id = $1
+            ORDER BY (c.status = 'RUNNING') DESC, c.created_at DESC
+            LIMIT 1`,
+          [a.workspaceId],
+        );
+
+    const run = await one(
+      getPool(),
+      `SELECT id, mailing_id, purpose_code
+         FROM mailing_intelligence_runs
+        WHERE workspace_id = $1
+          AND ($2::uuid IS NULL OR production_campaign_id = $2 OR lab_campaign_id = $2 OR mailing_id = $3)
+        ORDER BY created_at DESC
+        LIMIT 1`,
+      [a.workspaceId, campaign?.id ?? null, campaign?.mailing_id ?? null],
+    );
+
+    const planRows = run
+      ? await q(
+          getPool(),
+          `SELECT p.contact_id, c.external_id, c.name, p.primary_channel, p.preferred_destination,
+                  p.local_time_window, p.locator_score, p.expected_cost_per_cpc_brl, p.blocks
+             FROM contact_cpc_plans p
+             JOIN contacts c ON c.id = p.contact_id
+            WHERE p.run_id = $1 AND p.workspace_id = $2
+            ORDER BY p.priority_rank ASC
+            LIMIT 50`,
+          [run.id, a.workspaceId],
+        )
+      : [];
+
+    const items = planRows.map((r: any) => {
+      const channel = String(r.primary_channel || 'WHATSAPP');
+      const destRaw = String(r.preferred_destination || '');
+      const blocks = (r.blocks ?? {}) as Partial<Contact8Blocks>;
+      const rawRate = Number((blocks as any)?.economics?.expectedCpcProbability ?? (Number(r.locator_score || 50) / 150));
+      const historicRate = Math.max(0.05, Math.min(0.95, rawRate > 1 ? rawRate / 100 : rawRate));
+
+      return {
+        contactId: r.contact_id,
+        externalId: r.external_id,
+        name: r.name,
+        channel,
+        destinationMasked: destRaw ? maskAddress(destRaw) : '—',
+        bestTimeWindow: r.local_time_window || '09:00-18:00',
+        evidencesCount: Math.max(1, Math.round(Number(r.locator_score || 30) / 15)),
+        historicRate,
+        estimatedCostPerSuccess:
+          r.expected_cost_per_cpc_brl !== null && r.expected_cost_per_cpc_brl !== undefined
+            ? Number(r.expected_cost_per_cpc_brl)
+            : null,
+        policyUsed: 'LOWEST_COST_PER_CPC',
+      };
+    });
+
+    return {
+      enabled: false,
+      policyCode: 'LOWEST_COST_PER_CPC',
+      minEvidences: 3,
+      strategyId: campaign?.strategy_id ?? undefined,
+      strategyName: campaign?.strategy_name ?? 'Padrão (Somente Leitura)',
+      strategyVersion: campaign?.strategy_version ? Number(campaign.strategy_version) : 1,
+      items,
+      policy: 'Modo Somente Leitura · Base PostgreSQL',
+      notes: [
+        'Central de Inteligência operando em modo somente leitura.',
+        items.length > 0
+          ? `${items.length} recomendações carregadas diretamente da execução no PostgreSQL.`
+          : 'Nenhuma recomendação gerada no banco para a campanha selecionada.',
+      ],
+    };
+  });
+
+  app.post('/optimization/configure', { preHandler: requireRoles(...CAN.manageData) }, async () => {
+    throw readOnlyIntelError();
+  });
+
+  app.post('/optimization/apply', { preHandler: requireRoles(...CAN.manageData) }, async () => {
+    throw readOnlyIntelError();
   });
 }
 

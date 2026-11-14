@@ -6,15 +6,33 @@
 import { z } from 'zod';
 
 // ------------------------------------------------------------------ enums
-export const ROLES = ['ADMIN', 'MANAGER', 'SUPERVISOR', 'OPERATOR', 'ANALYST'] as const;
+export const ROLES = [
+  'SUPER_ADMIN',
+  'SUPER_ADMIN_VIEWER',
+  'ADMIN',
+  'MANAGER',
+  'SUPERVISOR',
+  'OPERATOR',
+  'ANALYST',
+] as const;
 export type Role = (typeof ROLES)[number];
 export const ROLE_LABEL: Record<Role, string> = {
+  SUPER_ADMIN: 'Super Admin',
+  SUPER_ADMIN_VIEWER: 'Suporte (Leitura)',
   ADMIN: 'Administrador',
   MANAGER: 'Gestor',
   SUPERVISOR: 'Supervisor',
   OPERATOR: 'Operador',
   ANALYST: 'Analista',
 };
+
+export function isSuperAdminRole(role?: string | null): boolean {
+  return role === 'SUPER_ADMIN' || role === 'SUPER_ADMIN_VIEWER';
+}
+
+export function isReadOnlyRole(role?: string | null): boolean {
+  return role === 'SUPER_ADMIN_VIEWER';
+}
 
 export const CHANNEL_TYPES = ['VOICE', 'WHATSAPP', 'SMS', 'EMAIL'] as const;
 export type ChannelType = (typeof CHANNEL_TYPES)[number];
@@ -297,6 +315,7 @@ export const ConnectionUpdateSchema = z.object({
   endpointUrl: z.string().nullable().optional(),
   callerId: z.string().nullable().optional(),
   authToken: z.string().nullable().optional(),
+  tenantId: z.string().max(120).nullable().optional(),
   simulation: z
     .object({
       /** pesos por resultado simulado */

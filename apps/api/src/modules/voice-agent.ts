@@ -193,6 +193,20 @@ export async function voiceAgentRoutes(app: FastifyInstance) {
     if (!state.agent) throw badRequest('Cadastre o agente de voz antes de publicar');
     const tenant = toTenant(conn, state.agent, state.version);
     const error = await publish(conn, tenant);
+    if (!error) {
+      await getPool()
+        .query(
+          `INSERT INTO workspace_voice_resources (resource_type, resource_id, workspace_id, is_global_default, owner_mode, updated_at)
+           VALUES ('agent', $1, $2, false, 'TENANT_BYOK', now())
+           ON CONFLICT (resource_type, resource_id) DO UPDATE
+           SET workspace_id = EXCLUDED.workspace_id,
+               is_global_default = false,
+               owner_mode = 'TENANT_BYOK',
+               updated_at = now()`,
+          [tenant.id, a.workspaceId],
+        )
+        .catch(() => {});
+    }
     return tx(async (c) => {
       // grava sobre a configuração atual: outra edição pode ter chegado durante o HTTP
       const cur = await loadVoiceConnection(conn.id, a.workspaceId, true, c);

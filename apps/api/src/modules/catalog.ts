@@ -15,19 +15,21 @@ import {
 } from '@voll/shared';
 import { getPool, one, q, tx } from '../db/pool.js';
 import { actor, requireRoles, CAN } from '../auth/context.js';
+import { isSuperAdminRole } from '@voll/shared';
 import { badRequest, conflict, forbidden, notFound, parse, unprocessable } from '../lib/problem.js';
 import { audit } from '../lib/audit.js';
 import { DEFAULT_SIMULATION } from '../connectors/simulated.js';
 
-function connectionDto(r: any) {
+function connectionDto(r: any, isSuper = false) {
   return {
     id: r.id,
     name: r.name,
     channelType: r.channel_type,
     provider: r.provider,
-    tariff: r.tariff,
-    tariffUpdatedAt: r.tariff_updated_at,
+    tariff: isSuper ? r.tariff : null,
+    tariffUpdatedAt: isSuper ? r.tariff_updated_at : null,
     active: r.active,
+    tenantId: r.config?.tenantId ?? null,
     simulation: r.provider === 'SIMULATED' ? { ...DEFAULT_SIMULATION, ...(r.config?.simulation ?? {}) } : null,
   };
 }
@@ -136,13 +138,17 @@ export async function catalogRoutes(app: FastifyInstance) {
   });
 
   app.get('/connections', async (req) => {
-    const rows = await q(getPool(), `SELECT * FROM connections WHERE workspace_id=$1 ORDER BY channel_type, name`, [actor(req).workspaceId]);
-    return { items: rows.map(connectionDto) };
+    const a = actor(req);
+    const isSuper = isSuperAdminRole(a.role);
+    const rows = await q(getPool(), `SELECT * FROM connections WHERE workspace_id=$1 ORDER BY channel_type, name`, [a.workspaceId]);
+    return { items: rows.map((r) => connectionDto(r, isSuper)) };
   });
 
   app.post('/connections', { preHandler: requireRoles(...CAN.admin) }, async (req, reply) => {
     const body = parse(ConnectionCreateSchema, req.body);
     const a = actor(req);
+    const isSuper = isSuperAdminRole(a.role);
+    const tariff = isSuper ? (body.tariff ?? null) : null;
     const secret = crypto.randomBytes(24).toString('hex');
     const created = await tx(async (c) => {
       const ins = await one(
@@ -150,10 +156,10 @@ export async function catalogRoutes(app: FastifyInstance) {
         `INSERT INTO connections (workspace_id, name, channel_type, provider, config, webhook_secret, tariff, tariff_updated_at, active)
          VALUES ($1, $2, $3, $4, $5, $6, $7, CASE WHEN $7 IS NOT NULL THEN now() ELSE null END, true)
          RETURNING *`,
-        [a.workspaceId, body.name, body.channelType, body.provider, JSON.stringify({ simulation: DEFAULT_SIMULATION }), secret, body.tariff ?? null],
+        [a.workspaceId, body.name, body.channelType, body.provider, JSON.stringify({ simulation: DEFAULT_SIMULATION }), secret, tariff],
       );
-      await audit(c, a, 'connection.create', 'connection', ins!.id, { after: connectionDto(ins) });
-      return connectionDto(ins);
+      await audit(c, a, 'connection.create', 'connection', ins!.id, { after: connectionDto(ins, isSuper) });
+      return connectionDto(ins, isSuper);
     });
     return reply.code(201).send(created);
   });
@@ -161,26 +167,49 @@ export async function catalogRoutes(app: FastifyInstance) {
   app.patch<{ Params: { id: string } }>('/connections/:id', { preHandler: requireRoles(...CAN.admin) }, async (req) => {
     const body = parse(ConnectionUpdateSchema, req.body);
     const a = actor(req);
+    const isSuper = isSuperAdminRole(a.role);
     return tx(async (c) => {
       const before = await one(c, `SELECT * FROM connections WHERE id=$1 AND workspace_id=$2 FOR UPDATE`, [req.params.id, a.workspaceId]);
       if (!before) throw notFound('Conexão');
       if (body.simulation && body.simulation.maxDelaySeconds < body.simulation.minDelaySeconds)
         throw unprocessable('Corrija os campos indicados', { 'simulation.maxDelaySeconds': 'Deve ser maior ou igual ao mínimo' });
-      const config = body.simulation ? { ...before.config, simulation: body.simulation } : before.config;
-      const tariffChanged = body.tariff !== undefined && body.tariff !== before.tariff;
+      const nextConfig: Record<string, any> = { ...(before.config ?? {}) };
+      if (body.simulation) nextConfig.simulation = body.simulation;
+      if (body.callerId !== undefined) nextConfig.defaultCallerId = body.callerId;
+      if (body.tenantId !== undefined) {
+        const nextTid = body.tenantId ? String(body.tenantId).trim() : null;
+        if (nextTid) {
+          const own = await one<{ workspace_id: string | null }>(
+            c,
+            `SELECT workspace_id FROM workspace_voice_resources WHERE resource_type='agent' AND resource_id=$1`,
+            [nextTid],
+          ).catch(() => null);
+          if (own && own.workspace_id && own.workspace_id !== a.workspaceId) {
+            throw forbidden('Este Agente de Voz pertence a outra empresa.');
+          }
+          nextConfig.tenantId = nextTid;
+          // Telefonia passa a ser a fonte única de verdade deste vínculo
+          delete nextConfig.voiceAgent;
+          delete nextConfig.voiceAgentVersion;
+          delete nextConfig.voiceAgentSyncedVersion;
+        } else {
+          delete nextConfig.tenantId;
+        }
+      }
+      const tariffChanged = isSuper && body.tariff !== undefined && body.tariff !== before.tariff;
       const after = await one(
         c,
         `UPDATE connections SET name=COALESCE($2,name), active=COALESCE($3,active), config=$4,
                 tariff = CASE WHEN $5 THEN $6::numeric ELSE tariff END,
                 tariff_updated_at = CASE WHEN $5 THEN now() ELSE tariff_updated_at END
           WHERE id=$1 RETURNING *`,
-        [before.id, body.name ?? null, body.active ?? null, JSON.stringify(config), tariffChanged, body.tariff ?? null],
+        [before.id, body.name ?? null, body.active ?? null, JSON.stringify(nextConfig), tariffChanged, body.tariff ?? null],
       );
       await audit(c, a, 'connection.update', 'connection', before.id, {
-        before: { name: before.name, tariff: before.tariff, active: before.active, simulation: before.config?.simulation ?? null },
-        after: { name: after.name, tariff: after.tariff, active: after.active, simulation: after.config?.simulation ?? null },
+        before: { name: before.name, tariff: before.tariff, active: before.active, tenantId: before.config?.tenantId ?? null },
+        after: { name: after.name, tariff: after.tariff, active: after.active, tenantId: after.config?.tenantId ?? null },
       });
-      return connectionDto(after);
+      return connectionDto(after, isSuper);
     });
   });
 
@@ -191,7 +220,7 @@ export async function catalogRoutes(app: FastifyInstance) {
       `SELECT config FROM workspace_channel_endpoints WHERE workspace_id=$1`,
       [a.workspaceId],
     );
-    return { data: row?.config ?? DEFAULT_CHANNEL_ENDPOINTS };
+    return { data: { ...DEFAULT_CHANNEL_ENDPOINTS, ...(row?.config ?? {}) } };
   });
 
   app.post('/channels/technical-endpoints', { preHandler: requireRoles(...CAN.admin) }, async (req) => {
@@ -199,8 +228,13 @@ export async function catalogRoutes(app: FastifyInstance) {
     const body = parse(ChannelEndpointConfigSchema, req.body);
     await getPool().query(
       `INSERT INTO workspace_channel_endpoints (workspace_id, config, updated_at)
-       VALUES ($1, $2, now())
-       ON CONFLICT (workspace_id) DO UPDATE SET config=$2, updated_at=now()`,
+       VALUES ($1, $2::jsonb, now())
+       ON CONFLICT (workspace_id) DO UPDATE
+       SET config = CASE
+             WHEN workspace_channel_endpoints.config ? 'ai' THEN $2::jsonb || jsonb_build_object('ai', workspace_channel_endpoints.config->'ai')
+             ELSE $2::jsonb
+           END,
+           updated_at = now()`,
       [a.workspaceId, JSON.stringify(body)],
     );
     await audit(getPool(), a, 'channels.endpoints_update', 'workspace_channel_endpoints', a.workspaceId, { after: body });

@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import {
   AiCampaignChatRequestSchema,
   CHANNEL_LABEL,
@@ -10,10 +10,64 @@ import {
   type OperationPurpose,
 } from '@voll/shared';
 import { config } from '../config.js';
+import { actor, requireRoles, CAN } from '../auth/context.js';
+import { getPool, one } from '../db/pool.js';
 import { parse } from '../lib/problem.js';
+import { decryptSecret, encryptSecret } from '../lib/crypto.js';
 
-let runtimeOpenAiKey = config.openAiApiKey;
-let runtimeOpenAiModel = config.openAiModel || 'gpt-4o-mini';
+const DEFAULT_AI_MODEL = config.openAiModel || 'gpt-4o-mini';
+
+type StoredAiConfig = { apiKey: string; model: string; orgId: string };
+
+async function loadAiConfig(workspaceId: string): Promise<StoredAiConfig> {
+  const row = await one<{ ai?: { apiKey?: string; model?: string; orgId?: string } | null }>(
+    getPool(),
+    `SELECT config->'ai' AS ai FROM workspace_channel_endpoints WHERE workspace_id=$1`,
+    [workspaceId],
+  ).catch(() => null);
+
+  // Nunca vaza chaves salvas de outros workspaces via memória global.
+  // Apenas o workspace master pode usar a chave de ambiente caso ainda não tenha chave própria no banco.
+  let envFallbackKey = '';
+  if (typeof row?.ai?.apiKey !== 'string' && config.openAiApiKey) {
+    const ws = await one<{ is_master: boolean }>(
+      getPool(),
+      `SELECT COALESCE(is_master, false) AS is_master FROM workspaces WHERE id=$1`,
+      [workspaceId],
+    ).catch(() => null);
+    if (ws?.is_master) envFallbackKey = config.openAiApiKey;
+  }
+
+  const rawKey = typeof row?.ai?.apiKey === 'string' ? decryptSecret(row.ai.apiKey) : envFallbackKey;
+  const apiKey = rawKey.trim();
+  const model = (typeof row?.ai?.model === 'string' && row.ai.model.trim())
+    ? row.ai.model.trim()
+    : DEFAULT_AI_MODEL;
+  const orgId = typeof row?.ai?.orgId === 'string' ? row.ai.orgId.trim() : '';
+  return { apiKey, model, orgId };
+}
+
+async function saveAiConfig(workspaceId: string, cfg: StoredAiConfig): Promise<void> {
+  const encryptedPayload: StoredAiConfig = {
+    apiKey: cfg.apiKey ? encryptSecret(cfg.apiKey) : '',
+    model: cfg.model,
+    orgId: cfg.orgId,
+  };
+  await getPool().query(
+    `INSERT INTO workspace_channel_endpoints (workspace_id, config, updated_at)
+     VALUES ($1, jsonb_build_object('ai', $2::jsonb), now())
+     ON CONFLICT (workspace_id) DO UPDATE
+     SET config = jsonb_set(COALESCE(workspace_channel_endpoints.config, '{}'::jsonb), '{ai}', $2::jsonb, true),
+         updated_at = now()`,
+    [workspaceId, JSON.stringify(encryptedPayload)],
+  );
+}
+
+function maskApiKey(key: string): string {
+  if (!key) return '';
+  if (key.length <= 12) return `${key.slice(0, 3)}***`;
+  return `${key.slice(0, 7)}...${key.slice(-4)}`;
+}
 
 const SYSTEM_PROMPT = `Você é o Assistente Especialista em Operações Omnichannel e CPC (Contato com a Pessoa Certa) da plataforma Voll Plan.
 Sua missão é conduzir uma conversa interativa em português (pt-BR) para ajudar o usuário a estruturar uma campanha de acionamento passo a passo, extraindo os parâmetros da conversa e fazendo perguntas objetivas apenas sobre as informações que ainda faltam.
@@ -356,36 +410,57 @@ export function buildLocalInteractiveResponse(body: AiCampaignChatRequest): AiCa
 }
 
 export async function aiRoutes(app: FastifyInstance) {
-  app.get('/ai/status', async () => {
-    const hasKey = Boolean(runtimeOpenAiKey && runtimeOpenAiKey.trim().length > 10);
+  app.get('/ai/status', async (req) => {
+    const cfg = await loadAiConfig(actor(req).workspaceId);
+    const hasKey = Boolean(cfg.apiKey && cfg.apiKey.length > 10);
     return {
       configured: hasKey,
       provider: hasKey ? 'OPENAI' : 'LOCAL_ASSISTANT',
-      model: runtimeOpenAiModel,
+      model: cfg.model,
     };
   });
 
-  app.post<{ Body: { apiKey?: string; model?: string } }>('/ai/config', async (req) => {
-    const body = (req.body ?? {}) as { apiKey?: string; model?: string };
-    if (typeof body.apiKey === 'string') {
-      runtimeOpenAiKey = body.apiKey.trim();
-    }
-    if (typeof body.model === 'string' && body.model.trim()) {
-      runtimeOpenAiModel = body.model.trim();
-    }
-    const hasKey = Boolean(runtimeOpenAiKey && runtimeOpenAiKey.trim().length > 10);
+  app.get('/ai/config', async (req) => {
+    const cfg = await loadAiConfig(actor(req).workspaceId);
+    const hasKey = Boolean(cfg.apiKey && cfg.apiKey.length > 10);
+    return {
+      configured: hasKey,
+      provider: hasKey ? 'OPENAI' : 'LOCAL_ASSISTANT',
+      model: cfg.model,
+      orgId: cfg.orgId,
+      maskedApiKey: maskApiKey(cfg.apiKey),
+    };
+  });
+
+  const handleSaveConfig = async (req: FastifyRequest<{ Body?: { apiKey?: string; model?: string; orgId?: string } }>) => {
+    const workspaceId = actor(req).workspaceId;
+    const current = await loadAiConfig(workspaceId);
+    const body = (req.body ?? {}) as { apiKey?: string; model?: string; orgId?: string };
+    const next: StoredAiConfig = {
+      apiKey: typeof body.apiKey === 'string' ? body.apiKey.trim() : current.apiKey,
+      model: typeof body.model === 'string' && body.model.trim() ? body.model.trim() : current.model,
+      orgId: typeof body.orgId === 'string' ? body.orgId.trim() : current.orgId,
+    };
+    await saveAiConfig(workspaceId, next);
+    const hasKey = Boolean(next.apiKey && next.apiKey.length > 10);
     return {
       ok: true,
       configured: hasKey,
       provider: hasKey ? 'OPENAI' : 'LOCAL_ASSISTANT',
-      model: runtimeOpenAiModel,
+      model: next.model,
+      orgId: next.orgId,
+      maskedApiKey: maskApiKey(next.apiKey),
     };
-  });
+  };
 
-  app.post<{ Body: { apiKey?: string; model?: string } }>('/ai/test', async (req) => {
+  app.post('/ai/config', { preHandler: requireRoles(...CAN.admin) }, handleSaveConfig as any);
+  app.put('/ai/config', { preHandler: requireRoles(...CAN.admin) }, handleSaveConfig as any);
+
+  app.post<{ Body: { apiKey?: string; model?: string } }>('/ai/test', { preHandler: requireRoles(...CAN.admin) }, async (req) => {
+    const cfg = await loadAiConfig(actor(req).workspaceId);
     const body = (req.body ?? {}) as { apiKey?: string; model?: string };
-    const keyToTest = (body.apiKey?.trim() || runtimeOpenAiKey || '').trim();
-    const modelToTest = (body.model?.trim() || runtimeOpenAiModel || 'gpt-4o-mini').trim();
+    const keyToTest = (body.apiKey?.trim() || cfg.apiKey || '').trim();
+    const modelToTest = (body.model?.trim() || cfg.model || 'gpt-4o-mini').trim();
 
     if (!keyToTest) {
       return {
@@ -436,9 +511,10 @@ export async function aiRoutes(app: FastifyInstance) {
   });
 
   app.post('/ai/campaign-chat', async (req) => {
+    const cfg = await loadAiConfig(actor(req).workspaceId);
     const body = parse(AiCampaignChatRequestSchema, req.body);
-    const activeKey = (body.apiKey?.trim() || runtimeOpenAiKey || '').trim();
-    const activeModel = (body.model?.trim() || runtimeOpenAiModel || 'gpt-4o-mini').trim();
+    const activeKey = (body.apiKey?.trim() || cfg.apiKey || '').trim();
+    const activeModel = (body.model?.trim() || cfg.model || 'gpt-4o-mini').trim();
 
     if (activeKey.length > 10) {
       try {

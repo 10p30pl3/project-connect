@@ -1,10 +1,11 @@
 import type { Db } from '../db/pool.js';
 
 export type Actor = { userId: string | null; organizationId: string; workspaceId: string };
+export type AuditActor = { userId: string | null; organizationId: string; workspaceId: string | null };
 
 export async function audit(
   db: Db,
-  actor: Actor,
+  actor: AuditActor,
   action: string,
   entity: string,
   entityId: string | null,

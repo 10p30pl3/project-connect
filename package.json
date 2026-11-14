@@ -18,6 +18,7 @@
     "build": "npm run build -w @voll/shared --if-present && npm run build -w @voll/api && npm run build -w @voll/web",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test -w @voll/api && npm run test -w @voll/voice-gateway",
+    "test:arch": "npm run test:arch -w @voll/api",
     "test:e2e": "npm run test:e2e -w @voll/web",
     "dev:gateway": "npm run dev -w @voll/voice-gateway",
     "voice:up": "docker compose --profile voice up -d",
