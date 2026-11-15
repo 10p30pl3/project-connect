@@ -30,7 +30,6 @@ import {
   Button,
   Card,
   Checkbox,
-  ConfirmDialog,
   Empty,
   Field,
   Input,
@@ -85,7 +84,6 @@ export function CallsTab({
   const [dateFilter, setDateFilter] = useState('');
   const [tabFilter, setTabFilter] = useState('all');
 
-  const [endingCall, setEndingCall] = useState<LiveCall | null>(null);
   const [sayCall, setSayCall] = useState<LiveCall | null>(null);
   const [sayRole, setSayRole] = useState<'agent' | 'system'>('agent');
   const [sayText, setSayText] = useState('');
@@ -183,7 +181,7 @@ export function CallsTab({
   const scrollTranscriptToBottom = () => {
     const el = transcriptScrollRef.current ?? transcriptPreRef.current;
     if (el) {
-      el.scrollTop = el.scrollHeight;
+      el.scrollTo({ top: el.scrollHeight, behavior: 'auto' });
     }
   };
 
@@ -202,8 +200,15 @@ export function CallsTab({
 
   useEffect(() => {
     if (!transcriptCallId || !shouldAutoScrollRef.current) return;
-    const raf = requestAnimationFrame(scrollTranscriptToBottom);
-    return () => cancelAnimationFrame(raf);
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      scrollTranscriptToBottom();
+      raf2 = requestAnimationFrame(scrollTranscriptToBottom);
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      if (raf2) cancelAnimationFrame(raf2);
+    };
   }, [transcriptCallId, liveTranscriptQ.data, liveTranscriptQ.dataUpdatedAt]);
 
   const historyTranscriptQ = useQuery({
@@ -222,7 +227,6 @@ export function CallsTab({
     mutationFn: (c: LiveCall) => post(`/telephony/calls/${encodeURIComponent(c.callId)}/hangup`, { reason: 'Encerrada pelo operador no Voll Plan' }),
     onSuccess: () => {
       toast('success', 'Chamada encerrada.');
-      setEndingCall(null);
       invalidateCalls();
     },
     onError: (e) => toast('error', errorMessage(e)),
@@ -448,7 +452,12 @@ export function CallsTab({
               </thead>
               <tbody>
                 {calls.map((c) => (
-                  <tr key={c.callId}>
+                  <tr
+                    key={c.callId}
+                    onClick={() => setTranscriptCallId(c.callId)}
+                    className="cursor-pointer transition-colors hover:bg-slate-50/80"
+                    title={isAtLeast('advanced') ? 'Clique para abrir o Cockpit ao Vivo' : 'Clique para acompanhar a ligação ao vivo'}
+                  >
                     <td>
                       <div className="font-mono text-xs font-semibold text-slate-900">
                         {c.caller || '—'} → {c.called || '—'}
@@ -512,7 +521,7 @@ export function CallsTab({
                         )}
                       </div>
                     </td>
-                    <td className="text-right whitespace-nowrap">
+                    <td className="text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                       <div className="inline-flex flex-wrap items-center justify-end gap-1">
                         <Button
                           size="sm"
@@ -610,7 +619,9 @@ export function CallsTab({
                               variant="danger"
                               title="Encerrar chamada"
                               icon={<PhoneOff className="size-3.5" aria-hidden />}
-                              onClick={() => setEndingCall(c)}
+                              loading={hangupM.isPending && hangupM.variables?.callId === c.callId}
+                              disabled={hangupM.isPending}
+                              onClick={() => hangupM.mutate(c)}
                             >
                               Desligar
                             </Button>
@@ -1102,10 +1113,12 @@ export function CallsTab({
         }
         description={isAtLeast('advanced') ? (transcriptCallId ?? undefined) : undefined}
         wide
+        contentClassName="h-[min(88dvh,840px)]"
+        bodyClassName="flex flex-col overflow-y-auto"
       >
-        <div className="space-y-3">
+        <div className="flex min-h-0 flex-1 flex-col gap-3">
           {/* Barra de data/hora/minuto/segundo ao vivo */}
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
             <div className="flex items-center gap-2 font-medium text-slate-800">
               <span className="inline-block size-2 rounded-full bg-emerald-500 animate-pulse" aria-hidden />
               <span>Ao vivo</span>
@@ -1126,7 +1139,7 @@ export function CallsTab({
           </div>
 
           {activeCockpitCall && (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
               <div className="flex flex-wrap items-center gap-1.5 text-xs">
                 <Badge tone="brand">{elapsedSince(activeCockpitCall.startedAt)}</Badge>
                 <Badge tone="gray">{activeCockpitCall.tenantId || 'default'}</Badge>
@@ -1214,7 +1227,9 @@ export function CallsTab({
                     size="sm"
                     variant="danger"
                     icon={<PhoneOff className="size-3.5" />}
-                    onClick={() => setEndingCall(activeCockpitCall)}
+                    loading={hangupM.isPending && hangupM.variables?.callId === activeCockpitCall.callId}
+                    disabled={hangupM.isPending}
+                    onClick={() => hangupM.mutate(activeCockpitCall)}
                   >
                     Desligar
                   </Button>
@@ -1224,17 +1239,19 @@ export function CallsTab({
           )}
 
           {transcriptCallId && (
-            <LiveVoiceMonitor
-              callId={transcriptCallId}
-              call={activeCockpitCall}
-              isAdvanced={isAtLeast('advanced')}
-            />
+            <div className="shrink-0">
+              <LiveVoiceMonitor
+                callId={transcriptCallId}
+                call={activeCockpitCall}
+                isAdvanced={isAtLeast('advanced')}
+              />
+            </div>
           )}
 
           {isAtLeast('advanced') &&
             activeCockpitCall?.extractedData &&
             Object.keys(activeCockpitCall.extractedData).length > 0 && (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div className="max-h-24 shrink-0 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Dados Estruturados Coletados ao Vivo
                 </div>
@@ -1249,7 +1266,9 @@ export function CallsTab({
             )}
 
           {liveTranscriptQ.isLoading ? (
-            <Loading rows={3} />
+            <div className="min-h-0 flex-1">
+              <Loading rows={3} />
+            </div>
           ) : (() => {
               const data = liveTranscriptQ.data;
               const turns: {
@@ -1269,11 +1288,11 @@ export function CallsTab({
                   : [];
               if (turns.length > 0 && typeof turns[0] === 'object') {
                 return (
-                  <div className="relative">
+                  <div className="relative flex min-h-[180px] flex-1 flex-col">
                     <div
                       ref={transcriptScrollRef}
                       onScroll={(e) => handleTranscriptScroll(e.currentTarget)}
-                      className="max-h-96 space-y-2.5 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/70 p-4"
+                      className="min-h-0 flex-1 space-y-2.5 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/70 p-4"
                     >
                       {turns.map((t, i) => {
                         const isAgent = /^(agent|assistant|ai|ia|atendente)/i.test(t.role || t.speaker || '');
@@ -1302,10 +1321,11 @@ export function CallsTab({
                       })}
                     </div>
                     {autoScrollPaused && (
-                      <div className="mt-2 flex justify-center">
+                      <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center">
                         <Button
                           size="sm"
                           variant="secondary"
+                          className="pointer-events-auto shadow-md"
                           icon={<ArrowDown className="size-3.5" />}
                           onClick={() => {
                             shouldAutoScrollRef.current = true;
@@ -1321,19 +1341,20 @@ export function CallsTab({
                 );
               }
               return (
-                <div className="relative">
+                <div className="relative flex min-h-[180px] flex-1 flex-col">
                   <pre
                     ref={transcriptPreRef}
                     onScroll={(e) => handleTranscriptScroll(e.currentTarget)}
-                    className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-900 p-4 font-mono text-xs text-slate-100"
+                    className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-900 p-4 font-mono text-xs text-slate-100"
                   >
                     {renderTranscriptBody(data)}
                   </pre>
                   {autoScrollPaused && (
-                    <div className="mt-2 flex justify-center">
+                    <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center">
                       <Button
                         size="sm"
                         variant="secondary"
+                        className="pointer-events-auto shadow-md"
                         icon={<ArrowDown className="size-3.5" />}
                         onClick={() => {
                           shouldAutoScrollRef.current = true;
@@ -1382,19 +1403,6 @@ export function CallsTab({
           </div>
         )}
       </Modal>
-
-      {/* Confirmação Hangup */}
-      <ConfirmDialog
-        open={!!endingCall}
-        onOpenChange={(o) => !o && setEndingCall(null)}
-        title="Encerrar esta chamada?"
-        confirmLabel="Encerrar chamada"
-        danger
-        loading={hangupM.isPending}
-        onConfirm={() => endingCall && hangupM.mutate(endingCall)}
-      >
-        A ligação para <strong>{endingCall?.called || endingCall?.callId}</strong> será desligada agora e registrada na auditoria.
-      </ConfirmDialog>
     </div>
   );
 }

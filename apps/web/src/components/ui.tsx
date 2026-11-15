@@ -497,6 +497,8 @@ export function Modal({
   footer,
   wide,
   side,
+  contentClassName,
+  bodyClassName,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -506,6 +508,8 @@ export function Modal({
   footer?: ReactNode;
   wide?: boolean;
   side?: boolean;
+  contentClassName?: string;
+  bodyClassName?: string;
 }) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -523,9 +527,10 @@ export function Modal({
               side
                 ? 'h-full max-h-[100dvh] w-full max-w-2xl'
                 : clsx('max-h-[90dvh] w-full rounded-xl', wide ? 'max-w-3xl' : 'max-w-lg'),
+              contentClassName,
             )}
           >
-            <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-6 py-4">
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 px-6 py-4">
               <div className="min-w-0">
                 <Dialog.Title className="text-base font-semibold tracking-tight text-slate-900">{title}</Dialog.Title>
                 {description ? (
@@ -540,8 +545,8 @@ export function Modal({
                 </Button>
               </Dialog.Close>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
-            {footer && <div className="flex flex-wrap justify-end gap-2.5 border-t border-slate-100 bg-slate-50/50 px-6 py-3.5 rounded-b-xl">{footer}</div>}
+            <div className={clsx('min-h-0 flex-1 overflow-y-auto px-6 py-5', bodyClassName)}>{children}</div>
+            {footer && <div className="flex shrink-0 flex-wrap justify-end gap-2.5 border-t border-slate-100 bg-slate-50/50 px-6 py-3.5 rounded-b-xl">{footer}</div>}
           </Dialog.Content>
         </div>
       </Dialog.Portal>
