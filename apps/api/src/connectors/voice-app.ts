@@ -11,7 +11,7 @@
 import { VoiceCallRequestSchema, type VoiceCallRequest } from '@voll/shared';
 import { config } from '../config.js';
 import type { Db } from '../db/pool.js';
-import { one } from '../db/pool.js';
+import { one, q } from '../db/pool.js';
 import type { ConnectorAdapter, SendInput, SendResult } from './adapter.js';
 import { TransientConnectorError } from './adapter.js';
 import { agentState } from '../modules/voice-agent.js';
@@ -58,15 +58,18 @@ export const voiceAppAdapter: ConnectorAdapter = {
     const row = await one<{
       workspace_id: string;
       campaign_id: string;
+      contact_id: string;
       contact_name: string | null;
       contact_ext_id: string;
       contact_attrs: Record<string, unknown> | null;
       tabulation_rules: Record<string, unknown> | null;
+      voice_overrides: Record<string, unknown> | null;
     }>(
       db,
-      `SELECT a.workspace_id, a.campaign_id,
+      `SELECT a.workspace_id, a.campaign_id, a.contact_id,
               c.name AS contact_name, c.external_id AS contact_ext_id, c.attributes AS contact_attrs,
-              sv.config->'tabulationRules' AS tabulation_rules
+              sv.config->'tabulationRules' AS tabulation_rules,
+              sv.config->'voiceOverrides' AS voice_overrides
          FROM attempts a
          JOIN contacts c ON c.id = a.contact_id
          LEFT JOIN strategy_versions sv ON sv.id = a.strategy_version_id
@@ -79,6 +82,7 @@ export const voiceAppAdapter: ConnectorAdapter = {
     // agente de voz cadastrado na conexão: o tenant no gateway é a própria conexão, na versão publicada
     const agent = agentState(connection.config);
     let agentVersion: number | undefined;
+    let callerIdPool: string[] | undefined;
     if (agent.agent) {
       if (!agent.inSync) {
         return { status: 'REJECTED', reason: `VOICE_AGENT_NOT_SYNCED: versão ${agent.version} ainda não publicada no gateway` };
@@ -87,9 +91,34 @@ export const voiceAppAdapter: ConnectorAdapter = {
       ep.tenantId = connection.id;
       ep.callerId = agent.agent.defaultCallerId;
       ep.maxDurationSec = agent.agent.maxDurationSec;
+      if (agent.agent.allowedCallerIds?.length) {
+        callerIdPool = agent.agent.allowedCallerIds;
+      }
     }
     if (!ep.baseUrl || !ep.callerId) {
       return { status: 'REJECTED', reason: 'VOICE_APP_NOT_CONFIGURED: informe endereço do gateway e caller ID' };
+    }
+
+    const contactVariables: Record<string, unknown> = { ...(row.contact_attrs ?? {}) };
+    if (agent.agent?.crossCallMemoryEnabled) {
+      const prevRows = await q<{ tabulation_code: string | null; state_reason: string | null; extracted_data: any; finalized_at: string | null }>(
+        db,
+        `SELECT tabulation_code, state_reason, extracted_data, finalized_at
+           FROM attempts
+          WHERE workspace_id = $1 AND contact_id = $2 AND id <> $3 AND state = 'FINALIZED'
+          ORDER BY finalized_at DESC NULLS LAST
+          LIMIT 2`,
+        [row.workspace_id, row.contact_id, attempt.id],
+      ).catch(() => []);
+      if (prevRows.length > 0) {
+        contactVariables.__memory = prevRows
+          .map((p) => {
+            const extra = p.extracted_data && Object.keys(p.extracted_data).length ? JSON.stringify(p.extracted_data) : '';
+            return `${p.finalized_at?.slice(0, 10) ?? 'anterior'}: ${p.tabulation_code ?? p.state_reason ?? 'contato'}${extra ? ` (${extra})` : ''}`;
+          })
+          .join(' | ')
+          .slice(0, 1100);
+      }
     }
 
     let webhookSecret: string | undefined = (connection as any).webhook_secret;
@@ -106,15 +135,17 @@ export const voiceAppAdapter: ConnectorAdapter = {
       to: attempt.destination_address,
       from: ep.callerId,
       callerId: ep.callerId,
+      ...(callerIdPool ? { callerIdPool } : {}),
       tenantId: ep.tenantId,
       contact: {
         externalId: row.contact_ext_id,
         name: row.contact_name ?? 'Cliente',
-        variables: row.contact_attrs ?? {},
+        variables: contactVariables,
       },
       campaign: { id: row.campaign_id },
       limits: { maxDurationSec: ep.maxDurationSec },
       allowedTabulations: row.tabulation_rules ? Object.keys(row.tabulation_rules) : undefined,
+      ...(row.voice_overrides ? { agentOverrides: row.voice_overrides as any } : {}),
       agentVersion,
       callback: {
         url: `${config.publicUrl}/api/connectors/${connection.id}/events`,

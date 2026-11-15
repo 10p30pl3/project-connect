@@ -16,6 +16,10 @@ const {
   linear16ToMulaw,
   mulawToLinear16
 } = require('../utils/audio-resampler');
+const { LiveMonitor } = require('../utils/live-monitor');
+const { IdleMessageManager } = require('../utils/voice-ai-helpers');
+const { executeCustomTool } = require('../utils/tool-executor');
+const { redactPii } = require('../utils/pii-redactor');
 
 function wait(ms) {
   return new Promise((r) => setTimeout(r, ms));
@@ -121,6 +125,10 @@ class ElevenLabsS2SBridge extends EventEmitter {
     this.isSafetyExpiring = false;
     this.maxDurationSec = 180;
     this.isTerminated = false;
+    this.callOutcome = null;
+    this.extractedData = null;
+    this.liveMonitor = null;
+    this.idleManager = null;
 
     // Barge-In Dinâmico & Carência da Saudação Inicial (idêntico à OpenAI)
     const sipBargeinGrace = this.sipHeaders['x-bargein-grace-sec'] || this.sipHeaders['X-Bargein-Grace-Sec'];
@@ -458,6 +466,9 @@ class ElevenLabsS2SBridge extends EventEmitter {
         if (this.mediaBridge && !this.isTerminated && pcm8k.length > 0) {
           // Nota: WsMediaBridge.pushAudioChunk já alimenta automaticamente this.recorder.pushAiChunk(pcm8k)
           this.mediaBridge.pushAudioChunk(pcm8k);
+          if (this.liveMonitor) {
+            this.liveMonitor.pushAgentAudio(pcm8k);
+          }
         }
 
         if (pcm8k.length > 0) {
@@ -499,6 +510,9 @@ class ElevenLabsS2SBridge extends EventEmitter {
               this.isAgentTalking = false;
             }
           }
+          if (this.idleManager) {
+            this.idleManager.reset();
+          }
 
           // Barge-in Dinâmico: Quando a IA termina de reproduzir os chunks da saudação inicial,
           // abre o microfone do cliente no FreeSWITCH.
@@ -533,6 +547,8 @@ class ElevenLabsS2SBridge extends EventEmitter {
       if (msg.user_transcription_event && msg.user_transcription_event.user_transcript) {
         this.isResponseCancelled = false;
         const text = msg.user_transcription_event.user_transcript.trim();
+        if (this.liveMonitor) this.liveMonitor.markUserSpeechEnd(Date.now());
+        if (this.idleManager) this.idleManager.onUserSpeech();
         if (text) {
           if (this.isBargeinGraceActive()) {
             console.log(
@@ -543,6 +559,17 @@ class ElevenLabsS2SBridge extends EventEmitter {
             this.recordTranscriptTurn('Cliente', text);
           }
         }
+      }
+
+      // 2.1 Execução de Client Tools ElevenLabs (paridade com OpenAI function calls)
+      if (msg.type === 'client_tool_call' || msg.client_tool_call) {
+        const tc = msg.client_tool_call || msg;
+        const toolName = tc.tool_name || tc.name;
+        const toolCallId = tc.tool_call_id;
+        const params = tc.parameters || {};
+        this._handleElevenClientToolCall(toolName, toolCallId, params).catch((err) => {
+          console.warn(`[${this.callId}] ⚠️ Erro em client_tool_call (${toolName}):`, err.message);
+        });
       }
 
       // 3. Resposta textual do Agente da ElevenLabs
@@ -709,8 +736,61 @@ class ElevenLabsS2SBridge extends EventEmitter {
     }
   }
 
+  async _handleElevenClientToolCall(toolName, toolCallId, parsedArgs = {}) {
+    let toolOutput = { ok: true, status: 'registrado' };
+    let isError = false;
+
+    if (toolName === 'registrar_desfecho_chamada') {
+      this.callOutcome = {
+        tabulationCode: parsedArgs.tabulationCode,
+        scheduledAt: parsedArgs.scheduledAt,
+        summary: parsedArgs.summary,
+        extractedData: parsedArgs.extractedData
+      };
+      if (parsedArgs.extractedData && typeof parsedArgs.extractedData === 'object') {
+        this.extractedData = { ...(this.extractedData || {}), ...parsedArgs.extractedData };
+      }
+      console.log(`[${this.callId}] 🎯 [ElevenLabs Desfecho Registrado]:`, this.callOutcome);
+    } else if (toolName === 'send_dtmf') {
+      try {
+        const digits = String(parsedArgs.digits || '').trim();
+        if (digits) await this.sendDtmf(digits, 'outbound');
+        toolOutput = { ok: true, digits };
+      } catch (e) {
+        isError = true;
+        toolOutput = { ok: false, error: e.message };
+      }
+    } else {
+      const customTool = (this.tenant?.tools || []).find((t) => t.name === toolName);
+      if (customTool) {
+        if (customTool.fillerSpeech) {
+          try {
+            this.say(customTool.fillerSpeech, { role: 'user', interrupt: false, triggerResponse: true });
+          } catch {}
+        }
+        toolOutput = await executeCustomTool(customTool, parsedArgs, {
+          callId: this.callId,
+          tenantId: this.tenant?.id,
+          caller: this.caller,
+          called: this.called
+        });
+        isError = !toolOutput.ok;
+      }
+    }
+
+    if (this.elevenSocket && this.elevenSocket.readyState === WebSocket.OPEN && toolCallId) {
+      this.elevenSocket.send(JSON.stringify({
+        type: 'client_tool_result',
+        tool_call_id: toolCallId,
+        result: JSON.stringify(toolOutput),
+        is_error: isError
+      }));
+    }
+    return toolOutput;
+  }
+
   recordTranscriptTurn(speaker, text) {
-    const cleanText = String(text || '').trim();
+    const cleanText = redactPii(String(text || '').trim(), Boolean(this.tenant?.piiRedactionEnabled));
     if (!cleanText) return null;
 
     const now = Date.now();
@@ -818,6 +898,17 @@ class ElevenLabsS2SBridge extends EventEmitter {
     }
     this.startedAt = new Date();
     this.channelUuid = getChannelUuid(endpoint);
+    this.liveMonitor = new LiveMonitor({ callId: this.callId });
+    this.idleManager = new IdleMessageManager({
+      messages: this.tenant?.idleMessages,
+      timeoutSeconds: this.tenant?.idleTimeoutSeconds,
+      onIdle: (msg) => {
+        if (this.isTerminated || this.isAgentTalking) return;
+        try {
+          this.say(`[SISTEMA] Usuário em silêncio. Fale cordialmente: "${msg}"`, { role: 'user', interrupt: false, triggerResponse: true });
+        } catch {}
+      }
+    });
 
     if (!this.channelUuid) {
       throw new Error('Não consegui identificar o UUID do canal FreeSWITCH');
@@ -1014,6 +1105,9 @@ class ElevenLabsS2SBridge extends EventEmitter {
         // Gravação Stereo (Left=Cliente, Right=Atendente) guiada pelo clock de 20ms do RTP
         if (this.recorder && !this.isToneProbe) {
           this.recorder.writeUserChunk(buffer);
+        }
+        if (this.liveMonitor && !this.isToneProbe) {
+          this.liveMonitor.pushCallerAudio(buffer);
         }
 
         // OTIMIZAÇÃO DE ESCALA: Só calcula RMS e Goertzel durante os 1.1s iniciais de calibração Sonar
@@ -1479,7 +1573,9 @@ class ElevenLabsS2SBridge extends EventEmitter {
       recordingFile: this.recorder ? this.recorder.fileName : null,
       transcriptFile: this.recorder ? this.recorder.transcriptFileName : null,
       transcriptTurnsCount: this.transcriptLog.length,
-      lastTranscript: lastTurnEntry
+      lastTranscript: lastTurnEntry,
+      responseLatency: this.liveMonitor ? this.liveMonitor.getStats() : null,
+      extractedData: this.extractedData || null
     };
 
     if (includeTranscript) {
@@ -1563,6 +1659,14 @@ class ElevenLabsS2SBridge extends EventEmitter {
     if (this.dtmfTimer) {
       clearTimeout(this.dtmfTimer);
       this.dtmfTimer = null;
+    }
+    if (this.idleManager) {
+      this.idleManager.stop();
+      this.idleManager = null;
+    }
+    if (this.liveMonitor) {
+      this.liveMonitor.stop();
+      this.liveMonitor = null;
     }
 
     if (this.endpoint && typeof this.endpoint.removeListener === 'function') {

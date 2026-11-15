@@ -1161,6 +1161,16 @@ function seedAttempts() {
         leaseUntil: null,
         feedbackDeadline: new Date(Date.now() + 300_000).toISOString(),
         providerAttemptId: `sim-${s.id.slice(-4)}`,
+        ...(s.channel === 'VOICE'
+          ? {
+              amdResult: 'HUMAN',
+              latencyStats: { p50Ms: 210, lastMs: 198, maxMs: 290, turnsCount: 4 },
+              extractedData:
+                s.state === 'FINALIZED'
+                  ? { interesse_confirmado: true, resumo_objetivo: 'Cliente confirmou vencimento e pediu boleto atualizado.' }
+                  : undefined,
+            }
+          : {}),
       },
       explanation: {
         whatHappened:
@@ -1999,6 +2009,26 @@ export async function handleMockApi<T = unknown>(
     return { deleted: true, id: removed.id } as T;
   }
   // Agente de voz (fase 3) e Telefonia (fase 4) na demonstração: sem gateway real
+  const evalMatch = pathname.match(/^\/connections\/([^/]+)\/voice-agent\/evals\/run$/);
+  if (evalMatch && method === 'POST') {
+    const st = MOCK_VOICE_AGENTS[evalMatch[1]];
+    if (!st?.agent) throw new ApiError({ type: 'bad_request', title: 'Requisição inválida', status: 400, detail: 'Salve o agente de voz antes de rodar Evals' });
+    const a = st.agent;
+    const results = [
+      { id: 'eval-greeting', name: 'Saudação & Identidade no Roteiro', status: a.instructions?.length >= 20 ? 'PASS' : 'FAIL', estimatedOpenAiMs: 220, estimatedElevenMs: 310 },
+      { id: 'eval-compliance', name: 'Guardrails & Disclosures LGPD', status: a.guardrails?.mandatoryDisclosures?.length || a.piiRedactionEnabled ? 'PASS' : 'PASS', estimatedOpenAiMs: 245, estimatedElevenMs: 340 },
+      { id: 'eval-tools', name: 'Validação de Tools HTTP & SSRF', status: Array.isArray(a.tools) ? 'PASS' : 'FAIL', estimatedOpenAiMs: 380, estimatedElevenMs: 490 },
+      { id: 'eval-bargein', name: 'Tolerância de Endpointing & Interrupção', status: 'PASS', estimatedOpenAiMs: 195, estimatedElevenMs: 270 },
+    ];
+    return {
+      ok: true,
+      agentVersion: st.version,
+      passedCount: results.filter((r) => r.status === 'PASS').length,
+      totalCount: results.length,
+      results,
+    } as T;
+  }
+
   const agentMatch = pathname.match(/^\/connections\/([^/]+)\/voice-agent(\/sync)?$/);
   if (agentMatch) {
     const st = (MOCK_VOICE_AGENTS[agentMatch[1]] ??= { agent: null, version: 0, syncedVersion: null, syncedAt: null, syncError: null, inSync: false });
@@ -2022,7 +2052,42 @@ export async function handleMockApi<T = unknown>(
     if (pathname === '/telephony/status' && method === 'GET') {
       return { status: 'ok', uptimeSec: 3600, activeCalls: 0, drachtioConnected: true, freeSwitchCluster: { totalNodes: 1, healthyNodes: 1 }, whisperCluster: { totalNodes: 1, healthyNodes: 1 } } as T;
     }
-    if (pathname === '/telephony/calls' && method === 'GET') return { calls: [], count: 0 } as T;
+    if (pathname === '/telephony/calls' && method === 'GET') {
+      const demoCalls = [
+        {
+          callId: 'demo-call-live-001',
+          tenantId: 'default',
+          caller: '+551130001000',
+          called: '+5511988887777',
+          direction: 'outbound',
+          startedAt: new Date(Date.now() - 34_000).toISOString(),
+          maxDurationSec: 180,
+          deviceMode: 'fone_ouvido',
+          noiseProfile: 'SILENCE',
+          crosstalkMode: 'ecapa',
+          isAgentTalking: true,
+          isMuted: false,
+          isHeld: false,
+          isRecording: true,
+          recordingPaused: false,
+          stsEngine: 'openai',
+          responseLatency: { lastMs: 204, avgMs: 212, p50Ms: 204, maxMs: 245, turnsCount: 3 },
+          extractedData: { cliente_identificado: 'Mariana Costa', assunto: 'Renegociação D+5' },
+        },
+      ];
+      return { calls: demoCalls, count: demoCalls.length } as T;
+    }
+    const callTranscriptMatch = pathname.match(/^\/telephony\/calls\/([^/]+)\/transcript$/);
+    if (callTranscriptMatch && method === 'GET') {
+      return {
+        callId: callTranscriptMatch[1],
+        turns: [
+          { role: 'agent', text: 'Olá Mariana! Aqui é da Voll Solutions, tudo bem com você?', ts: new Date(Date.now() - 25_000).toISOString() },
+          { role: 'user', text: 'Oi, tudo bem sim. Pode confirmar qual parcela ficou em aberto?', ts: new Date(Date.now() - 16_000).toISOString() },
+          { role: 'agent', text: 'Claro! É a parcela com vencimento dia 10 no valor de R$ 248,90. Posso enviar o boleto atualizado por WhatsApp?', ts: new Date(Date.now() - 8_000).toISOString() },
+        ],
+      } as T;
+    }
     if (pathname === '/telephony/calls/history' && method === 'GET') return { history: [], count: 0 } as T;
     if (pathname === '/telephony/features' && method === 'GET') {
       return { count: MOCK_TELEPHONY.features.length, activeCount: MOCK_TELEPHONY.features.filter((f) => f.active).length, features: MOCK_TELEPHONY.features } as T;

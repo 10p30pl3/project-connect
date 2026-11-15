@@ -52,6 +52,76 @@
     "recordingUrl": {
       "type": "string",
       "format": "uri"
+    },
+    "amdResult": {
+      "type": "string",
+      "enum": [
+        "HUMAN",
+        "VOICEMAIL",
+        "SILENCE",
+        "UNKNOWN"
+      ]
+    },
+    "extractedData": {
+      "type": "object",
+      "additionalProperties": {}
+    },
+    "intermediaryData": {
+      "type": "object",
+      "additionalProperties": {}
+    },
+    "latencyStats": {
+      "type": "object",
+      "properties": {
+        "p50Ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "lastMs": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maxMs": {
+          "type": "number",
+          "minimum": 0
+        },
+        "turnsCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "history": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "userEndAt": {
+                "type": "number"
+              },
+              "aiStartAt": {
+                "type": "number"
+              },
+              "responseMs": {
+                "type": "number",
+                "minimum": 0
+              },
+              "endpointingMs": {
+                "type": "number",
+                "minimum": 0
+              },
+              "aiTurnaroundMs": {
+                "type": "number",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "responseMs"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 100
+        }
+      },
+      "additionalProperties": false
     }
   },
   "required": [

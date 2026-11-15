@@ -4,6 +4,7 @@
  * com Troncos Default (read-only/mascarados), Troncos & Chaves IA BYOK por tenant,
  * idempotência na originação e sanitização estrita (tempo-apenas para clientes).
  */
+import { Readable } from 'node:stream';
 import type { FastifyInstance, FastifyReply } from 'fastify';
 import { isReadOnlyRole, isSuperAdminRole } from '@voll/shared';
 import { getPool, one, q } from '../db/pool.js';
@@ -521,6 +522,59 @@ export async function telephonyRoutes(app: FastifyInstance) {
     await assertCallOwnership(a.workspaceId, req.params.id, a.role);
     return proxyJson(a.workspaceId, `/v1/calls/${enc(req.params.id)}/transcript`);
   });
+
+  app.get<{ Params: { id: string } }>('/telephony/calls/:id/monitor/events', async (req, reply: FastifyReply) => {
+    const a = actor(req);
+    await assertCallOwnership(a.workspaceId, req.params.id, a.role);
+    const gw = await gatewayFor(a.workspaceId);
+    const controller = new AbortController();
+    req.raw.on('close', () => controller.abort());
+
+    const upstream = await fetch(`${gw.baseUrl}/v1/calls/${enc(req.params.id)}/monitor/events`, {
+      headers: { Accept: 'text/event-stream', ...(gw.token ? { Authorization: `Bearer ${gw.token}` } : {}) },
+      signal: controller.signal,
+    }).catch((err: any) => {
+      throw new HttpError(502, 'Monitor indisponível', String(err?.message ?? err));
+    });
+
+    if (!upstream.ok || !upstream.body) {
+      throw new HttpError(upstream.status === 404 ? 404 : 502, 'Monitor ao vivo indisponível', `HTTP ${upstream.status}`);
+    }
+    reply.code(200);
+    reply.header('Content-Type', 'text/event-stream; charset=utf-8');
+    reply.header('Cache-Control', 'no-cache, no-transform');
+    reply.header('X-Accel-Buffering', 'no');
+    return reply.send(Readable.fromWeb(upstream.body as any));
+  });
+
+  app.get<{ Params: { id: string }; Querystring: { channel?: string } }>(
+    '/telephony/calls/:id/monitor/audio',
+    operateGuard,
+    async (req, reply: FastifyReply) => {
+      const a = actor(req);
+      await assertCallOwnership(a.workspaceId, req.params.id, a.role);
+      const ch = ['stereo', 'caller', 'agent'].includes(String(req.query.channel)) ? String(req.query.channel) : 'stereo';
+      const gw = await gatewayFor(a.workspaceId);
+      const controller = new AbortController();
+      req.raw.on('close', () => controller.abort());
+
+      const upstream = await fetch(`${gw.baseUrl}/v1/calls/${enc(req.params.id)}/monitor/audio?channel=${enc(ch)}`, {
+        headers: { ...(gw.token ? { Authorization: `Bearer ${gw.token}` } : {}) },
+        signal: controller.signal,
+      }).catch((err: any) => {
+        throw new HttpError(502, 'Áudio ao vivo indisponível', String(err?.message ?? err));
+      });
+
+      if (!upstream.ok || !upstream.body) {
+        throw new HttpError(upstream.status === 404 ? 404 : 502, 'Stream ao vivo indisponível', `HTTP ${upstream.status}`);
+      }
+      reply.code(200);
+      reply.header('Content-Type', upstream.headers.get('content-type') ?? 'audio/l16; rate=8000; channels=2');
+      reply.header('Cache-Control', 'no-cache, no-store');
+      reply.header('X-Accel-Buffering', 'no');
+      return reply.send(Readable.fromWeb(upstream.body as any));
+    },
+  );
 
   app.delete<{ Params: { id: string } }>('/telephony/calls/:id', operateGuard, async (req) => {
     const a = actor(req);

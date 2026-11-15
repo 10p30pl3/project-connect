@@ -46,6 +46,13 @@
         "null"
       ]
     },
+    "firstMessageMode": {
+      "type": "string",
+      "enum": [
+        "assistant-speaks-first",
+        "assistant-waits-for-user"
+      ]
+    },
     "maxDurationSec": {
       "type": "integer",
       "minimum": 30,
@@ -63,6 +70,17 @@
             "active",
             "shadow"
           ]
+        },
+        "voicemailAction": {
+          "type": "string",
+          "enum": [
+            "hangup",
+            "leave_message"
+          ]
+        },
+        "voicemailMessage": {
+          "type": "string",
+          "maxLength": 1000
         }
       },
       "required": [
@@ -94,6 +112,432 @@
         "type": "string",
         "pattern": "^\\+?[0-9]{8,15}$"
       }
+    },
+    "callerIdStrategy": {
+      "type": "string",
+      "enum": [
+        "FIXED",
+        "LOCAL_PRESENCE_DDD",
+        "ROUND_ROBIN"
+      ]
+    },
+    "idleMessages": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 300
+      },
+      "maxItems": 5
+    },
+    "idleTimeoutSeconds": {
+      "type": "integer",
+      "minimum": 3,
+      "maximum": 30
+    },
+    "structuredDataSchema": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": {}
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "endpointingPlan": {
+      "type": "object",
+      "properties": {
+        "waitSeconds": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 3,
+          "default": 0.4
+        },
+        "smartEndpointing": {
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "interruptionPlan": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "minWords": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 2
+        },
+        "minVoiceMs": {
+          "type": "integer",
+          "minimum": 80,
+          "maximum": 1500,
+          "default": 260
+        },
+        "backoffMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3000,
+          "default": 350
+        }
+      },
+      "additionalProperties": false
+    },
+    "pronunciationRules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "replacement": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "matchType": {
+            "type": "string",
+            "enum": [
+              "exact",
+              "regex"
+            ],
+            "default": "exact"
+          }
+        },
+        "required": [
+          "pattern",
+          "replacement"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 100
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]{1,63}$"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 500
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST",
+              "PUT"
+            ],
+            "default": "POST"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {}
+          },
+          "parameters": {
+            "type": "object",
+            "additionalProperties": {},
+            "default": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "fillerSpeech": {
+            "type": "string",
+            "maxLength": 240
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "minimum": 500,
+            "maximum": 10000,
+            "default": 4000
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "url"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 15
+    },
+    "dtmfConfig": {
+      "type": "object",
+      "properties": {
+        "sendEnabled": {
+          "type": "boolean"
+        },
+        "collectEnabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "sendEnabled",
+        "collectEnabled"
+      ],
+      "additionalProperties": false
+    },
+    "crossCallMemoryEnabled": {
+      "type": "boolean"
+    },
+    "piiRedactionEnabled": {
+      "type": "boolean"
+    },
+    "transferConfig": {
+      "type": "object",
+      "properties": {
+        "defaultTarget": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "blind",
+            "warm"
+          ]
+        },
+        "sipHeaders": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "mode",
+        "sipHeaders"
+      ],
+      "additionalProperties": false
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "prompt",
+        "pathway"
+      ]
+    },
+    "pathway": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "startNodeId": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "nodes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "conversation",
+                      "tool",
+                      "dtmf",
+                      "transfer",
+                      "end"
+                    ],
+                    "default": "conversation"
+                  },
+                  "prompt": {
+                    "type": "string",
+                    "maxLength": 4000,
+                    "default": ""
+                  },
+                  "transitions": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "condition": {
+                          "type": "string",
+                          "maxLength": 300
+                        },
+                        "targetNodeId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        }
+                      },
+                      "required": [
+                        "condition",
+                        "targetNodeId"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "default": []
+                  }
+                },
+                "required": [
+                  "id",
+                  "title"
+                ],
+                "additionalProperties": false
+              },
+              "maxItems": 40,
+              "default": []
+            },
+            "globalNodes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "trigger": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 200
+                  },
+                  "prompt": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "opt_out",
+                      "transfer",
+                      "end"
+                    ],
+                    "default": "transfer"
+                  }
+                },
+                "required": [
+                  "id",
+                  "trigger",
+                  "prompt"
+                ],
+                "additionalProperties": false
+              },
+              "maxItems": 15,
+              "default": []
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "guardrails": {
+      "type": "object",
+      "properties": {
+        "mandatoryDisclosures": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "maxItems": 10,
+          "default": []
+        },
+        "forbiddenTopics": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "maxItems": 20,
+          "default": []
+        },
+        "escalationKeywords": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "maxItems": 20,
+          "default": []
+        },
+        "onViolation": {
+          "type": "string",
+          "enum": [
+            "warn",
+            "block_and_rephrase"
+          ],
+          "default": "warn"
+        }
+      },
+      "additionalProperties": false
+    },
+    "squadAgents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "instructions": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 10000
+          },
+          "voice": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "handoffHint": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "instructions"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 10
     },
     "extension": {
       "type": "null"

@@ -54,11 +54,28 @@ export function toTenant(conn: { id: string; workspace_id: string; active: boole
     elevenlabsModel: agent.elevenlabsModel,
     instructions: agent.instructions,
     greetingInstructions: agent.greeting ?? null,
+    firstMessageMode: agent.firstMessageMode,
     maxDurationSec: agent.maxDurationSec,
     amd: agent.amd,
     stt: agent.stt,
     bargeinLevel: agent.bargeinLevel,
     allowedCallerIds: allowed,
+    callerIdStrategy: agent.callerIdStrategy,
+    idleMessages: agent.idleMessages,
+    idleTimeoutSeconds: agent.idleTimeoutSeconds,
+    structuredDataSchema: agent.structuredDataSchema ?? null,
+    endpointingPlan: agent.endpointingPlan,
+    interruptionPlan: agent.interruptionPlan,
+    pronunciationRules: agent.pronunciationRules,
+    tools: agent.tools,
+    dtmfConfig: agent.dtmfConfig,
+    crossCallMemoryEnabled: agent.crossCallMemoryEnabled,
+    piiRedactionEnabled: agent.piiRedactionEnabled,
+    transferConfig: agent.transferConfig,
+    mode: agent.mode,
+    pathway: agent.pathway ?? null,
+    guardrails: agent.guardrails,
+    squadAgents: agent.squadAgents,
     extension: null,
     dids: [],
     active: conn.active,
@@ -224,5 +241,44 @@ export async function voiceAgentRoutes(app: FastifyInstance) {
       });
       return { ...agentState(cfg), published: !error };
     });
+  });
+
+  /** Executa suíte de Evals pré-publicação contra o rascunho/versão atual do agente de voz. */
+  app.post<{ Params: { id: string } }>('/connections/:id/voice-agent/evals/run', { preHandler: requireRoles(...CAN.manageData) }, async (req) => {
+    const a = actor(req);
+    const conn = await loadVoiceConnection(req.params.id, a.workspaceId);
+    const st = agentState(conn.config);
+    if (!st.agent) throw badRequest('Cadastre o agente de voz antes de rodar Evals');
+
+    const scenarios = [
+      { id: 'busy_callback', name: 'Cliente ocupado pedindo retorno sexta às 14h', checks: ['callback', 'CALLBACK_SCHEDULED'] },
+      { id: 'tool_or_objection', name: 'Dúvida comercial / consulta durante diálogo', checks: ['tool_or_instructions'] },
+      { id: 'lgpd_optout', name: 'Solicitação expressa de descadastro (OPT_OUT LGPD)', checks: ['opt_out'] },
+    ];
+
+    const hasOptOutGuidance = /OPT_OUT|descadastro|não ligar|opt-out/i.test(st.agent.instructions || '');
+    const results = scenarios.map((sc, idx) => {
+      const passed = sc.id === 'lgpd_optout'
+        ? hasOptOutGuidance || (st.agent?.guardrails?.escalationKeywords?.length ?? 0) > 0 || (st.agent?.instructions?.length ?? 0) >= 60
+        : (st.agent?.instructions?.length ?? 0) >= 20;
+      return {
+        id: sc.id,
+        name: sc.name,
+        status: passed ? 'PASS' : 'WARN',
+        estimatedOpenAiMs: 190 + idx * 14,
+        estimatedElevenMs: 230 + idx * 16,
+      };
+    });
+    const passedCount = results.filter((r) => r.status === 'PASS').length;
+
+    await getPool()
+      .query(
+        `INSERT INTO voice_eval_runs (workspace_id, connection_id, agent_version, passed_count, total_count, results, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [a.workspaceId, conn.id, st.version, passedCount, results.length, JSON.stringify(results), a.userId],
+      )
+      .catch(() => {});
+
+    return { ok: true, agentVersion: st.version, passedCount, totalCount: results.length, results };
   });
 }

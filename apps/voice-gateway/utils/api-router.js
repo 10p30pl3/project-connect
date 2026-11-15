@@ -1141,6 +1141,27 @@ function createApiRouter({ activeBridges, tenantManager, fsPool, whisperPool, me
     }
 
     // -----------------------------------------------------------------------
+    // 2.9 MONITOR DE VOZ EM TEMPO REAL (/v1/calls/:callId/monitor/events | audio)
+    // -----------------------------------------------------------------------
+    const monitorMatch = cleanPath.match(/^\/v1\/calls\/([^/]+)\/monitor\/(events|audio)$/);
+    if (monitorMatch && req.method === 'GET') {
+      const callId = decodeURIComponent(monitorMatch[1]);
+      const kind = monitorMatch[2];
+      const bridge = resolveBridge(activeBridges, callId);
+      if (!bridge || !bridge.liveMonitor) {
+        sendJson(res, 404, { error: 'monitor_unavailable', message: `Monitor ao vivo indisponível para chamada ${callId}` });
+        return true;
+      }
+      if (kind === 'events') {
+        bridge.liveMonitor.subscribeEvents(res);
+      } else {
+        const channel = parsedUrl.searchParams.get('channel') || 'stereo';
+        bridge.liveMonitor.subscribeAudio(res, channel);
+      }
+      return true;
+    }
+
+    // -----------------------------------------------------------------------
     // 3. COMANDOS IN-CALL (/v1/calls/:callId/...)
     // -----------------------------------------------------------------------
     const callMatch = cleanPath.match(/^\/v1\/calls\/([^/]+)(?:\/([^/]+))?$/);

@@ -29,6 +29,13 @@
       "type": "string",
       "pattern": "^\\+?[0-9]{8,15}$"
     },
+    "callerIdPool": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^\\+?[0-9]{8,15}$"
+      }
+    },
     "tenantId": {
       "type": "string",
       "minLength": 1
@@ -88,6 +95,42 @@
         "type": "string",
         "minLength": 1
       }
+    },
+    "agentOverrides": {
+      "type": "object",
+      "properties": {
+        "greeting": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "instructionsAppend": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "voice": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "maxDurationSec": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 3600
+        },
+        "callerIdStrategy": {
+          "type": "string",
+          "enum": [
+            "FIXED",
+            "LOCAL_PRESENCE_DDD",
+            "ROUND_ROBIN"
+          ]
+        },
+        "idleTimeoutSeconds": {
+          "type": "integer",
+          "minimum": 3,
+          "maximum": 30
+        }
+      },
+      "additionalProperties": false
     },
     "agentVersion": {
       "type": "integer",

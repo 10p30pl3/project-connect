@@ -42,6 +42,11 @@ function buildConnectorEvent({
   summary,
   durationSeconds,
   aiCostUsd,
+  recordingUrl,
+  amdResult,
+  extractedData,
+  intermediaryData,
+  latencyStats,
   occurredAt = new Date().toISOString(),
 }) {
   const key = attemptId || providerAttemptId;
@@ -57,6 +62,11 @@ function buildConnectorEvent({
   if (summary) event.summary = String(summary).slice(0, 2000);
   if (Number.isFinite(durationSeconds)) event.durationSeconds = Math.max(0, Math.round(durationSeconds));
   if (Number.isFinite(aiCostUsd) && aiCostUsd >= 0) event.aiCostUsd = aiCostUsd;
+  if (recordingUrl && /^https?:\/\//i.test(String(recordingUrl))) event.recordingUrl = String(recordingUrl);
+  if (amdResult && ['HUMAN', 'VOICEMAIL', 'SILENCE', 'UNKNOWN'].includes(amdResult)) event.amdResult = amdResult;
+  if (extractedData && typeof extractedData === 'object' && !Array.isArray(extractedData)) event.extractedData = extractedData;
+  if (intermediaryData && typeof intermediaryData === 'object' && !Array.isArray(intermediaryData)) event.intermediaryData = intermediaryData;
+  if (latencyStats && typeof latencyStats === 'object') event.latencyStats = latencyStats;
   return event;
 }
 

@@ -245,6 +245,10 @@ export type AttemptRow = {
   finalizedAt: string | null;
   nextAction: string;
   campaign?: { id: string; name: string };
+  recordingUrl?: string | null;
+  amdResult?: string | null;
+  extractedData?: Record<string, unknown> | null;
+  latencyStats?: { p50Ms?: number; lastMs?: number; maxMs?: number; turnsCount?: number } | null;
 };
 export type EligibilityRow = {
   enrollmentId: string;

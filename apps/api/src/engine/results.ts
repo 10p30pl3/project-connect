@@ -86,6 +86,23 @@ async function applyEvent(c: Client, a: any, ev: ConnectorEvent): Promise<'OK' |
   if (ev.aiCostUsd !== undefined) {
     await c.query(`UPDATE attempts SET ai_cost_usd=$2 WHERE id=$1`, [a.id, ev.aiCostUsd]);
   }
+  if (ev.recordingUrl || ev.amdResult || ev.extractedData || ev.latencyStats) {
+    await c.query(
+      `UPDATE attempts
+          SET recording_url = COALESCE($2, recording_url),
+              amd_result = COALESCE($3, amd_result),
+              extracted_data = CASE WHEN $4::jsonb IS NOT NULL THEN COALESCE(extracted_data, '{}'::jsonb) || $4::jsonb ELSE extracted_data END,
+              latency_stats = CASE WHEN $5::jsonb IS NOT NULL THEN $5::jsonb ELSE latency_stats END
+        WHERE id = $1`,
+      [
+        a.id,
+        ev.recordingUrl ?? null,
+        ev.amdResult ?? null,
+        ev.extractedData ? JSON.stringify(ev.extractedData) : null,
+        ev.latencyStats ? JSON.stringify(ev.latencyStats) : null,
+      ],
+    );
+  }
 
   if (ev.type === 'OPT_OUT') {
     if (open) {

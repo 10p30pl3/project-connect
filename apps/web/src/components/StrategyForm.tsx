@@ -12,9 +12,10 @@ import {
   type StrategyConfig,
 } from '@voll/shared';
 import { applyFieldErrors, get } from '../lib/api';
+import { useExperienceMode } from '../lib/experience-mode';
 import type { Tabulation } from '../lib/types';
 import { WEEKDAYS } from '../lib/format';
-import { Alert, Button, Checkbox, Field, Input, Select } from './ui';
+import { Alert, Button, Checkbox, Field, InfoTooltip, Input, Select, Textarea } from './ui';
 
 type Form = z.input<typeof StrategyConfigSchema>;
 
@@ -42,6 +43,7 @@ export function StrategyForm({
   onCancel?: () => void;
   extraTop?: React.ReactNode;
 }) {
+  const { isAtLeast } = useExperienceMode();
   const tabs = useQuery({ queryKey: ['tabulations'], queryFn: () => get<{ items: Tabulation[] }>('/tabulations') });
   const [serverErr, setServerErr] = useState<string | null>(null);
   const form = useForm<Form>({ resolver: zodResolver(StrategyConfigSchema) as unknown as Resolver<Form>, defaultValues: initial, shouldFocusError: true });
@@ -53,7 +55,20 @@ export function StrategyForm({
     async (v) => {
       setServerErr(null);
       try {
-        await onSubmit(StrategyConfigSchema.parse(v));
+        const vo = v.voiceOverrides;
+        const cleanedVo = vo
+          ? {
+              greeting: vo.greeting?.trim() || undefined,
+              instructionsAppend: vo.instructionsAppend?.trim() || undefined,
+              callerIdStrategy: vo.callerIdStrategy || undefined,
+              idleTimeoutSeconds:
+                typeof vo.idleTimeoutSeconds === 'number' && Number.isFinite(vo.idleTimeoutSeconds)
+                  ? vo.idleTimeoutSeconds
+                  : undefined,
+            }
+          : undefined;
+        const hasVo = cleanedVo && Object.values(cleanedVo).some((x) => x !== undefined);
+        await onSubmit(StrategyConfigSchema.parse({ ...v, voiceOverrides: hasVo ? cleanedVo : undefined }));
       } catch (err) {
         if (!applyFieldErrors(err, form.setError, { setFocus: form.setFocus, prefix: 'config.' })) setServerErr(err instanceof Error ? err.message : 'Erro');
         else setServerErr('Corrija os campos destacados. Nenhuma versão foi publicada.');
@@ -272,6 +287,54 @@ export function StrategyForm({
               </Field>
             </div>
           </fieldset>
+
+          {isAtLeast('advanced') && (
+            <fieldset className="space-y-3 rounded-xl border border-slate-200/90 bg-slate-50/40 p-4">
+              <legend className="flex items-center gap-1.5 px-1.5 text-xs font-semibold uppercase tracking-wider text-slate-600">
+                <span>Overrides do Agente de Voz (Opcional)</span>
+                <InfoTooltip content="Sobrescreve saudação, estratégia de BINA DDD e timeout de silêncio apenas nas ligações que usam esta estratégia." />
+              </legend>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Saudação personalizada da campanha">
+                  {(p) => <Input id={p.id} placeholder="Ex.: Olá, condição especial da campanha de novembro…" {...register('voiceOverrides.greeting')} />}
+                </Field>
+                <Field label="Estratégia de BINA (Caller ID)">
+                  {(p) => (
+                    <Select id={p.id} defaultValue={initial.voiceOverrides?.callerIdStrategy ?? ''} {...register('voiceOverrides.callerIdStrategy')}>
+                      <option value="">Usar padrão do Agente de Voz</option>
+                      <option value="FIXED">Fixo</option>
+                      <option value="LOCAL_PRESENCE_DDD">Local Presence DDD</option>
+                      <option value="ROUND_ROBIN">Round-Robin</option>
+                    </Select>
+                  )}
+                </Field>
+                <Field label="Timeout de silêncio (s)" hint="Opcional (3 a 30s)">
+                  {(p) => (
+                    <Input
+                      id={p.id}
+                      type="number"
+                      min={3}
+                      max={30}
+                      placeholder="Padrão do agente"
+                      {...register('voiceOverrides.idleTimeoutSeconds', {
+                        setValueAs: (val) => (val === '' || val == null ? undefined : Number(val)),
+                      })}
+                    />
+                  )}
+                </Field>
+                <Field label="Instruções extras anexadas ao roteiro" className="sm:col-span-2">
+                  {(p) => (
+                    <Textarea
+                      id={p.id}
+                      rows={2}
+                      placeholder="Ex.: Priorize parcelamento em até 6x sem juros."
+                      {...register('voiceOverrides.instructionsAppend')}
+                    />
+                  )}
+                </Field>
+              </div>
+            </fieldset>
+          )}
 
           <fieldset className="space-y-3 rounded-xl border border-slate-200/90 bg-slate-50/40 p-4">
             <legend className="px-1.5 text-xs font-semibold uppercase tracking-wider text-slate-600">Regras por Tabulação</legend>

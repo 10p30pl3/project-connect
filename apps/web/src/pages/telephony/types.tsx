@@ -40,6 +40,14 @@ export type LiveCall = {
   recordingPaused?: boolean;
   stsEngine?: string;
   attemptId?: string | null;
+  responseLatency?: {
+    lastMs?: number | null;
+    avgMs?: number | null;
+    p50Ms?: number | null;
+    maxMs?: number | null;
+    turnsCount?: number;
+  };
+  extractedData?: Record<string, unknown>;
 };
 
 export type HistoryItem = {
@@ -57,6 +65,8 @@ export type HistoryItem = {
   recordingFile?: string | null;
   stsEngine?: string;
   amdResult?: string;
+  extractedData?: Record<string, unknown>;
+  latencyStats?: { p50Ms?: number; lastMs?: number; maxMs?: number; turnsCount?: number } | null;
 };
 
 export type RecordingItem = {

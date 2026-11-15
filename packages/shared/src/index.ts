@@ -157,6 +157,18 @@ export const OPTIMIZATION_POLICY_LABEL: Record<OptimizationPolicy, string> = {
 // ------------------------------------------------------------------ strategy config
 const hhmm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM');
 
+export const CALLER_ID_STRATEGIES = ['FIXED', 'LOCAL_PRESENCE_DDD', 'ROUND_ROBIN'] as const;
+
+export const VoiceAgentOverridesSchema = z.object({
+  greeting: z.string().max(1000).optional(),
+  instructionsAppend: z.string().max(4000).optional(),
+  voice: z.string().max(80).optional(),
+  maxDurationSec: z.number().int().min(10).max(3600).optional(),
+  callerIdStrategy: z.enum(CALLER_ID_STRATEGIES).optional(),
+  idleTimeoutSeconds: z.number().int().min(3).max(30).optional(),
+});
+export type VoiceAgentOverrides = z.infer<typeof VoiceAgentOverridesSchema>;
+
 export const StrategyConfigSchema = z
   .object({
     calendar: z.object({
@@ -188,6 +200,8 @@ export const StrategyConfigSchema = z
         minEvidences: z.number().int().min(1).max(50).default(3),
       })
       .optional(),
+    /** overrides opcionais de comportamento de voz aplicados por esta estratégia/campanha */
+    voiceOverrides: VoiceAgentOverridesSchema.optional(),
     /** código da tabulação -> ação */
     tabulationRules: z.record(z.string(), z.enum(TABULATION_ACTIONS)),
   })
@@ -574,6 +588,16 @@ export const CONNECTOR_EVENT_TYPES = [
   'OPT_OUT',
   'RESULT_UNKNOWN',
 ] as const;
+export const AMD_RESULT_TYPES = ['HUMAN', 'VOICEMAIL', 'SILENCE', 'UNKNOWN'] as const;
+
+export const LatencyTurnTelemetrySchema = z.object({
+  userEndAt: z.number().optional(),
+  aiStartAt: z.number().optional(),
+  responseMs: z.number().min(0),
+  endpointingMs: z.number().min(0).optional(),
+  aiTurnaroundMs: z.number().min(0).optional(),
+});
+
 export const ConnectorEventSchema = z.object({
   eventId: z.string().min(1),
   providerAttemptId: z.string().min(1),
@@ -589,6 +613,18 @@ export const ConnectorEventSchema = z.object({
   summary: z.string().max(2000).optional(),
   durationSeconds: z.number().int().min(0).optional(),
   recordingUrl: z.string().url().optional(),
+  amdResult: z.enum(AMD_RESULT_TYPES).optional(),
+  extractedData: z.record(z.string(), z.unknown()).optional(),
+  intermediaryData: z.record(z.string(), z.unknown()).optional(),
+  latencyStats: z
+    .object({
+      p50Ms: z.number().min(0).optional(),
+      lastMs: z.number().min(0).optional(),
+      maxMs: z.number().min(0).optional(),
+      turnsCount: z.number().int().min(0).optional(),
+      history: z.array(LatencyTurnTelemetrySchema).max(100).optional(),
+    })
+    .optional(),
 });
 export type ConnectorEvent = z.infer<typeof ConnectorEventSchema>;
 
@@ -606,6 +642,7 @@ export const VoiceCallRequestSchema = z.object({
   to: z.string().regex(/^\+?[0-9]{8,15}$/, 'destino deve ter 8 a 15 dígitos'),
   from: z.string().regex(/^\+?[0-9]{8,15}$/),
   callerId: z.string().regex(/^\+?[0-9]{8,15}$/),
+  callerIdPool: z.array(z.string().regex(/^\+?[0-9]{8,15}$/)).optional(),
   tenantId: z.string().min(1),
   contact: z.object({
     externalId: z.string().min(1),
@@ -616,6 +653,8 @@ export const VoiceCallRequestSchema = z.object({
   limits: z.object({ maxDurationSec: z.number().int().min(10).max(3600) }),
   /** códigos de tabulação que o gateway pode devolver nesta tentativa (snapshot da estratégia) */
   allowedTabulations: z.array(z.string().min(1)).optional(),
+  /** overrides opcionais por campanha/estratégia */
+  agentOverrides: VoiceAgentOverridesSchema.optional(),
   /** versão do agente de voz cadastrado na conexão; o gateway recusa se o tenant estiver em outra versão */
   agentVersion: z.number().int().min(1).optional(),
   callback: z.object({ url: z.string().url(), secret: z.string().min(16) }),
@@ -623,6 +662,68 @@ export const VoiceCallRequestSchema = z.object({
 export type VoiceCallRequest = z.infer<typeof VoiceCallRequestSchema>;
 
 const E164 = z.string().regex(/^\+?[0-9]{8,15}$/, 'Use de 8 a 15 dígitos, com DDI (ex.: +551130001000)');
+
+export const CustomVoiceToolSchema = z.object({
+  name: z.string().regex(/^[a-zA-Z_][a-zA-Z0-9_]{1,63}$/, 'Nome de tool inválido'),
+  description: z.string().min(3).max(500),
+  method: z.enum(['GET', 'POST', 'PUT']).default('POST'),
+  url: z.string().url(),
+  headers: z.record(z.string(), z.string()).default({}),
+  parameters: z.record(z.string(), z.unknown()).default({ type: 'object', properties: {} }),
+  fillerSpeech: z.string().max(240).optional(),
+  timeoutMs: z.number().int().min(500).max(10000).default(4000),
+});
+export type CustomVoiceTool = z.infer<typeof CustomVoiceToolSchema>;
+
+export const PronunciationRuleSchema = z.object({
+  pattern: z.string().min(1).max(80),
+  replacement: z.string().min(1).max(160),
+  matchType: z.enum(['exact', 'regex']).default('exact'),
+});
+
+export const EndpointingPlanSchema = z.object({
+  waitSeconds: z.number().min(0.1).max(3).default(0.4),
+  smartEndpointing: z.boolean().default(true),
+});
+
+export const InterruptionPlanSchema = z.object({
+  enabled: z.boolean().default(true),
+  minWords: z.number().int().min(1).max(10).default(2),
+  minVoiceMs: z.number().int().min(80).max(1500).default(260),
+  backoffMs: z.number().int().min(0).max(3000).default(350),
+});
+
+export const PathwayNodeSchema = z.object({
+  id: z.string().min(1).max(64),
+  title: z.string().min(1).max(120),
+  type: z.enum(['conversation', 'tool', 'dtmf', 'transfer', 'end']).default('conversation'),
+  prompt: z.string().max(4000).default(''),
+  transitions: z.array(z.object({ condition: z.string().max(300), targetNodeId: z.string().min(1).max(64) })).default([]),
+});
+
+export const PathwaySchema = z.object({
+  startNodeId: z.string().max(64).optional(),
+  nodes: z.array(PathwayNodeSchema).max(40).default([]),
+  globalNodes: z
+    .array(z.object({ id: z.string().min(1).max(64), trigger: z.string().min(2).max(200), prompt: z.string().max(2000), action: z.enum(['opt_out', 'transfer', 'end']).default('transfer') }))
+    .max(15)
+    .default([]),
+});
+
+export const GuardrailsSchema = z.object({
+  mandatoryDisclosures: z.array(z.string().max(400)).max(10).default([]),
+  forbiddenTopics: z.array(z.string().max(400)).max(20).default([]),
+  escalationKeywords: z.array(z.string().max(120)).max(20).default([]),
+  onViolation: z.enum(['warn', 'block_and_rephrase']).default('warn'),
+});
+
+export const SquadAgentSchema = z.object({
+  key: z.string().min(1).max(64),
+  name: z.string().min(1).max(120),
+  instructions: z.string().min(10).max(10000),
+  voice: z.string().max(80).optional(),
+  handoffHint: z.string().max(300).optional(),
+});
 
 /**
  * Agente de voz cadastrado na Conexão de voz do Voll Plan (cadastro único, fase 3 da consolidação).
@@ -638,12 +739,42 @@ export const VoiceAgentSchema = z
     elevenlabsModel: z.string().max(80).optional(),
     instructions: z.string().min(20, 'Descreva o roteiro do agente (mínimo de 20 caracteres)').max(20000),
     greeting: z.string().max(1000).optional(),
+    firstMessageMode: z.enum(['assistant-speaks-first', 'assistant-waits-for-user']).default('assistant-speaks-first'),
     maxDurationSec: z.number().int().min(30).max(900).default(180),
-    amd: z.object({ enabled: z.boolean().default(true), mode: z.enum(['active', 'shadow']).default('active') }).default({}),
+    amd: z
+      .object({
+        enabled: z.boolean().default(true),
+        mode: z.enum(['active', 'shadow']).default('active'),
+        voicemailAction: z.enum(['hangup', 'leave_message']).default('hangup'),
+        voicemailMessage: z.string().max(1000).optional(),
+      })
+      .default({}),
     stt: z.object({ enabled: z.boolean().default(true) }).default({}),
     bargeinLevel: z.number().int().min(1).max(5).default(3),
     defaultCallerId: E164,
     allowedCallerIds: z.array(E164).default([]),
+    callerIdStrategy: z.enum(CALLER_ID_STRATEGIES).default('FIXED'),
+    idleMessages: z.array(z.string().min(1).max(300)).max(5).default([]),
+    idleTimeoutSeconds: z.number().int().min(3).max(30).default(8),
+    structuredDataSchema: z.record(z.string(), z.unknown()).nullable().optional(),
+    endpointingPlan: EndpointingPlanSchema.default({}),
+    interruptionPlan: InterruptionPlanSchema.default({}),
+    pronunciationRules: z.array(PronunciationRuleSchema).max(100).default([]),
+    tools: z.array(CustomVoiceToolSchema).max(15).default([]),
+    dtmfConfig: z.object({ sendEnabled: z.boolean().default(true), collectEnabled: z.boolean().default(true) }).default({}),
+    crossCallMemoryEnabled: z.boolean().default(false),
+    piiRedactionEnabled: z.boolean().default(false),
+    transferConfig: z
+      .object({
+        defaultTarget: z.string().max(200).optional(),
+        mode: z.enum(['blind', 'warm']).default('blind'),
+        sipHeaders: z.record(z.string(), z.string()).default({}),
+      })
+      .default({}),
+    mode: z.enum(['prompt', 'pathway']).default('prompt'),
+    pathway: PathwaySchema.nullable().optional(),
+    guardrails: GuardrailsSchema.default({}),
+    squadAgents: z.array(SquadAgentSchema).max(10).default([]),
   })
   .superRefine((a, ctx) => {
     if (a.allowedCallerIds.length && !a.allowedCallerIds.includes(a.defaultCallerId))
@@ -668,11 +799,39 @@ export const VoiceAgentTenantSchema = z
     elevenlabsModel: z.string().optional(),
     instructions: z.string().min(20),
     greetingInstructions: z.string().nullable(),
+    firstMessageMode: z.enum(['assistant-speaks-first', 'assistant-waits-for-user']).optional(),
     maxDurationSec: z.number().int().min(30).max(900),
-    amd: z.object({ enabled: z.boolean(), mode: z.enum(['active', 'shadow']) }),
+    amd: z.object({
+      enabled: z.boolean(),
+      mode: z.enum(['active', 'shadow']),
+      voicemailAction: z.enum(['hangup', 'leave_message']).optional(),
+      voicemailMessage: z.string().max(1000).optional(),
+    }),
     stt: z.object({ enabled: z.boolean() }),
     bargeinLevel: z.number().int().min(1).max(5),
     allowedCallerIds: z.array(E164),
+    callerIdStrategy: z.enum(CALLER_ID_STRATEGIES).optional(),
+    idleMessages: z.array(z.string().min(1).max(300)).max(5).optional(),
+    idleTimeoutSeconds: z.number().int().min(3).max(30).optional(),
+    structuredDataSchema: z.record(z.string(), z.unknown()).nullable().optional(),
+    endpointingPlan: EndpointingPlanSchema.optional(),
+    interruptionPlan: InterruptionPlanSchema.optional(),
+    pronunciationRules: z.array(PronunciationRuleSchema).max(100).optional(),
+    tools: z.array(CustomVoiceToolSchema).max(15).optional(),
+    dtmfConfig: z.object({ sendEnabled: z.boolean(), collectEnabled: z.boolean() }).optional(),
+    crossCallMemoryEnabled: z.boolean().optional(),
+    piiRedactionEnabled: z.boolean().optional(),
+    transferConfig: z
+      .object({
+        defaultTarget: z.string().max(200).optional(),
+        mode: z.enum(['blind', 'warm']),
+        sipHeaders: z.record(z.string(), z.string()),
+      })
+      .optional(),
+    mode: z.enum(['prompt', 'pathway']).optional(),
+    pathway: PathwaySchema.nullable().optional(),
+    guardrails: GuardrailsSchema.optional(),
+    squadAgents: z.array(SquadAgentSchema).max(10).optional(),
     /** tenant de campanha: não atende ramal nem DID de entrada */
     extension: z.null(),
     dids: z.array(z.string()).max(0),

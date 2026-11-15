@@ -9,6 +9,7 @@ import { API_BASE, applyFieldErrors, errorMessage, get, post } from '../lib/api'
 import type { AttemptDetail, Tabulation } from '../lib/types';
 import { fmtDateTimeSec, fmtMoney } from '../lib/format';
 import { useAuth } from '../lib/auth';
+import { useExperienceMode } from '../lib/experience-mode';
 import { Alert, AttemptStateBadge, Badge, Button, ErrorState, Field, KeyValue, Loading, Modal, Select, Input, useToast } from './ui';
 import { Link } from 'react-router-dom';
 import { Copy, Disc, Repeat, Wrench } from 'lucide-react';
@@ -40,6 +41,8 @@ export function AttemptDrawer() {
 
 function AttemptBody({ id }: { id: string }) {
   const { me, can } = useAuth();
+  const { isAtLeast } = useExperienceMode();
+  const isAdvanced = isAtLeast('advanced');
   const isSuper = isSuperAdminRole(me?.role);
   const toast = useToast();
   const qc = useQueryClient();
@@ -175,18 +178,38 @@ function AttemptBody({ id }: { id: string }) {
         )}
       </section>
 
-      {a.channelType === 'VOICE' && matchingRecordingId && (
+      {a.channelType === 'VOICE' && (matchingRecordingId || a.recordingUrl) && (
         <section aria-labelledby="voice-rec-title" className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-2.5">
-          <h3 id="voice-rec-title" className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
-            <Disc className="size-4 text-brand-700" aria-hidden />
-            Gravação &amp; Transcrição da Ligação
-          </h3>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 id="voice-rec-title" className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
+              <Disc className="size-4 text-brand-700" aria-hidden />
+              Gravação &amp; Transcrição da Ligação
+            </h3>
+            {isAdvanced && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                {a.amdResult && (
+                  <Badge tone={a.amdResult === 'MACHINE' || a.amdResult === 'VOICEMAIL' ? 'amber' : 'green'}>
+                    AMD: {a.amdResult}
+                  </Badge>
+                )}
+                {a.latencyStats?.p50Ms != null && (
+                  <Badge tone="brand">
+                    Latência P50: {a.latencyStats.p50Ms}ms · Última: {a.latencyStats.lastMs ?? '—'}ms
+                  </Badge>
+                )}
+              </div>
+            )}
+          </div>
           <audio
-            key={matchingRecordingId}
+            key={matchingRecordingId ?? a.recordingUrl ?? 'rec'}
             controls
             preload="none"
             className="w-full"
-            src={`${API_BASE}/telephony/recordings/${encodeURIComponent(matchingRecordingId)}/audio`}
+            src={
+              matchingRecordingId
+                ? `${API_BASE}/telephony/recordings/${encodeURIComponent(matchingRecordingId)}/audio`
+                : a.recordingUrl ?? undefined
+            }
           >
             Seu navegador não reproduz áudio.
           </audio>
@@ -201,6 +224,20 @@ function AttemptBody({ id }: { id: string }) {
                 : 'Transcrição não localizada ou chamada sem diálogo gravado.'}
             </p>
           )}
+        </section>
+      )}
+
+      {isAdvanced && a.extractedData && Object.keys(a.extractedData).length > 0 && (
+        <section aria-labelledby="extracted-data-title" className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-2">
+          <h3 id="extracted-data-title" className="text-sm font-semibold text-slate-900">
+            Dados Estruturados Extraídos (Structured Output)
+          </h3>
+          <KeyValue
+            items={Object.entries(a.extractedData).map(([k, v]) => [
+              k,
+              typeof v === 'object' ? JSON.stringify(v) : String(v ?? '—'),
+            ])}
+          />
         </section>
       )}
 

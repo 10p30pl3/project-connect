@@ -41,6 +41,7 @@ import {
   Textarea,
   useToast,
 } from '../../components/ui';
+import { LiveVoiceMonitor } from '../../components/LiveVoiceMonitor';
 import {
   elapsedSince,
   fmtDuration,
@@ -439,6 +440,7 @@ export function CallsTab({
                   <th>{mode === 'basic' ? 'Telefone' : 'Origem → Destino'}</th>
                   <th>{mode === 'basic' ? 'Agente de Voz' : 'Agente / Motor'}</th>
                   <th>Duração</th>
+                  <th>Resp. IA</th>
                   {isAtLeast('advanced') && <th>Áudio / Ambiente</th>}
                   <th>{isAtLeast('advanced') ? 'Estado / Canal' : 'Status'}</th>
                   <th className="text-right">{isAtLeast('advanced') ? 'Controles In-Call' : 'Ações'}</th>
@@ -468,6 +470,20 @@ export function CallsTab({
                       {isAtLeast('advanced') && c.maxDurationSec ? (
                         <span className="text-slate-400"> / {Math.round(c.maxDurationSec / 60)}m</span>
                       ) : null}
+                    </td>
+                    <td className="tabular-nums text-xs">
+                      {c.responseLatency?.lastMs != null ? (
+                        <div className="flex flex-col gap-0.5">
+                          <Badge tone={c.responseLatency.lastMs <= 350 ? 'green' : c.responseLatency.lastMs <= 750 ? 'amber' : 'red'}>
+                            {c.responseLatency.lastMs} ms
+                          </Badge>
+                          {c.responseLatency.avgMs != null && (
+                            <span className="text-[11px] text-slate-400">méd {c.responseLatency.avgMs} ms</span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
                     </td>
                     {isAtLeast('advanced') && (
                       <td className="text-xs text-slate-600">
@@ -1196,6 +1212,31 @@ export function CallsTab({
               )}
             </div>
           )}
+
+          {transcriptCallId && (
+            <LiveVoiceMonitor
+              callId={transcriptCallId}
+              call={activeCockpitCall}
+              isAdvanced={isAtLeast('advanced')}
+            />
+          )}
+
+          {isAtLeast('advanced') &&
+            activeCockpitCall?.extractedData &&
+            Object.keys(activeCockpitCall.extractedData).length > 0 && (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Dados Estruturados Coletados ao Vivo
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(activeCockpitCall.extractedData).map(([k, v]) => (
+                    <Badge key={k} tone="brand">
+                      {k}: <strong>{typeof v === 'object' ? JSON.stringify(v) : String(v ?? '—')}</strong>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
 
           {liveTranscriptQ.isLoading ? (
             <Loading rows={3} />

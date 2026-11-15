@@ -108,6 +108,15 @@ const {
   linear16ToMulaw,
   mulawToLinear16
 } = require('./utils/audio-resampler');
+const { LiveMonitor } = require('./utils/live-monitor');
+const {
+  selectCallerId,
+  buildOutcomeToolSchema,
+  buildContactPrompt,
+  IdleMessageManager
+} = require('./utils/voice-ai-helpers');
+const { executeCustomTool } = require('./utils/tool-executor');
+const { redactPii } = require('./utils/pii-redactor');
 
 class OpenAIS2SBridge {
   constructor(tenant, sipHeaders = {}) {
@@ -126,6 +135,9 @@ class OpenAIS2SBridge {
     this.attemptId = null;
     this.providerAttemptId = null;
     this.callOutcome = null;
+    this.extractedData = null;
+    this.liveMonitor = null;
+    this.idleManager = null;
     this.energyManager = new EnergyManager();
     this.mediaBridge = new WsMediaBridge();
 
@@ -482,33 +494,9 @@ class OpenAIS2SBridge {
       }
 
       if (body.type === 'response.function_call_arguments.done') {
-        console.log(`[${this.callId}] 🛠️ [Tool Call] Função invocada: ${body.name} com args:`, body.arguments);
-        if (body.name === 'registrar_desfecho_chamada') {
-          try {
-            const parsed = JSON.parse(body.arguments || '{}');
-            this.callOutcome = {
-              tabulationCode: parsed.tabulationCode,
-              scheduledAt: parsed.scheduledAt,
-              summary: parsed.summary
-            };
-            console.log(`[${this.callId}] 🎯 [Desfecho Registrado pela IA]:`, this.callOutcome);
-          } catch (e) {
-            console.warn(`[${this.callId}] ⚠️ Erro ao fazer parse dos args de registrar_desfecho_chamada:`, e.message);
-          }
-        }
-        if (this.openaiSocket && this.openaiSocket.readyState === WebSocket.OPEN && body.call_id) {
-          try {
-            this.openaiSocket.send(JSON.stringify({
-              type: 'conversation.item.create',
-              item: {
-                type: 'function_call_output',
-                call_id: body.call_id,
-                output: JSON.stringify({ ok: true, status: 'registrado' })
-              }
-            }));
-            this.openaiSocket.send(JSON.stringify({ type: 'response.create' }));
-          } catch {}
-        }
+        this._handleOpenAiFunctionCall(body).catch((err) => {
+          console.warn(`[${this.callId}] ⚠️ Erro em function call (${body.name}):`, err.message);
+        });
       }
 
       if (body.type === 'response.output_item.done' && body.item && body.item.type === 'function_call') {
@@ -518,8 +506,12 @@ class OpenAIS2SBridge {
             this.callOutcome = {
               tabulationCode: parsed.tabulationCode,
               scheduledAt: parsed.scheduledAt,
-              summary: parsed.summary
+              summary: parsed.summary,
+              extractedData: parsed.extractedData
             };
+            if (parsed.extractedData && typeof parsed.extractedData === 'object') {
+              this.extractedData = { ...(this.extractedData || {}), ...parsed.extractedData };
+            }
             console.log(`[${this.callId}] 🎯 [Desfecho Registrado via output_item.done]:`, this.callOutcome);
           } catch {}
         }
@@ -568,6 +560,9 @@ class OpenAIS2SBridge {
           ? this.reconFilter8k.process(mulawToLinear16(rawDelta))
           : this.resampler24to8.process(rawDelta);
         this.mediaBridge.pushAudioChunk(pcm8k);
+        if (this.liveMonitor && pcm8k.length > 0) {
+          this.liveMonitor.pushAgentAudio(pcm8k);
+        }
 
         if (this.isGreetingInProgress) {
           if (!this.greetingPlaybackStartTime) {
@@ -672,9 +667,27 @@ class OpenAIS2SBridge {
             this.terminateCall('safety_limit_3_minutes');
           }, 1500);
         }
+        if (this.idleManager) {
+          this.idleManager.reset();
+        }
+      }
+
+      if (body.type === 'input_audio_buffer.speech_stopped') {
+        if (this.liveMonitor) {
+          this.liveMonitor.markUserSpeechEnd(Date.now());
+        }
+        if (this.idleManager) {
+          this.idleManager.onUserSpeech();
+        }
       }
 
       if (body.type === 'input_audio_buffer.speech_started') {
+        if (this.liveMonitor) {
+          this.liveMonitor.markUserSpeechStart(Date.now());
+        }
+        if (this.idleManager) {
+          this.idleManager.onUserSpeech();
+        }
         const isAgentReallyPlaying = Boolean(this.isAgentTalking || (this.mediaBridge && this.mediaBridge.isPlaying));
         const isLegitSpeaker = !this.isSecondaryVoiceBlocked &&
           (!this.crosstalkFilter || this.crosstalkFilter.isActivelySpeaking(isAgentReallyPlaying) || this.crosstalkFilter.wasRecentlySpeaking(800));
@@ -686,6 +699,63 @@ class OpenAIS2SBridge {
       }
     } catch (err) {
       console.error(`[${this.callId}] Erro ao decodificar mensagem OpenAI:`, err.message);
+    }
+  }
+
+  async _handleOpenAiFunctionCall(body) {
+    console.log(`[${this.callId}] 🛠️ [Tool Call] Função invocada: ${body.name} com args:`, body.arguments);
+    let toolOutput = { ok: true, status: 'registrado' };
+    let parsedArgs = {};
+    try { parsedArgs = JSON.parse(body.arguments || '{}'); } catch {}
+
+    if (body.name === 'registrar_desfecho_chamada') {
+      this.callOutcome = {
+        tabulationCode: parsedArgs.tabulationCode,
+        scheduledAt: parsedArgs.scheduledAt,
+        summary: parsedArgs.summary,
+        extractedData: parsedArgs.extractedData
+      };
+      if (parsedArgs.extractedData && typeof parsedArgs.extractedData === 'object') {
+        this.extractedData = { ...(this.extractedData || {}), ...parsedArgs.extractedData };
+      }
+      console.log(`[${this.callId}] 🎯 [Desfecho Registrado pela IA]:`, this.callOutcome);
+    } else if (body.name === 'send_dtmf') {
+      try {
+        const digits = String(parsedArgs.digits || '').trim();
+        if (digits) await this.sendDtmf(digits, 'outbound');
+        toolOutput = { ok: true, digits };
+      } catch (e) {
+        toolOutput = { ok: false, error: e.message };
+      }
+    } else {
+      const customTool = (this.tenant?.tools || []).find((t) => t.name === body.name);
+      if (customTool) {
+        if (customTool.fillerSpeech) {
+          try {
+            this.say(customTool.fillerSpeech, { role: 'system', interrupt: false, triggerResponse: true });
+          } catch {}
+        }
+        toolOutput = await executeCustomTool(customTool, parsedArgs, {
+          callId: this.callId,
+          tenantId: this.tenant?.id,
+          caller: this.caller,
+          called: this.called
+        });
+      }
+    }
+
+    if (this.openaiSocket && this.openaiSocket.readyState === WebSocket.OPEN && body.call_id) {
+      try {
+        this.openaiSocket.send(JSON.stringify({
+          type: 'conversation.item.create',
+          item: {
+            type: 'function_call_output',
+            call_id: body.call_id,
+            output: JSON.stringify(toolOutput)
+          }
+        }));
+        this.openaiSocket.send(JSON.stringify({ type: 'response.create' }));
+      } catch {}
     }
   }
 
@@ -807,6 +877,17 @@ class OpenAIS2SBridge {
     }
     this.startedAt = new Date();
     this.channelUuid = getChannelUuid(endpoint);
+    this.liveMonitor = new LiveMonitor({ callId: this.callId });
+    this.idleManager = new IdleMessageManager({
+      messages: this.tenant?.idleMessages,
+      timeoutSeconds: this.tenant?.idleTimeoutSeconds,
+      onIdle: (msg) => {
+        if (this.isTerminated || this.isAgentTalking) return;
+        try {
+          this.say(msg, { role: 'system', interrupt: false, triggerResponse: true });
+        } catch {}
+      }
+    });
 
     if (!this.channelUuid) {
       throw new Error('Não consegui identificar o UUID do canal FreeSWITCH');
@@ -1013,6 +1094,9 @@ class OpenAIS2SBridge {
         // Gravação Stereo (Left=Cliente, Right=Atendente) guiada pelo clock de 20ms do RTP (somente quando STT/Gravação ativa)
         if (this.recorder && !this.isToneProbe) {
           this.recorder.writeUserChunk(buffer);
+        }
+        if (this.liveMonitor && !this.isToneProbe) {
+          this.liveMonitor.pushCallerAudio(buffer);
         }
 
         // OTIMIZAÇÃO DE ESCALA: Só calcula RMS e Goertzel durante os 1.1s iniciais de calibração Sonar!
@@ -1296,45 +1380,53 @@ class OpenAIS2SBridge {
       sessionUpdate.session.prompt = { id: this.tenant.openaiPromptId };
     }
 
-    sessionUpdate.session.tools = [
-      {
+    const outcomeTool = buildOutcomeToolSchema(
+      this.tenant?._activeAllowedTabulations,
+      this.tenant?.structuredDataSchema
+    );
+    const toolsList = [outcomeTool];
+    if (this.tenant?.dtmfConfig?.sendEnabled !== false) {
+      toolsList.push({
         type: 'function',
-        name: 'registrar_desfecho_chamada',
-        description:
-          'Registra a tabulação e o desfecho final da ligação com o cliente, especialmente se houver acordo ou pedido de reagendamento para outro dia/horário.',
+        name: 'send_dtmf',
+        description: 'Envia dígitos DTMF para navegar em menus telefônicos ou URA (ex.: "1", "2#").',
         parameters: {
           type: 'object',
-          properties: {
-            tabulationCode: {
-              type: 'string',
-              enum: ['CONVERSION', 'CPC_NO_DEAL', 'CALLBACK_SCHEDULED', 'WRONG_PERSON', 'OPT_OUT'],
-              description: 'Código da tabulação: CONVERSION (acordo), CPC_NO_DEAL (sem acordo), CALLBACK_SCHEDULED (reagendamento), WRONG_PERSON (terceiro), OPT_OUT (remover contato)'
-            },
-            scheduledAt: {
-              type: 'string',
-              description: 'Data e hora combinada no formato ISO-8601 (ex: 2026-11-10T14:30:00-03:00) quando o cliente pedir reagendamento (CALLBACK_SCHEDULED)'
-            },
-            summary: {
-              type: 'string',
-              description: 'Resumo objetivo do que foi conversado ou combinado'
-            }
-          },
-          required: ['tabulationCode']
+          properties: { digits: { type: 'string', description: 'Dígitos 0-9, * ou #' } },
+          required: ['digits']
         }
+      });
+    }
+    if (Array.isArray(this.tenant?.tools)) {
+      for (const ct of this.tenant.tools) {
+        if (!ct?.name || ct.name === 'registrar_desfecho_chamada' || ct.name === 'send_dtmf') continue;
+        toolsList.push({
+          type: 'function',
+          name: ct.name,
+          description: ct.description || ct.name,
+          parameters: ct.parameters || { type: 'object', properties: {} }
+        });
       }
-    ];
+    }
+
+    sessionUpdate.session.tools = toolsList;
     sessionUpdate.session.tool_choice = 'auto';
 
     this.openaiSocket.send(JSON.stringify(sessionUpdate));
 
-    const responseCreate = {
-      type: 'response.create',
-      response: {
-        instructions: this.tenant?.greetingInstructions || this.tenant?.greetingMessage || 'Dê as boas-vindas cordialmente de forma curta e amigável e pergunte em que pode ajudar hoje.'
-      }
-    };
-    this.greetingResponsePending = true;
-    this.openaiSocket.send(JSON.stringify(responseCreate));
+    const waitsForUser = this.tenant?.firstMessageMode === 'assistant-waits-for-user';
+    if (!waitsForUser) {
+      const responseCreate = {
+        type: 'response.create',
+        response: {
+          instructions: this.tenant?.greetingInstructions || this.tenant?.greetingMessage || 'Dê as boas-vindas cordialmente de forma curta e amigável e pergunte em que pode ajudar hoje.'
+        }
+      };
+      this.greetingResponsePending = true;
+      this.openaiSocket.send(JSON.stringify(responseCreate));
+    } else {
+      this.openCustomerChannel('waits_for_user');
+    }
 
     // Somente após session.update e response.create liberamos o envio de input_audio_buffer.append
     this.openaiReady = true;
@@ -1345,7 +1437,7 @@ class OpenAIS2SBridge {
   }
 
   recordTranscriptTurn(speaker, text) {
-    const cleanText = String(text || '').trim();
+    const cleanText = redactPii(String(text || '').trim(), Boolean(this.tenant?.piiRedactionEnabled));
     if (!cleanText) return null;
 
     // Deduplicação: se a mesma fala do mesmo interlocutor chegar em menos de 3.5 segundos, não duplica
@@ -1460,7 +1552,9 @@ class OpenAIS2SBridge {
       recordingFile: this.recorder ? this.recorder.fileName : null,
       transcriptFile: this.recorder ? this.recorder.transcriptFileName : null,
       transcriptTurnsCount: this.transcriptLog.length,
-      lastTranscript: lastTurnEntry
+      lastTranscript: lastTurnEntry,
+      responseLatency: this.liveMonitor ? this.liveMonitor.getStats() : null,
+      extractedData: this.extractedData || null
     };
 
     if (includeTranscript) {
@@ -1760,6 +1854,14 @@ class OpenAIS2SBridge {
       clearTimeout(this.dtmfTimer);
       this.dtmfTimer = null;
     }
+    if (this.idleManager) {
+      this.idleManager.stop();
+      this.idleManager = null;
+    }
+    if (this.liveMonitor) {
+      this.liveMonitor.stop();
+      this.liveMonitor = null;
+    }
 
     if (this.endpoint && typeof this.endpoint.removeListener === 'function') {
       try {
@@ -1846,39 +1948,29 @@ async function originateOutboundCall(params) {
 
   const tenantId = params.tenantId || 'default';
   const baseTenant = tenantManager.tenants.get(tenantId) || tenantManager.getDefaultTenant();
+  const overrides = params.agentOverrides && typeof params.agentOverrides === 'object' ? params.agentOverrides : {};
 
-  let extraInstructions = params.instructions || '';
-  if (params.contact) {
-    const contactName = params.contact.name || 'Cliente';
-    const vars = params.contact.variables || {};
-    const varLines = Object.entries(vars).map(([k, v]) => `- ${k}: ${v}`).join('\n');
-    const nowBrt = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
-
-    const contactPrompt = `
-[DADOS DO CLIENTE E CONTEXTO OPERACIONAL]
-- Nome do cliente: ${contactName}
-- Data e hora atual (São Paulo): ${nowBrt}
-${varLines ? `- Dados complementares:\n${varLines}` : ''}
-[INSTRUÇÃO OBRIGATÓRIA DE DESFECHO]
-Sempre utilize a ferramenta "registrar_desfecho_chamada" ao identificar o desfecho da conversa.
-- Se o cliente concordar com o pagamento/acordo: tabulationCode="CONVERSION".
-- Se o cliente disser que não pode falar agora e pedir para ligar em outro horário/dia: descubra a data/hora exata preferida, calcule o timestamp ISO com fuso -03:00 correspondente à data atual informada acima e registre tabulationCode="CALLBACK_SCHEDULED" e scheduledAt="<ISO>".
-- Se disser que não tem interesse ou recusar: tabulationCode="CPC_NO_DEAL".
-- Se não for o titular da conta / engano / terceiro: tabulationCode="WRONG_PERSON".
-- Se solicitar expressamente para nunca mais ligar: tabulationCode="OPT_OUT".
-`.trim();
-
-    extraInstructions = extraInstructions
-      ? `${contactPrompt}\n\n[INSTRUÇÕES ESPECÍFICAS DA CAMPANHA]\n${extraInstructions}`
-      : contactPrompt;
-  }
+  let combinedExtra = [params.instructions, overrides.instructionsAppend].filter(Boolean).join('\n\n');
+  const dynamicExtra = buildContactPrompt({
+    contact: params.contact,
+    allowedTabulations: params.allowedTabulations,
+    structuredDataSchema: baseTenant.structuredDataSchema,
+    extraInstructions: combinedExtra,
+    tenant: baseTenant,
+  });
 
   const tenant = {
     ...baseTenant,
-    instructions: extraInstructions
-      ? `${baseTenant.instructions ? baseTenant.instructions + '\n\n' : ''}${extraInstructions}`
+    _activeAllowedTabulations: params.allowedTabulations,
+    instructions: dynamicExtra
+      ? `${baseTenant.instructions ? baseTenant.instructions + '\n\n' : ''}${dynamicExtra}`
       : baseTenant.instructions,
-    ...(params.voice ? { voice: params.voice } : {}),
+    ...(overrides.greeting ? { greetingInstructions: overrides.greeting } : {}),
+    ...(overrides.voice || params.voice ? { voice: overrides.voice || params.voice } : {}),
+    ...(overrides.maxDurationSec || params.limits?.maxDurationSec
+      ? { maxDurationSec: overrides.maxDurationSec || params.limits?.maxDurationSec }
+      : {}),
+    ...(overrides.idleTimeoutSeconds ? { idleTimeoutSeconds: overrides.idleTimeoutSeconds } : {}),
     ...(params.openaiModel ? { openaiModel: params.openaiModel } : {})
   };
 
@@ -1901,7 +1993,14 @@ Sempre utilize a ferramenta "registrar_desfecho_chamada" ao identificar o desfec
   };
 
   try {
-    let from = requireCallerId(params.from, params.callerId);
+    const selectedCid = selectCallerId({
+      strategy: overrides.callerIdStrategy || tenant.callerIdStrategy || 'FIXED',
+      to: params.to,
+      defaultCallerId: params.callerId || params.from,
+      allowedCallerIds: params.callerIdPool || tenant.allowedCallerIds,
+      tenantKey: tenant.id,
+    });
+    let from = requireCallerId(selectedCid || params.from, params.callerId);
     let to = params.to ? String(params.to).trim() : '';
     if (to.startsWith('+')) {
       to = to.substring(1);
@@ -2065,6 +2164,21 @@ Sempre utilize a ferramenta "registrar_desfecho_chamada" ao identificar o desfec
           }
 
           if (params.callback && params.callback.url) {
+            let recordingUrl;
+            const recFile = callInfo?.recordingFile;
+            if (recFile) {
+              try {
+                const baseOrigin = process.env.VOICE_PUBLIC_URL || new URL(params.callback.url).origin;
+                const cleanRecId = String(recFile).replace(/.*\//, '').replace(/\.wav$/i, '');
+                recordingUrl = `${baseOrigin.replace(/\/+$/, '')}/api/telephony/recordings/${encodeURIComponent(cleanRecId)}/audio`;
+              } catch {}
+            }
+            const amdResult = reason.startsWith('amd_caixa_postal') || reason.startsWith('amd_operadora')
+              ? 'VOICEMAIL'
+              : reason === 'amd_silencio'
+              ? 'SILENCE'
+              : (callInfo && callInfo.durationSec > 4 ? 'HUMAN' : 'UNKNOWN');
+
             sendVollPlanWebhook(params.callback, buildConnectorEvent({
               attemptId: params.attemptId,
               providerAttemptId: params.providerAttemptId || callId,
@@ -2072,7 +2186,11 @@ Sempre utilize a ferramenta "registrar_desfecho_chamada" ao identificar o desfec
               scheduledAt,
               summary,
               durationSeconds: callInfo ? callInfo.durationSec : 0,
-              aiCostUsd: aiUsage ? aiUsage.costUsd : undefined
+              aiCostUsd: aiUsage ? aiUsage.costUsd : undefined,
+              recordingUrl,
+              amdResult,
+              extractedData: bridge.callOutcome?.extractedData || bridge.extractedData || undefined,
+              latencyStats: callInfo?.responseLatency || undefined
             })).catch((whErr) => console.warn(`[${callId}] Falha ao despachar webhook para Voll Plan:`, whErr.message));
           }
         }

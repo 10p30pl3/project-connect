@@ -5,6 +5,7 @@ export const ATTEMPT_SELECT = `
   a.id, a.state, a.state_reason, a.channel_type, a.destination_address, a.stage, a.created_at, a.sent_at, a.finalized_at,
   a.tabulation_code, a.campaign_id, a.trace_id, a.strategy_version_id, a.journey_version_id, a.tariff_snapshot,
   a.cost_confirmed, a.lease_until, a.feedback_deadline, a.provider_attempt_id,
+  a.recording_url, a.amd_result, a.extracted_data, a.latency_stats,
   c.id AS contact_id, c.external_id, c.name AS contact_name,
   cn.name AS connection_name, t.name AS tabulation_name, cp.name AS campaign_name`;
 
@@ -49,6 +50,10 @@ export function attemptRow(r: any) {
     createdAt: r.created_at,
     sentAt: r.sent_at,
     finalizedAt: r.finalized_at,
+    recordingUrl: r.recording_url ?? null,
+    amdResult: r.amd_result ?? null,
+    extractedData: r.extracted_data ?? {},
+    latencyStats: r.latency_stats ?? {},
     nextAction: nextActionFor(r.state, r.state_reason),
   };
 }
