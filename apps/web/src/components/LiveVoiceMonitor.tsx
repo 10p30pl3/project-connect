@@ -260,7 +260,7 @@ export function LiveVoiceMonitor({
         const rect = canvas.getBoundingClientRect();
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
         const w = Math.max(320, Math.floor(rect.width));
-        const h = 148;
+        const h = 168;
         if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {
           canvas.width = Math.floor(w * dpr);
           canvas.height = Math.floor(h * dpr);
@@ -282,10 +282,11 @@ export function LiveVoiceMonitor({
           ctx.fillStyle = bg;
           ctx.fillRect(0, 0, w, h);
 
-          const midY = h / 2;
-          const maxAmp = midY - 18;
+          const midY = 76;
+          const maxAmp = 54;
           const plotX = 44;
-          const plotW = Math.max(200, w - plotX - 6);
+          const plotW = Math.max(200, w - plotX - 8);
+          const axisBottomY = midY + maxAmp + 16; // 146px
 
           // Linhas guia de energia (50% e 100% para Cliente e Agente IA)
           ctx.strokeStyle = grid;
@@ -337,13 +338,56 @@ export function LiveVoiceMonitor({
           ctx.fillStyle = callerBar;
           ctx.fillText('CLIENTE (↑)', plotX + 6, 13);
           ctx.fillStyle = aiBar;
-          ctx.fillText('AGENTE IA (↓)', plotX + 6, h - 6);
+          ctx.fillText('AGENTE IA (↓)', plotX + 6, midY + maxAmp + 11);
 
           const samples = samplesRef.current;
           const visibleCount = Math.min(180, Math.max(80, Math.floor(plotW / 4)));
           const slice = samples.slice(-visibleCount);
           const barSlot = plotW / visibleCount;
           const barWidth = Math.max(1.8, barSlot * 0.62);
+
+          // Escala horizontal de tempo (janela visível em segundos)
+          const avgSampleMs =
+            slice.length > 1
+              ? Math.max(30, Math.min(120, (slice[slice.length - 1].t - slice[0].t) / (slice.length - 1)))
+              : 60;
+          const totalSpanMs = visibleCount * avgSampleMs;
+          const totalSpanSec = totalSpanMs / 1000;
+          const stepSec = totalSpanSec > 8 ? 2 : 1;
+
+          ctx.strokeStyle = centerLine;
+          ctx.beginPath();
+          ctx.moveTo(plotX, axisBottomY);
+          ctx.lineTo(plotX + plotW, axisBottomY);
+          ctx.stroke();
+
+          ctx.font = '500 9px ui-monospace, SFMono-Regular, Menlo, monospace';
+          ctx.fillStyle = mutedText;
+          ctx.textBaseline = 'top';
+          for (let secAgo = 0; secAgo <= Math.floor(totalSpanSec); secAgo += stepSec) {
+            const xTick = plotX + plotW - (secAgo / totalSpanSec) * plotW;
+            if (xTick < plotX + 12 && secAgo !== 0) continue;
+
+            // Linha de grade vertical sutil
+            ctx.strokeStyle = grid;
+            ctx.beginPath();
+            ctx.moveTo(xTick, midY - maxAmp);
+            ctx.lineTo(xTick, axisBottomY);
+            ctx.stroke();
+
+            // Marca no eixo
+            ctx.strokeStyle = centerLine;
+            ctx.beginPath();
+            ctx.moveTo(xTick, axisBottomY);
+            ctx.lineTo(xTick, axisBottomY + 3);
+            ctx.stroke();
+
+            const label = secAgo === 0 ? '0s (Agora)' : `-${secAgo}s`;
+            ctx.textAlign = secAgo === 0 ? 'right' : 'center';
+            ctx.fillText(label, secAgo === 0 ? plotX + plotW : xTick, axisBottomY + 5);
+          }
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'alphabetic';
 
           if (slice.length > 0) {
             const tStart = slice[0].t;
@@ -362,21 +406,21 @@ export function LiveVoiceMonitor({
               ctx.fillRect(x, midY + 1, barWidth, aAmp);
             }
 
-            // Marcadores verticais de tempo de resposta (ex.: 200 ms)
+            // Marcadores verticais de tempo de resposta alinhados à escala de tempo real
             for (const turn of turnsRef.current) {
               if (turn.atMs < tStart || turn.atMs > tEnd + 120) continue;
               const idxRatio = (turn.atMs - tStart) / Math.max(1, tEnd - tStart);
               const xEnd = plotX + ((visibleCount - slice.length) + idxRatio * (slice.length - 1)) * barSlot;
-              const gapPx = Math.min(24, Math.max(6, Math.round(turn.responseMs / 35)));
+              const gapPx = Math.max(4, (turn.responseMs / totalSpanMs) * plotW);
               const xStart = Math.max(plotX, xEnd - gapPx);
 
               ctx.strokeStyle = markerColor;
               ctx.lineWidth = 1.25;
               ctx.beginPath();
-              ctx.moveTo(xStart, 18);
-              ctx.lineTo(xStart, h - 14);
-              ctx.moveTo(xEnd, 18);
-              ctx.lineTo(xEnd, h - 14);
+              ctx.moveTo(xStart, midY - maxAmp);
+              ctx.lineTo(xStart, axisBottomY);
+              ctx.moveTo(xEnd, midY - maxAmp);
+              ctx.lineTo(xEnd, axisBottomY);
               ctx.stroke();
 
               const badgeText = `${turn.responseMs} ms`;
@@ -567,7 +611,7 @@ export function LiveVoiceMonitor({
 
       {/* Waveform Dual-Track */}
       <div className="overflow-hidden rounded-lg border border-slate-200">
-        <canvas ref={canvasRef} className="block w-full h-[148px]" aria-label="Osciloscópio de voz em tempo real Cliente vs Agente IA" />
+        <canvas ref={canvasRef} className="block w-full h-[168px]" aria-label="Osciloscópio de voz em tempo real Cliente vs Agente IA" />
       </div>
 
       {/* Barra de reprodução de áudio + Breakdown avançado */}
