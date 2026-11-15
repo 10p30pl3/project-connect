@@ -1,22 +1,20 @@
 import { useEffect, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Activity, CheckCircle2, Clock, Database, Megaphone, PhoneCall, PlayCircle, Sparkles, Upload } from 'lucide-react';
+import { Activity, Clock, PlayCircle, Sparkles } from 'lucide-react';
 import { CHANNEL_LABEL } from '@voll/shared';
-import { errorMessage, get, post } from '../lib/api';
+import { get } from '../lib/api';
 import type { AttemptRow, CampaignSummary, Eligibility, Overview, OverviewQueueItem, Paginated } from '../lib/types';
 import { fmtDateTime, fmtNumber } from '../lib/format';
-import { Alert, Badge, Button, btnClass, Card, Empty, ErrorState, Loading, PageHeader, Stat, TableWrap, useToast } from '../components/ui';
+import { Alert, Badge, Card, Empty, ErrorState, Loading, PageHeader, Stat, TableWrap } from '../components/ui';
 import { AttemptsTable } from '../components/AttemptsTable';
 import { CallsTab } from './telephony/CallsTab';
 import { useAuth } from '../lib/auth';
 import { useExperienceMode } from '../lib/experience-mode';
 
 export function OverviewPage() {
-  const { me, can } = useAuth();
+  const { me } = useAuth();
   const { isAtLeast } = useExperienceMode();
-  const qc = useQueryClient();
-  const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [openDialerSignal, setOpenDialerSignal] = useState(false);
   const [dialerTenantId, setDialerTenantId] = useState<string | null>(null);
@@ -33,19 +31,6 @@ export function OverviewPage() {
     }
   }, [searchParams, setSearchParams]);
   const q = useQuery({ queryKey: ['overview'], queryFn: () => get<Overview>('/overview'), refetchInterval: 5000 });
-  const seedDemo = useMutation({
-    mutationFn: () => post<{ alreadySeeded?: boolean }>('/system/seed-demo'),
-    onSuccess: async (res) => {
-      await qc.invalidateQueries();
-      toast(
-        res?.alreadySeeded ? 'info' : 'success',
-        res?.alreadySeeded
-          ? 'Os dados de exemplo já estão carregados neste workspace.'
-          : 'Dados de exemplo (1.000 contatos) carregados com sucesso.',
-      );
-    },
-    onError: (e) => toast('error', errorMessage(e)),
-  });
 
   // Caso a API real não envie workingRecords / nextInQueue diretamente no /overview, buscamos das rotas operacionais
   const needFallback = !!q.data && !q.data.workingRecords;
@@ -112,7 +97,6 @@ export function OverviewPage() {
         <div className="space-y-5">
           {/* KPIs Centrais */}
           {(() => {
-            const hasData = (q.data?.contacts ?? 0) > 0 || (q.data?.attempts.sentToday ?? 0) > 0;
             const k = q.data?.kpis;
             const cpcRateLabel = k?.cpcRatePct != null ? `${k.cpcRatePct.toFixed(1).replace('.', ',')}%` : '—';
             return (
@@ -147,95 +131,6 @@ export function OverviewPage() {
                     tooltip="Contatos disponíveis em mailings para suas campanhas."
                   />
                 </div>
-
-                {!hasData && (
-                  <Card
-                    title={
-                      <span className="inline-flex items-center gap-2">
-                        <CheckCircle2 className="size-4 text-brand-700" aria-hidden />
-                        Primeiros passos — base pronta para testes e operação
-                      </span>
-                    }
-                    className="border-dashed border-slate-300 bg-slate-50/70"
-                  >
-                    <p className="mb-4 text-xs text-slate-600">
-                      Sua base operacional está zerada (seus troncos, ramais e agentes de voz permanecem prontos). Siga os 3 passos abaixo ou carregue os dados de exemplo:
-                    </p>
-                    <div className="grid gap-3 md:grid-cols-3">
-                      <div className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-3.5">
-                        <div>
-                          <div className="mb-1 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-brand-700">
-                            <PhoneCall className="size-3.5" aria-hidden /> Passo 1
-                          </div>
-                          <div className="text-sm font-semibold text-slate-900">Testar Agente IA de Voz</div>
-                          <p className="mt-1 text-xs text-slate-600">
-                            Faça uma ligação direta para o seu celular ou ramal SIP para validar voz, saudação e transcrição.
-                          </p>
-                        </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            size="sm"
-                            icon={<PhoneCall className="size-3.5" aria-hidden />}
-                            onClick={() => setOpenDialerSignal(true)}
-                          >
-                            Nova ligação de teste
-                          </Button>
-                          <Link to="/agentes-de-voz" className="text-xs font-medium text-brand-700 hover:underline self-center">
-                            Agentes de Voz →
-                          </Link>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-3.5">
-                        <div>
-                          <div className="mb-1 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-brand-700">
-                            <Upload className="size-3.5" aria-hidden /> Passo 2
-                          </div>
-                          <div className="text-sm font-semibold text-slate-900">Importar Contatos / CSV</div>
-                          <p className="mt-1 text-xs text-slate-600">
-                            Suba uma planilha simples (Nome e Telefone) ou carregue a carteira de demonstração.
-                          </p>
-                        </div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <Link to="/mailings/importar" className={btnClass('primary', 'sm')}>
-                            Subir CSV
-                          </Link>
-                          {can('control.write') && (
-                            <Button
-                              type="button"
-                              variant="secondary"
-                              size="sm"
-                              loading={seedDemo.isPending}
-                              icon={<Database className="size-3.5" />}
-                              onClick={() => seedDemo.mutate()}
-                            >
-                              Carregar exemplo
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-3.5">
-                        <div>
-                          <div className="mb-1 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-brand-700">
-                            <Megaphone className="size-3.5" aria-hidden /> Passo 3
-                          </div>
-                          <div className="text-sm font-semibold text-slate-900">Criar 1ª Campanha</div>
-                          <p className="mt-1 text-xs text-slate-600">
-                            Escolha a lista de contatos, vincule seu agente de voz ou canal e inicie os disparos.
-                          </p>
-                        </div>
-                        <div className="mt-3">
-                          <Link to="/campanhas/nova" className={btnClass('secondary', 'sm')}>
-                            Nova campanha
-                          </Link>
-                        </div>
-                      </div>
-                    </div>
-                  </Card>
-                )}
               </>
             );
           })()}

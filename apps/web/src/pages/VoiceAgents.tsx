@@ -1,9 +1,9 @@
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bot, RefreshCw } from 'lucide-react';
+import { Bot, PhoneCall, RefreshCw } from 'lucide-react';
 import { get } from '../lib/api';
 import { useExperienceMode } from '../lib/experience-mode';
-import { Badge, Button, PageHeader, Stat } from '../components/ui';
+import { Badge, Button, Card, PageHeader, Stat } from '../components/ui';
 import { TenantsTab } from './telephony/TenantsTab';
 import type { GatewayStatus, TenantConfig } from './telephony/types';
 
@@ -67,6 +67,26 @@ export function VoiceAgentsPage() {
         <Stat label="OpenAI Realtime" value={openAiCount} />
         <Stat label="ElevenLabs STS" value={elevenCount} />
       </div>
+
+      <Card>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="text-sm font-semibold text-slate-900">Testar Agente IA de Voz</div>
+            <p className="mt-1 text-xs text-slate-600">
+              Faça uma ligação direta para o seu celular ou ramal SIP para validar voz, saudação e transcrição.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            icon={<PhoneCall className="size-3.5" aria-hidden />}
+            onClick={() => navigate('/?dial=1')}
+          >
+            Nova ligação de teste
+          </Button>
+        </div>
+      </Card>
 
       <TenantsTab
         onTestTenant={(tid) => navigate(`/?dial=1&tenant=${encodeURIComponent(tid)}`)}
