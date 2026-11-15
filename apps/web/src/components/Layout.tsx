@@ -3,7 +3,7 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ROLE_LABEL, ROLES, isSuperAdminRole } from '@voll/shared';
 import { errorMessage, post, setActiveWorkspaceId, setDemoRole } from '../lib/api';
-import { fmtDateTime, fmtFullDateTimeSec } from '../lib/format';
+import { fmtFullDateTimeSec } from '../lib/format';
 import clsx from 'clsx';
 
 declare const __APP_BUILT_AT__: string;
@@ -667,17 +667,18 @@ export function Layout() {
               </>
             )}
           </button>
-          <div
-            className="flex items-center justify-between gap-2 px-1 text-[11px] font-medium text-slate-400"
-            title={`Último build: ${fmtFullDateTimeSec(typeof __APP_BUILT_AT__ !== 'undefined' ? __APP_BUILT_AT__ : null)}`}
-          >
-            <span className="flex items-center gap-1 shrink-0">
-              <Settings2 className="size-3 text-brand-700" aria-hidden />
-              Voll Plan
-            </span>
-            <span className="tabular opacity-75 truncate">
-              v1.0.4 · {fmtDateTime(typeof __APP_BUILT_AT__ !== 'undefined' ? __APP_BUILT_AT__ : null)}
-            </span>
+          <div className="space-y-0.5 px-1 text-[11px] font-medium text-slate-400">
+            <div className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-1 shrink-0">
+                <Settings2 className="size-3 text-brand-700" aria-hidden />
+                Voll Plan
+              </span>
+              <span className="tabular font-semibold text-slate-500">v1.0.5</span>
+            </div>
+            <div className="flex items-center justify-between text-[10px] text-slate-400/90 tabular">
+              <span>Último build</span>
+              <span>{fmtFullDateTimeSec(typeof __APP_BUILT_AT__ !== 'undefined' ? __APP_BUILT_AT__ : null)}</span>
+            </div>
           </div>
         </div>
       </aside>
