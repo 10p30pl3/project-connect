@@ -2,22 +2,27 @@ import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
-function versionManifestPlugin(): Plugin {
-  const version = process.env.VITE_APP_VERSION || new Date().toISOString().replace(/[:.]/g, '-');
+function versionManifestPlugin(builtAt: string): Plugin {
+  const version = process.env.VITE_APP_VERSION || builtAt.replace(/[:.]/g, '-');
   return {
     name: 'voll-version-manifest',
     generateBundle() {
       this.emitFile({
         type: 'asset',
         fileName: 'version.json',
-        source: JSON.stringify({ version, builtAt: new Date().toISOString() }, null, 2),
+        source: JSON.stringify({ version, builtAt }, null, 2),
       });
     },
   };
 }
 
+const builtAtIso = process.env.VITE_BUILD_DATE || new Date().toISOString();
+
 export default defineConfig({
-  plugins: [react(), tailwindcss(), versionManifestPlugin()],
+  define: {
+    __APP_BUILT_AT__: JSON.stringify(builtAtIso),
+  },
+  plugins: [react(), tailwindcss(), versionManifestPlugin(builtAtIso)],
   build: {
     chunkSizeWarningLimit: 500,
     rollupOptions: {
