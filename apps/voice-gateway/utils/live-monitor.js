@@ -23,8 +23,12 @@ function computePeakPct(pcmBuf) {
     sumSq += s * s;
   }
   const rms = Math.sqrt(sumSq / Math.max(1, samples));
-  // Escala perceptual suave (0..100) para telefonia 8kHz
-  return Math.min(100, Math.round((rms / 9000) * 100));
+  if (rms < 40) return 0;
+  // Escala logarítmica perceptual em dBFS (-55 dBFS -> 0%, 0 dBFS -> 100%)
+  // Evita saturação em 100% durante fala normal/alta e mantém dinâmica real da energia.
+  const db = 20 * Math.log10(rms / 32768);
+  const pct = ((db + 55) / 55) * 100;
+  return Math.max(0, Math.min(100, Math.round(pct)));
 }
 
 class LiveMonitor {

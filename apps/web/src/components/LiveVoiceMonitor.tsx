@@ -228,9 +228,10 @@ export function LiveVoiceMonitor({
                   });
                   if (samplesRef.current.length > 220) samplesRef.current.shift();
                 } else if (currentEvent === 'latency_turn') {
-                  turnsRef.current.push(payload);
+                  const turn = payload.turn ?? payload;
+                  turnsRef.current.push(turn);
                   if (turnsRef.current.length > 40) turnsRef.current.shift();
-                  setLastTurn(payload);
+                  setLastTurn(turn);
                   if (payload.stats) setStats(payload.stats);
                 }
               } catch {
