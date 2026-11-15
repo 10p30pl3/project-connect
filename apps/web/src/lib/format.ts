@@ -38,8 +38,15 @@ export function fmtDateTimeSec(iso: string | null | undefined): string {
 }
 export function fmtFullDateTimeSec(val: string | number | Date | null | undefined): string {
   if (val === null || val === undefined || val === '') return '—';
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    // Se já vier formatado em pt-BR (ex.: voice-gateway "14/11/2026 23:10:57")
+    if (/^\d{2}\/\d{2}\/\d{4}[,\s]+\d{2}:\d{2}:\d{2}/.test(trimmed)) {
+      return trimmed;
+    }
+  }
   const d = val instanceof Date ? val : new Date(val);
-  return isNaN(d.getTime()) ? '—' : dtfFullSec.format(d);
+  return isNaN(d.getTime()) ? (typeof val === 'string' ? val : '—') : dtfFullSec.format(d);
 }
 
 export function fmtNumber(n: number | null | undefined): string {
