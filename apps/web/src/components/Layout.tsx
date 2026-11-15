@@ -13,6 +13,7 @@ import {
   BrainCircuit,
   Building2,
   Cable,
+  CalendarDays,
   PhoneCall,
   ChevronDown,
   Clock,
@@ -146,6 +147,13 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
         icon: <SlidersHorizontal className={ico} aria-hidden />,
         matchPrefixes: ['/estrategias'],
         minMode: 'advanced',
+      },
+      {
+        to: '/calendarios',
+        label: 'Calendários',
+        icon: <CalendarDays className={ico} aria-hidden />,
+        matchPrefixes: ['/calendarios'],
+        minMode: 'basic',
       },
       {
         to: '/tabulacoes',

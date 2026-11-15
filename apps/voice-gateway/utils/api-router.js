@@ -747,13 +747,18 @@ function createApiRouter({ activeBridges, tenantManager, fsPool, whisperPool, me
     if (configuredToken) {
       const authHeader = req.headers['authorization'] || '';
       const apiKeyHeader = req.headers['x-api-key'] || '';
+      const queryToken = parsedUrl.searchParams.get('token') || '';
       const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : authHeader.trim();
       const timingMatch = (a, b) => {
         const ha = crypto.createHash('sha256').update(String(a || '')).digest();
         const hb = crypto.createHash('sha256').update(String(b || '')).digest();
         return crypto.timingSafeEqual(ha, hb);
       };
-      if (!timingMatch(bearerToken, configuredToken) && !timingMatch(apiKeyHeader, configuredToken)) {
+      if (
+        !timingMatch(bearerToken, configuredToken) &&
+        !timingMatch(apiKeyHeader, configuredToken) &&
+        !timingMatch(queryToken, configuredToken)
+      ) {
         sendJson(res, 401, {
           error: 'unauthorized',
           message: 'Token de API inválido ou ausente (use Authorization: Bearer <token> ou X-API-Key)'

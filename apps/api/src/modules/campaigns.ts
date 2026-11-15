@@ -29,6 +29,7 @@ const SUMMARY_SQL = `
   SELECT c.*, j.id AS journey_id, j.name AS journey_name, jv.version AS journey_version, jv.steps,
          s.id AS strategy_id, s.name AS strategy_name, sv.version AS strategy_version, sv.config,
          m.name AS mailing_name, l.name AS list_name, lv.version AS list_version, lv.membership_mode,
+         cal.name AS calendar_name, cal.timezone AS calendar_timezone, cal.windows AS calendar_windows, cal.holiday_policy AS calendar_holiday_policy, cal.active AS calendar_active,
          w.global_suspension,
          (SELECT count(*)::int FROM enrollments e WHERE e.campaign_id=c.id) AS members,
          (SELECT count(*)::int FROM enrollments e WHERE e.campaign_id=c.id AND e.state <> 'ACTIVE') AS finished,
@@ -40,6 +41,7 @@ const SUMMARY_SQL = `
     JOIN strategy_versions sv ON sv.id=c.strategy_version_id JOIN strategies s ON s.id=sv.strategy_id
     JOIN mailings m ON m.id=c.mailing_id
     JOIN workspaces w ON w.id=c.workspace_id
+    LEFT JOIN calendars cal ON cal.id=c.calendar_id
     LEFT JOIN list_versions lv ON lv.id=c.list_version_id LEFT JOIN lists l ON l.id=lv.list_id`;
 
 /** Estado operacional derivado (§26.6) — não altera contadores nem dispara acionamentos. */
@@ -50,9 +52,12 @@ export function operational(r: any, now = new Date()): { state: string; explanat
       return { state: 'WAITING_RELEASE', explanation: 'Aguardando liberação: há suspensão global ativa no Controle central. Nenhum novo acionamento será feito.' };
     if (!r.materialized_at) return { state: 'PROCESSING', explanation: 'Preparando as inscrições da base.' };
     const cfg = r.config as StrategyConfig;
-    if (r.active_enrollments > 0 && !inCalendar(cfg.calendar, now)) {
-      const nw = describeNextWindow(cfg.calendar, now);
-      return { state: 'WAITING_WINDOW', explanation: `Aguardando próxima janela: fora do calendário da estratégia.${nw ? ` Próxima abertura: ${nw}.` : ''}` };
+    const cal = r.calendar_windows
+      ? { timezone: r.calendar_timezone, windows: r.calendar_windows, holidayPolicy: r.calendar_holiday_policy }
+      : cfg.calendar;
+    if (r.active_enrollments > 0 && !inCalendar(cal, now)) {
+      const nw = describeNextWindow(cal, now);
+      return { state: 'WAITING_WINDOW', explanation: `Aguardando próxima janela: fora do calendário de funcionamento.${nw ? ` Próxima abertura: ${nw}.` : ''}` };
     }
     if (r.ready_enrollments > 0) return { state: 'PROCESSING', explanation: 'Processando: há clientes na fila de seleção; cada um é revalidado antes da reserva.' };
     if (r.active_attempts > 0)
@@ -96,6 +101,8 @@ function summary(r: any) {
     journeyName: r.journey_name,
     strategyName: r.strategy_name,
     strategyVersion: r.strategy_version,
+    calendarId: r.calendar_id ?? null,
+    calendarName: r.calendar_name ?? null,
     createdAt: r.created_at,
     startedAt: r.started_at,
     archivedAt: r.archived_at ?? null,
@@ -113,6 +120,17 @@ function detail(r: any) {
     listVersion: r.list_version_id ? { id: r.list_version_id, version: r.list_version, membershipMode: r.membership_mode, name: r.list_name } : null,
     journey: { id: r.journey_id, versionId: r.journey_version_id, version: r.journey_version, name: r.journey_name, steps: r.steps },
     strategy: { id: r.strategy_id, versionId: r.strategy_version_id, version: r.strategy_version, name: r.strategy_name, config: r.config, summary: strategySummary(r.config) },
+    calendar: r.calendar_id
+      ? {
+          id: r.calendar_id,
+          name: r.calendar_name,
+          timezone: r.calendar_timezone,
+          windows: r.calendar_windows,
+          holidayPolicy: r.calendar_holiday_policy,
+          active: r.calendar_active,
+          holidays: [],
+        }
+      : null,
   };
 }
 
@@ -127,6 +145,7 @@ const PreflightSchema = z.object({
   listVersionId: z.string().uuid().nullish(),
   journeyVersionId: z.string().uuid().nullish(),
   strategyVersionId: z.string().uuid().nullish(),
+  calendarId: z.string().uuid().nullish(),
 }).passthrough();
 
 async function audienceCount(db: Db, workspaceId: string, mailingId: string, listVersionId?: string | null) {
@@ -228,6 +247,12 @@ export async function campaignRoutes(app: FastifyInstance) {
       if (!sv) throw unprocessable('Estratégia não encontrada', { strategyVersionId: 'Estratégia não encontrada' });
       strategy = { name: sv.name, version: sv.version, summary: strategySummary(sv.config), config: sv.config };
       nextWindow = describeNextWindow(sv.config.calendar, new Date());
+      if (body.calendarId) {
+        const cal = await one(db, `SELECT timezone, windows, holiday_policy FROM calendars WHERE id=$1 AND workspace_id=$2`, [body.calendarId, a.workspaceId]);
+        if (cal) {
+          nextWindow = describeNextWindow({ timezone: cal.timezone, windows: cal.windows, holidayPolicy: cal.holiday_policy }, new Date());
+        }
+      }
       if (sv.config.limits.incompleteHistory === 'BLOCK' && body.mailingId) {
         const [{ n }] = await q(
           db,
@@ -274,16 +299,21 @@ export async function campaignRoutes(app: FastifyInstance) {
       if (!jv) throw unprocessable('Jornada não encontrada', { journeyVersionId: 'Jornada não encontrada' });
       const sv = await one(c, `SELECT sv.id FROM strategy_versions sv JOIN strategies s ON s.id=sv.strategy_id WHERE sv.id=$1 AND s.workspace_id=$2`, [body.strategyVersionId, a.workspaceId]);
       if (!sv) throw unprocessable('Estratégia não encontrada', { strategyVersionId: 'Estratégia não encontrada' });
+      if (body.calendarId) {
+        const cal = await one(c, `SELECT id FROM calendars WHERE id=$1 AND workspace_id=$2`, [body.calendarId, a.workspaceId]);
+        if (!cal) throw unprocessable('Calendário não encontrado', { calendarId: 'Calendário não encontrado' });
+      }
       const status = body.startMode === 'NOW' ? 'RUNNING' : body.startMode === 'SCHEDULE' ? 'SCHEDULED' : 'READY';
       const ins = await one(
         c,
         `INSERT INTO campaigns (workspace_id, name, description, status, mailing_id, list_version_id, journey_version_id,
-                                strategy_version_id, scheduled_at, idempotency_key, created_by, started_at)
-         VALUES ($1,$2,$3,$4::campaign_status,$5,$6,$7,$8,$9,$10,$11, CASE WHEN $4::text='RUNNING' THEN now() END)
+                                strategy_version_id, calendar_id, scheduled_at, idempotency_key, created_by, started_at)
+         VALUES ($1,$2,$3,$4::campaign_status,$5,$6,$7,$8,$9,$10,$11,$12, CASE WHEN $4::text='RUNNING' THEN now() END)
          ON CONFLICT (workspace_id, idempotency_key) DO NOTHING RETURNING id`,
         [
           a.workspaceId, body.name, body.description ?? null, status, body.mailingId, body.listVersionId ?? null,
-          body.journeyVersionId, body.strategyVersionId, body.startMode === 'SCHEDULE' ? body.scheduledAt : null, key, a.userId,
+          body.journeyVersionId, body.strategyVersionId, body.calendarId ?? null,
+          body.startMode === 'SCHEDULE' ? body.scheduledAt : null, key, a.userId,
         ],
       );
       if (!ins) {
@@ -590,11 +620,12 @@ export async function campaignRoutes(app: FastifyInstance) {
     const a = actor(req);
     const rows = await q(
       getPool(),
-      `SELECT t.*, j.name AS journey_name, s.name AS strategy_name, sv.version AS strategy_version
+      `SELECT t.*, j.name AS journey_name, s.name AS strategy_name, sv.version AS strategy_version, cal.name AS calendar_name
          FROM campaign_templates t
          LEFT JOIN journeys j ON j.id = t.journey_id
          LEFT JOIN strategies s ON s.id = t.strategy_id
          LEFT JOIN strategy_versions sv ON sv.id = t.strategy_version_id
+         LEFT JOIN calendars cal ON cal.id = t.calendar_id
         WHERE t.workspace_id = $1
         ORDER BY t.created_at DESC`,
       [a.workspaceId],
@@ -611,6 +642,8 @@ export async function campaignRoutes(app: FastifyInstance) {
       strategyName: r.strategy_name ?? 'Estratégia',
       strategyVersionId: r.strategy_version_id,
       strategyVersion: r.strategy_version ?? 1,
+      calendarId: r.calendar_id ?? null,
+      calendarName: r.calendar_name ?? null,
       startMode: r.start_mode,
       sourceCampaignId: r.source_campaign_id,
       sourceCampaignName: r.source_campaign_name,
@@ -625,11 +658,12 @@ export async function campaignRoutes(app: FastifyInstance) {
     const a = actor(req);
     const r = await one(
       getPool(),
-      `SELECT t.*, j.name AS journey_name, s.name AS strategy_name, sv.version AS strategy_version
+      `SELECT t.*, j.name AS journey_name, s.name AS strategy_name, sv.version AS strategy_version, cal.name AS calendar_name
          FROM campaign_templates t
          LEFT JOIN journeys j ON j.id = t.journey_id
          LEFT JOIN strategies s ON s.id = t.strategy_id
          LEFT JOIN strategy_versions sv ON sv.id = t.strategy_version_id
+         LEFT JOIN calendars cal ON cal.id = t.calendar_id
         WHERE t.workspace_id = $1 AND t.id = $2`,
       [a.workspaceId, req.params.id],
     );
@@ -646,6 +680,8 @@ export async function campaignRoutes(app: FastifyInstance) {
       strategyName: r.strategy_name ?? 'Estratégia',
       strategyVersionId: r.strategy_version_id,
       strategyVersion: r.strategy_version ?? 1,
+      calendarId: r.calendar_id ?? null,
+      calendarName: r.calendar_name ?? null,
       startMode: r.start_mode,
       sourceCampaignId: r.source_campaign_id,
       sourceCampaignName: r.source_campaign_name,

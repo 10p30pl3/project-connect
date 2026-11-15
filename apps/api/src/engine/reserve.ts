@@ -117,7 +117,7 @@ export async function runReservations(campaignId: string, now: Date = new Date()
   if (!rt || rt.status !== 'RUNNING') return { reserved: 0, evaluated: 0 };
   const [ws] = await q(pool, `SELECT global_suspension FROM workspaces WHERE id=$1`, [rt.workspaceId]);
   if (ws.global_suspension) return { reserved: 0, evaluated: 0 };
-  if (!inCalendar(rt.strategy.calendar, now)) return { reserved: 0, evaluated: 0 };
+  if (!inCalendar(rt.calendar ?? rt.strategy.calendar, now)) return { reserved: 0, evaluated: 0 };
 
   const [{ n: pending }] = await q(
     pool,

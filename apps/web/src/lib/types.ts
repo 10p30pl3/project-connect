@@ -1,6 +1,10 @@
 // Formatos de resposta conforme docs/API.md
 import type {
   AttemptState,
+  CalendarCreate,
+  CalendarHoliday,
+  CalendarHolidayCreate,
+  CalendarWindow,
   CampaignDraft,
   CampaignStatus,
   CampaignTemplate,
@@ -9,6 +13,7 @@ import type {
   ColumnMapping,
   EnrollmentState,
   JourneyStep,
+  OperationCalendar,
   OperationPurpose,
   ReasonCode,
   Role,
@@ -17,7 +22,16 @@ import type {
 } from '@voll/shared';
 import type { ContactIntelligenceRationale } from './intelligence-rationale';
 
-export type { ContactIntelligenceRationale, CampaignTemplate, CampaignTemplateCreate };
+export type {
+  ContactIntelligenceRationale,
+  CampaignTemplate,
+  CampaignTemplateCreate,
+  OperationCalendar,
+  CalendarHoliday,
+  CalendarWindow,
+  CalendarCreate,
+  CalendarHolidayCreate,
+};
 
 export type WorkspaceOption = {
   id: string;
@@ -197,6 +211,8 @@ export type CampaignSummary = {
   journeyName: string;
   strategyName: string;
   strategyVersion: number;
+  calendarId?: string | null;
+  calendarName?: string | null;
   createdAt: string;
   startedAt: string | null;
   archivedAt?: string | null;
@@ -209,6 +225,7 @@ export type CampaignDetail = CampaignSummary & {
   listVersion: { id: string; version: number; membershipMode: 'SNAPSHOT' | 'DYNAMIC' } | null;
   journey: { id: string; version: number; steps: JourneyStepView[] };
   strategy: { id: string; version: number; config: StrategyConfig };
+  calendar?: OperationCalendar | null;
   scheduledAt: string | null;
 };
 export type Campaign = CampaignDetail;

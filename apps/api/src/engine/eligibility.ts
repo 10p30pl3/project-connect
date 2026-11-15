@@ -5,7 +5,7 @@
 import type { ChannelType, JourneyStep, ReasonCode, StrategyConfig } from '@voll/shared';
 import type { Db } from '../db/pool.js';
 import { q } from '../db/pool.js';
-import { inCalendar, startOfOperationalDay } from './calendar.js';
+import { inCalendar, startOfOperationalDay, type OperationCalendarLike } from './calendar.js';
 
 export type DestinationInfo = {
   id: string;
@@ -18,7 +18,7 @@ export type DestinationInfo = {
 
 export type EvalContext = {
   now: Date;
-  campaign: { id: string; status: string };
+  campaign: { id: string; status: string; calendar?: OperationCalendarLike | null };
   workspace: { globalSuspension: boolean; dailyLimit: number | null; totalLimit: number | null };
   enrollment: { id: string; state: string; stage: number; destinationCursor: number; nextEligibleAt: Date };
   steps: JourneyStep[];
@@ -112,7 +112,7 @@ export function evaluateEnrollment(ctx: EvalContext): EvalResult {
     reasons.push('DAILY_LIMIT');
 
   // 5. calendário, pausa, canal
-  if (!inCalendar(s.calendar, ctx.now)) reasons.push('OUTSIDE_CALENDAR');
+  if (!inCalendar(ctx.campaign.calendar ?? s.calendar, ctx.now)) reasons.push('OUTSIDE_CALENDAR');
   if (ctx.campaign.status === 'PAUSED') reasons.push('CAMPAIGN_PAUSED');
   else if (ctx.campaign.status !== 'RUNNING' && !reasons.includes('FLOW_ENDED')) reasons.push('FLOW_ENDED');
   if (step && ctx.connectionsActive[step.connectionId] === false) reasons.push('CHANNEL_UNAVAILABLE');
@@ -145,12 +145,13 @@ export type CampaignRuntime = {
   strategyVersion: number;
   membershipMode: 'SNAPSHOT' | 'DYNAMIC' | null;
   timezone: string;
+  calendar?: OperationCalendarLike | null;
 };
 
 export async function loadCampaignRuntime(db: Db, campaignId: string): Promise<CampaignRuntime | null> {
   const rows = await q(
     db,
-    `SELECT c.id, c.workspace_id, c.status, c.mailing_id, c.list_version_id, c.journey_version_id, c.strategy_version_id,
+    `SELECT c.id, c.workspace_id, c.status, c.mailing_id, c.list_version_id, c.journey_version_id, c.strategy_version_id, c.calendar_id,
             jv.steps, sv.config, sv.version AS strategy_version, lv.membership_mode, w.timezone
        FROM campaigns c
        JOIN journey_versions jv ON jv.id = c.journey_version_id
@@ -162,6 +163,29 @@ export async function loadCampaignRuntime(db: Db, campaignId: string): Promise<C
   );
   const r = rows[0];
   if (!r) return null;
+
+  let calendar: OperationCalendarLike | null = null;
+  if (r.calendar_id) {
+    const calRows = await q(
+      db,
+      `SELECT timezone, windows, holiday_policy FROM calendars WHERE id = $1 AND active = true AND archived_at IS NULL`,
+      [r.calendar_id],
+    );
+    if (calRows[0]) {
+      const holidays = await q(
+        db,
+        `SELECT date::text, action, start_time AS "startTime", end_time AS "endTime" FROM calendar_holidays WHERE calendar_id = $1`,
+        [r.calendar_id],
+      );
+      calendar = {
+        timezone: calRows[0].timezone,
+        windows: calRows[0].windows,
+        holidayPolicy: calRows[0].holiday_policy,
+        holidays,
+      };
+    }
+  }
+
   return {
     id: r.id,
     workspaceId: r.workspace_id,
@@ -175,6 +199,7 @@ export async function loadCampaignRuntime(db: Db, campaignId: string): Promise<C
     strategyVersion: r.strategy_version,
     membershipMode: r.membership_mode,
     timezone: r.timezone,
+    calendar,
   };
 }
 
@@ -198,7 +223,7 @@ export async function buildContexts(
   const out = new Map<string, EvalContext & { contactName: string | null }>();
   if (enrollments.length === 0) return out;
   const contactIds = [...new Set(enrollments.map((e) => e.contact_id))];
-  const tz = campaign.strategy.calendar.timezone || campaign.timezone;
+  const tz = campaign.calendar?.timezone || campaign.strategy.calendar.timezone || campaign.timezone;
   const dayStart = startOfOperationalDay(now, tz);
 
   const [ws] = await q(
@@ -266,7 +291,7 @@ export async function buildContexts(
     out.set(e.id, {
       now,
       contactName: c?.name ?? null,
-      campaign: { id: campaign.id, status: campaign.status },
+      campaign: { id: campaign.id, status: campaign.status, calendar: campaign.calendar },
       workspace: {
         globalSuspension: ws.global_suspension,
         dailyLimit: ws.institutional_daily_limit,

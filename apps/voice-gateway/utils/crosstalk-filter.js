@@ -50,6 +50,7 @@ class CrosstalkFilter {
     this.speechFramesCount = 0;
     this.blockedFramesCount = 0;
     this.passedFramesCount = 0;
+    this.lastActiveSpeechAt = 0;
   }
 
   /**
@@ -222,18 +223,19 @@ class CrosstalkFilter {
     // - Voz secundária / fundo: rejeita energia abaixo de 450-1000 RMS
     const dynamicThreshold = this.enrolled
       ? (isBiometricMatch
-          ? (isAgentTalking ? Math.max(700, this.userVoiceRms * 0.35) : Math.max(200, Math.min(600, this.userVoiceRms * 0.18)))
+          ? (isAgentTalking ? Math.min(600, Math.max(380, this.userVoiceRms * 0.28)) : Math.max(200, Math.min(600, this.userVoiceRms * 0.18)))
           : (this.isGateOpen && !isAgentTalking
               ? Math.max(250, Math.min(700, this.userVoiceRms * 0.22))
-              : (isAgentTalking ? Math.max(850, this.userVoiceRms * 0.50) : Math.max(450, Math.min(1000, this.userVoiceRms * 0.45)))))
-      : (isAgentTalking ? Math.max(850, this.userVoiceRms * 0.50) : Math.max(300, this.userVoiceRms * this.ratio));
+              : (isAgentTalking ? Math.min(650, Math.max(450, this.userVoiceRms * 0.32)) : Math.max(450, Math.min(1000, this.userVoiceRms * 0.45)))))
+      : (isAgentTalking ? Math.min(650, Math.max(420, this.userVoiceRms * 0.32)) : Math.max(300, this.userVoiceRms * this.ratio));
 
-    const requiredAttack = (isBiometricMatch || (this.isGateOpen && !isAgentTalking)) ? 1 : (isAgentTalking ? Math.max(3, this.attackFrames) : this.attackFrames);
+    const requiredAttack = (isBiometricMatch || (this.isGateOpen && !isAgentTalking)) ? 1 : (isAgentTalking ? Math.max(2, this.attackFrames) : this.attackFrames);
     if (feat.rms >= dynamicThreshold) {
       this.consecutiveAbove++;
       if (this.isGateOpen || this.consecutiveAbove >= requiredAttack) {
         this.isGateOpen = true;
         this.hangoverCounter = this.hangoverFrames;
+        this.lastActiveSpeechAt = Date.now();
         this.speechFramesCount++;
         this.passedFramesCount++;
         return true;
@@ -265,11 +267,20 @@ class CrosstalkFilter {
   isActivelySpeaking(isAgentTalking = false) {
     if (!this.isGateOpen || this.consecutiveAbove === 0) return false;
     if (isAgentTalking) {
-      // Quando o agente fala, exige energia de voz intencional e sustentada (100ms) para rejeitar eco acústico do microfone
-      const minBargeinRms = Math.max(1500, Math.round(this.userVoiceRms * 0.70));
-      return this.consecutiveAbove >= 5 && this.lastRms >= minBargeinRms;
+      // Quando o agente fala, exige energia de voz intencional e sustentada (40ms) com teto calibrado para não travar após picos
+      const minBargeinRms = Math.min(650, Math.max(420, Math.round(this.userVoiceRms * 0.35)));
+      return this.consecutiveAbove >= 2 && this.lastRms >= minBargeinRms;
     }
     return true;
+  }
+
+  /**
+   * Indica se houve fala ativa do locutor principal dentro de uma janela recente (ms).
+   * Útil para validar eventos assíncronos de VAD remoto (OpenAI/ElevenLabs) que chegam com latência de rede.
+   * @param {number} [windowMs=800]
+   */
+  wasRecentlySpeaking(windowMs = 800) {
+    return this.lastActiveSpeechAt > 0 && (Date.now() - this.lastActiveSpeechAt) <= windowMs;
   }
 
   /**
@@ -306,6 +317,7 @@ class CrosstalkFilter {
     this.speechFramesCount = 0;
     this.blockedFramesCount = 0;
     this.passedFramesCount = 0;
+    this.lastActiveSpeechAt = 0;
   }
 }
 

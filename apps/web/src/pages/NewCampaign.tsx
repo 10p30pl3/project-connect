@@ -6,10 +6,12 @@ import {
   ArrowLeft,
   ArrowRight,
   Bookmark,
+  CalendarDays,
   Check,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Clock,
   Database,
   ExternalLink,
   Filter,
@@ -37,6 +39,7 @@ import type {
   Journey,
   ListSummary,
   MailingSummary,
+  OperationCalendar,
   Preflight,
   Strategy,
   Tabulation,
@@ -97,6 +100,8 @@ type Extra = {
   templateJourney?: string;
   templateStrategy?: string;
   purposeCode?: OperationPurpose;
+  calendarId?: string;
+  calendarName?: string;
 };
 
 const EMPTY: CampaignDraft = { step: 'MAILING', extra: {} };
@@ -215,6 +220,8 @@ export function NewCampaignPage() {
           templateName: templateQ.data.name,
           templateJourney: templateQ.data.journeyName,
           templateStrategy: templateQ.data.strategyName,
+          calendarId: templateQ.data.calendarId ?? undefined,
+          calendarName: templateQ.data.calendarName ?? undefined,
         },
       );
       toast('success', `Modelo "${templateQ.data.name}" aplicado! Jornada e estratégia foram pré-configuradas.`);
@@ -268,6 +275,11 @@ export function NewCampaignPage() {
     queryFn: () => get<{ items: Strategy[] }>('/strategies'),
   });
 
+  const calendarsQ = useQuery({
+    queryKey: ['calendars'],
+    queryFn: () => get<{ items: OperationCalendar[] }>('/calendars'),
+  });
+
   const tabulationsQ = useQuery({
     queryKey: ['tabulations'],
     queryFn: () => get<{ items: Tabulation[] }>('/tabulations'),
@@ -286,6 +298,11 @@ export function NewCampaignPage() {
   const selectedStrategy = useMemo(
     () => strategiesQ.data?.items.find((s) => s.latestVersion?.id === draft?.strategyVersionId),
     [strategiesQ.data, draft?.strategyVersionId],
+  );
+
+  const selectedCalendar = useMemo(
+    () => calendarsQ.data?.items.find((c) => c.id === extra.calendarId),
+    [calendarsQ.data, extra.calendarId],
   );
 
   const curIdx = STEPS.findIndex((s) => s.id === currentStep);
@@ -458,8 +475,10 @@ export function NewCampaignPage() {
             extra={extra}
             journeys={journeysQ.data?.items}
             strategies={strategiesQ.data?.items}
+            calendars={calendarsQ.data?.items}
             selectedJourney={selectedJourney}
             selectedStrategy={selectedStrategy}
+            selectedCalendar={selectedCalendar}
             update={update}
             onBack={() => goStep('AUDIENCE')}
             onNext={() => goStep('CAMPAIGN')}
@@ -473,6 +492,7 @@ export function NewCampaignPage() {
             selectedMailing={selectedMailing}
             selectedJourney={selectedJourney}
             selectedStrategy={selectedStrategy}
+            selectedCalendar={selectedCalendar}
             update={update}
             onBack={() => goStep('ACTIVATION')}
             onDone={(campaign) => {
@@ -823,10 +843,13 @@ function AudienceStep({
 // ==================================================================
 function ActivationStep({
   draft,
+  extra,
   journeys,
   strategies,
+  calendars,
   selectedJourney,
   selectedStrategy,
+  selectedCalendar,
   update,
   onBack,
   onNext,
@@ -835,8 +858,10 @@ function ActivationStep({
   extra: Extra;
   journeys?: Journey[];
   strategies?: Strategy[];
+  calendars?: OperationCalendar[];
   selectedJourney?: Journey;
   selectedStrategy?: Strategy;
+  selectedCalendar?: OperationCalendar;
   update: UpdateFn;
   onBack: () => void;
   onNext: () => void;
@@ -845,6 +870,11 @@ function ActivationStep({
   const [strategyTab, setStrategyTab] = useState<'SIMPLE' | 'COMPLETE'>('SIMPLE');
   const [showStrategyDetails, setShowStrategyDetails] = useState(false);
   const [err, setErr] = useState<{ journey?: string; strategy?: string }>({});
+
+  const activeCalendars = useMemo(
+    () => (calendars ?? []).filter((c) => c.active && !c.archivedAt),
+    [calendars],
+  );
 
   // Auto-seleciona defaults se nenhum tiver sido escolhido
   useEffect(() => {
@@ -859,7 +889,20 @@ function ActivationStep({
       const defS = strategies.find((s) => s.name.includes('Simples') || s.name.includes('24x7')) ?? strategies[0];
       if (defS.latestVersion) update({ strategyVersionId: defS.latestVersion.id });
     }
-  }, [draft.journeyVersionId, draft.strategyVersionId, journeys, strategies, update]);
+    if (!extra.calendarId && activeCalendars.length > 0) {
+      const defC =
+        activeCalendars.find((c) => c.name.includes('Comercial')) ?? activeCalendars[0];
+      update({}, { calendarId: defC.id, calendarName: defC.name });
+    }
+  }, [
+    draft.journeyVersionId,
+    draft.strategyVersionId,
+    extra.calendarId,
+    journeys,
+    strategies,
+    activeCalendars,
+    update,
+  ]);
 
   // Filtra jornadas por Simples (1 canal) e Multicanal
   const simpleJourneys = useMemo(
@@ -1155,6 +1198,86 @@ function ActivationStep({
         )}
       </Card>
 
+      {/* 3. Calendário de Funcionamento */}
+      <Card
+        title="3. Selecione o Calendário de Funcionamento"
+        tooltip="Define em quais dias, horários e feriados esta campanha pode realizar disparos."
+        actions={
+          <Link
+            to="/calendarios"
+            className="inline-flex items-center gap-1 text-xs font-medium text-brand-700 hover:text-brand-900"
+          >
+            Gerenciar calendários <ExternalLink className="size-3" />
+          </Link>
+        }
+      >
+        {activeCalendars.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-slate-200 p-4 text-xs text-slate-500">
+            Nenhum calendário ativo cadastrado.{' '}
+            <Link to="/calendarios" className="font-semibold text-brand-700 underline">
+              Criar calendário
+            </Link>{' '}
+            ou usar o horário padrão da estratégia.
+          </div>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2">
+            {activeCalendars.map((cal) => {
+              const selected = (selectedCalendar?.id ?? extra.calendarId) === cal.id;
+              const DAYS_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+              return (
+                <div
+                  key={cal.id}
+                  onClick={() => update({}, { calendarId: cal.id, calendarName: cal.name })}
+                  className={clsx(
+                    'flex cursor-pointer flex-col justify-between rounded-xl border p-4 transition-all',
+                    selected
+                      ? 'border-brand-700 bg-brand-50/40 ring-1 ring-brand-700'
+                      : 'border-slate-200 bg-white hover:border-slate-300',
+                  )}
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <CalendarDays className="size-4 text-brand-700 shrink-0" />
+                        <div className="font-semibold text-slate-900 text-sm">{cal.name}</div>
+                      </div>
+                      <Badge
+                        tone={cal.holidayPolicy === 'BLOCK' ? 'amber' : 'green'}
+                        className="text-[10px]"
+                      >
+                        {cal.holidayPolicy === 'BLOCK' ? 'Bloqueia feriados' : 'Permite feriados'}
+                      </Badge>
+                    </div>
+                    {cal.description && (
+                      <p className="mt-1 text-xs text-slate-500 line-clamp-2">{cal.description}</p>
+                    )}
+                    <div className="mt-2.5 flex flex-wrap gap-1.5">
+                      {cal.windows.map((w, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700"
+                        >
+                          <Clock className="size-3 text-slate-500" />
+                          {w.days.map((d) => DAYS_SHORT[d]).join(', ')} · {w.start}–{w.end}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-100 pt-2">
+                    <span>{cal.timezone}</span>
+                    <span>
+                      {(cal.holidays?.length ?? 0) > 0
+                        ? `${cal.holidays!.length} feriado(s)`
+                        : 'Sem feriados cadastrados'}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+
       {/* Integração de Voz IA (Telefonia como fonte única) */}
       <VoiceReadinessCard journey={selectedJourney} showTrunksPreflight={false} />
 
@@ -1331,6 +1454,7 @@ function ReviewStep({
   selectedMailing,
   selectedJourney,
   selectedStrategy,
+  selectedCalendar,
   update,
   onBack,
   onDone,
@@ -1340,6 +1464,7 @@ function ReviewStep({
   selectedMailing?: MailingSummary;
   selectedJourney?: Journey;
   selectedStrategy?: Strategy;
+  selectedCalendar?: OperationCalendar;
   update: UpdateFn;
   onBack: () => void;
   onDone: (c: Campaign) => void;
@@ -1360,6 +1485,7 @@ function ReviewStep({
         listVersionId: draft.audienceMode === 'LIST' ? draft.listVersionId : null,
         journeyVersionId: draft.journeyVersionId,
         strategyVersionId: draft.strategyVersionId,
+        calendarId: selectedCalendar?.id ?? extra.calendarId ?? null,
         status,
         scheduledAt: status === 'SCHEDULED' ? saoPauloLocalToIso(scheduledAt) : null,
       }),
@@ -1484,12 +1610,44 @@ function ReviewStep({
             <div className="mt-0.5 text-xs text-slate-500">
               {selectedStrategy?.latestVersion?.config ? (
                 <>
-                  Horário: {selectedStrategy.latestVersion.config.calendar.start}–
-                  {selectedStrategy.latestVersion.config.calendar.end} · Até{' '}
-                  {selectedStrategy.latestVersion.config.limits.total} tentativas
+                  Até {selectedStrategy.latestVersion.config.limits.total} tentativas ·{' '}
+                  {selectedStrategy.latestVersion.config.limits.daily}/dia
                 </>
               ) : (
                 '—'
+              )}
+            </div>
+          </div>
+
+          {/* Pilar 5: Calendário de Funcionamento */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 sm:col-span-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
+                <CalendarDays className="size-4 text-brand-700" />
+                5. Calendário de Funcionamento
+              </div>
+              {selectedCalendar && (
+                <Badge tone={selectedCalendar.holidayPolicy === 'BLOCK' ? 'amber' : 'green'}>
+                  {selectedCalendar.holidayPolicy === 'BLOCK' ? 'Bloqueia feriados' : 'Permite feriados'}
+                </Badge>
+              )}
+            </div>
+            <div className="mt-2 text-sm font-semibold text-slate-900">
+              {selectedCalendar?.name ?? extra.calendarName ?? 'Padrão da estratégia'}
+            </div>
+            <div className="mt-0.5 text-xs text-slate-500">
+              {selectedCalendar ? (
+                <>
+                  {selectedCalendar.windows
+                    .map(
+                      (w) =>
+                        `${w.days.map((d) => ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][d]).join(', ')} (${w.start}–${w.end})`,
+                    )
+                    .join(' · ')}{' '}
+                  · {selectedCalendar.timezone}
+                </>
+              ) : (
+                'Usando janelas definidas na estratégia.'
               )}
             </div>
           </div>

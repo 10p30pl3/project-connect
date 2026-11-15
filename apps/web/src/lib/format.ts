@@ -16,6 +16,15 @@ const dtfSec = new Intl.DateTimeFormat('pt-BR', {
   minute: '2-digit',
   second: '2-digit',
 });
+const dtfFullSec = new Intl.DateTimeFormat('pt-BR', {
+  timeZone: TZ,
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+});
 
 export function fmtDateTime(iso: string | null | undefined): string {
   if (!iso) return '—';
@@ -26,6 +35,11 @@ export function fmtDateTimeSec(iso: string | null | undefined): string {
   if (!iso) return '—';
   const d = new Date(iso);
   return isNaN(d.getTime()) ? '—' : dtfSec.format(d);
+}
+export function fmtFullDateTimeSec(val: string | number | Date | null | undefined): string {
+  if (val === null || val === undefined || val === '') return '—';
+  const d = val instanceof Date ? val : new Date(val);
+  return isNaN(d.getTime()) ? '—' : dtfFullSec.format(d);
 }
 
 export function fmtNumber(n: number | null | undefined): string {

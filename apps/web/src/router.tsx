@@ -42,6 +42,7 @@ const NewListPage = lazyNamed(() => import('./pages/Lists'), 'NewListPage');
 const JourneysPage = lazyNamed(() => import('./pages/Journeys'), 'JourneysPage');
 const StrategiesPage = lazyNamed(() => import('./pages/Strategies'), 'StrategiesPage');
 const StrategyDetailPage = lazyNamed(() => import('./pages/Strategies'), 'StrategyDetailPage');
+const CalendarsPage = lazyNamed(() => import('./pages/Calendars'), 'CalendarsPage');
 const TabulationsPage = lazyNamed(() => import('./pages/Tabulations'), 'TabulationsPage');
 const ChannelsPage = lazyNamed(() => import('./pages/Channels'), 'ChannelsPage');
 const VoiceAgentsPage = lazyNamed(() => import('./pages/VoiceAgents'), 'VoiceAgentsPage');
@@ -113,6 +114,7 @@ export const router = createBrowserRouter([
           { path: '/jornadas', element: <S><JourneysPage /></S> },
           { path: '/estrategias', element: <S><StrategiesPage /></S> },
           { path: '/estrategias/:id', element: <S><StrategyDetailPage /></S> },
+          { path: '/calendarios', element: <S><CalendarsPage /></S> },
           { path: '/tabulacoes', element: <S><TabulationsPage /></S> },
           { path: '/canais', element: <S><ChannelsPage /></S> },
           { path: '/agentes-de-voz', element: <S><VoiceAgentsPage /></S> },

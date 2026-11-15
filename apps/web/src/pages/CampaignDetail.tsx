@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useState } from 'react';
-import { ArrowLeft, Archive, ArchiveRestore, Bookmark, Download, Pause, Play, Square } from 'lucide-react';
+import { ArrowLeft, Archive, ArchiveRestore, Bookmark, CalendarDays, Clock, Download, Pause, Play, Square } from 'lucide-react';
 import {
   ATTEMPT_STATES,
   ATTEMPT_STATE_LABEL,
@@ -281,6 +281,48 @@ function OverviewTab({ c }: { c: CampaignDetail }) {
       >
         <StrategySummary config={c.strategy.config} version={c.strategy.version} compact />
       </Card>
+      {(c.calendar || c.calendarName) && (
+        <Card
+          title={`Calendário de Funcionamento · ${c.calendar?.name ?? c.calendarName}`}
+          actions={
+            <Link to="/calendarios" className="text-xs font-medium text-brand-700 hover:underline">
+              Gerenciar calendários
+            </Link>
+          }
+        >
+          {c.calendar ? (
+            <div className="space-y-2.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge tone={c.calendar.holidayPolicy === 'BLOCK' ? 'amber' : 'green'}>
+                  {c.calendar.holidayPolicy === 'BLOCK' ? 'Bloqueia feriados' : 'Permite feriados'}
+                </Badge>
+                <span className="text-xs text-slate-500">{c.calendar.timezone}</span>
+                {c.calendar.holidays && c.calendar.holidays.length > 0 && (
+                  <span className="text-xs text-slate-500">
+                    · {c.calendar.holidays.length} feriado(s) cadastrado(s)
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {c.calendar.windows.map((w, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700"
+                  >
+                    <Clock className="size-3.5 text-slate-500" />
+                    {w.days.map((d) => ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][d]).join(', ')} · {w.start}–{w.end}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-sm text-slate-700">
+              <CalendarDays className="size-4 text-brand-700" />
+              <span>{c.calendarName}</span>
+            </div>
+          )}
+        </Card>
+      )}
     </div>
   );
 }

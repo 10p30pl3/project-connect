@@ -421,6 +421,61 @@ export const PRIMARY_OPERATION_PURPOSES = ['COBRANCA', 'VENDAS', 'AGENDAMENTOS']
 export const AUDIENCE_SEGMENTS = ['B2C', 'B2B', 'MIXED'] as const;
 export type AudienceSegment = (typeof AUDIENCE_SEGMENTS)[number];
 
+export const CalendarWindowSchema = z
+  .object({
+    days: z.array(z.number().int().min(0).max(6)).min(1, 'Selecione pelo menos um dia'),
+    start: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Horário inicial inválido (HH:MM)'),
+    end: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Horário final inválido (HH:MM)'),
+  })
+  .superRefine((w, ctx) => {
+    if (w.end <= w.start) {
+      ctx.addIssue({ code: 'custom', path: ['end'], message: 'O horário final deve ser posterior ao inicial' });
+    }
+  });
+export type CalendarWindow = z.infer<typeof CalendarWindowSchema>;
+
+export const CalendarCreateSchema = z.object({
+  name: z.string().min(1, 'Informe o nome do calendário').max(100),
+  description: z.string().max(500).nullable().optional(),
+  timezone: z.string().min(1).default('America/Sao_Paulo'),
+  windows: z.array(CalendarWindowSchema).min(1, 'Configure pelo menos uma janela de horário'),
+  holidayPolicy: z.enum(['BLOCK', 'ALLOW']).default('BLOCK'),
+  active: z.boolean().default(true),
+});
+export type CalendarCreate = z.infer<typeof CalendarCreateSchema>;
+
+export const CalendarHolidayCreateSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida (AAAA-MM-DD)'),
+  name: z.string().min(1, 'Informe o nome do feriado/exceção').max(150),
+  action: z.enum(['BLOCK', 'ALLOW', 'LIMIT']).default('BLOCK'),
+  startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable().optional(),
+  endTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable().optional(),
+});
+export type CalendarHolidayCreate = z.infer<typeof CalendarHolidayCreateSchema>;
+
+export interface CalendarHoliday {
+  id: string;
+  date: string;
+  name: string;
+  action: 'BLOCK' | 'ALLOW' | 'LIMIT';
+  startTime?: string | null;
+  endTime?: string | null;
+}
+
+export interface OperationCalendar {
+  id: string;
+  name: string;
+  description?: string | null;
+  timezone: string;
+  windows: CalendarWindow[];
+  holidayPolicy: 'BLOCK' | 'ALLOW';
+  active: boolean;
+  archivedAt?: string | null;
+  holidays: CalendarHoliday[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export const CreateCampaignSchema = z
   .object({
     name: z.string().min(1, 'Informe o nome da campanha'),
@@ -429,6 +484,7 @@ export const CreateCampaignSchema = z
     listVersionId: z.string().uuid().nullable().optional(),
     journeyVersionId: z.string().uuid(),
     strategyVersionId: z.string().uuid(),
+    calendarId: z.string().uuid().nullable().optional(),
     purposeCode: z.enum(OPERATION_PURPOSES).optional(),
     audienceSegment: z.enum(AUDIENCE_SEGMENTS).optional(),
     startMode: z.enum(['NOW', 'SCHEDULE', 'READY']),
@@ -449,6 +505,7 @@ export const CampaignTemplateCreateSchema = z.object({
   journeyId: z.string().optional().nullable(),
   strategyVersionId: z.string().optional().nullable(),
   strategyId: z.string().optional().nullable(),
+  calendarId: z.string().optional().nullable(),
   purposeCode: z.enum(OPERATION_PURPOSES).optional().nullable(),
   startMode: z.enum(['NOW', 'SCHEDULE', 'READY']).optional().nullable(),
   sourceCampaignId: z.string().optional().nullable(),
@@ -467,6 +524,8 @@ export interface CampaignTemplate {
   strategyName: string;
   strategyVersionId?: string;
   strategyVersion?: number;
+  calendarId?: string | null;
+  calendarName?: string | null;
   startMode?: 'NOW' | 'SCHEDULE' | 'READY';
   sourceCampaignId?: string | null;
   sourceCampaignName?: string | null;

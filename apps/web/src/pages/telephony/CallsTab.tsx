@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
+  ArrowDown,
+  Clock,
   Download,
   FileText,
   Hash,
@@ -22,7 +24,7 @@ import { isSuperAdminRole } from '@voll/shared';
 import { API_BASE, errorMessage, get, post } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useExperienceMode } from '../../lib/experience-mode';
-import { fmtDateTime } from '../../lib/format';
+import { fmtDateTime, fmtFullDateTimeSec } from '../../lib/format';
 import {
   Badge,
   Button,
@@ -98,6 +100,10 @@ export function CallsTab({
   const [xferMode, setXferMode] = useState<'blind' | 'refer'>('blind');
 
   const [transcriptCallId, setTranscriptCallId] = useState<string | null>(null);
+  const [autoScrollPaused, setAutoScrollPaused] = useState(false);
+  const transcriptScrollRef = useRef<HTMLDivElement | null>(null);
+  const transcriptPreRef = useRef<HTMLPreElement | null>(null);
+  const shouldAutoScrollRef = useRef(true);
   const [historyPlayRec, setHistoryPlayRec] = useState<string | null>(null);
 
   const [originateOpen, setOriginateOpen] = useState(false);
@@ -127,10 +133,10 @@ export function CallsTab({
 
   useEffect(() => {
     const activeCount = liveQ.data?.calls?.length ?? 0;
-    if (!activeCount) return;
+    if (!activeCount && !transcriptCallId) return;
     const t = setInterval(() => setClockTick((n) => (n + 1) % 10000), 1000);
     return () => clearInterval(t);
-  }, [liveQ.data?.calls?.length]);
+  }, [liveQ.data?.calls?.length, transcriptCallId]);
 
   const tenantsQ = useQuery({
     queryKey: ['telephony', 'tenants'],
@@ -172,6 +178,32 @@ export function CallsTab({
     refetchInterval: 2000,
     retry: false,
   });
+
+  const scrollTranscriptToBottom = () => {
+    const el = transcriptScrollRef.current ?? transcriptPreRef.current;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+    }
+  };
+
+  const handleTranscriptScroll = (el: HTMLElement | null) => {
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const nearBottom = distanceFromBottom < 64;
+    shouldAutoScrollRef.current = nearBottom;
+    setAutoScrollPaused(!nearBottom);
+  };
+
+  useEffect(() => {
+    shouldAutoScrollRef.current = true;
+    setAutoScrollPaused(false);
+  }, [transcriptCallId]);
+
+  useEffect(() => {
+    if (!transcriptCallId || !shouldAutoScrollRef.current) return;
+    const raf = requestAnimationFrame(scrollTranscriptToBottom);
+    return () => cancelAnimationFrame(raf);
+  }, [transcriptCallId, liveTranscriptQ.data, liveTranscriptQ.dataUpdatedAt]);
 
   const historyTranscriptQ = useQuery({
     queryKey: ['telephony', 'recording-transcript', historyPlayRec],
@@ -1045,7 +1077,28 @@ export function CallsTab({
         description={isAtLeast('advanced') ? (transcriptCallId ?? undefined) : undefined}
         wide
       >
-        <div className="space-y-4">
+        <div className="space-y-3">
+          {/* Barra de data/hora/minuto/segundo ao vivo */}
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+            <div className="flex items-center gap-2 font-medium text-slate-800">
+              <span className="inline-block size-2 rounded-full bg-emerald-500 animate-pulse" aria-hidden />
+              <span>Ao vivo</span>
+              <span className="text-slate-300">·</span>
+              <span className="inline-flex items-center gap-1 font-mono tabular-nums text-slate-700">
+                <Clock className="size-3.5 text-slate-400" aria-hidden />
+                {fmtFullDateTimeSec(Date.now())}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-500 tabular-nums">
+              {activeCockpitCall?.startedAt && (
+                <span>Início: <strong className="font-mono text-slate-700">{fmtFullDateTimeSec(activeCockpitCall.startedAt)}</strong></span>
+              )}
+              {liveTranscriptQ.dataUpdatedAt > 0 && (
+                <span>Atualizado: <strong className="font-mono text-slate-700">{fmtFullDateTimeSec(liveTranscriptQ.dataUpdatedAt)}</strong></span>
+              )}
+            </div>
+          </div>
+
           {activeCockpitCall && (
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
               <div className="flex flex-wrap items-center gap-1.5 text-xs">
@@ -1148,40 +1201,100 @@ export function CallsTab({
             <Loading rows={3} />
           ) : (() => {
               const data = liveTranscriptQ.data;
-              const turns: { role?: string; speaker?: string; text?: string; at?: string }[] = Array.isArray(data?.transcript)
+              const turns: {
+                role?: string;
+                speaker?: string;
+                text?: string;
+                content?: string;
+                at?: string | number;
+                timestamp?: string | number;
+                ts?: string | number;
+                createdAt?: string | number;
+                time?: string | number;
+              }[] = Array.isArray(data?.transcript)
                 ? data.transcript
                 : Array.isArray(data?.turns)
                   ? data.turns
                   : [];
               if (turns.length > 0 && typeof turns[0] === 'object') {
                 return (
-                  <div className="max-h-96 space-y-2.5 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-                    {turns.map((t, i) => {
-                      const isAgent = /^(agent|assistant|ai|ia|atendente)/i.test(t.role || t.speaker || '');
-                      return (
-                        <div key={i} className={`flex flex-col ${isAgent ? 'items-end' : 'items-start'}`}>
-                          <span className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                            {isAgent ? 'Agente IA' : 'Cliente'}
-                          </span>
-                          <div
-                            className={`max-w-[82%] rounded-2xl px-3.5 py-2 text-xs shadow-2xs ${
-                              isAgent
-                                ? 'rounded-tr-xs bg-brand-700 text-white'
-                                : 'rounded-tl-xs border border-slate-200 bg-white text-slate-800'
-                            }`}
-                          >
-                            {t.text || String(t)}
+                  <div className="relative">
+                    <div
+                      ref={transcriptScrollRef}
+                      onScroll={(e) => handleTranscriptScroll(e.currentTarget)}
+                      className="max-h-96 space-y-2.5 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50/70 p-4"
+                    >
+                      {turns.map((t, i) => {
+                        const isAgent = /^(agent|assistant|ai|ia|atendente)/i.test(t.role || t.speaker || '');
+                        const turnAt = t.at ?? t.timestamp ?? t.ts ?? t.createdAt ?? t.time;
+                        return (
+                          <div key={i} className={`flex flex-col ${isAgent ? 'items-end' : 'items-start'}`}>
+                            <span className="mb-0.5 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                              <span>{isAgent ? 'Agente IA' : 'Cliente'}</span>
+                              {turnAt !== undefined && turnAt !== null && turnAt !== '' && (
+                                <span className="font-mono font-normal normal-case tabular-nums text-slate-400">
+                                  · {fmtFullDateTimeSec(turnAt)}
+                                </span>
+                              )}
+                            </span>
+                            <div
+                              className={`max-w-[82%] rounded-2xl px-3.5 py-2 text-xs shadow-2xs ${
+                                isAgent
+                                  ? 'rounded-tr-xs bg-brand-700 text-white'
+                                  : 'rounded-tl-xs border border-slate-200 bg-white text-slate-800'
+                              }`}
+                            >
+                              {t.text || t.content || String(t)}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
+                    {autoScrollPaused && (
+                      <div className="mt-2 flex justify-center">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          icon={<ArrowDown className="size-3.5" />}
+                          onClick={() => {
+                            shouldAutoScrollRef.current = true;
+                            setAutoScrollPaused(false);
+                            scrollTranscriptToBottom();
+                          }}
+                        >
+                          Acompanhar novas falas
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 );
               }
               return (
-                <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-900 p-4 font-mono text-xs text-slate-100">
-                  {renderTranscriptBody(data)}
-                </pre>
+                <div className="relative">
+                  <pre
+                    ref={transcriptPreRef}
+                    onScroll={(e) => handleTranscriptScroll(e.currentTarget)}
+                    className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-900 p-4 font-mono text-xs text-slate-100"
+                  >
+                    {renderTranscriptBody(data)}
+                  </pre>
+                  {autoScrollPaused && (
+                    <div className="mt-2 flex justify-center">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        icon={<ArrowDown className="size-3.5" />}
+                        onClick={() => {
+                          shouldAutoScrollRef.current = true;
+                          setAutoScrollPaused(false);
+                          scrollTranscriptToBottom();
+                        }}
+                      >
+                        Acompanhar novas falas
+                      </Button>
+                    </div>
+                  )}
+                </div>
               );
             })()}
         </div>

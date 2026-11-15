@@ -4367,21 +4367,101 @@
       }, 3500);
     }
 
-    // Helper centralizado com anti-cache e timestamp para garantir dados 100% em tempo real
+    function getSavedApiToken() {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const urlToken = params.get('token');
+        if (urlToken) {
+          localStorage.setItem('VOLL_API_TOKEN', urlToken.trim());
+          params.delete('token');
+          const nextQs = params.toString();
+          const nextUrl = window.location.pathname + (nextQs ? `?${nextQs}` : '') + window.location.hash;
+          window.history.replaceState({}, '', nextUrl);
+        }
+        return localStorage.getItem('VOLL_API_TOKEN') || '';
+      } catch (e) {
+        return '';
+      }
+    }
+
+    function setSavedApiToken(token) {
+      try {
+        if (token && token.trim()) {
+          localStorage.setItem('VOLL_API_TOKEN', token.trim());
+        } else {
+          localStorage.removeItem('VOLL_API_TOKEN');
+        }
+      } catch (e) {}
+    }
+
+    let _authModalOpen = false;
+    function promptApiTokenAuth() {
+      if (_authModalOpen) return;
+      _authModalOpen = true;
+      let modal = document.getElementById('voll-auth-modal');
+      if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'voll-auth-modal';
+        modal.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,0.72);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:16px;';
+        modal.innerHTML = `
+          <div style="background:var(--bg-card,#1e293b);color:var(--text-primary,#f8fafc);border:1px solid var(--border-color,#334155);border-radius:14px;max-width:420px;width:100%;padding:24px;box-shadow:0 20px 40px rgba(0,0,0,0.4);">
+            <h3 style="margin:0 0 8px;font-size:17px;font-weight:600;">Autenticação do Painel</h3>
+            <p style="margin:0 0 16px;font-size:13px;color:var(--text-secondary,#94a3b8);line-height:1.45;">
+              Este servidor exige <code>API_AUTH_TOKEN</code> para acompanhar chamadas e métricas em tempo real.
+            </p>
+            <input id="voll-auth-token-input" type="password" placeholder="Cole o API_AUTH_TOKEN aqui" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:8px;border:1px solid var(--border-color,#475569);background:var(--bg-main,#0f172a);color:var(--text-primary,#f8fafc);font-size:13px;margin-bottom:14px;" />
+            <div style="display:flex;justify-content:flex-end;gap:8px;">
+              <button id="voll-auth-save-btn" type="button" style="background:#6366f1;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;">Conectar</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(modal);
+        const input = modal.querySelector('#voll-auth-token-input');
+        const saveBtn = modal.querySelector('#voll-auth-save-btn');
+        const submit = () => {
+          const val = (input.value || '').trim();
+          if (!val) return;
+          setSavedApiToken(val);
+          modal.style.display = 'none';
+          _authModalOpen = false;
+          if (typeof fetchCallsData === 'function') fetchCallsData();
+          if (typeof fetchHistoryData === 'function') fetchHistoryData();
+          if (typeof fetchClusterStatus === 'function') fetchClusterStatus();
+          if (typeof fetchVoiceFeatures === 'function') fetchVoiceFeatures();
+          if (typeof initHistorySSE === 'function') initHistorySSE(true);
+        };
+        saveBtn.addEventListener('click', submit);
+        input.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Enter') submit();
+        });
+      } else {
+        modal.style.display = 'flex';
+      }
+      const inp = modal.querySelector('#voll-auth-token-input');
+      if (inp) setTimeout(() => inp.focus(), 50);
+    }
+
+    // Helper centralizado com anti-cache, auth token e timestamp para garantir dados 100% em tempo real
     async function apiFetch(url, options = {}) {
       const opts = { ...options };
       opts.cache = 'no-store';
+      const token = getSavedApiToken();
       opts.headers = {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
         'Expires': '0',
+        ...(token ? { Authorization: `Bearer ${token}`, 'X-API-Key': token } : {}),
         ...(opts.headers || {})
       };
       const separator = url.includes('?') ? '&' : '?';
       const cleanUrl = (!opts.method || opts.method.toUpperCase() === 'GET')
         ? `${url}${separator}_t=${Date.now()}`
         : url;
-      return fetch(cleanUrl, opts);
+      const res = await fetch(cleanUrl, opts);
+      if (res.status === 401) {
+        promptApiTokenAuth();
+      }
+      return res;
     }
 
     function updateGatewayStatus(isOnline) {
@@ -5787,7 +5867,11 @@
     let historyEventSource = null;
     let liveDurationsTimer = null;
 
-    function initHistorySSE() {
+    function initHistorySSE(forceReconnect = false) {
+      if (forceReconnect && historyEventSource) {
+        try { historyEventSource.close(); } catch {}
+        historyEventSource = null;
+      }
       if (historyEventSource) return;
 
       const updateSseBadge = (status) => {
@@ -5807,7 +5891,11 @@
       };
 
       try {
-        historyEventSource = new EventSource('/v1/calls/events');
+        const token = getSavedApiToken();
+        const sseUrl = token
+          ? `/v1/calls/events?token=${encodeURIComponent(token)}`
+          : '/v1/calls/events';
+        historyEventSource = new EventSource(sseUrl);
 
         historyEventSource.onopen = () => {
           updateSseBadge('connected');

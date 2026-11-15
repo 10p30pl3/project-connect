@@ -254,8 +254,8 @@ class OpenAIS2SBridge {
 
     // VAD de energia por frame: detector de "fala ativa" quando o gate DSP não está em uso
     // (modos 'wespeaker', 'ecapa' e 'none'), evitando barge-in por frames de silêncio ou ruídos de fundo.
-    const frameVadMinRms = Number(this.tenant?.bargeinMinRms || process.env.BARGEIN_MIN_RMS || 800);
-    const frameVadAttack = Number(this.tenant?.bargeinAttackFrames || process.env.BARGEIN_ATTACK_FRAMES || 8);
+    const frameVadMinRms = Number(this.tenant?.bargeinMinRms || process.env.BARGEIN_MIN_RMS || 550);
+    const frameVadAttack = Number(this.tenant?.bargeinAttackFrames || process.env.BARGEIN_ATTACK_FRAMES || 3);
     this.frameVad = this.crosstalkFilter
       ? null
       : new FrameVad({ minRms: frameVadMinRms, attackFrames: frameVadAttack, noiseRatio: 2.8 });
@@ -300,8 +300,8 @@ class OpenAIS2SBridge {
     if (this.isSafetyExpiring) return false;
     if (this.isGreetingInProgress || this.isMicMutedByGrace) return false;
     if (this.isBargeinGraceActive()) return false;
-    // Carência mínima de 700ms após o início do áudio do agente para evitar falso corte pelo eco transatlântico
-    if (this.agentPlaybackStartTime && Date.now() - this.agentPlaybackStartTime < 700) {
+    // Carência mínima de 450ms após o início do áudio do agente para evitar falso corte pelo eco inicial
+    if (this.agentPlaybackStartTime && Date.now() - this.agentPlaybackStartTime < 450) {
       return false;
     }
     return true;
@@ -525,15 +525,15 @@ class OpenAIS2SBridge {
         }
       }
 
-      if (body.type === 'response.created' || body.type === 'response.output_item.added') {
+      if (body.type === 'response.created') {
         this.isResponseCancelled = false;
-        if (this.greetingResponsePending && body.type === 'response.created') {
+        if (this.greetingResponsePending) {
           this.greetingResponsePending = false;
           this.greetingResponseId = body.response?.id;
           console.log(
             `[${this.callId}] ⏳ [BARGE-IN DINÂMICO] IA gerando saudação inicial (Response ID: ${this.greetingResponseId || 'n/a'}). Canal do cliente permanece fechado.`
           );
-        } else if (this.isBargeinGraceActive() && body.type === 'response.created') {
+        } else if (this.isBargeinGraceActive()) {
           console.log(
             `[${this.callId}] 🛡️ [BARGE-IN DINÂMICO] Resposta da IA cancelada: pedido do cliente ignorado durante a saudação do agente.`
           );
@@ -677,7 +677,7 @@ class OpenAIS2SBridge {
       if (body.type === 'input_audio_buffer.speech_started') {
         const isAgentReallyPlaying = Boolean(this.isAgentTalking || (this.mediaBridge && this.mediaBridge.isPlaying));
         const isLegitSpeaker = !this.isSecondaryVoiceBlocked &&
-          (!this.crosstalkFilter || this.crosstalkFilter.isActivelySpeaking(isAgentReallyPlaying));
+          (!this.crosstalkFilter || this.crosstalkFilter.isActivelySpeaking(isAgentReallyPlaying) || this.crosstalkFilter.wasRecentlySpeaking(800));
         if (isLegitSpeaker) {
           this.triggerBargeIn('speech_started');
         } else {
@@ -1098,10 +1098,10 @@ class OpenAIS2SBridge {
           effectiveBuffer = Buffer.alloc(buffer.length);
         }
 
-        // Barge-in Instantâneo (<20ms): só interrompe se for fala ativa legítima (não cauda/hangover silencioso)
-        const isActivelySpeaking = this.crosstalkFilter
+        // Barge-in Instantâneo (<40ms): só interrompe se for fala ativa legítima (não cauda/hangover silencioso)
+        const isActivelySpeaking = (this.isDspFilterActive && this.crosstalkFilter)
           ? this.crosstalkFilter.isActivelySpeaking(isAgentReallyPlaying)
-          : this.frameVad.process(buffer);
+          : (this.frameVad ? this.frameVad.process(buffer) : true);
         if (isPrimaryVoice && isActivelySpeaking && isAgentReallyPlaying && this.canTriggerBargeIn()) {
           this.triggerBargeIn(this.isNeuralFilterActive ? `biometric_${this.crosstalkMode}` : 'local_biometric_vad');
         }
@@ -1486,8 +1486,9 @@ class OpenAIS2SBridge {
       }
       this.frameVad = null;
     } else {
-      const frameVadMinRms = Number(this.tenant?.bargeinMinRms || process.env.BARGEIN_MIN_RMS || 800);
-      const frameVadAttack = Number(this.tenant?.bargeinAttackFrames || process.env.BARGEIN_ATTACK_FRAMES || 8);
+      this.crosstalkFilter = null;
+      const frameVadMinRms = Number(this.tenant?.bargeinMinRms || process.env.BARGEIN_MIN_RMS || 550);
+      const frameVadAttack = Number(this.tenant?.bargeinAttackFrames || process.env.BARGEIN_ATTACK_FRAMES || 3);
       this.frameVad = new FrameVad({ minRms: frameVadMinRms, attackFrames: frameVadAttack, noiseRatio: 2.8 });
     }
 
@@ -1505,6 +1506,7 @@ class OpenAIS2SBridge {
   }
 
   interruptAgent() {
+    this.isResponseCancelled = true;
     this.isAgentTalking = false;
     this.agentPlaybackStartTime = null;
     this.resampler24to8.reset();

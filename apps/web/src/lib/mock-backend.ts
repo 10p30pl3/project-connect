@@ -56,6 +56,7 @@ import type {
   MailingRecord,
   MailingSummary,
   Me,
+  OperationCalendar,
   Overview,
   Preflight,
   Strategy,
@@ -482,6 +483,7 @@ let MAILINGS: { detail: MailingDetail; records: MailingRecord[] }[] = [];
 let LISTS: ListDetail[] = [];
 let CAMPAIGNS: CampaignDetail[] = [];
 let CAMPAIGN_TEMPLATES: CampaignTemplate[] = [];
+let CALENDARS: OperationCalendar[] = [];
 const ATTEMPTS: Map<string, AttemptDetail> = new Map();
 let CONTROL: Control = { dailyLimit: null, totalLimit: null, globalSuspension: false };
 let AUDITS: AuditRow[] = [];
@@ -678,6 +680,65 @@ export function seedSampleDemoData() {
     },
   ];
 
+  CALENDARS = [
+    {
+      id: uuid(601),
+      name: 'Comercial Brasil',
+      description: 'Segunda a sexta em horário comercial padrão (08h às 18h).',
+      timezone: 'America/Sao_Paulo',
+      windows: [{ days: [1, 2, 3, 4, 5], start: '08:00', end: '18:00' }],
+      holidayPolicy: 'BLOCK',
+      active: true,
+      archivedAt: null,
+      holidays: [
+        { id: uuid(611), date: '2026-11-15', name: 'Proclamação da República', action: 'BLOCK' },
+        { id: uuid(612), date: '2026-11-20', name: 'Dia da Consciência Negra', action: 'BLOCK' },
+        { id: uuid(613), date: '2026-12-25', name: 'Natal', action: 'BLOCK' },
+      ],
+    },
+    {
+      id: uuid(602),
+      name: 'Horário Estendido (Cobrança)',
+      description: 'Segunda a sexta (08h–20h) e sábado (08h–14h) dentro da janela legal de cobrança.',
+      timezone: 'America/Sao_Paulo',
+      windows: [
+        { days: [1, 2, 3, 4, 5], start: '08:00', end: '20:00' },
+        { days: [6], start: '08:00', end: '14:00' },
+      ],
+      holidayPolicy: 'BLOCK',
+      active: true,
+      archivedAt: null,
+      holidays: [
+        { id: uuid(614), date: '2026-12-25', name: 'Natal', action: 'BLOCK' },
+      ],
+    },
+    {
+      id: uuid(603),
+      name: 'Cobrança Conservadora',
+      description: 'Janela reduzida para operações sensíveis (09h às 17h, seg a sex).',
+      timezone: 'America/Sao_Paulo',
+      windows: [{ days: [1, 2, 3, 4, 5], start: '09:00', end: '17:00' }],
+      holidayPolicy: 'BLOCK',
+      active: true,
+      archivedAt: null,
+      holidays: [],
+    },
+    {
+      id: uuid(604),
+      name: 'Atendimento 24x7',
+      description: 'Operação contínua todos os dias da semana, incluindo feriados.',
+      timezone: 'America/Sao_Paulo',
+      windows: [{ days: [0, 1, 2, 3, 4, 5, 6], start: '00:00', end: '23:59' }],
+      holidayPolicy: 'ALLOW',
+      active: true,
+      archivedAt: null,
+      holidays: [],
+    },
+  ];
+
+  const calEstendido = CALENDARS[1];
+  const calComercial = CALENDARS[0];
+
   const seededJourney = JOURNEYS.find((j) => j.name === 'WhatsApp → Voz') ?? JOURNEYS[0];
   const seededStrategy = STRATEGIES.find((s) => s.name === 'Simples · 24x7 (Disparo Imediato)') ?? STRATEGIES[0];
 
@@ -695,6 +756,9 @@ export function seedSampleDemoData() {
       journeyName: seededJourney.name,
       strategyName: seededStrategy.name,
       strategyVersion: 1,
+      calendarId: calEstendido.id,
+      calendarName: calEstendido.name,
+      calendar: calEstendido,
       createdAt: '2026-10-20T10:00:00Z',
       startedAt: '2026-10-20T10:05:00Z',
       scheduledAt: null,
@@ -2642,6 +2706,7 @@ export async function handleMockApi<T = unknown>(
     const j = JOURNEYS.find((x) => x.latestVersion?.id === body.journeyVersionId) ?? JOURNEYS[0];
     const s = STRATEGIES.find((x) => x.versions.some((v) => v.id === body.strategyVersionId)) ?? STRATEGIES[0];
     const sv = s?.versions.find((v) => v.id === body.strategyVersionId) ?? s?.latestVersion!;
+    const cal = body.calendarId ? CALENDARS.find((x) => x.id === body.calendarId) ?? null : null;
     const status: CampaignStatus = body.startMode === 'NOW' ? 'RUNNING' : body.startMode === 'SCHEDULE' ? 'SCHEDULED' : 'READY';
     const members = l ? (l.latestVersion?.memberCount ?? 16) : m.detail.recordCount;
     const now = new Date().toISOString();
@@ -2663,6 +2728,9 @@ export async function handleMockApi<T = unknown>(
       journeyName: j?.name ?? 'Jornada',
       strategyName: s?.name ?? 'Estratégia',
       strategyVersion: sv?.version ?? 1,
+      calendarId: cal?.id ?? null,
+      calendarName: cal?.name ?? null,
+      calendar: cal,
       createdAt: now,
       startedAt: status === 'RUNNING' ? now : null,
       scheduledAt: body.scheduledAt ?? null,
@@ -2741,6 +2809,98 @@ export async function handleMockApi<T = unknown>(
     const c = CAMPAIGNS.find((c) => c.id === campMatch[1]);
     if (!c) throw new ApiError({ type: 'not_found', title: 'Campanha não encontrada', status: 404 });
     return c as T;
+  }
+
+  // Calendários de funcionamento de campanhas
+  if (pathname === '/calendars' && method === 'GET') {
+    const includeArchived = searchParams.get('includeArchived') === 'true';
+    const items = CALENDARS.filter((c) => includeArchived || !c.archivedAt);
+    return { items } as T;
+  }
+
+  if (pathname === '/calendars' && method === 'POST') {
+    if (!body?.name?.trim()) {
+      throw new ApiError({ type: 'validation', title: 'Verifique os campos', status: 422, fieldErrors: { name: 'Informe o nome do calendário' } });
+    }
+    const now = new Date().toISOString();
+    const cal: OperationCalendar = {
+      id: nextUuid(),
+      name: body.name.trim(),
+      description: body.description?.trim() || null,
+      timezone: body.timezone || 'America/Sao_Paulo',
+      windows: Array.isArray(body.windows) && body.windows.length > 0 ? body.windows : [{ days: [1, 2, 3, 4, 5], start: '08:00', end: '18:00' }],
+      holidayPolicy: body.holidayPolicy || 'BLOCK',
+      active: body.active ?? true,
+      archivedAt: null,
+      holidays: [],
+      createdAt: now,
+      updatedAt: now,
+    };
+    CALENDARS.unshift(cal);
+    return cal as T;
+  }
+
+  const calHolidayDelMatch = pathname.match(/^\/calendars\/([^/]+)\/holidays\/([^/]+)$/);
+  if (calHolidayDelMatch && method === 'DELETE') {
+    const cal = CALENDARS.find((c) => c.id === calHolidayDelMatch[1]);
+    if (!cal) throw new ApiError({ type: 'not_found', title: 'Calendário não encontrado', status: 404 });
+    cal.holidays = cal.holidays.filter((h) => h.id !== calHolidayDelMatch[2]);
+    return undefined as T;
+  }
+
+  const calHolidayPostMatch = pathname.match(/^\/calendars\/([^/]+)\/holidays$/);
+  if (calHolidayPostMatch && method === 'POST') {
+    const cal = CALENDARS.find((c) => c.id === calHolidayPostMatch[1]);
+    if (!cal) throw new ApiError({ type: 'not_found', title: 'Calendário não encontrado', status: 404 });
+    if (!body?.date || !body?.name?.trim()) {
+      throw new ApiError({ type: 'validation', title: 'Verifique os campos', status: 422 });
+    }
+    const existingIdx = cal.holidays.findIndex((h) => h.date === body.date && h.name === body.name.trim());
+    const hol = {
+      id: existingIdx >= 0 ? cal.holidays[existingIdx].id : nextUuid(),
+      date: body.date,
+      name: body.name.trim(),
+      action: body.action || 'BLOCK',
+      startTime: body.startTime ?? null,
+      endTime: body.endTime ?? null,
+    };
+    if (existingIdx >= 0) cal.holidays[existingIdx] = hol;
+    else cal.holidays.push(hol);
+    return hol as T;
+  }
+
+  const calActionMatch = pathname.match(/^\/calendars\/([^/]+)\/(archive|restore)$/);
+  if (calActionMatch && method === 'POST') {
+    const cal = CALENDARS.find((c) => c.id === calActionMatch[1]);
+    if (!cal) throw new ApiError({ type: 'not_found', title: 'Calendário não encontrado', status: 404 });
+    if (calActionMatch[2] === 'archive') {
+      cal.archivedAt = new Date().toISOString();
+      cal.active = false;
+    } else {
+      cal.archivedAt = null;
+      cal.active = true;
+    }
+    return cal as T;
+  }
+
+  const calMatch = pathname.match(/^\/calendars\/([^/]+)$/);
+  if (calMatch && (method === 'PATCH' || method === 'PUT')) {
+    const cal = CALENDARS.find((c) => c.id === calMatch[1]);
+    if (!cal) throw new ApiError({ type: 'not_found', title: 'Calendário não encontrado', status: 404 });
+    if (body.name !== undefined) cal.name = body.name.trim();
+    if (body.description !== undefined) cal.description = body.description?.trim() || null;
+    if (body.timezone !== undefined) cal.timezone = body.timezone;
+    if (body.windows !== undefined) cal.windows = body.windows;
+    if (body.holidayPolicy !== undefined) cal.holidayPolicy = body.holidayPolicy;
+    if (body.active !== undefined) cal.active = body.active;
+    cal.updatedAt = new Date().toISOString();
+    return cal as T;
+  }
+  if (calMatch && method === 'DELETE') {
+    const idx = CALENDARS.findIndex((c) => c.id === calMatch[1]);
+    if (idx < 0) throw new ApiError({ type: 'not_found', title: 'Calendário não encontrado', status: 404 });
+    CALENDARS.splice(idx, 1);
+    return undefined as T;
   }
 
   // Salvar campanha como modelo: POST /campaigns/:id/save-as-template

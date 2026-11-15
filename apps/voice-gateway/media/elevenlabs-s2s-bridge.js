@@ -172,8 +172,8 @@ class ElevenLabsS2SBridge extends EventEmitter {
     this.dynamicEcapaSwitched = false;
     this.crosstalkRatio = crosstalkRatio;
 
-    const frameVadMinRms = Number(this.tenant?.bargeinMinRms || process.env.BARGEIN_MIN_RMS || 800);
-    const frameVadAttack = Number(this.tenant?.bargeinAttackFrames || process.env.BARGEIN_ATTACK_FRAMES || 8);
+    const frameVadMinRms = Number(this.tenant?.bargeinMinRms || process.env.BARGEIN_MIN_RMS || 550);
+    const frameVadAttack = Number(this.tenant?.bargeinAttackFrames || process.env.BARGEIN_ATTACK_FRAMES || 3);
     this.frameVad = this.crosstalkFilter
       ? null
       : new FrameVad({ minRms: frameVadMinRms, attackFrames: frameVadAttack, noiseRatio: 2.8 });
@@ -439,7 +439,10 @@ class ElevenLabsS2SBridge extends EventEmitter {
       // 1. Áudio do Agente da ElevenLabs para tocar no FreeSWITCH via WsMediaBridge
       if (msg.audio_event && msg.audio_event.audio_base_64) {
         if (this.isResponseCancelled) {
-          return;
+          if (this.responseCancelledAt && Date.now() - this.responseCancelledAt < 1200) {
+            return;
+          }
+          this.isResponseCancelled = false;
         }
         if (!this.isAgentTalking) {
           this.isAgentTalking = true;
@@ -528,6 +531,7 @@ class ElevenLabsS2SBridge extends EventEmitter {
 
       // 2. Transcrição da fala do Cliente recebida da ElevenLabs
       if (msg.user_transcription_event && msg.user_transcription_event.user_transcript) {
+        this.isResponseCancelled = false;
         const text = msg.user_transcription_event.user_transcript.trim();
         if (text) {
           if (this.isBargeinGraceActive()) {
@@ -560,7 +564,7 @@ class ElevenLabsS2SBridge extends EventEmitter {
         }
         const isAgentReallyPlaying = Boolean(this.isAgentTalking || (this.mediaBridge && this.mediaBridge.isPlaying));
         const isLegitSpeaker = !this.isSecondaryVoiceBlocked &&
-          (!this.crosstalkFilter || this.crosstalkFilter.isActivelySpeaking(isAgentReallyPlaying));
+          (!this.crosstalkFilter || this.crosstalkFilter.isActivelySpeaking(isAgentReallyPlaying) || this.crosstalkFilter.wasRecentlySpeaking(800));
         if (!isLegitSpeaker) {
           console.log(`[${this.callId}] 🛡️ [BIOMETRIA] interruption_event ignorado (voz secundária/fundo bloqueada ou energia insuficiente).`);
           return;
@@ -615,6 +619,7 @@ class ElevenLabsS2SBridge extends EventEmitter {
 
     console.log(`[${this.callId}] 🎤 BARGE-IN: Interrompendo agente ElevenLabs imediatamente (${reason})...`);
     this.isResponseCancelled = true;
+    this.responseCancelledAt = Date.now();
     this.interruptAgent();
     return true;
   }
@@ -1081,10 +1086,10 @@ class ElevenLabsS2SBridge extends EventEmitter {
           effectiveBuffer = Buffer.alloc(buffer.length);
         }
 
-        // Barge-in Instantâneo (<20ms): só interrompe se for fala ativa legítima e fora da carência
-        const isActivelySpeaking = this.crosstalkFilter
+        // Barge-in Instantâneo (<40ms): só interrompe se for fala ativa legítima e fora da carência
+        const isActivelySpeaking = (this.isDspFilterActive && this.crosstalkFilter)
           ? this.crosstalkFilter.isActivelySpeaking(isAgentReallyPlaying)
-          : this.frameVad.process(buffer);
+          : (this.frameVad ? this.frameVad.process(buffer) : true);
         if (isPrimaryVoice && isActivelySpeaking && isAgentReallyPlaying && this.canTriggerBargeIn()) {
           this.triggerBargeIn(this.isNeuralFilterActive ? `biometric_${this.crosstalkMode}` : 'local_biometric_vad');
         }
@@ -1250,8 +1255,9 @@ class ElevenLabsS2SBridge extends EventEmitter {
       }
       this.frameVad = null;
     } else {
-      const frameVadMinRms = Number(this.tenant?.bargeinMinRms || process.env.BARGEIN_MIN_RMS || 800);
-      const frameVadAttack = Number(this.tenant?.bargeinAttackFrames || process.env.BARGEIN_ATTACK_FRAMES || 8);
+      this.crosstalkFilter = null;
+      const frameVadMinRms = Number(this.tenant?.bargeinMinRms || process.env.BARGEIN_MIN_RMS || 550);
+      const frameVadAttack = Number(this.tenant?.bargeinAttackFrames || process.env.BARGEIN_ATTACK_FRAMES || 3);
       this.frameVad = new FrameVad({ minRms: frameVadMinRms, attackFrames: frameVadAttack, noiseRatio: 2.8 });
     }
 
