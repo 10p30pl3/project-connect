@@ -40,7 +40,7 @@ async function resolveEndpoint(db: Db | null, connectionConfig: any, workspaceId
     token,
     callerId,
     tenantId: String(cfg.tenantId || 'default'),
-    maxDurationSec: Number(cfg.maxDurationSec || 300),
+    maxDurationSec: Number(cfg.maxDurationSec || 180),
   };
 }
 
@@ -165,13 +165,20 @@ export const voiceAppAdapter: ConnectorAdapter = {
     try {
       const res = await fetch(`${ep.baseUrl}/v1/calls`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': attempt.id, ...authHeaders(ep.token) },
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': attempt.id,
+          'X-Correlation-Id': attempt.id,
+          ...authHeaders(ep.token),
+        },
         body: JSON.stringify(checked.data),
         signal: controller.signal,
       });
 
-      // 429: capacidade indisponível ANTES da aceitação; o worker reagenda sem consumir tentativa
-      if (res.status === 429) throw new TransientConnectorError('Gateway de voz sem capacidade (HTTP 429)');
+      // 429/503: capacidade indisponível ANTES da aceitação; o worker reagenda sem consumir tentativa
+      if (res.status === 429 || res.status === 503) {
+        throw new TransientConnectorError(`Gateway de voz sem capacidade (HTTP ${res.status})`);
+      }
 
       const body: any = await res.json().catch(() => ({}));
       if (res.status === 200 || res.status === 201 || res.status === 202) {

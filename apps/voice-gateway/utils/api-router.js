@@ -1085,10 +1085,25 @@ function createApiRouter({ activeBridges, tenantManager, fsPool, whisperPool, me
         }
       }
 
-      // Validação rápida de capacidade do cluster FreeSWITCH
+      // Validação rápida de capacidade do cluster FreeSWITCH e do Tenant
       if (fsPool && typeof fsPool.hasHealthyNode === 'function' && !fsPool.hasHealthyNode()) {
         sendJson(res, 429, { error: 'capacity_exceeded', message: 'Nenhum nó de telefonia saudável no cluster FreeSWITCH' });
         return true;
+      }
+
+      if (tenantManager && typeof tenantManager.getTenant === 'function') {
+        const targetTenantId = body.tenantId || 'default';
+        const tCfg = tenantManager.getTenant(targetTenantId);
+        const maxConcurrent = Number(tCfg?.maxConcurrentCalls || 200);
+        const activeCount = tenantManager.activeCallsByTenant?.get(targetTenantId) || 0;
+        if (activeCount >= maxConcurrent) {
+          sendJson(res, 429, {
+            error: 'tenant_capacity_exceeded',
+            retryAfterSec: 15,
+            message: `Limite simultâneo do tenant [${targetTenantId}] atingido (${activeCount}/${maxConcurrent})`
+          });
+          return true;
+        }
       }
 
       const attemptId = body.attemptId || req.headers['idempotency-key'] || null;

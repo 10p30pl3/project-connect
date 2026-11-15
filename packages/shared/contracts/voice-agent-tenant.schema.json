@@ -55,8 +55,23 @@
     },
     "maxDurationSec": {
       "type": "integer",
-      "minimum": 30,
-      "maximum": 900
+      "minimum": 15,
+      "maximum": 3600,
+      "default": 180
+    },
+    "maxConcurrentCalls": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "recording": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "additionalProperties": false
     },
     "amd": {
       "type": "object",
@@ -573,7 +588,6 @@
     "stsEngine",
     "instructions",
     "greetingInstructions",
-    "maxDurationSec",
     "amd",
     "stt",
     "bargeinLevel",

@@ -60,6 +60,8 @@ export type HistoryItem = {
   endedAt?: string;
   durationSec?: number;
   hangupReason?: string;
+  failureStage?: string;
+  correlationId?: string;
   tabulationCode?: string;
   costUsd?: number;
   recordingFile?: string | null;

@@ -15,6 +15,8 @@ async function sendVollPlanWebhook(callback, payload) {
   const rawBody = JSON.stringify(payload);
   const secret = callback.secret || '';
   const signature = 'sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const correlationId = String(payload.correlationId || payload.attemptId || payload.providerAttemptId || '');
 
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
@@ -23,6 +25,9 @@ async function sendVollPlanWebhook(callback, payload) {
         headers: {
           'Content-Type': 'application/json',
           'x-voll-signature': signature,
+          'X-Webhook-Signature': signature,
+          'X-Webhook-Timestamp': timestamp,
+          ...(correlationId ? { 'X-Correlation-Id': correlationId } : {}),
         },
         body: rawBody,
         signal: AbortSignal.timeout(5000),

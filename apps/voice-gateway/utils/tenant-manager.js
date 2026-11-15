@@ -192,6 +192,9 @@ class TenantManager {
       stt: {
         enabled: process.env.STT_DEFAULT_ENABLED === 'true'
       },
+      recording: {
+        enabled: process.env.RECORDING_DEFAULT_ENABLED !== 'false'
+      },
       dtmf: {
         enabled: process.env.DTMF_DEFAULT_ENABLED !== 'false',
         debounceMs: parseInt(process.env.DTMF_DEBOUNCE_MS || '1200', 10)

@@ -768,7 +768,17 @@ export function CallsTab({
                         </td>
                       )}
                       {isAtLeast('advanced') && (
-                        <td className="text-xs text-slate-600">{h.hangupReason ?? '—'}</td>
+                        <td className="text-xs text-slate-600">
+                          <div>{h.hangupReason ?? '—'}</div>
+                          {(h.failureStage && h.failureStage !== 'none') || h.correlationId ? (
+                            <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[10px] text-slate-400 font-mono">
+                              {h.failureStage && h.failureStage !== 'none' && (
+                                <Badge tone="amber">{h.failureStage}</Badge>
+                              )}
+                              {h.correlationId && <span title="Correlation ID">{h.correlationId}</span>}
+                            </div>
+                          ) : null}
+                        </td>
                       )}
                       {canSeeCosts && isAtLeast('advanced') && (
                         <td className="text-right tabular-nums text-xs">

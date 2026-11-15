@@ -209,6 +209,8 @@ class OpenAIS2SBridge {
     this.isSafetyExpiring = false;
     this.maxDurationSec = 180;
     this.isTerminated = false;
+    this.failureStage = 'none';
+    this.correlationId = null;
 
     const sipBargeinGrace = this.sipHeaders['x-bargein-grace-sec'] || this.sipHeaders['X-Bargein-Grace-Sec'];
     this.bargeinGraceSec = Number(
@@ -455,12 +457,18 @@ class OpenAIS2SBridge {
       this.openaiConnected = false;
       this.openaiReady = false;
       if (!this.isTerminated) {
+        if (this.failureStage === 'none') {
+          this.failureStage = 'ai_provider';
+        }
         this.terminateCall('openai_disconnected');
       }
     });
 
     this.openaiSocket.on('error', (err) => {
       console.error(`[${this.callId}] 🔴 Erro no WebSocket OpenAI:`, err.message);
+      if (this.failureStage === 'none') {
+        this.failureStage = 'ai_provider';
+      }
       if (!this.openaiConnected && this.openaiReadyResolve) {
         this.openaiReadyResolve();
       }
@@ -664,6 +672,9 @@ class OpenAIS2SBridge {
             `[${this.callId}] ⏱️ Aviso de limite de segurança reproduzido pela IA. Encerrando chamada com tolerância de 1.5s.`
           );
           this.safetyCloseTimer = setTimeout(() => {
+            if (this.failureStage === 'none') {
+              this.failureStage = 'duration_cap';
+            }
             this.terminateCall('safety_limit_3_minutes');
           }, 1500);
         }
@@ -938,7 +949,7 @@ class OpenAIS2SBridge {
     this.maxDurationSec = Number(
       this.tenant.maxDurationSec || process.env.MAX_CALL_DURATION_SEC || 180
     );
-    const warningLeadSec = Math.min(10, Math.max(4, Math.floor(this.maxDurationSec / 10)));
+    const warningLeadSec = this.maxDurationSec > 20 ? 15 : Math.max(4, Math.floor(this.maxDurationSec / 2));
     const warningTimeMs = Math.max(1000, (this.maxDurationSec - warningLeadSec) * 1000);
 
     // 1. Timer de Aviso Prévio com Fala Explícita de Interrupção aos ~170s
@@ -979,6 +990,9 @@ class OpenAIS2SBridge {
       console.warn(
         `[${this.callId}] 🛑 Limite rígido de segurança atingido (${this.maxDurationSec}s). Encerrando chamada para evitar cobrança indevida da OpenAI.`
       );
+      if (this.failureStage === 'none') {
+        this.failureStage = 'duration_cap';
+      }
       this.terminateCall('safety_limit_3_minutes');
     }, this.maxDurationSec * 1000);
 
@@ -1030,8 +1044,8 @@ class OpenAIS2SBridge {
       this.whisperSession.start();
     }
 
-    // 2. Gravação Dual-Stream Stereo (.wav) + Transcrição (.txt) SOMENTE quando a transcrição (STT) estiver habilitada
-    if (this.whisperSession && this.whisperSession.isSttEnabled) {
+    // 2. Gravação Dual-Stream Stereo (.wav) + Transcrição (.txt) ativa por padrão (desacoplada do STT opcional; fail-open)
+    if (this.tenant.recording?.enabled !== false && !this.isToneProbe) {
       this.recorder = new CallRecorder({
         callId: this.callId,
         tenantId: this.tenant.id,
@@ -1554,7 +1568,9 @@ class OpenAIS2SBridge {
       transcriptTurnsCount: this.transcriptLog.length,
       lastTranscript: lastTurnEntry,
       responseLatency: this.liveMonitor ? this.liveMonitor.getStats() : null,
-      extractedData: this.extractedData || null
+      extractedData: this.extractedData || null,
+      correlationId: this.correlationId || this.callId,
+      failureStage: this.failureStage || 'none'
     };
 
     if (includeTranscript) {
@@ -1797,6 +1813,13 @@ class OpenAIS2SBridge {
       return;
     }
     this.isTerminated = true;
+    if (this.failureStage === 'none') {
+      if (reason === 'safety_limit_3_minutes') {
+        this.failureStage = 'duration_cap';
+      } else if (reason.includes('openai') || reason.includes('elevenlabs')) {
+        this.failureStage = 'ai_provider';
+      }
+    }
 
     console.log(`[${this.callId}] Encerrando chamada (Motivo: ${reason})...`);
     if (this.dialog) {
@@ -2066,6 +2089,7 @@ async function originateOutboundCall(params) {
     bridge = createAiBridge(tenant, sipHeaders);
     bridge.attemptId = params.attemptId || null;
     bridge.providerAttemptId = params.providerAttemptId || callId;
+    bridge.correlationId = params.correlationId || params.attemptId || callId;
     activeBridges.set(callId, bridge);
     try {
       if (callHistoryManager) {
@@ -2182,6 +2206,8 @@ async function originateOutboundCall(params) {
             sendVollPlanWebhook(params.callback, buildConnectorEvent({
               attemptId: params.attemptId,
               providerAttemptId: params.providerAttemptId || callId,
+              correlationId: bridge.correlationId || params.correlationId || params.attemptId || callId,
+              failureStage: callInfo?.failureStage || bridge.failureStage || 'none',
               tabulationCode,
               scheduledAt,
               summary,
@@ -2269,7 +2295,9 @@ async function originateOutboundCall(params) {
           deviceMode: 'outbound_attempt',
           noiseProfile: 'N/A',
           amdResult: 'FALHA_CONEXAO',
-          sttEnabled: Boolean(params.stt)
+          sttEnabled: Boolean(params.stt),
+          correlationId: params.correlationId || params.attemptId || (dialog && dialog.sip?.callId) || undefined,
+          failureStage: 'signaling'
         });
       }
     } catch (logErr) {
@@ -2389,7 +2417,9 @@ async function startWebRtcSession({ tenantId, sdpOffer, caller = 'web-visitor', 
       recordingFile: recInfo?.recordingFile || null,
       transcriptFile: recInfo?.transcriptFile || null,
       transcript: bridge?.transcriptLog || [],
-      totalTokens: aiUsage ? aiUsage.totalTokens : undefined
+      totalTokens: aiUsage ? aiUsage.totalTokens : undefined,
+      correlationId: bridge?.correlationId || callId,
+      failureStage: bridge?.failureStage || 'none'
     });
     releaseTenantSlotOnce();
   };
@@ -2587,6 +2617,17 @@ srf.invite(async (req, res) => {
   const slotCheck = tenantManager.tryAcquireSlot(tenant);
   if (!slotCheck.allowed) {
     console.warn(`[${callId}] Chamada recusada para Tenant [${tenant.id}]: ${slotCheck.reason}`);
+    callHistoryManager.recordCallEnd({
+      callId,
+      tenantId: tenant.id,
+      direction: 'inbound',
+      caller: callerId,
+      called: cleanCalled,
+      durationSec: 0,
+      hangupReason: `REJECTED_CAPACITY: ${slotCheck.reason}`,
+      hangupBy: 'system',
+      failureStage: 'capacity'
+    });
     return res.send(slotCheck.sipStatus || 486);
   }
 
@@ -2787,6 +2828,8 @@ srf.invite(async (req, res) => {
           costUsd: 0,
           costBrl: 0,
           hangupReason: `fail_setup: ${err.message}`,
+          correlationId: req.get('X-Correlation-Id') || callId,
+          failureStage: 'signaling',
           hangupBy: 'system',
           codec: 'g711_ulaw',
           deviceMode: 'inbound_attempt',

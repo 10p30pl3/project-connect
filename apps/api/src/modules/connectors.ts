@@ -20,8 +20,17 @@ export async function connectorRoutes(app: FastifyInstance) {
     const conn = await one(getPool(), `SELECT id, workspace_id, webhook_secret FROM connections WHERE id=$1`, [id]);
     if (!conn) throw notFound('Conexão');
     const raw = req.rawBody ?? '';
-    if (!verifySignature(raw, conn.webhook_secret, req.headers['x-voll-signature'] as string | undefined))
+    const sigHeader = (req.headers['x-voll-signature'] ?? req.headers['x-webhook-signature']) as string | undefined;
+    if (!verifySignature(raw, conn.webhook_secret, sigHeader))
       throw new HttpError(401, 'Assinatura inválida', 'Origem do webhook não autenticada');
+    const tsHeader = req.headers['x-webhook-timestamp'] as string | undefined;
+    if (tsHeader !== undefined) {
+      const tsNum = Number(tsHeader);
+      const nowSec = Math.floor(Date.now() / 1000);
+      if (!Number.isFinite(tsNum) || Math.abs(nowSec - tsNum) > 300) {
+        throw new HttpError(401, 'Timestamp expirado', 'Janela de replay do webhook excedida');
+      }
+    }
     const ev = parse(ConnectorEventSchema, req.body);
     const r = await processConnectorEvent(conn, ev, req.body);
     return { accepted: true, duplicate: r.duplicate };

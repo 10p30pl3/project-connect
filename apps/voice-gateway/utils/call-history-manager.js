@@ -211,6 +211,8 @@ class CallHistoryManager extends EventEmitter {
         telephonyLogs: Array.isArray(callData.telephonyLogs) && callData.telephonyLogs.length > 0
           ? callData.telephonyLogs
           : (existingActive?.telephonyLogs || []),
+        correlationId: callData.correlationId || existingActive?.correlationId || callData.attemptId || callData.callId,
+        failureStage: callData.failureStage || existingActive?.failureStage || 'none',
         isActive: false
       };
 

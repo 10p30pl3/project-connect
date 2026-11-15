@@ -535,6 +535,66 @@ export function ChannelsPage() {
                     </TableWrap>
                   </Card>
                 )}
+
+                <Card
+                  title={
+                    <span className="flex items-center gap-2">
+                      <Radio className="size-4 text-brand-600" aria-hidden />
+                      <span>Canal WebRTC &amp; Web Voice Widget</span>
+                    </span>
+                  }
+                  tooltip="Sinalização WebRTC e widget web servidos via proxy autenticado do portal (/api/telephony/webrtc/* e /voll-voice-widget.js), sem expor a porta interna do gateway. Navegadores exigem HTTPS fora de localhost para captura de microfone."
+                  actions={
+                    <Badge
+                      tone={
+                        typeof window !== 'undefined' &&
+                        (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+                          ? 'green'
+                          : 'amber'
+                      }
+                    >
+                      {typeof window !== 'undefined' &&
+                      (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+                        ? 'HTTPS Pronto'
+                        : 'Requer HTTPS (Microfone)'}
+                    </Badge>
+                  }
+                >
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Proxy de Sinalização WebRTC</div>
+                      <div className="mt-1 flex items-center justify-between gap-2">
+                        <code className="truncate font-mono text-xs text-slate-800">/api/telephony/webrtc/offer</code>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            navigator.clipboard?.writeText(`${window.location.origin}/api/telephony/webrtc/offer`);
+                            toast('info', 'Endpoint WebRTC copiado.');
+                          }}
+                        >
+                          Copiar
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Script Web Voice Widget</div>
+                      <div className="mt-1 flex items-center justify-between gap-2">
+                        <code className="truncate font-mono text-xs text-slate-800">/voll-voice-widget.js</code>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            navigator.clipboard?.writeText(`<script src="${window.location.origin}/voll-voice-widget.js"></script>`);
+                            toast('info', 'Tag do widget WebRTC copiada.');
+                          }}
+                        >
+                          Copiar
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
               </div>
             ),
           },

@@ -625,6 +625,8 @@ export const ConnectorEventSchema = z.object({
       history: z.array(LatencyTurnTelemetrySchema).max(100).optional(),
     })
     .optional(),
+  failureStage: z.enum(['signaling', 'media', 'ai_provider', 'capacity', 'duration_cap', 'none']).optional(),
+  correlationId: z.string().min(1).max(200).optional(),
 });
 export type ConnectorEvent = z.infer<typeof ConnectorEventSchema>;
 
@@ -800,7 +802,9 @@ export const VoiceAgentTenantSchema = z
     instructions: z.string().min(20),
     greetingInstructions: z.string().nullable(),
     firstMessageMode: z.enum(['assistant-speaks-first', 'assistant-waits-for-user']).optional(),
-    maxDurationSec: z.number().int().min(30).max(900),
+    maxDurationSec: z.number().int().min(15).max(3600).default(180),
+    maxConcurrentCalls: z.number().int().min(1).optional(),
+    recording: z.object({ enabled: z.boolean().default(true) }).optional(),
     amd: z.object({
       enabled: z.boolean(),
       mode: z.enum(['active', 'shadow']),

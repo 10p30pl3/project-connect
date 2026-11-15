@@ -122,6 +122,22 @@
         }
       },
       "additionalProperties": false
+    },
+    "failureStage": {
+      "type": "string",
+      "enum": [
+        "signaling",
+        "media",
+        "ai_provider",
+        "capacity",
+        "duration_cap",
+        "none"
+      ]
+    },
+    "correlationId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
     }
   },
   "required": [

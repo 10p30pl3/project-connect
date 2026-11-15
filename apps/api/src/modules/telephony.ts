@@ -1293,4 +1293,36 @@ export async function telephonyRoutes(app: FastifyInstance) {
       return proxyJson(a.workspaceId, `/v1/ai-costs/statement${qs.size ? `?${qs}` : ''}`);
     },
   );
+
+  // ---------------- WebRTC Portal Proxy (FR-012) ----------------
+  app.post('/telephony/webrtc/token', operateGuard, async (req) => {
+    const a = actor(req);
+    return proxyJson(a.workspaceId, '/v1/webrtc/token', jsonInit('POST', req.body ?? {}));
+  });
+
+  app.post('/telephony/webrtc/offer', operateGuard, async (req) => {
+    const a = actor(req);
+    return proxyJson(a.workspaceId, '/v1/webrtc/offer', jsonInit('POST', req.body ?? {}), LONG_TIMEOUT_MS);
+  });
+
+  app.post<{ Params: { callId: string } }>('/telephony/webrtc/:callId/ice', operateGuard, async (req) => {
+    const a = actor(req);
+    return proxyJson(a.workspaceId, `/v1/webrtc/${enc(req.params.callId)}/ice`, jsonInit('POST', req.body ?? {}));
+  });
+
+  app.delete<{ Params: { callId: string } }>('/telephony/webrtc/:callId', operateGuard, async (req) => {
+    const a = actor(req);
+    return proxyJson(a.workspaceId, `/v1/webrtc/${enc(req.params.callId)}`, { method: 'DELETE' });
+  });
+
+  app.get('/telephony/webrtc/widget.js', async (req, reply) => {
+    const a = actor(req);
+    const res = await callGateway(a.workspaceId, '/voll-voice-widget.js');
+    if (!res.ok) {
+      throw new HttpError(res.status === 404 ? 404 : 502, 'Widget WebRTC indisponível', `HTTP ${res.status}`);
+    }
+    const script = await res.text();
+    reply.header('Content-Type', 'application/javascript; charset=utf-8');
+    return reply.send(script);
+  });
 }

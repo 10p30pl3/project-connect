@@ -37,6 +37,8 @@ function buildConnectorEvent({
   type = 'RESULT',
   attemptId = null,
   providerAttemptId,
+  correlationId,
+  failureStage,
   tabulationCode,
   scheduledAt,
   summary,
@@ -57,6 +59,8 @@ function buildConnectorEvent({
     occurredAt,
   };
   if (attemptId) event.attemptId = attemptId;
+  if (correlationId) event.correlationId = String(correlationId);
+  if (failureStage) event.failureStage = String(failureStage);
   if (tabulationCode) event.tabulationCode = tabulationCode;
   if (scheduledAt) event.scheduledAt = scheduledAt;
   if (summary) event.summary = String(summary).slice(0, 2000);
