@@ -112,7 +112,7 @@ description: "Actionable, dependency-ordered task list for Production Voice Base
 **Purpose**: Full-stack quality gates, regression check (`FR-011`), and production deployment validation.
 
 - [X] T023 Run `npm run typecheck`, `npm run check:gateway`, `npm run build`, and `npm test` across all workspaces
-- [ ] T024 Validate all scenarios in `specs/001-production-voice-baseline/quickstart.md` against `192.168.15.36` (voice gateway) and `194.163.151.91` (production Docker stack)
+- [X] T024 Validate all scenarios in `specs/001-production-voice-baseline/quickstart.md` against `192.168.15.36` (voice gateway) and `194.163.151.91` (production Docker stack)
 
 ---
 
@@ -143,4 +143,4 @@ description: "Actionable, dependency-ordered task list for Production Voice Base
 
 - [X] T025 Persist `correlationId` (`attemptId || callId`) and `failureStage` (`signaling` | `media` | `ai_provider` | `capacity` | `duration_cap` | `none`) in `apps/voice-gateway/utils/call-history-manager.js`, all `recordCallEnd` call sites in `apps/voice-gateway/index.js`, and `buildConnectorEvent` in `apps/voice-gateway/utils/voll-contract.js` per FR-006, FR-007, Constitution VII (partial)
 - [X] T026 Set explicit `this.failureStage` on `maxDurationTimer` (`duration_cap`) and external AI WebSocket `error`/timeout closures (`ai_provider`) in `apps/voice-gateway/index.js` per FR-001, FR-003, FR-007 (partial)
-- [ ] T027 Deploy updated code to `192.168.15.36` (`voice-app`) and `194.163.151.91` (`deploy/deploy.sh`) and execute live `quickstart.md` verification per T024 (missing)
+- [X] T027 Deploy updated code to `192.168.15.36` (`voice-app`) and `194.163.151.91` (`deploy/deploy.sh`) and execute live `quickstart.md` verification per T024
