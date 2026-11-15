@@ -282,36 +282,68 @@ export function LiveVoiceMonitor({
           ctx.fillStyle = bg;
           ctx.fillRect(0, 0, w, h);
 
-          // Linhas guia
+          const midY = h / 2;
+          const maxAmp = midY - 18;
+          const plotX = 44;
+          const plotW = Math.max(200, w - plotX - 6);
+
+          // Linhas guia de energia (50% e 100% para Cliente e Agente IA)
           ctx.strokeStyle = grid;
           ctx.lineWidth = 1;
-          for (const yFrac of [0.25, 0.75]) {
+          for (const yPos of [
+            midY - maxAmp,
+            midY - maxAmp * 0.5,
+            midY + maxAmp * 0.5,
+            midY + maxAmp,
+          ]) {
             ctx.beginPath();
-            ctx.moveTo(0, h * yFrac);
-            ctx.lineTo(w, h * yFrac);
+            ctx.moveTo(plotX, yPos);
+            ctx.lineTo(plotX + plotW, yPos);
             ctx.stroke();
           }
 
-          const midY = h / 2;
+          // Linha central (piso -55 dBFS / 0%)
           ctx.strokeStyle = centerLine;
           ctx.beginPath();
-          ctx.moveTo(0, midY);
-          ctx.lineTo(w, midY);
+          ctx.moveTo(plotX, midY);
+          ctx.lineTo(plotX + plotW, midY);
           ctx.stroke();
+
+          // Eixo vertical e escala dBFS
+          ctx.beginPath();
+          ctx.moveTo(plotX, midY - maxAmp);
+          ctx.lineTo(plotX, midY + maxAmp);
+          ctx.stroke();
+
+          ctx.font = '500 9px ui-monospace, SFMono-Regular, Menlo, monospace';
+          ctx.fillStyle = mutedText;
+          ctx.textAlign = 'right';
+          ctx.textBaseline = 'middle';
+          const scaleTicks: [number, string][] = [
+            [midY - maxAmp, '0 dB'],
+            [midY - maxAmp * 0.5, '-28 dB'],
+            [midY, '-55 dB'],
+            [midY + maxAmp * 0.5, '-28 dB'],
+            [midY + maxAmp, '0 dB'],
+          ];
+          for (const [yTick, label] of scaleTicks) {
+            ctx.fillText(label, plotX - 5, yTick);
+          }
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'alphabetic';
 
           // Rótulos laterais dos canais
           ctx.font = '600 10px Inter, system-ui, sans-serif';
           ctx.fillStyle = callerBar;
-          ctx.fillText('CLIENTE (↑)', 8, 14);
+          ctx.fillText('CLIENTE (↑)', plotX + 6, 13);
           ctx.fillStyle = aiBar;
-          ctx.fillText('AGENTE IA (↓)', 8, h - 8);
+          ctx.fillText('AGENTE IA (↓)', plotX + 6, h - 6);
 
           const samples = samplesRef.current;
-          const visibleCount = Math.min(180, Math.max(80, Math.floor(w / 4)));
+          const visibleCount = Math.min(180, Math.max(80, Math.floor(plotW / 4)));
           const slice = samples.slice(-visibleCount);
-          const barSlot = w / visibleCount;
+          const barSlot = plotW / visibleCount;
           const barWidth = Math.max(1.8, barSlot * 0.62);
-          const maxAmp = midY - 18;
 
           if (slice.length > 0) {
             const tStart = slice[0].t;
@@ -319,7 +351,7 @@ export function LiveVoiceMonitor({
 
             for (let i = 0; i < slice.length; i++) {
               const s = slice[i];
-              const x = (visibleCount - slice.length + i) * barSlot;
+              const x = plotX + (visibleCount - slice.length + i) * barSlot;
 
               const cAmp = Math.max(1.5, Math.min(1, s.caller) * maxAmp);
               ctx.fillStyle = callerBar;
@@ -334,9 +366,9 @@ export function LiveVoiceMonitor({
             for (const turn of turnsRef.current) {
               if (turn.atMs < tStart || turn.atMs > tEnd + 120) continue;
               const idxRatio = (turn.atMs - tStart) / Math.max(1, tEnd - tStart);
-              const xEnd = ((visibleCount - slice.length) + idxRatio * (slice.length - 1)) * barSlot;
+              const xEnd = plotX + ((visibleCount - slice.length) + idxRatio * (slice.length - 1)) * barSlot;
               const gapPx = Math.min(24, Math.max(6, Math.round(turn.responseMs / 35)));
-              const xStart = Math.max(0, xEnd - gapPx);
+              const xStart = Math.max(plotX, xEnd - gapPx);
 
               ctx.strokeStyle = markerColor;
               ctx.lineWidth = 1.25;
@@ -350,7 +382,7 @@ export function LiveVoiceMonitor({
               const badgeText = `${turn.responseMs} ms`;
               ctx.font = '700 11px Inter, system-ui, sans-serif';
               const tw = ctx.measureText(badgeText).width + 10;
-              const bx = Math.min(w - tw - 4, Math.max(4, (xStart + xEnd) / 2 - tw / 2));
+              const bx = Math.min(plotX + plotW - tw - 4, Math.max(plotX + 4, (xStart + xEnd) / 2 - tw / 2));
               ctx.fillStyle = labelBg;
               ctx.fillRect(bx, 4, tw, 18);
               ctx.strokeStyle = markerColor;
