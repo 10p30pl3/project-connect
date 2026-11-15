@@ -185,6 +185,15 @@ class TenantManager {
         // Limiar biométrico (wespeaker/ecapa). null = padrão calibrado do modelo (0.38 / 0.40)
         threshold: process.env.SPEAKER_VERIFIER_THRESHOLD ? parseFloat(process.env.SPEAKER_VERIFIER_THRESHOLD) : null
       },
+      audioFilters: {
+        crosstalkDynamicEcapaEnabled: process.env.CROSSTALK_DYNAMIC_ECAPA !== 'false',
+        aecSonarEnabled: process.env.AEC_SONAR_ENABLED !== 'false',
+        energyVadEnabled: process.env.ENERGY_VAD_ENABLED !== 'false',
+        noiseSuppressionEnabled: process.env.FS_NOISE_SUPPRESSION === 'true',
+        inputGainAttenuationEnabled: process.env.INPUT_GAIN_ATTENUATION !== 'false',
+        frameVadEnabled: process.env.FRAME_VAD_ENABLED !== 'false',
+        firAntialiasingEnabled: (process.env.AUDIO_CODEC_MODE || 'pcm24k') !== 'g711_ulaw'
+      },
       amd: {
         enabled: process.env.AMD_DEFAULT_ENABLED === 'true',
         mode: process.env.AMD_DEFAULT_MODE || 'active'
@@ -221,6 +230,10 @@ class TenantManager {
                 crosstalkFilter: {
                   ...defaultTenant.crosstalkFilter,
                   ...(item.crosstalkFilter || {})
+                },
+                audioFilters: {
+                  ...defaultTenant.audioFilters,
+                  ...(item.audioFilters || {})
                 },
                 amd: {
                   ...defaultTenant.amd,
@@ -410,6 +423,11 @@ class TenantManager {
         ...defaultTenant.crosstalkFilter,
         ...(existing.crosstalkFilter || {}),
         ...(data.crosstalkFilter || {})
+      },
+      audioFilters: {
+        ...defaultTenant.audioFilters,
+        ...(existing.audioFilters || {}),
+        ...(data.audioFilters || {})
       },
       amd: {
         ...defaultTenant.amd,

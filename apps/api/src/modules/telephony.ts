@@ -343,6 +343,79 @@ export async function proxyJson(
   return body;
 }
 
+type CrosstalkMode = 'atual' | 'wespeaker' | 'ecapa' | 'none';
+
+export type AudioFiltersConfig = {
+  crosstalkMode: CrosstalkMode;
+  crosstalkRatio: number;
+  crosstalkDynamicEcapaEnabled: boolean;
+  aecSonarEnabled: boolean;
+  energyVadEnabled: boolean;
+  noiseSuppressionEnabled: boolean;
+  inputGainAttenuationEnabled: boolean;
+  bargeinEnabled: boolean;
+  bargeinLevel: number;
+  bargeinGraceEnabled: boolean;
+  bargeinGraceSec: number;
+  frameVadEnabled: boolean;
+  firAntialiasingEnabled: boolean;
+};
+
+const DEFAULT_AUDIO_FILTERS: AudioFiltersConfig = {
+  crosstalkMode: 'atual',
+  crosstalkRatio: 0.45,
+  crosstalkDynamicEcapaEnabled: true,
+  aecSonarEnabled: true,
+  energyVadEnabled: true,
+  noiseSuppressionEnabled: false,
+  inputGainAttenuationEnabled: true,
+  bargeinEnabled: true,
+  bargeinLevel: 3,
+  bargeinGraceEnabled: true,
+  bargeinGraceSec: 8,
+  frameVadEnabled: true,
+  firAntialiasingEnabled: true,
+};
+
+function normalizeCrosstalkMode(raw: unknown, fallback: CrosstalkMode = 'atual'): CrosstalkMode {
+  const s = String(raw ?? '').toLowerCase().trim();
+  if (s === 'dsp' || s === 'atual') return 'atual';
+  if (s === 'wespeaker' || s === 'ecapa' || s === 'none') return s;
+  return fallback;
+}
+
+function normalizeAudioFilters(raw: unknown, base: AudioFiltersConfig = DEFAULT_AUDIO_FILTERS): AudioFiltersConfig {
+  const src = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const bool = (key: keyof AudioFiltersConfig, fb: boolean) =>
+    typeof src[key] === 'boolean' ? (src[key] as boolean) : fb;
+  const num = (key: keyof AudioFiltersConfig, fb: number, min: number, max: number) => {
+    const n = Number(src[key]);
+    return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fb;
+  };
+  const bargeinEnabled = bool('bargeinEnabled', base.bargeinEnabled);
+  const rawLevel = num('bargeinLevel', base.bargeinLevel, 0, 5);
+  const bargeinLevel = bargeinEnabled ? (rawLevel > 0 ? Math.round(rawLevel) : 3) : 0;
+  const bargeinGraceEnabled = bool('bargeinGraceEnabled', base.bargeinGraceEnabled);
+  const rawGrace = num('bargeinGraceSec', base.bargeinGraceSec, 0, 30);
+  const bargeinGraceSec = bargeinGraceEnabled ? (rawGrace > 0 ? Math.round(rawGrace) : 8) : 0;
+
+  return {
+    crosstalkMode: normalizeCrosstalkMode(src.crosstalkMode, base.crosstalkMode),
+    crosstalkRatio: Number(num('crosstalkRatio', base.crosstalkRatio, 0.15, 0.85).toFixed(2)),
+    crosstalkDynamicEcapaEnabled: bool('crosstalkDynamicEcapaEnabled', base.crosstalkDynamicEcapaEnabled),
+    aecSonarEnabled: bool('aecSonarEnabled', base.aecSonarEnabled),
+    energyVadEnabled: bool('energyVadEnabled', base.energyVadEnabled),
+    noiseSuppressionEnabled: bool('noiseSuppressionEnabled', base.noiseSuppressionEnabled),
+    inputGainAttenuationEnabled: bool('inputGainAttenuationEnabled', base.inputGainAttenuationEnabled),
+    bargeinEnabled,
+    bargeinLevel,
+    bargeinGraceEnabled,
+    bargeinGraceSec,
+    frameVadEnabled: bool('frameVadEnabled', base.frameVadEnabled),
+    firAntialiasingEnabled: bool('firAntialiasingEnabled', base.firAntialiasingEnabled),
+  };
+}
+
 function jsonInit(method: string, body?: unknown): RequestInit {
   if (body === undefined || method === 'GET' || method === 'HEAD') {
     return { method };
@@ -439,6 +512,148 @@ export async function telephonyRoutes(app: FastifyInstance) {
   };
   app.post('/telephony/features/crosstalk/mode', manageGuard, handleCrosstalkMode);
   app.put('/telephony/features/crosstalk/mode', manageGuard, handleCrosstalkMode);
+
+  app.get('/telephony/audio-filters', async (req) => {
+    const a = actor(req);
+    const savedRow = await one<{ config: unknown; updated_at: string }>(
+      getPool(),
+      `SELECT config, updated_at FROM workspace_audio_filters WHERE workspace_id = $1`,
+      [a.workspaceId],
+    ).catch(() => null);
+
+    const [gwXtalk, gwTenant, gwGranular, gwFeatures] = await Promise.all([
+      proxyJson(a.workspaceId, '/v1/features/crosstalk/mode').catch(() => null),
+      proxyJson(a.workspaceId, '/v1/tenants/default').catch(() => null),
+      proxyJson(a.workspaceId, '/v1/features/audio-filters').catch(() => null),
+      proxyJson(a.workspaceId, '/v1/features').catch(() => null),
+    ]);
+
+    const gatewayOnline = Boolean(gwXtalk || gwTenant || gwFeatures);
+    const base = normalizeAudioFilters(savedRow?.config, DEFAULT_AUDIO_FILTERS);
+    const liveOverlay: Partial<AudioFiltersConfig> = {};
+    if (gwXtalk?.mode || gwXtalk?.crosstalkFilter?.mode) {
+      liveOverlay.crosstalkMode = normalizeCrosstalkMode(
+        gwXtalk?.crosstalkFilter?.mode ?? gwXtalk?.mode,
+        base.crosstalkMode,
+      );
+    }
+    if (gwXtalk?.crosstalkFilter?.ratio != null) {
+      liveOverlay.crosstalkRatio = Number(gwXtalk.crosstalkFilter.ratio);
+    }
+    if (gwTenant) {
+      if (typeof gwTenant.bargeinLevel === 'number') {
+        liveOverlay.bargeinEnabled = gwTenant.bargeinLevel > 0;
+        liveOverlay.bargeinLevel = gwTenant.bargeinLevel;
+      }
+      if (typeof gwTenant.bargeinGraceSec === 'number') {
+        liveOverlay.bargeinGraceEnabled = gwTenant.bargeinGraceSec > 0;
+        liveOverlay.bargeinGraceSec = gwTenant.bargeinGraceSec;
+      }
+      if (typeof gwTenant.audioCodec === 'string') {
+        liveOverlay.firAntialiasingEnabled = gwTenant.audioCodec !== 'g711_ulaw';
+      }
+    }
+    if (gwGranular?.filters && typeof gwGranular.filters === 'object') {
+      Object.assign(liveOverlay, gwGranular.filters);
+    }
+
+    const filters = normalizeAudioFilters({ ...base, ...liveOverlay }, base);
+    return {
+      ok: true,
+      gatewayOnline,
+      gatewaySupportsGranularFilters: Boolean(gwGranular?.ok),
+      canManageGlobal: isSuperAdminRole(a.role),
+      filters,
+      features: Array.isArray(gwFeatures?.features) ? gwFeatures.features : [],
+      updatedAt: savedRow?.updated_at ?? null,
+    };
+  });
+
+  app.put('/telephony/audio-filters', manageGuard, async (req) => {
+    const a = actor(req);
+    if (!isSuperAdminRole(a.role)) {
+      throw new HttpError(403, 'Acesso restrito ao Super Admin', 'Somente Super Admin pode alterar os filtros de áudio globais do gateway.');
+    }
+    const rawBody = (req.body ?? {}) as Record<string, unknown>;
+    const applyToCallId = typeof rawBody.applyToCallId === 'string' ? rawBody.applyToCallId.trim() : '';
+    const existingRow = await one<{ config: unknown }>(
+      getPool(),
+      `SELECT config FROM workspace_audio_filters WHERE workspace_id = $1`,
+      [a.workspaceId],
+    ).catch(() => null);
+    const prev = normalizeAudioFilters(existingRow?.config, DEFAULT_AUDIO_FILTERS);
+    const next = normalizeAudioFilters(rawBody.filters ?? rawBody, prev);
+
+    await getPool().query(
+      `INSERT INTO workspace_audio_filters (workspace_id, config, updated_by, updated_at)
+       VALUES ($1, $2::jsonb, $3, now())
+       ON CONFLICT (workspace_id) DO UPDATE
+         SET config = EXCLUDED.config,
+             updated_by = EXCLUDED.updated_by,
+             updated_at = now()`,
+      [a.workspaceId, JSON.stringify(next), a.userId],
+    );
+
+    let gatewaySync: 'full' | 'partial' | 'offline' = 'offline';
+    const xtalkOk = await proxyJson(
+      a.workspaceId,
+      '/v1/features/crosstalk/mode',
+      jsonInit('POST', { mode: next.crosstalkMode, ratio: next.crosstalkRatio }),
+    )
+      .then(() => true)
+      .catch(() => false);
+
+    const tenantOk = await proxyJson(
+      a.workspaceId,
+      '/v1/tenants/default',
+      jsonInit('PUT', {
+        id: 'default',
+        bargeinLevel: next.bargeinLevel,
+        bargeinGraceSec: next.bargeinGraceSec,
+        audioCodec: next.firAntialiasingEnabled ? 'pcm24k' : 'g711_ulaw',
+        crosstalkFilter: {
+          mode: next.crosstalkMode,
+          ratio: next.crosstalkRatio,
+        },
+      }),
+    )
+      .then(() => true)
+      .catch(() => false);
+
+    const granularOk = await proxyJson(
+      a.workspaceId,
+      '/v1/features/audio-filters',
+      jsonInit('PUT', { filters: next, applyToCallId: applyToCallId || undefined }),
+    )
+      .then(() => true)
+      .catch(() => false);
+
+    if (granularOk) {
+      gatewaySync = 'full';
+    } else if (xtalkOk || tenantOk) {
+      gatewaySync = 'partial';
+    }
+
+    if (applyToCallId) {
+      await proxyJson(
+        a.workspaceId,
+        `/v1/calls/${enc(applyToCallId)}/crosstalk`,
+        jsonInit('POST', { mode: next.crosstalkMode }),
+      ).catch(() => null);
+    }
+
+    await audit(getPool(), a, 'telephony.audio_filters', 'gateway', a.workspaceId, {
+      before: prev,
+      after: { ...next, gatewaySync },
+    });
+
+    return {
+      ok: true,
+      filters: next,
+      gatewaySync,
+      gatewaySupportsGranularFilters: granularOk,
+    };
+  });
 
   // ---------------- Chamadas Ao Vivo, Histórico & Comandos In-Call ----------------
   app.get('/telephony/calls', async (req) => {

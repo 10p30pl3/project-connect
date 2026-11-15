@@ -268,11 +268,21 @@ class OpenAIS2SBridge {
     this.dynamicEcapaSwitched = false;
     this.crosstalkRatio = crosstalkRatio;
 
+    const af = this.tenant.audioFilters || {};
+    this.audioFilters = {
+      crosstalkDynamicEcapaEnabled: af.crosstalkDynamicEcapaEnabled !== false,
+      aecSonarEnabled: af.aecSonarEnabled !== false,
+      energyVadEnabled: af.energyVadEnabled !== false,
+      noiseSuppressionEnabled: Boolean(af.noiseSuppressionEnabled),
+      inputGainAttenuationEnabled: af.inputGainAttenuationEnabled !== false,
+      frameVadEnabled: af.frameVadEnabled !== false,
+    };
+
     // VAD de energia por frame: detector de "fala ativa" quando o gate DSP não está em uso
     // (modos 'wespeaker', 'ecapa' e 'none'), evitando barge-in por frames de silêncio ou ruídos de fundo.
     const frameVadMinRms = Number(this.tenant?.bargeinMinRms || process.env.BARGEIN_MIN_RMS || 550);
     const frameVadAttack = Number(this.tenant?.bargeinAttackFrames || process.env.BARGEIN_ATTACK_FRAMES || 3);
-    this.frameVad = this.crosstalkFilter
+    this.frameVad = (this.crosstalkFilter || !this.audioFilters.frameVadEnabled)
       ? null
       : new FrameVad({ minRms: frameVadMinRms, attackFrames: frameVadAttack, noiseRatio: 2.8 });
 
@@ -333,6 +343,7 @@ class OpenAIS2SBridge {
   }
 
   canTriggerBargeIn() {
+    if ((this.tenant?.bargeinLevel ?? 3) <= 0) return false;
     if (this.isSafetyExpiring) return false;
     if (this.isGreetingInProgress || this.isMicMutedByGrace) return false;
     if (this.isBargeinGraceActive()) return false;
@@ -1119,10 +1130,10 @@ class OpenAIS2SBridge {
     }
 
     this.safeApi(`uuid_setvar ${this.channelUuid} echo_cancellation false`);
-    // Desativa supressao Speex no FreeSWITCH para evitar voz metalica/abafada em G.711/PCM
-    this.safeApi(`uuid_setvar ${this.channelUuid} noise_suppression false`);
-    // Ajuste de ganho de entrada (-3dB) para evitar saturação analógica/clipping digital (pico > 32000)
-    this.safeApi(`uuid_setvar ${this.channelUuid} rtp_audio_in_level -3`);
+    // Supressão Speex no FreeSWITCH (por padrão desativada para evitar voz metálica em G.711/PCM)
+    this.safeApi(`uuid_setvar ${this.channelUuid} noise_suppression ${this.audioFilters.noiseSuppressionEnabled ? 'true' : 'false'}`);
+    // Ajuste de ganho de entrada (-3dB quando ativo) para evitar saturação analógica/clipping digital (pico > 32000)
+    this.safeApi(`uuid_setvar ${this.channelUuid} rtp_audio_in_level ${this.audioFilters.inputGainAttenuationEnabled ? '-3' : '0'}`);
 
     let vadThreshold = 0.45;
     let prefixPaddingMs = 160;
@@ -1130,7 +1141,7 @@ class OpenAIS2SBridge {
 
     // 3. Inicia ponte de áudio recebendo Buffer binário direto (sem conversão Base64 intermediária)
     this.energyManager.reset();
-    this.calibrationActive = true;
+    this.calibrationActive = this.audioFilters.aecSonarEnabled || this.audioFilters.energyVadEnabled;
 
     this.mediaBridge.on('playback_ended', () => {
       this.isAgentTalking = false;
@@ -1199,7 +1210,7 @@ class OpenAIS2SBridge {
           // Monitoramento em tempo real do piso de ruído durante a chamada:
           // Se o ruído subir consistentemente (noiseFloor > 200, ex: rua, TV ou conversas paralelas),
           // chaveia automaticamente para o modelo neural ECAPA para máxima robustez acústica!
-          if (!this.dynamicEcapaSwitched && this.crosstalkFilter.noiseFloor >= 200) {
+          if (this.audioFilters.crosstalkDynamicEcapaEnabled && !this.dynamicEcapaSwitched && this.crosstalkFilter.noiseFloor >= 200) {
             this.dynamicEcapaSwitched = true;
             this.switchCrosstalkFilter('ecapa', `Piso de ruído elevado em tempo real (${Math.round(this.crosstalkFilter.noiseFloor)} RMS)`);
           }
@@ -1302,21 +1313,23 @@ class OpenAIS2SBridge {
     if (amdWasExecuted) {
       this.calibrationActive = false;
       this.deviceMode = 'fone_ouvido';
-      this.currentProfile = this.energyManager.getClassification();
-      const lineProfiles = this.profilesByLine[this.lineType] || this.profilesByLine.trunk_sip;
-      const config = lineProfiles[this.currentProfile].fone;
-      vadThreshold = Number(this.tenant?.vadThreshold || config.base);
-      prefixPaddingMs = Number(this.tenant?.prefixPaddingMs || config.prefix);
-      silenceDurationMs = Number(this.tenant?.silenceDurationMs || config.silence);
+      if (this.audioFilters.energyVadEnabled) {
+        this.currentProfile = this.energyManager.getClassification();
+        const lineProfiles = this.profilesByLine[this.lineType] || this.profilesByLine.trunk_sip;
+        const config = lineProfiles[this.currentProfile].fone;
+        vadThreshold = Number(this.tenant?.vadThreshold || config.base);
+        prefixPaddingMs = Number(this.tenant?.prefixPaddingMs || config.prefix);
+        silenceDurationMs = Number(this.tenant?.silenceDurationMs || config.silence);
+      }
       console.log(
         `[${this.callId}] ⚡ FAST-LOCK (Pós-AMD): Linha ${this.lineType.toUpperCase()} | Ambiente ${this.currentProfile} | VAD ${vadThreshold} | Silêncio ${silenceDurationMs}ms (Sonar pulado para 0ms de atraso)`
       );
 
       // Chaveamento Dinâmico para ECAPA em ambiente ruidoso
-      if (['STREET', 'TV', 'OFFICE'].includes(this.currentProfile) && (this.crosstalkMode === 'atual' || this.crosstalkMode === 'dsp')) {
+      if (this.audioFilters.crosstalkDynamicEcapaEnabled && ['STREET', 'TV', 'OFFICE'].includes(this.currentProfile) && (this.crosstalkMode === 'atual' || this.crosstalkMode === 'dsp')) {
         this.switchCrosstalkFilter('ecapa', `Ambiente ruidoso detectado pós-AMD (${this.currentProfile})`);
       }
-    } else if (bargeinLevel >= 3) {
+    } else if (bargeinLevel >= 3 && this.audioFilters.aecSonarEnabled) {
       this.safeApi(`uuid_setvar ${this.channelUuid} echo_cancellation false`);
       await wait(150);
       if (this.isTerminated || !this.endpoint) return;
@@ -1350,26 +1363,31 @@ class OpenAIS2SBridge {
         this.safeApi(`uuid_setvar ${this.channelUuid} echo_cancellation false`);
       }
 
-      this.currentProfile = this.energyManager.getClassification();
-      const lineProfiles = this.profilesByLine[this.lineType] || this.profilesByLine.trunk_sip;
-      const config = lineProfiles[this.currentProfile][this.deviceMode === 'fone_ouvido' ? 'fone' : 'viva'];
+      if (this.audioFilters.energyVadEnabled) {
+        this.currentProfile = this.energyManager.getClassification();
+        const lineProfiles = this.profilesByLine[this.lineType] || this.profilesByLine.trunk_sip;
+        const config = lineProfiles[this.currentProfile][this.deviceMode === 'fone_ouvido' ? 'fone' : 'viva'];
 
-      vadThreshold = Number(this.tenant?.vadThreshold || config.base);
-      prefixPaddingMs = Number(this.tenant?.prefixPaddingMs || config.prefix);
-      silenceDurationMs = Number(this.tenant?.silenceDurationMs || config.silence);
+        vadThreshold = Number(this.tenant?.vadThreshold || config.base);
+        prefixPaddingMs = Number(this.tenant?.prefixPaddingMs || config.prefix);
+        silenceDurationMs = Number(this.tenant?.silenceDurationMs || config.silence);
+      }
 
       console.log(
         `[${this.callId}] 🎯 SONAR LOCK: Linha ${this.lineType.toUpperCase()} | Dispositivo ${this.deviceMode.toUpperCase()} | Ambiente ${this.currentProfile} | VAD ${vadThreshold} | Silêncio ${silenceDurationMs}ms`
       );
 
       // Chaveamento Dinâmico para ECAPA em ambiente ruidoso
-      if (['STREET', 'TV', 'OFFICE'].includes(this.currentProfile) && (this.crosstalkMode === 'atual' || this.crosstalkMode === 'dsp')) {
+      if (this.audioFilters.crosstalkDynamicEcapaEnabled && ['STREET', 'TV', 'OFFICE'].includes(this.currentProfile) && (this.crosstalkMode === 'atual' || this.crosstalkMode === 'dsp')) {
         this.switchCrosstalkFilter('ecapa', `Ambiente ruidoso detectado na calibração Sonar (${this.currentProfile})`);
       }
-    } else {
+    } else if (this.audioFilters.aecSonarEnabled) {
       this.calibrationActive = false;
       this.endpoint.play('tone_stream://v=-13;%(500,0,425)').catch(() => {});
       await wait(500);
+    } else {
+      this.calibrationActive = false;
+      this.safeApi(`uuid_setvar ${this.channelUuid} echo_cancellation false`);
     }
 
     if (this.isTerminated) return;
@@ -1635,9 +1653,13 @@ class OpenAIS2SBridge {
       this.frameVad = null;
     } else {
       this.crosstalkFilter = null;
-      const frameVadMinRms = Number(this.tenant?.bargeinMinRms || process.env.BARGEIN_MIN_RMS || 550);
-      const frameVadAttack = Number(this.tenant?.bargeinAttackFrames || process.env.BARGEIN_ATTACK_FRAMES || 3);
-      this.frameVad = new FrameVad({ minRms: frameVadMinRms, attackFrames: frameVadAttack, noiseRatio: 2.8 });
+      if (this.audioFilters?.frameVadEnabled !== false) {
+        const frameVadMinRms = Number(this.tenant?.bargeinMinRms || process.env.BARGEIN_MIN_RMS || 550);
+        const frameVadAttack = Number(this.tenant?.bargeinAttackFrames || process.env.BARGEIN_ATTACK_FRAMES || 3);
+        this.frameVad = new FrameVad({ minRms: frameVadMinRms, attackFrames: frameVadAttack, noiseRatio: 2.8 });
+      } else {
+        this.frameVad = null;
+      }
     }
 
     if (this.whisperSession) {

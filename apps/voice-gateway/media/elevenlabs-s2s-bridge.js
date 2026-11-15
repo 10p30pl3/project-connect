@@ -184,9 +184,19 @@ class ElevenLabsS2SBridge extends EventEmitter {
     this.dynamicEcapaSwitched = false;
     this.crosstalkRatio = crosstalkRatio;
 
+    const af = this.tenant.audioFilters || {};
+    this.audioFilters = {
+      crosstalkDynamicEcapaEnabled: af.crosstalkDynamicEcapaEnabled !== false,
+      aecSonarEnabled: af.aecSonarEnabled !== false,
+      energyVadEnabled: af.energyVadEnabled !== false,
+      noiseSuppressionEnabled: Boolean(af.noiseSuppressionEnabled),
+      inputGainAttenuationEnabled: af.inputGainAttenuationEnabled !== false,
+      frameVadEnabled: af.frameVadEnabled !== false,
+    };
+
     const frameVadMinRms = Number(this.tenant?.bargeinMinRms || process.env.BARGEIN_MIN_RMS || 550);
     const frameVadAttack = Number(this.tenant?.bargeinAttackFrames || process.env.BARGEIN_ATTACK_FRAMES || 3);
-    this.frameVad = this.crosstalkFilter
+    this.frameVad = (this.crosstalkFilter || !this.audioFilters.frameVadEnabled)
       ? null
       : new FrameVad({ minRms: frameVadMinRms, attackFrames: frameVadAttack, noiseRatio: 2.8 });
 
@@ -1140,17 +1150,17 @@ class ElevenLabsS2SBridge extends EventEmitter {
     }
 
     this.safeApi(`uuid_setvar ${this.channelUuid} echo_cancellation false`);
-    // Desativa supressao Speex no FreeSWITCH para evitar voz metalica/abafada em G.711/PCM
-    this.safeApi(`uuid_setvar ${this.channelUuid} noise_suppression false`);
-    // Ajuste de ganho de entrada (-3dB) para evitar saturação analógica/clipping digital (pico > 32000)
-    this.safeApi(`uuid_setvar ${this.channelUuid} rtp_audio_in_level -3`);
+    // Supressão Speex no FreeSWITCH (desativada por padrão para evitar voz metálica em G.711/PCM)
+    this.safeApi(`uuid_setvar ${this.channelUuid} noise_suppression ${this.audioFilters.noiseSuppressionEnabled ? 'true' : 'false'}`);
+    // Ajuste de ganho de entrada (-3dB quando ativo) para evitar saturação analógica/clipping digital (pico > 32000)
+    this.safeApi(`uuid_setvar ${this.channelUuid} rtp_audio_in_level ${this.audioFilters.inputGainAttenuationEnabled ? '-3' : '0'}`);
 
     let vadThreshold = 0.45;
     let silenceDurationMs = 280;
 
     // 3. Inicia ponte de áudio recebendo Buffer binário direto
     this.energyManager.reset();
-    this.calibrationActive = true;
+    this.calibrationActive = this.audioFilters.aecSonarEnabled || this.audioFilters.energyVadEnabled;
 
     this.mediaBridge.on('playback_ended', () => {
       this.isAgentTalking = false;
@@ -1208,7 +1218,7 @@ class ElevenLabsS2SBridge extends EventEmitter {
             ? this.crosstalkFilter.process(buffer, isAgentReallyPlaying)
             : false;
 
-          if (!this.dynamicEcapaSwitched && this.crosstalkFilter.noiseFloor >= 200) {
+          if (this.audioFilters.crosstalkDynamicEcapaEnabled && !this.dynamicEcapaSwitched && this.crosstalkFilter.noiseFloor >= 200) {
             this.dynamicEcapaSwitched = true;
             this.switchCrosstalkFilter('ecapa', `Piso de ruído elevado em tempo real (${Math.round(this.crosstalkFilter.noiseFloor)} RMS)`);
           }
@@ -1313,10 +1323,10 @@ class ElevenLabsS2SBridge extends EventEmitter {
         `[${this.callId}] ⚡ FAST-LOCK (Pós-AMD): Linha ${this.lineType.toUpperCase()} | Ambiente ${this.currentProfile} | VAD ${vadThreshold} | Silêncio ${silenceDurationMs}ms (Sonar pulado para 0ms de atraso)`
       );
 
-      if (['STREET', 'TV', 'OFFICE'].includes(this.currentProfile) && (this.crosstalkMode === 'atual' || this.crosstalkMode === 'dsp')) {
+      if (this.audioFilters.crosstalkDynamicEcapaEnabled && ['STREET', 'TV', 'OFFICE'].includes(this.currentProfile) && (this.crosstalkMode === 'atual' || this.crosstalkMode === 'dsp')) {
         this.switchCrosstalkFilter('ecapa', `Ambiente ruidoso detectado pós-AMD (${this.currentProfile})`);
       }
-    } else if (bargeinLevel >= 3) {
+    } else if (bargeinLevel >= 3 && this.audioFilters.aecSonarEnabled) {
       this.safeApi(`uuid_setvar ${this.channelUuid} echo_cancellation false`);
       await wait(150);
       if (this.isTerminated || !this.endpoint) return;
@@ -1359,13 +1369,16 @@ class ElevenLabsS2SBridge extends EventEmitter {
         `[${this.callId}] 🎯 SONAR LOCK: Linha ${this.lineType.toUpperCase()} | Dispositivo ${this.deviceMode.toUpperCase()} | Ambiente ${this.currentProfile} | VAD ${vadThreshold} | Silêncio ${silenceDurationMs}ms`
       );
 
-      if (['STREET', 'TV', 'OFFICE'].includes(this.currentProfile) && (this.crosstalkMode === 'atual' || this.crosstalkMode === 'dsp')) {
+      if (this.audioFilters.crosstalkDynamicEcapaEnabled && ['STREET', 'TV', 'OFFICE'].includes(this.currentProfile) && (this.crosstalkMode === 'atual' || this.crosstalkMode === 'dsp')) {
         this.switchCrosstalkFilter('ecapa', `Ambiente ruidoso detectado na calibração Sonar (${this.currentProfile})`);
       }
-    } else {
+    } else if (this.audioFilters.aecSonarEnabled) {
       this.calibrationActive = false;
       this.endpoint.play('tone_stream://v=-13;%(500,0,425)').catch(() => {});
       await wait(500);
+    } else {
+      this.calibrationActive = false;
+      this.safeApi(`uuid_setvar ${this.channelUuid} echo_cancellation false`);
     }
 
     if (this.isTerminated) return;

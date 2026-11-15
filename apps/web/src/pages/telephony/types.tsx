@@ -217,6 +217,32 @@ export type AiStatementItem = {
   costUsd?: number;
 };
 
+export type AudioFiltersConfig = {
+  crosstalkMode: 'atual' | 'wespeaker' | 'ecapa' | 'none';
+  crosstalkRatio: number;
+  crosstalkDynamicEcapaEnabled: boolean;
+  aecSonarEnabled: boolean;
+  energyVadEnabled: boolean;
+  noiseSuppressionEnabled: boolean;
+  inputGainAttenuationEnabled: boolean;
+  bargeinEnabled: boolean;
+  bargeinLevel: number;
+  bargeinGraceEnabled: boolean;
+  bargeinGraceSec: number;
+  frameVadEnabled: boolean;
+  firAntialiasingEnabled: boolean;
+};
+
+export type AudioFiltersResponse = {
+  ok: boolean;
+  gatewayOnline: boolean;
+  gatewaySupportsGranularFilters: boolean;
+  canManageGlobal: boolean;
+  filters: AudioFiltersConfig;
+  features?: VoiceFeature[];
+  updatedAt?: string | null;
+};
+
 export type VoiceFeature = {
   id: string;
   name: string;

@@ -12,12 +12,14 @@ import {
   PhoneCall,
   RefreshCw,
   Settings,
+  SlidersHorizontal,
   Smartphone,
 } from 'lucide-react';
 import { isSuperAdminRole } from '@voll/shared';
 import { get } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useExperienceMode } from '../lib/experience-mode';
+import { AdvancedMonitorModal } from '../components/AdvancedMonitorModal';
 import { Badge, Button, PageHeader, Stat, Tabs } from '../components/ui';
 import { ExtensionsTab } from './telephony/ExtensionsTab';
 import { RecordingsTab } from './telephony/RecordingsTab';
@@ -46,6 +48,7 @@ export function TelephonyPage() {
         ? rawParamTab
         : 'recordings';
   const [tab, setTabState] = useState(normalizedInitial);
+  const [advancedMonitorOpen, setAdvancedMonitorOpen] = useState(false);
 
   useEffect(() => {
     const paramTab = searchParams.get('tab');
@@ -125,13 +128,24 @@ export function TelephonyPage() {
         title={mode === 'basic' ? 'Telefonia & Gravações' : 'Telefonia · Voll Connect'}
         tooltip="Infraestrutura de voz: gravações estéreo, ramais SIP, troncos, rotas, provedores IA e motores DSP."
         actions={
-          <Button
-            variant="secondary"
-            icon={<RefreshCw className={`size-4 ${statusQ.isFetching ? 'animate-spin' : ''}`} aria-hidden />}
-            onClick={() => qc.invalidateQueries({ queryKey: ['telephony'] })}
-          >
-            Atualizar
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {isAtLeast('advanced') && (
+              <Button
+                variant="primary"
+                icon={<SlidersHorizontal className="size-4" aria-hidden />}
+                onClick={() => setAdvancedMonitorOpen(true)}
+              >
+                Monitoramento Avançado
+              </Button>
+            )}
+            <Button
+              variant="secondary"
+              icon={<RefreshCw className={`size-4 ${statusQ.isFetching ? 'animate-spin' : ''}`} aria-hidden />}
+              onClick={() => qc.invalidateQueries({ queryKey: ['telephony'] })}
+            >
+              Atualizar
+            </Button>
+          </div>
         }
       />
 
@@ -236,6 +250,15 @@ export function TelephonyPage() {
             : []),
         ]}
       />
+
+      {isAtLeast('advanced') && (
+        <AdvancedMonitorModal
+          open={advancedMonitorOpen}
+          onOpenChange={setAdvancedMonitorOpen}
+          initialSection="filters"
+          onOpenDialer={() => navigate('/?dial=1')}
+        />
+      )}
     </div>
   );
 }

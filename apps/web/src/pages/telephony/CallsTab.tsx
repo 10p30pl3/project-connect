@@ -40,6 +40,7 @@ import {
   Textarea,
   useToast,
 } from '../../components/ui';
+import { AdvancedMonitorModal } from '../../components/AdvancedMonitorModal';
 import { LiveVoiceMonitor } from '../../components/LiveVoiceMonitor';
 import {
   elapsedSince,
@@ -99,6 +100,9 @@ export function CallsTab({
   const [xferMode, setXferMode] = useState<'blind' | 'refer'>('blind');
 
   const [transcriptCallId, setTranscriptCallId] = useState<string | null>(null);
+  const [advancedMonitorOpen, setAdvancedMonitorOpen] = useState(false);
+  const [advancedMonitorInitCallId, setAdvancedMonitorInitCallId] = useState<string | null>(null);
+  const [advancedMonitorInitSection, setAdvancedMonitorInitSection] = useState<'filters' | 'monitor'>('filters');
   const [autoScrollPaused, setAutoScrollPaused] = useState(false);
   const transcriptScrollRef = useRef<HTMLDivElement | null>(null);
   const transcriptPreRef = useRef<HTMLPreElement | null>(null);
@@ -413,16 +417,32 @@ export function CallsTab({
         }
         tooltip="Monitoramento em tempo real (atualização a cada 3s) com comandos completos In-Call."
         actions={
-          canOperate && (
-            <Button
-              size="sm"
-              variant="primary"
-              icon={<PhoneOutgoing className="size-3.5" aria-hidden />}
-              onClick={() => setOriginateOpen(true)}
-            >
-              Nova Ligação de Teste
-            </Button>
-          )
+          <div className="flex flex-wrap items-center gap-2">
+            {isAtLeast('advanced') && (
+              <Button
+                size="sm"
+                variant="secondary"
+                icon={<SlidersHorizontal className="size-3.5" aria-hidden />}
+                onClick={() => {
+                  setAdvancedMonitorInitCallId(calls[0]?.callId ?? null);
+                  setAdvancedMonitorInitSection('filters');
+                  setAdvancedMonitorOpen(true);
+                }}
+              >
+                Monitoramento Avançado
+              </Button>
+            )}
+            {canOperate && (
+              <Button
+                size="sm"
+                variant="primary"
+                icon={<PhoneOutgoing className="size-3.5" aria-hidden />}
+                onClick={() => setOriginateOpen(true)}
+              >
+                Nova Ligação de Teste
+              </Button>
+            )}
+          </div>
         }
         padded={false}
       >
@@ -432,7 +452,25 @@ export function CallsTab({
           <div className="p-4"><GatewayError error={liveQ.error} onRetry={() => liveQ.refetch()} /></div>
         ) : !calls.length ? (
           <div className="p-6">
-            <Empty title="Nenhuma chamada ativa no momento">
+            <Empty
+              title="Nenhuma chamada ativa no momento"
+              action={
+                isAtLeast('advanced') ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    icon={<SlidersHorizontal className="size-3.5" aria-hidden />}
+                    onClick={() => {
+                      setAdvancedMonitorInitCallId(null);
+                      setAdvancedMonitorInitSection('filters');
+                      setAdvancedMonitorOpen(true);
+                    }}
+                  >
+                    Abrir Monitoramento Avançado
+                  </Button>
+                ) : undefined
+              }
+            >
               Clique em &ldquo;Nova Ligação de Teste&rdquo; ou ligue de um ramal para 9000 para testar o agente de IA.
             </Empty>
           </div>
@@ -1135,6 +1173,22 @@ export function CallsTab({
               {liveTranscriptQ.dataUpdatedAt > 0 && (
                 <span>Atualizado: <strong className="font-mono text-slate-700">{fmtFullDateTimeSec(liveTranscriptQ.dataUpdatedAt)}</strong></span>
               )}
+              {isAtLeast('advanced') && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  icon={<SlidersHorizontal className="size-3" aria-hidden />}
+                  onClick={() => {
+                    const currentId = transcriptCallId;
+                    setTranscriptCallId(null);
+                    setAdvancedMonitorInitCallId(currentId);
+                    setAdvancedMonitorInitSection('filters');
+                    setAdvancedMonitorOpen(true);
+                  }}
+                >
+                  Filtros de Áudio
+                </Button>
+              )}
             </div>
           </div>
 
@@ -1403,6 +1457,16 @@ export function CallsTab({
           </div>
         )}
       </Modal>
+
+      {isAtLeast('advanced') && (
+        <AdvancedMonitorModal
+          open={advancedMonitorOpen}
+          onOpenChange={setAdvancedMonitorOpen}
+          initialCallId={advancedMonitorInitCallId}
+          initialSection={advancedMonitorInitSection}
+          onOpenDialer={canOperate ? () => setOriginateOpen(true) : undefined}
+        />
+      )}
     </div>
   );
 }

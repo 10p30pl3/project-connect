@@ -352,6 +352,9 @@ function createApiRouter({ activeBridges, tenantManager, fsPool, whisperPool, me
       process.env.CROSSTALK_RATIO ||
       0.45
     );
+    const af = tenant.audioFilters || {};
+    const aecActive = af.aecSonarEnabled !== false;
+    const energyVadActive = af.energyVadEnabled !== false;
 
     return [
       {
@@ -359,8 +362,8 @@ function createApiRouter({ activeBridges, tenantManager, fsPool, whisperPool, me
         name: 'Cancelamento de Eco (AEC Dinâmico)',
         icon: '🛡️',
         category: 'DSP & Acústica',
-        active: true,
-        badge: 'ATIVO (SONAR)',
+        active: aecActive,
+        badge: aecActive ? 'ATIVO (SONAR)' : 'DESATIVADO',
         mode: 'Sonda 425Hz na Conexão',
         detail: 'Sonda acústica calibrada em 425Hz nos primeiros 700ms. Identifica fone de ouvido vs viva-voz e chaveia o AEC dinâmico no FreeSWITCH sob demanda (economia de ~30% de CPU).',
         parameters: {
@@ -375,8 +378,8 @@ function createApiRouter({ activeBridges, tenantManager, fsPool, whisperPool, me
         name: 'Medição de Ruído & VAD Dinâmico',
         icon: '📊',
         category: 'DSP & Acústica',
-        active: true,
-        badge: 'ATIVO (4 PERFIS)',
+        active: energyVadActive,
+        badge: energyVadActive ? 'ATIVO (4 PERFIS)' : 'DESATIVADO',
         mode: 'EnergyManager RMS em Tempo Real',
         detail: 'Calcula energia RMS contínua e classifica em 4 perfis acústicos (SILENCE, OFFICE, STREET, TV). Readequa dinamicamente VAD (0.38 a 0.95), prefix padding e silêncio.',
         parameters: {
@@ -392,7 +395,7 @@ function createApiRouter({ activeBridges, tenantManager, fsPool, whisperPool, me
         icon: '⚡',
         category: 'Interação em Tempo Real',
         active: bargeinLevel > 0,
-        badge: `NÍVEL ${bargeinLevel} (ATIVO)`,
+        badge: bargeinLevel > 0 ? `NÍVEL ${bargeinLevel} (ATIVO)` : 'DESATIVADO',
         mode: 'Corte Imediato & Limpeza de Playout',
         detail: 'Corta instantaneamente a voz da IA ao detectar fala do cliente. Envia response.cancel para a OpenAI e executa mod_audio_fork stop_play e uuid_break para silêncio imediato (<15ms).',
         parameters: {
@@ -963,6 +966,105 @@ function createApiRouter({ activeBridges, tenantManager, fsPool, whisperPool, me
         tenantId,
         mode,
         crosstalkFilter: targetTenant.crosstalkFilter || { mode }
+      });
+      return true;
+    }
+
+    if (req.method === 'GET' && cleanPath === '/v1/features/audio-filters') {
+      const tenantId = parsedUrl.searchParams.get('tenantId') || 'default';
+      const targetTenant = tenantManager.tenants.get(tenantId) || tenantManager.getDefaultTenant();
+      const af = targetTenant.audioFilters || {};
+      const xtalkMode = (targetTenant.crosstalkFilter && targetTenant.crosstalkFilter.mode) || process.env.CROSSTALK_FILTER_MODE || 'atual';
+      const xtalkRatio = Number((targetTenant.crosstalkFilter && targetTenant.crosstalkFilter.ratio) || process.env.CROSSTALK_RATIO || 0.45);
+      const bargeinLevel = Number(targetTenant.bargeinLevel ?? 3);
+      const bargeinGraceSec = Number(targetTenant.bargeinGraceSec ?? 8);
+      sendJson(res, 200, {
+        ok: true,
+        tenantId,
+        filters: {
+          crosstalkMode: xtalkMode === 'dsp' ? 'atual' : xtalkMode,
+          crosstalkRatio: xtalkRatio,
+          crosstalkDynamicEcapaEnabled: af.crosstalkDynamicEcapaEnabled !== false,
+          aecSonarEnabled: af.aecSonarEnabled !== false,
+          energyVadEnabled: af.energyVadEnabled !== false,
+          noiseSuppressionEnabled: Boolean(af.noiseSuppressionEnabled),
+          inputGainAttenuationEnabled: af.inputGainAttenuationEnabled !== false,
+          bargeinEnabled: bargeinLevel > 0,
+          bargeinLevel,
+          bargeinGraceEnabled: bargeinGraceSec > 0,
+          bargeinGraceSec,
+          frameVadEnabled: af.frameVadEnabled !== false,
+          firAntialiasingEnabled: (targetTenant.audioCodec || 'pcm24k') !== 'g711_ulaw'
+        }
+      });
+      return true;
+    }
+
+    if ((req.method === 'POST' || req.method === 'PUT') && cleanPath === '/v1/features/audio-filters') {
+      const tenantId = body.tenantId || 'default';
+      const targetTenant = tenantManager.tenants.get(tenantId) || tenantManager.getDefaultTenant();
+      const src = body.filters && typeof body.filters === 'object' ? body.filters : body;
+      const validModes = ['atual', 'dsp', 'wespeaker', 'ecapa', 'none'];
+      const rawMode = String(src.crosstalkMode || targetTenant.crosstalkFilter?.mode || 'atual').toLowerCase().trim();
+      const mode = validModes.includes(rawMode) ? (rawMode === 'dsp' ? 'atual' : rawMode) : 'atual';
+      const ratio = src.crosstalkRatio !== undefined ? Number(src.crosstalkRatio) : Number(targetTenant.crosstalkFilter?.ratio ?? 0.45);
+      const bargeinEnabled = typeof src.bargeinEnabled === 'boolean' ? src.bargeinEnabled : Number(targetTenant.bargeinLevel ?? 3) > 0;
+      const bargeinLevel = bargeinEnabled ? Math.max(1, Number(src.bargeinLevel ?? targetTenant.bargeinLevel ?? 3)) : 0;
+      const bargeinGraceEnabled = typeof src.bargeinGraceEnabled === 'boolean' ? src.bargeinGraceEnabled : Number(targetTenant.bargeinGraceSec ?? 8) > 0;
+      const bargeinGraceSec = bargeinGraceEnabled ? Math.max(1, Number(src.bargeinGraceSec ?? targetTenant.bargeinGraceSec ?? 8)) : 0;
+      const nextAudioFilters = {
+        ...(targetTenant.audioFilters || {}),
+        ...(typeof src.crosstalkDynamicEcapaEnabled === 'boolean' ? { crosstalkDynamicEcapaEnabled: src.crosstalkDynamicEcapaEnabled } : {}),
+        ...(typeof src.aecSonarEnabled === 'boolean' ? { aecSonarEnabled: src.aecSonarEnabled } : {}),
+        ...(typeof src.energyVadEnabled === 'boolean' ? { energyVadEnabled: src.energyVadEnabled } : {}),
+        ...(typeof src.noiseSuppressionEnabled === 'boolean' ? { noiseSuppressionEnabled: src.noiseSuppressionEnabled } : {}),
+        ...(typeof src.inputGainAttenuationEnabled === 'boolean' ? { inputGainAttenuationEnabled: src.inputGainAttenuationEnabled } : {}),
+        ...(typeof src.frameVadEnabled === 'boolean' ? { frameVadEnabled: src.frameVadEnabled } : {}),
+        ...(typeof src.firAntialiasingEnabled === 'boolean' ? { firAntialiasingEnabled: src.firAntialiasingEnabled } : {})
+      };
+      const audioCodec =
+        typeof src.firAntialiasingEnabled === 'boolean'
+          ? (src.firAntialiasingEnabled ? 'pcm24k' : 'g711_ulaw')
+          : targetTenant.audioCodec;
+
+      const updatedTenant = tenantManager.upsertTenant({
+        ...targetTenant,
+        id: tenantId,
+        bargeinLevel,
+        bargeinGraceSec,
+        audioCodec,
+        crosstalkFilter: {
+          ...(targetTenant.crosstalkFilter || {}),
+          mode,
+          ratio
+        },
+        audioFilters: nextAudioFilters
+      });
+
+      if (tenantId === 'default') {
+        process.env.CROSSTALK_FILTER_MODE = mode;
+      }
+
+      if (body.applyToCallId) {
+        const bridge = resolveBridge(activeBridges, String(body.applyToCallId));
+        if (bridge && typeof bridge.switchCrosstalkFilter === 'function') {
+          bridge.switchCrosstalkFilter(mode, 'audio_filters_panel');
+        }
+      }
+
+      sendJson(res, 200, {
+        ok: true,
+        tenantId,
+        filters: {
+          crosstalkMode: mode,
+          crosstalkRatio: ratio,
+          ...updatedTenant.audioFilters,
+          bargeinEnabled: bargeinLevel > 0,
+          bargeinLevel,
+          bargeinGraceEnabled: bargeinGraceSec > 0,
+          bargeinGraceSec,
+          firAntialiasingEnabled: updatedTenant.audioCodec !== 'g711_ulaw'
+        }
       });
       return true;
     }
