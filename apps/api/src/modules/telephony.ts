@@ -354,6 +354,31 @@ function jsonInit(method: string, body?: unknown): RequestInit {
   };
 }
 
+export async function telephonyPublicRoutes(app: FastifyInstance) {
+  app.get('/telephony/webrtc/widget.js', async (_req, reply) => {
+    const masterId = await getMasterWorkspaceId();
+    const baseUrl = String(process.env.VOICE_APP_BASE_URL || '').trim().replace(/\/+$/, '');
+    let res: Response;
+    if (masterId) {
+      res = await callGateway(masterId, '/voll-voice-widget.js');
+    } else if (baseUrl) {
+      const token = String(process.env.VOICE_APP_TOKEN || process.env.API_AUTH_TOKEN || '').trim();
+      res = await fetch(`${baseUrl}/voll-voice-widget.js`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+      });
+    } else {
+      throw new HttpError(503, 'Widget WebRTC indisponível', 'Gateway de voz não configurado.');
+    }
+    if (!res.ok) {
+      throw new HttpError(res.status === 404 ? 404 : 502, 'Widget WebRTC indisponível', `HTTP ${res.status}`);
+    }
+    const script = await res.text();
+    reply.header('Content-Type', 'application/javascript; charset=utf-8');
+    return reply.send(script);
+  });
+}
+
 export async function telephonyRoutes(app: FastifyInstance) {
   const manageGuard = { preHandler: requireRoles(...CAN.admin) };
   const operateGuard = { preHandler: requireRoles(...CAN.supervise, ...CAN.operate) };
@@ -1313,16 +1338,5 @@ export async function telephonyRoutes(app: FastifyInstance) {
   app.delete<{ Params: { callId: string } }>('/telephony/webrtc/:callId', operateGuard, async (req) => {
     const a = actor(req);
     return proxyJson(a.workspaceId, `/v1/webrtc/${enc(req.params.callId)}`, { method: 'DELETE' });
-  });
-
-  app.get('/telephony/webrtc/widget.js', async (req, reply) => {
-    const a = actor(req);
-    const res = await callGateway(a.workspaceId, '/voll-voice-widget.js');
-    if (!res.ok) {
-      throw new HttpError(res.status === 404 ? 404 : 502, 'Widget WebRTC indisponível', `HTTP ${res.status}`);
-    }
-    const script = await res.text();
-    reply.header('Content-Type', 'application/javascript; charset=utf-8');
-    return reply.send(script);
   });
 }

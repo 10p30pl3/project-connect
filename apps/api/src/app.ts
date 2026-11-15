@@ -22,7 +22,7 @@ import { intelligenceRoutes } from './modules/intelligence.js';
 import { reportRoutes } from './modules/reports.js';
 import { aiRoutes } from './modules/ai.js';
 import { voiceAgentRoutes } from './modules/voice-agent.js';
-import { telephonyRoutes } from './modules/telephony.js';
+import { telephonyPublicRoutes, telephonyRoutes } from './modules/telephony.js';
 import { billingRoutes } from './modules/billing.js';
 import { validateEnv } from './config/env-validator.js';
 import { ensureUpcomingPartitions } from './db/partition-service.js';
@@ -148,6 +148,7 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     async (api) => {
       await authRoutes(api, { loginRateMax: opts.loginRateMax ?? 20 });
       await connectorRoutes(api); // público, autenticado por HMAC
+      await telephonyPublicRoutes(api); // entrega pública do bundle estático /voll-voice-widget.js
       await api.register(async (p) => {
         p.addHook('preHandler', authenticate);
         await overviewRoutes(p);
