@@ -204,9 +204,14 @@ export function LiveVoiceMonitor({
               if (!rawJson) continue;
               try {
                 const payload = JSON.parse(rawJson);
+                const toUnit = (v: unknown) => Math.max(0, Math.min(1, Number(v ?? 0) / 100));
                 if (currentEvent === 'init') {
                   if (Array.isArray(payload.samples)) {
-                    samplesRef.current = payload.samples.slice(-220);
+                    samplesRef.current = payload.samples.slice(-220).map((s: WaveSample) => ({
+                      t: Number(s.t ?? Date.now()),
+                      caller: toUnit(s.caller),
+                      agent: toUnit(s.agent),
+                    }));
                   }
                   if (Array.isArray(payload.latencyHistory)) {
                     turnsRef.current = payload.latencyHistory.slice(-40);
@@ -216,7 +221,11 @@ export function LiveVoiceMonitor({
                   }
                   if (payload.stats) setStats(payload.stats);
                 } else if (currentEvent === 'wave_sample') {
-                  samplesRef.current.push(payload);
+                  samplesRef.current.push({
+                    t: Number(payload.t ?? Date.now()),
+                    caller: toUnit(payload.caller),
+                    agent: toUnit(payload.agent),
+                  });
                   if (samplesRef.current.length > 220) samplesRef.current.shift();
                 } else if (currentEvent === 'latency_turn') {
                   turnsRef.current.push(payload);
