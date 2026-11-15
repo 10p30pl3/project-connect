@@ -12,6 +12,7 @@ const {
 const { redactPii } = require('../utils/pii-redactor');
 const { assertSafeToolUrl } = require('../utils/tool-executor');
 const { buildConnectorEvent, validateConnectorEvent } = require('../utils/voll-contract');
+const CrosstalkFilter = require('../utils/crosstalk-filter');
 
 test('LiveMonitor mede latencia de turno e agrega picos L/R', () => {
   const mon = new LiveMonitor({ callId: 'c-mon-1' });
@@ -108,4 +109,25 @@ test('buildConnectorEvent inclui recordingUrl, amdResult, extractedData e latenc
     latencyStats: { p50Ms: 210, lastMs: 205, maxMs: 260, turnsCount: 3 },
   });
   assert.deepStrictEqual(validateConnectorEvent(ev), { ok: true, errors: [] });
+});
+
+test('CrosstalkFilter valida barge-in com 2 frames, teto dinamico <= 650 RMS e janela wasRecentlySpeaking(800)', () => {
+  const filter = new CrosstalkFilter({ initialUserRms: 5000, attackFrames: 2 });
+  assert.strictEqual(filter.isActivelySpeaking(true), false);
+  assert.strictEqual(filter.wasRecentlySpeaking(800), false);
+
+  // Gera um frame PCM16 de 20ms (160 samples) com energia firme (~700 RMS) acima do teto dinâmico de 650 RMS
+  const pcmBargeIn = Buffer.alloc(320);
+  for (let i = 0; i < 160; i++) {
+    pcmBargeIn.writeInt16LE(i % 2 === 0 ? 700 : -700, i * 2);
+  }
+
+  // 1o frame: acumula consecutiveAbove = 1 (< attackFrames 2)
+  assert.strictEqual(filter.process(pcmBargeIn, true), false);
+  assert.strictEqual(filter.isActivelySpeaking(true), false);
+
+  // 2o frame consecutivo (40ms): abre gate e aciona barge-in determinístico
+  assert.strictEqual(filter.process(pcmBargeIn, true), true);
+  assert.strictEqual(filter.isActivelySpeaking(true), true);
+  assert.strictEqual(filter.wasRecentlySpeaking(800), true);
 });

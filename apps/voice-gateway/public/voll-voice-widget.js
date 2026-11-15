@@ -22,6 +22,7 @@
       this.localStream = null;
       this.remoteAudio = null;
       this.callId = null;
+      this.controlToken = null;
       this.muted = false;
       this.state = 'idle';
     }
@@ -125,6 +126,7 @@
         }
 
         this.callId = data.callId;
+        this.controlToken = data.controlToken || null;
         await this.pc.setRemoteDescription({ type: 'answer', sdp: data.sdpAnswer });
         this._setState('connected');
       } catch (err) {
@@ -154,14 +156,23 @@
 
     async stop(skipRemote = false) {
       const cid = this.callId;
+      const ctrl = this.controlToken;
       this.callId = null;
+      this.controlToken = null;
 
       if (!skipRemote && cid) {
         try {
           if (this.dc && this.dc.readyState === 'open') {
             this.dc.send(JSON.stringify({ type: 'hangup' }));
           }
-          global.fetch(`${this.serverUrl}/v1/webrtc/${encodeURIComponent(cid)}`, { method: 'DELETE' }).catch(() => {});
+          const delHeaders = {};
+          if (ctrl) delHeaders['X-WebRTC-Control-Token'] = ctrl;
+          if (this.publicWidgetKey) delHeaders['X-Widget-Key'] = this.publicWidgetKey;
+          if (this.apiToken) delHeaders['Authorization'] = `Bearer ${this.apiToken}`;
+          global.fetch(`${this.serverUrl}/v1/webrtc/${encodeURIComponent(cid)}`, {
+            method: 'DELETE',
+            headers: delHeaders
+          }).catch(() => {});
         } catch {}
       }
 

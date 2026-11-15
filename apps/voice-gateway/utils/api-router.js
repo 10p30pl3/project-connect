@@ -230,6 +230,50 @@ function createApiRouter({ activeBridges, tenantManager, fsPool, whisperPool, me
   const webrtcTokenSecret = process.env.WEBRTC_TOKEN_SECRET || process.env.API_AUTH_TOKEN || crypto.randomBytes(32).toString('hex');
   const usedWebRtcNonces = new Map();
   const webRtcIpHits = new Map();
+  const webrtcControlTokens = new Map();
+
+  function timingMatchToken(a, b) {
+    if (!a || !b) return false;
+    const ha = crypto.createHash('sha256').update(String(a)).digest();
+    const hb = crypto.createHash('sha256').update(String(b)).digest();
+    return crypto.timingSafeEqual(ha, hb);
+  }
+
+  function hasValidApiToken(req, parsedUrl) {
+    const configuredToken = process.env.API_AUTH_TOKEN;
+    if (!configuredToken) return true;
+    const authHeader = req.headers['authorization'] || '';
+    const apiKeyHeader = req.headers['x-api-key'] || '';
+    const queryToken = parsedUrl?.searchParams?.get('token') || '';
+    const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : authHeader.trim();
+    return (
+      timingMatchToken(bearerToken, configuredToken) ||
+      timingMatchToken(apiKeyHeader, configuredToken) ||
+      timingMatchToken(queryToken, configuredToken)
+    );
+  }
+
+  function isAuthorizedWebRtcControl(req, parsedUrl, targetCallId, body = {}) {
+    if (hasValidApiToken(req, parsedUrl)) return true;
+    const expected = webrtcControlTokens.get(targetCallId);
+    const providedCtrl = String(
+      req.headers['x-webrtc-control-token'] ||
+      req.headers['x-webrtc-token'] ||
+      body?.controlToken ||
+      ''
+    ).trim();
+    if (expected && timingMatchToken(providedCtrl, expected)) return true;
+    const widgetKey = String(req.headers['x-widget-key'] || body?.publicWidgetKey || '').trim();
+    if (widgetKey) {
+      const matched = tenantManager.listTenants().find((t) => t.active && t.publicWidgetKey === widgetKey);
+      if (matched) {
+        const origin = req.headers.origin || '';
+        const allowed = Array.isArray(matched.allowedOrigins) ? matched.allowedOrigins : [];
+        if (allowed.length === 0 || allowed.includes('*') || allowed.includes(origin)) return true;
+      }
+    }
+    return false;
+  }
 
   function issueWebRtcToken({ tenantId = 'default', caller = 'web-visitor', metadata = {}, ttlSec = 60 }) {
     const exp = Date.now() + Math.max(15, Math.min(300, Number(ttlSec) || 60)) * 1000;
@@ -698,12 +742,15 @@ function createApiRouter({ activeBridges, tenantManager, fsPool, whisperPool, me
           caller: resolvedCaller,
           metadata: resolvedMetadata
         });
+        const controlToken = crypto.randomBytes(24).toString('base64url');
+        webrtcControlTokens.set(session.callId, controlToken);
         sendJson(res, 200, {
           ok: true,
           callId: session.callId,
           sdpAnswer: session.sdpAnswer,
           type: session.type,
-          iceServers: session.iceServers
+          iceServers: session.iceServers,
+          controlToken
         });
       } catch (err) {
         sendJson(res, 400, { error: 'webrtc_offer_failed', message: err.message });
@@ -714,12 +761,16 @@ function createApiRouter({ activeBridges, tenantManager, fsPool, whisperPool, me
     const webrtcIceMatch = cleanPath.match(/^\/v1\/webrtc\/([^/]+)\/ice$/);
     if (req.method === 'POST' && webrtcIceMatch) {
       const targetCallId = decodeURIComponent(webrtcIceMatch[1]);
+      const body = await readJsonBody(req).catch(() => ({}));
+      if (!isAuthorizedWebRtcControl(req, parsedUrl, targetCallId, body)) {
+        sendJson(res, 401, { error: 'unauthorized', message: 'Autenticação ou token WebRTC inválido' });
+        return true;
+      }
       const bridge = activeBridges.get(targetCallId);
       if (!bridge || !bridge.webrtcBridge) {
         sendJson(res, 404, { error: 'not_found', message: 'Sessão WebRTC não encontrada' });
         return true;
       }
-      const body = await readJsonBody(req);
       if (body.candidate) {
         await bridge.webrtcBridge.addIceCandidate(body.candidate);
       }
@@ -730,6 +781,12 @@ function createApiRouter({ activeBridges, tenantManager, fsPool, whisperPool, me
     const webrtcCallMatch = cleanPath.match(/^\/v1\/webrtc\/([^/]+)$/);
     if (req.method === 'DELETE' && webrtcCallMatch) {
       const targetCallId = decodeURIComponent(webrtcCallMatch[1]);
+      const body = await readJsonBody(req).catch(() => ({}));
+      if (!isAuthorizedWebRtcControl(req, parsedUrl, targetCallId, body)) {
+        sendJson(res, 401, { error: 'unauthorized', message: 'Autenticação ou token WebRTC inválido' });
+        return true;
+      }
+      webrtcControlTokens.delete(targetCallId);
       const bridge = activeBridges.get(targetCallId);
       if (!bridge) {
         sendJson(res, 404, { error: 'not_found', message: 'Sessão WebRTC não encontrada' });
@@ -742,29 +799,13 @@ function createApiRouter({ activeBridges, tenantManager, fsPool, whisperPool, me
       return true;
     }
 
-    // Autenticação opcional por Token (se API_AUTH_TOKEN estiver definido no .env)
-    const configuredToken = process.env.API_AUTH_TOKEN;
-    if (configuredToken) {
-      const authHeader = req.headers['authorization'] || '';
-      const apiKeyHeader = req.headers['x-api-key'] || '';
-      const queryToken = parsedUrl.searchParams.get('token') || '';
-      const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : authHeader.trim();
-      const timingMatch = (a, b) => {
-        const ha = crypto.createHash('sha256').update(String(a || '')).digest();
-        const hb = crypto.createHash('sha256').update(String(b || '')).digest();
-        return crypto.timingSafeEqual(ha, hb);
-      };
-      if (
-        !timingMatch(bearerToken, configuredToken) &&
-        !timingMatch(apiKeyHeader, configuredToken) &&
-        !timingMatch(queryToken, configuredToken)
-      ) {
-        sendJson(res, 401, {
-          error: 'unauthorized',
-          message: 'Token de API inválido ou ausente (use Authorization: Bearer <token> ou X-API-Key)'
-        });
-        return true;
-      }
+    // Autenticação por Token (quando API_AUTH_TOKEN está definido no .env)
+    if (!hasValidApiToken(req, parsedUrl)) {
+      sendJson(res, 401, {
+        error: 'unauthorized',
+        message: 'Token de API inválido ou ausente (use Authorization: Bearer <token> ou X-API-Key)'
+      });
+      return true;
     }
 
     let body = {};

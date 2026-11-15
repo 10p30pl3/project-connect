@@ -211,6 +211,8 @@ class OpenAIS2SBridge {
     this.isTerminated = false;
     this.failureStage = 'none';
     this.correlationId = null;
+    this.turnWatchdogTimer = null;
+    this.turnWatchdogMs = Number(process.env.AI_TURN_WATCHDOG_MS || 20000);
 
     const sipBargeinGrace = this.sipHeaders['x-bargein-grace-sec'] || this.sipHeaders['X-Bargein-Grace-Sec'];
     this.bargeinGraceSec = Number(
@@ -296,6 +298,26 @@ class OpenAIS2SBridge {
 
     this.handleEslEvent = this.handleEslEvent.bind(this);
     this.handleDtmf = this.handleDtmf.bind(this);
+  }
+
+  _armTurnWatchdog() {
+    this._clearTurnWatchdog();
+    if (this.isTerminated) return;
+    this.turnWatchdogTimer = setTimeout(() => {
+      if (this.isTerminated) return;
+      console.error(`[${this.callId}] 🛑 Watchdog de turno IA expirou (${this.turnWatchdogMs}ms sem resposta). Encerrando chamada.`);
+      if (this.failureStage === 'none') {
+        this.failureStage = 'ai_provider';
+      }
+      this.terminateCall('ai_turn_timeout');
+    }, this.turnWatchdogMs);
+  }
+
+  _clearTurnWatchdog() {
+    if (this.turnWatchdogTimer) {
+      clearTimeout(this.turnWatchdogTimer);
+      this.turnWatchdogTimer = null;
+    }
   }
 
   setCleanupHandler(handler) {
@@ -486,6 +508,14 @@ class OpenAIS2SBridge {
       if (body.type === 'error') {
         if (body.error && body.error.code !== 'response_cancel_not_active') {
           console.error(`[${this.callId}] 🔴 Erro recebido da OpenAI Realtime:`, body.error);
+          const errStr = JSON.stringify(body.error);
+          if (/429|rate_limit|insufficient_quota|5\d\d|server_error|session_expired|invalid_api_key/i.test(errStr)) {
+            if (this.failureStage === 'none') {
+              this.failureStage = 'ai_provider';
+            }
+            this.terminateCall('openai_provider_error');
+            return;
+          }
         }
       }
 
@@ -555,6 +585,7 @@ class OpenAIS2SBridge {
       }
 
       if (body.type === 'response.output_audio.delta' && body.delta) {
+        this._clearTurnWatchdog();
         if (this.isResponseCancelled) {
           return;
         }
@@ -638,6 +669,7 @@ class OpenAIS2SBridge {
       }
 
       if (['response.output_audio.done', 'response.done'].includes(body.type)) {
+        this._clearTurnWatchdog();
         if (this.isAgentTalking) {
           this.resampler24to8.reset();
           this.reconFilter8k.reset();
@@ -690,6 +722,7 @@ class OpenAIS2SBridge {
         if (this.idleManager) {
           this.idleManager.onUserSpeech();
         }
+        this._armTurnWatchdog();
       }
 
       if (body.type === 'input_audio_buffer.speech_started') {
@@ -1046,13 +1079,18 @@ class OpenAIS2SBridge {
 
     // 2. Gravação Dual-Stream Stereo (.wav) + Transcrição (.txt) ativa por padrão (desacoplada do STT opcional; fail-open)
     if (this.tenant.recording?.enabled !== false && !this.isToneProbe) {
-      this.recorder = new CallRecorder({
-        callId: this.callId,
-        tenantId: this.tenant.id,
-        recordingDir: this.tenant.recordingDir
-      });
-      this.mediaBridge.setRecorder(this.recorder);
-      await this.recorder.start();
+      try {
+        this.recorder = new CallRecorder({
+          callId: this.callId,
+          tenantId: this.tenant.id,
+          recordingDir: this.tenant.recordingDir
+        });
+        this.mediaBridge.setRecorder(this.recorder);
+        await this.recorder.start();
+      } catch (recErr) {
+        console.warn(`[${this.callId}] ⚠️ Gravação falhou ao iniciar (fail-open, chamada mantida):`, recErr.message);
+        this.recorder = null;
+      }
     }
 
     // 2.1 Captura de DTMF In-Call via FreeSWITCH ESL / drachtio-fsmrf
@@ -1813,10 +1851,11 @@ class OpenAIS2SBridge {
       return;
     }
     this.isTerminated = true;
+    this._clearTurnWatchdog();
     if (this.failureStage === 'none') {
       if (reason === 'safety_limit_3_minutes') {
         this.failureStage = 'duration_cap';
-      } else if (reason.includes('openai') || reason.includes('elevenlabs')) {
+      } else if (reason.includes('openai') || reason.includes('elevenlabs') || reason === 'ai_turn_timeout') {
         this.failureStage = 'ai_provider';
       }
     }
@@ -1873,6 +1912,7 @@ class OpenAIS2SBridge {
       this.maxDurationTimer = null;
     }
 
+    this._clearTurnWatchdog();
     if (this.dtmfTimer) {
       clearTimeout(this.dtmfTimer);
       this.dtmfTimer = null;
@@ -2159,7 +2199,7 @@ async function originateOutboundCall(params) {
             ...callInfo,
             direction: 'outbound',
             hangupReason: reason,
-            hangupBy: reason.includes('destroy') ? 'remote' : 'system',
+            hangupBy: reason === 'safety_limit_3_minutes' ? 'duration_cap' : reason.includes('destroy') ? 'remote' : 'system',
             costUsd: aiUsage ? aiUsage.costUsd : undefined,
             totalTokens: aiUsage ? aiUsage.totalTokens : undefined
           });
@@ -2779,7 +2819,7 @@ srf.invite(async (req, res) => {
             ...callInfo,
             direction: 'inbound',
             hangupReason: reason,
-            hangupBy: reason.includes('destroy') ? 'remote' : 'system',
+            hangupBy: reason === 'safety_limit_3_minutes' ? 'duration_cap' : reason.includes('destroy') ? 'remote' : 'system',
             costUsd: aiUsage ? aiUsage.costUsd : undefined,
             totalTokens: aiUsage ? aiUsage.totalTokens : undefined
           });

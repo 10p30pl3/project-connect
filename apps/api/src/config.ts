@@ -7,10 +7,10 @@ export const config = {
   webOrigin: process.env.WEB_ORIGIN ?? 'http://localhost:5173',
   workerTickMs: Number(process.env.WORKER_TICK_MS ?? 2000),
   isProduction: process.env.NODE_ENV === 'production',
-  /** Modo mockup: sem login; cada requisição age como o usuário demo do perfil escolhido (header X-Demo-Role). */
+  /** Modo mockup: permitido somente fora de produção (NODE_ENV=production sempre exige autenticação). */
   authDisabled:
-    process.env.AUTH_DISABLED === 'true' ||
-    (process.env.AUTH_DISABLED !== 'false' && process.env.NODE_ENV !== 'production'),
+    process.env.NODE_ENV !== 'production' &&
+    process.env.AUTH_DISABLED !== 'false',
   seedAdminEmail: process.env.SEED_ADMIN_EMAIL ?? 'admin@voll.local',
   seedAdminPassword: process.env.SEED_ADMIN_PASSWORD ?? 'Voll@2026',
   openAiApiKey: process.env.OPENAI_API_KEY ?? '',

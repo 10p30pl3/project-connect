@@ -32,6 +32,9 @@ export function validateEnv() {
 
   const env = parsed.data;
   if (env.NODE_ENV === 'production') {
+    if (env.AUTH_DISABLED === 'true') {
+      throw new Error('[env-validator] AUTH_DISABLED=true é proibido em produção (NODE_ENV=production exige login).');
+    }
     if (!process.env.DATABASE_URL) {
       throw new Error('[env-validator] DATABASE_URL deve estar explicitamente definida em produção.');
     }

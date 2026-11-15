@@ -125,6 +125,10 @@ class ElevenLabsS2SBridge extends EventEmitter {
     this.isSafetyExpiring = false;
     this.maxDurationSec = 180;
     this.isTerminated = false;
+    this.failureStage = 'none';
+    this.correlationId = null;
+    this.turnWatchdogTimer = null;
+    this.turnWatchdogMs = Number(process.env.AI_TURN_WATCHDOG_MS || 20000);
     this.callOutcome = null;
     this.extractedData = null;
     this.liveMonitor = null;
@@ -218,6 +222,26 @@ class ElevenLabsS2SBridge extends EventEmitter {
 
     this.handleEslEvent = this.handleEslEvent.bind(this);
     this.handleDtmf = this.handleDtmf.bind(this);
+  }
+
+  _armTurnWatchdog() {
+    this._clearTurnWatchdog();
+    if (this.isTerminated) return;
+    this.turnWatchdogTimer = setTimeout(() => {
+      if (this.isTerminated) return;
+      console.error(`[${this.callId}] 🛑 Watchdog de turno IA (ElevenLabs) expirou (${this.turnWatchdogMs}ms sem resposta). Encerrando chamada.`);
+      if (this.failureStage === 'none') {
+        this.failureStage = 'ai_provider';
+      }
+      this.terminateCall('ai_turn_timeout');
+    }, this.turnWatchdogMs);
+  }
+
+  _clearTurnWatchdog() {
+    if (this.turnWatchdogTimer) {
+      clearTimeout(this.turnWatchdogTimer);
+      this.turnWatchdogTimer = null;
+    }
   }
 
   setCleanupHandler(fn) {
@@ -382,6 +406,9 @@ class ElevenLabsS2SBridge extends EventEmitter {
 
       this.elevenSocket.on('error', (err) => {
         console.error(`[${this.callId}] 🔴 Erro no WebSocket da ElevenLabs:`, err.message);
+        if (this.failureStage === 'none') {
+          this.failureStage = 'ai_provider';
+        }
         if (!this.elevenConnected && this.elevenReadyResolve) {
           this.elevenReadyResolve();
           this.elevenReadyResolve = null;
@@ -393,6 +420,9 @@ class ElevenLabsS2SBridge extends EventEmitter {
         this.elevenConnected = false;
         this.elevenReady = false;
         if (!this.isTerminated) {
+          if (this.failureStage === 'none') {
+            this.failureStage = 'ai_provider';
+          }
           this.terminateCall('elevenlabs_disconnected');
         }
       });
@@ -444,8 +474,23 @@ class ElevenLabsS2SBridge extends EventEmitter {
         );
       }
 
+      // 0. Erro explícito do provedor ElevenLabs (429 / 5xx / session failure)
+      if (msg.type === 'error' || msg.error) {
+        const errInfo = msg.error || msg.error_event || msg;
+        const errStr = typeof errInfo === 'string' ? errInfo : JSON.stringify(errInfo || {});
+        console.error(`[${this.callId}] 🔴 Erro recebido da ElevenLabs:`, errStr);
+        if (/429|rate_limit|quota|5\d\d|server_error|internal|unauthorized/i.test(errStr)) {
+          if (this.failureStage === 'none') {
+            this.failureStage = 'ai_provider';
+          }
+          this.terminateCall('elevenlabs_provider_error');
+          return;
+        }
+      }
+
       // 1. Áudio do Agente da ElevenLabs para tocar no FreeSWITCH via WsMediaBridge
       if (msg.audio_event && msg.audio_event.audio_base_64) {
+        this._clearTurnWatchdog();
         if (this.isResponseCancelled) {
           if (this.responseCancelledAt && Date.now() - this.responseCancelledAt < 1200) {
             return;
@@ -537,6 +582,9 @@ class ElevenLabsS2SBridge extends EventEmitter {
               `[${this.callId}] ⏱️ Aviso de limite de segurança reproduzido pela IA. Encerrando chamada com tolerância de 1.5s.`
             );
             this.safetyCloseTimer = setTimeout(() => {
+              if (this.failureStage === 'none') {
+                this.failureStage = 'duration_cap';
+              }
               this.terminateCall('safety_limit_3_minutes');
             }, 1500);
           }
@@ -557,6 +605,7 @@ class ElevenLabsS2SBridge extends EventEmitter {
             this.recordTranscriptTurn('Cliente', `[Ignorado na Saudação]: ${text}`);
           } else {
             this.recordTranscriptTurn('Cliente', text);
+            this._armTurnWatchdog();
           }
         }
       }
@@ -574,6 +623,7 @@ class ElevenLabsS2SBridge extends EventEmitter {
 
       // 3. Resposta textual do Agente da ElevenLabs
       if (msg.agent_response_event && msg.agent_response_event.agent_response) {
+        this._clearTurnWatchdog();
         this.isResponseCancelled = false;
         const text = msg.agent_response_event.agent_response.trim();
         if (text) {
@@ -619,6 +669,7 @@ class ElevenLabsS2SBridge extends EventEmitter {
     this.resampler24to8.reset();
     this.resampler16to8.reset();
     this.reconFilter8k.reset();
+    this._clearTurnWatchdog();
     if (this.agentSilenceTimer) {
       clearTimeout(this.agentSilenceTimer);
       this.agentSilenceTimer = null;
@@ -964,7 +1015,9 @@ class ElevenLabsS2SBridge extends EventEmitter {
     this.maxDurationSec = Number(
       this.tenant.maxDurationSec || process.env.MAX_CALL_DURATION_SEC || 180
     );
-    const warningLeadSec = Math.min(10, Math.max(4, Math.floor(this.maxDurationSec / 10)));
+    const warningLeadSec = this.maxDurationSec > 20
+      ? 15
+      : Math.min(10, Math.max(4, Math.floor(this.maxDurationSec / 2)));
     const warningTimeMs = Math.max(1000, (this.maxDurationSec - warningLeadSec) * 1000);
 
     // 1. Timer de Aviso Prévio aos ~170s
@@ -998,6 +1051,9 @@ class ElevenLabsS2SBridge extends EventEmitter {
       console.warn(
         `[${this.callId}] 🛑 Limite rígido de segurança atingido (${this.maxDurationSec}s). Encerrando chamada ElevenLabs.`
       );
+      if (this.failureStage === 'none') {
+        this.failureStage = 'duration_cap';
+      }
       this.terminateCall('safety_limit_3_minutes');
     }, this.maxDurationSec * 1000);
 
@@ -1042,15 +1098,20 @@ class ElevenLabsS2SBridge extends EventEmitter {
       this.whisperSession.start();
     }
 
-    // 2. Gravação Dual-Stream Stereo (.wav) + Transcrição (.txt) SOMENTE quando STT habilitado
-    if (this.whisperSession && this.whisperSession.isSttEnabled) {
-      this.recorder = new CallRecorder({
-        callId: this.callId,
-        tenantId: this.tenant.id,
-        recordingDir: this.tenant.recordingDir
-      });
-      this.mediaBridge.setRecorder(this.recorder);
-      await this.recorder.start();
+    // 2. Gravação Dual-Stream Stereo (.wav) + Transcrição (.txt) ativa por padrão (desacoplada do STT opcional; fail-open)
+    if (this.tenant.recording?.enabled !== false && !this.isToneProbe) {
+      try {
+        this.recorder = new CallRecorder({
+          callId: this.callId,
+          tenantId: this.tenant.id,
+          recordingDir: this.tenant.recordingDir
+        });
+        this.mediaBridge.setRecorder(this.recorder);
+        await this.recorder.start();
+      } catch (recErr) {
+        console.warn(`[${this.callId}] ⚠️ Gravação falhou ao iniciar (fail-open, chamada mantida):`, recErr.message);
+        this.recorder = null;
+      }
     }
 
     // 2.1 Captura de DTMF In-Call via FreeSWITCH ESL / drachtio-fsmrf
@@ -1575,7 +1636,9 @@ class ElevenLabsS2SBridge extends EventEmitter {
       transcriptTurnsCount: this.transcriptLog.length,
       lastTranscript: lastTurnEntry,
       responseLatency: this.liveMonitor ? this.liveMonitor.getStats() : null,
-      extractedData: this.extractedData || null
+      extractedData: this.extractedData || null,
+      correlationId: this.correlationId || this.callId,
+      failureStage: this.failureStage || 'none'
     };
 
     if (includeTranscript) {
@@ -1607,6 +1670,14 @@ class ElevenLabsS2SBridge extends EventEmitter {
       return;
     }
     this.isTerminated = true;
+    this._clearTurnWatchdog();
+    if (this.failureStage === 'none') {
+      if (reason === 'safety_limit_3_minutes') {
+        this.failureStage = 'duration_cap';
+      } else if (reason.includes('elevenlabs') || reason.includes('openai') || reason === 'ai_turn_timeout') {
+        this.failureStage = 'ai_provider';
+      }
+    }
 
     console.log(`[${this.callId}] Encerrando chamada ElevenLabs (Motivo: ${reason})...`);
     if (this.dialog) {
@@ -1640,6 +1711,7 @@ class ElevenLabsS2SBridge extends EventEmitter {
       clearTimeout(this.greetingSafetyTimer);
       this.greetingSafetyTimer = null;
     }
+    this._clearTurnWatchdog();
     if (this.agentSilenceTimer) {
       clearTimeout(this.agentSilenceTimer);
       this.agentSilenceTimer = null;

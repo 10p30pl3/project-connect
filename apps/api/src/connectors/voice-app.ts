@@ -175,12 +175,14 @@ export const voiceAppAdapter: ConnectorAdapter = {
         signal: controller.signal,
       });
 
-      // 429/503: capacidade indisponível ANTES da aceitação; o worker reagenda sem consumir tentativa
-      if (res.status === 429 || res.status === 503) {
+      const body: any = await res.json().catch(() => ({}));
+      const isExplicitCapacity503 =
+        res.status === 503 &&
+        (body?.error === 'capacity_exceeded' || body?.error === 'tenant_capacity_exceeded');
+      // 429 ou 503 explícito de capacidade indisponível ANTES da aceitação: o worker reagenda sem consumir tentativa
+      if (res.status === 429 || isExplicitCapacity503) {
         throw new TransientConnectorError(`Gateway de voz sem capacidade (HTTP ${res.status})`);
       }
-
-      const body: any = await res.json().catch(() => ({}));
       if (res.status === 200 || res.status === 201 || res.status === 202) {
         return { status: 'ACCEPTED', providerAttemptId: body.providerAttemptId || body.callId || body.id || `va-${attempt.id}` };
       }

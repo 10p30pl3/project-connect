@@ -126,8 +126,10 @@ describe('adaptador do gateway de voz', () => {
     expect(await voiceAppAdapter.send(fakeDb(), input(configured))).toEqual({ status: 'ACCEPTED', providerAttemptId: 'call-outbound-123' });
   });
 
-  it('429 é indisponibilidade transitória (reagenda sem consumir tentativa)', async () => {
+  it('429 e 503 explícito de capacidade são indisponibilidade transitória (reagenda sem consumir tentativa)', async () => {
     mockFetch(429, { error: 'capacity_exceeded' });
+    await expect(voiceAppAdapter.send(fakeDb(), input(configured))).rejects.toThrow(TransientConnectorError);
+    mockFetch(503, { error: 'tenant_capacity_exceeded' });
     await expect(voiceAppAdapter.send(fakeDb(), input(configured))).rejects.toThrow(TransientConnectorError);
   });
 
