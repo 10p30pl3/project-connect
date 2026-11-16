@@ -108,13 +108,15 @@ export function TelephonyPage() {
     retry: false,
   });
 
-  const canSeeCosts = isSuperAdminRole(me?.role);
+  const isSuper = isSuperAdminRole(me?.role);
+  const canSeeCosts = isSuper;
   const monthDurationSec = aiProvQ.data?.monthDurationSec ?? 0;
   const monthDurLabel = `${Math.floor(monthDurationSec / 60)}m ${String(monthDurationSec % 60).padStart(2, '0')}s`;
 
   const featuresQ = useQuery({
     queryKey: ['telephony', 'features'],
     queryFn: () => get<{ count: number; activeCount: number; features: VoiceFeature[] }>('/telephony/features'),
+    enabled: isSuper,
     retry: false,
   });
 
@@ -126,10 +128,16 @@ export function TelephonyPage() {
     <div className="space-y-5">
       <PageHeader
         title={mode === 'basic' ? 'Telefonia & Gravações' : 'Telefonia · Voll Connect'}
-        tooltip="Infraestrutura de voz: gravações estéreo, ramais SIP, troncos, rotas, provedores IA e motores DSP."
+        tooltip={
+          isSuper
+            ? 'Infraestrutura de voz: gravações estéreo, ramais SIP, troncos, rotas, provedores IA e motores DSP.'
+            : mode === 'basic'
+              ? 'Gravações de atendimento e operação essencial de telefonia.'
+              : 'Gravações estéreo, ramais SIP, troncos, rotas e chaves de IA.'
+        }
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            {isAtLeast('advanced') && (
+            {isSuper && isAtLeast('advanced') && (
               <Button
                 variant="primary"
                 icon={<SlidersHorizontal className="size-4" aria-hidden />}
@@ -158,22 +166,22 @@ export function TelephonyPage() {
               ? 'Gateway Desconectado'
               : `Sistema: ${s.status ?? 'verificando...'}`}
         </Badge>
-        {isAtLeast('advanced') && (
+        {isSuper && isAtLeast('advanced') && (
           <Badge tone={s.drachtioConnected ? 'green' : 'red'}>
             SIP Drachtio {s.drachtioConnected ? 'Conectado' : 'Desconectado'}
           </Badge>
         )}
-        {isAtLeast('advanced') && fs.totalNodes != null && (
+        {isSuper && isAtLeast('advanced') && fs.totalNodes != null && (
           <Badge tone={fs.healthyNodes ? 'green' : 'red'}>
             FreeSWITCH {fs.healthyNodes ?? 0}/{fs.totalNodes} nós
           </Badge>
         )}
-        {isAtLeast('advanced') && whisper?.totalNodes != null && (
+        {isSuper && isAtLeast('advanced') && whisper?.totalNodes != null && (
           <Badge tone={whisper.healthyNodes ? 'green' : 'amber'}>
             Whisper AMD {whisper.healthyNodes ?? 0}/{whisper.totalNodes} nós
           </Badge>
         )}
-        {isAtLeast('advanced') && featuresQ.data && (
+        {isSuper && isAtLeast('advanced') && featuresQ.data && (
           <Badge tone="brand">
             DSP &amp; Controle {featuresQ.data.activeCount}/{featuresQ.data.count} ativas
           </Badge>
@@ -251,7 +259,7 @@ export function TelephonyPage() {
         ]}
       />
 
-      {isAtLeast('advanced') && (
+      {isSuper && isAtLeast('advanced') && (
         <AdvancedMonitorModal
           open={advancedMonitorOpen}
           onOpenChange={setAdvancedMonitorOpen}

@@ -5,6 +5,7 @@ import { del, errorMessage, get, post, put } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useExperienceMode } from '../../lib/experience-mode';
 import {
+  Alert,
   Badge,
   Button,
   Card,
@@ -12,6 +13,7 @@ import {
   ConfirmDialog,
   Empty,
   Field,
+  InfoTooltip,
   Input,
   Loading,
   Modal,
@@ -20,7 +22,7 @@ import {
   Textarea,
   useToast,
 } from '../../components/ui';
-import { GatewayError, type TenantConfig } from './types';
+import { GatewayError, type TenantConfig, type VoiceAgentUsageSummary } from './types';
 
 const DEFAULT_PROMPT =
   'Você é o assistente virtual oficial da Voll Solutions. Seja cordial, claro e objetivo. Responda em português do Brasil com frases naturais e curtas adequadas a uma ligação telefônica.';
@@ -136,6 +138,12 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
     retry: false,
   });
 
+  const usagesQ = useQuery({
+    queryKey: ['telephony', 'tenants', 'usages'],
+    queryFn: () => get<{ items: Record<string, VoiceAgentUsageSummary> }>('/telephony/tenants/usages'),
+    retry: false,
+  });
+
   const saveM = useMutation({
     mutationFn: ({ isNew, form }: { isNew: boolean; form: TenantForm }) => {
       const payload = {
@@ -190,6 +198,7 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
       toast('success', 'Agente removido com sucesso.');
       setDeleting(null);
       qc.invalidateQueries({ queryKey: ['telephony', 'tenants'] });
+      qc.invalidateQueries({ queryKey: ['telephony', 'tenants', 'usages'] });
     },
     onError: (e) => toast('error', errorMessage(e)),
   });
@@ -198,6 +207,8 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
   if (q.error) return <GatewayError error={q.error} onRetry={() => q.refetch()} />;
 
   const tenants = q.data?.tenants ?? [];
+  const usagesMap = usagesQ.data?.items ?? {};
+  const deletingUsage = deleting ? usagesMap[deleting.id] : undefined;
 
   return (
     <div className="space-y-4">
@@ -205,10 +216,10 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
         title={
           <div className="flex items-center gap-2">
             <Bot className="size-4 text-brand-700" aria-hidden />
-            <span>Agentes de IA / Tenants ({tenants.length})</span>
+            <span>Agentes de Voz ({tenants.length})</span>
           </div>
         }
-        tooltip="Cada tenant possui seu próprio motor STS (OpenAI Realtime ou ElevenLabs), persona, ramal de atendimento, filtro de voz e limites."
+        tooltip="Cada Agente de Voz possui motor STS (OpenAI Realtime ou ElevenLabs), prompt, filtros acústicos e limites próprios, podendo ser reutilizado por Canais, Rotas e Campanhas."
         actions={
           canManage && (
             <Button
@@ -217,16 +228,16 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
               icon={<Plus className="size-3.5" aria-hidden />}
               onClick={() => setEditing({ isNew: true, idManual: false, form: toForm(null) })}
             >
-              Novo Agente / Tenant
+              Novo Agente
             </Button>
           )
         }
         padded={false}
       >
         {!tenants.length ? (
-          <div className="p-6"><Empty title="Nenhum tenant configurado no gateway" /></div>
+          <div className="p-6"><Empty title="Nenhum agente de voz configurado" /></div>
         ) : (
-          <TableWrap label="Agentes IA (Tenants)">
+          <TableWrap label="Agentes de Voz">
             <table className="data w-full">
               <thead>
                 <tr>
@@ -235,6 +246,7 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
                   {isAtLeast('advanced') && <th>Ramal / DIDs</th>}
                   {isAtLeast('advanced') && <th>Pipeline (AMD/STT/Crosstalk)</th>}
                   <th>{mode === 'basic' ? 'Duração Máx.' : 'Limites'}</th>
+                  <th>Vínculos Ativos</th>
                   <th>Status</th>
                   <th className="text-right">Ações</th>
                 </tr>
@@ -242,6 +254,17 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
               <tbody>
                 {tenants.map((t) => {
                   const isEleven = t.stsEngine === 'elevenlabs';
+                  const usage = usagesMap[t.id];
+                  const usageTooltip = usage && usage.totalReferences > 0
+                    ? [
+                        usage.channels.length ? `Canais: ${usage.channels.map((c) => c.name).join(', ')}` : null,
+                        usage.routes.length ? `Rotas: ${usage.routes.map((r) => r.name).join(', ')}` : null,
+                        usage.campaigns.length ? `Campanhas: ${usage.campaigns.map((c) => c.name).join(', ')}` : null,
+                        usage.templates.length ? `Modelos: ${usage.templates.map((tp) => tp.name).join(', ')}` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')
+                    : 'Sem vínculos diretos no momento (disponível para reutilização).';
                   return (
                     <tr key={t.id}>
                       <td>
@@ -278,8 +301,23 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
                         </td>
                       )}
                       <td className="text-xs text-slate-600 tabular-nums">
-                        {isAtLeast('advanced') && <div>{t.maxConcurrentCalls ?? 200} canais</div>}
+                        {isAtLeast('advanced') && <div>{t.maxConcurrentCalls ?? 200} sessões</div>}
                         <div>Cap: {t.maxDurationSec ?? 180}s</div>
+                      </td>
+                      <td className="text-xs">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {usage && usage.totalReferences > 0 ? (
+                            <>
+                              {usage.channels.length > 0 && <Badge tone="brand">{usage.channels.length} canal(is)</Badge>}
+                              {usage.routes.length > 0 && <Badge tone="blue">{usage.routes.length} rota(s)</Badge>}
+                              {usage.campaigns.length > 0 && <Badge tone="amber">{usage.campaigns.length} camp.</Badge>}
+                              {usage.templates.length > 0 && <Badge tone="gray">{usage.templates.length} mod.</Badge>}
+                            </>
+                          ) : (
+                            <span className="text-[11px] text-slate-400">Sem vínculo</span>
+                          )}
+                          <InfoTooltip content={usageTooltip} />
+                        </div>
                       </td>
                       <td>
                         <Badge tone={t.active !== false ? 'green' : 'red'}>
@@ -335,7 +373,7 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
       <Modal
         open={!!editing}
         onOpenChange={(o) => !o && setEditing(null)}
-        title={editing?.isNew ? 'Novo Agente de IA (Tenant)' : `Editar Agente: ${editing?.form.id}`}
+        title={editing?.isNew ? 'Novo Agente de Voz' : `Editar Agente: ${editing?.form.id}`}
         wide
         footer={
           <>
@@ -381,7 +419,7 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
                   />
                 )}
               </Field>
-              <Field label="ID do Agente (Tenant)" required>
+              <Field label="ID do Agente" required>
                 {(f) => (
                   <Input
                     id={f.id}
@@ -763,7 +801,23 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
         loading={delM.isPending}
         onConfirm={() => deleting && delM.mutate(deleting.id)}
       >
-        O agente será removido da memória e do arquivo de configuração do gateway.
+        <div className="space-y-3">
+          {deletingUsage && deletingUsage.totalReferences > 0 && (
+            <Alert tone="warn" title="Agente vinculado em recursos ativos">
+              Este agente está referenciado em{' '}
+              {[
+                deletingUsage.channels.length ? `${deletingUsage.channels.length} canal(is) (${deletingUsage.channels.map((c) => c.name).join(', ')})` : null,
+                deletingUsage.routes.length ? `${deletingUsage.routes.length} rota(s) (${deletingUsage.routes.map((r) => r.name).join(', ')})` : null,
+                deletingUsage.campaigns.length ? `${deletingUsage.campaigns.length} campanha(s) (${deletingUsage.campaigns.map((c) => c.name).join(', ')})` : null,
+                deletingUsage.templates.length ? `${deletingUsage.templates.length} modelo(s) (${deletingUsage.templates.map((t) => t.name).join(', ')})` : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+              . Desvincule antes de excluir.
+            </Alert>
+          )}
+          <p>O agente será removido da memória e da configuração de voz da empresa.</p>
+        </div>
       </ConfirmDialog>
     </div>
   );

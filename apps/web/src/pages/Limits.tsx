@@ -160,18 +160,15 @@ export function LimitsPage() {
                 <div className="rounded-xl border border-amber-200/80 bg-amber-50/50 p-4">
                   <Checkbox
                     label={
-                      <span className="font-semibold text-amber-950">
-                        Suspensão Global Emergencial (Kill-Switch)
+                      <span className="inline-flex items-center gap-1.5 font-semibold text-amber-950">
+                        <span>Suspensão Global Emergencial (Kill-Switch)</span>
+                        <InfoTooltip content="Congela imediatamente novas reservas e envios em todas as campanhas. Retornos de tentativas já enviadas continuam sendo processados normalmente." />
                       </span>
                     }
                     checked={susp}
                     disabled={readOnly}
                     onChange={(e) => setSusp(e.target.checked)}
                   />
-                  <div className="mt-1 flex items-center gap-1.5 text-xs text-amber-800 ml-6">
-                    <span>Congela imediatamente novas reservas e envios em todas as campanhas.</span>
-                    <InfoTooltip content="Retornos de tentativas já enviadas continuam sendo processados normalmente." />
-                  </div>
                 </div>
 
                 {susp && (
@@ -207,7 +204,10 @@ export function LimitsPage() {
         </div>
 
         <div className="lg:col-span-4 space-y-4">
-          <Card title="Status de Governança">
+          <Card
+            title="Status de Governança"
+            tooltip="Não Perturbe (DNC/Procon), bloqueios de destino por contato e trilha imutável de auditoria LGPD são aplicados automaticamente."
+          >
             <div className="space-y-3.5 text-xs">
               <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                 <span className="text-slate-500">Operação Global:</span>
@@ -230,23 +230,6 @@ export function LimitsPage() {
                 <span className="font-semibold text-emerald-700">Auditável 100%</span>
               </div>
             </div>
-          </Card>
-
-          <Card title="Proteções Complementares">
-            <ul className="space-y-2.5 text-xs text-slate-600">
-              <li className="flex items-start gap-2">
-                <ShieldCheck className="size-4 text-emerald-600 shrink-0 mt-0.5" />
-                <span><strong>Não Perturbe (DNC/Procon):</strong> Bloqueios automáticos no cadastro antes do envio.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <Lock className="size-4 text-brand-600 shrink-0 mt-0.5" />
-                <span><strong>Bloqueios de Destino:</strong> Aplicados diretamente na ficha de cada contato.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <FileText className="size-4 text-blue-600 shrink-0 mt-0.5" />
-                <span><strong>Trilha Imutável:</strong> Toda alteração exige justificativa e gera log de auditoria.</span>
-              </li>
-            </ul>
           </Card>
         </div>
       </div>

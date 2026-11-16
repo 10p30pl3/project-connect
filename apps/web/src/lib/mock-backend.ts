@@ -2199,6 +2199,46 @@ export async function handleMockApi<T = unknown>(
     }
 
     if (pathname === '/telephony/tenants' && method === 'GET') return { count: MOCK_TELEPHONY.tenants.length, tenants: MOCK_TELEPHONY.tenants } as T;
+    const mockUsagesFor = (agentId: string) => {
+      const channels = CONNECTIONS.filter((c) => c.tenantId === agentId).map((c) => ({
+        id: c.id,
+        name: c.name,
+        channelType: c.channelType,
+        active: c.active,
+      }));
+      const routes = MOCK_TELEPHONY.routes
+        .filter((r: any) => r.tenantId === agentId)
+        .map((r: any) => ({
+          id: r.id,
+          name: r.name || 'Regra',
+          channelType: r.channelType || '*',
+          active: r.active !== false,
+        }));
+      const campaigns = CAMPAIGNS.filter((cp: any) => cp.voiceAgentId === agentId && cp.status !== 'ARCHIVED').map((cp: any) => ({
+        id: cp.id,
+        name: cp.name,
+        status: cp.status,
+      }));
+      return {
+        agentId,
+        channels,
+        routes,
+        campaigns,
+        templates: [],
+        totalReferences: channels.length + routes.length + campaigns.length,
+      };
+    };
+    if (pathname === '/telephony/tenants/usages' && method === 'GET') {
+      const items: Record<string, ReturnType<typeof mockUsagesFor>> = {};
+      for (const t of MOCK_TELEPHONY.tenants) {
+        items[t.id] = mockUsagesFor(t.id);
+      }
+      return { items } as T;
+    }
+    const telTenantUsageMatch = pathname.match(/^\/telephony\/tenants\/([^/]+)\/usages$/);
+    if (telTenantUsageMatch && method === 'GET') {
+      return mockUsagesFor(decodeURIComponent(telTenantUsageMatch[1])) as T;
+    }
     if (pathname === '/telephony/tenants' && method === 'POST') {
       const id = String(body.id || '').trim();
       if (!id || !/^[a-z0-9][a-z0-9_-]{2,48}$/i.test(id)) {
@@ -2220,6 +2260,17 @@ export async function handleMockApi<T = unknown>(
         return { ok: true, tenant: MOCK_TELEPHONY.tenants[idx] } as T;
       }
       if (method === 'DELETE') {
+        const channels = CONNECTIONS.filter((c) => c.tenantId === id);
+        const routes = MOCK_TELEPHONY.routes.filter((r: any) => r.tenantId === id);
+        const campaigns = CAMPAIGNS.filter((cp: any) => cp.voiceAgentId === id && cp.status !== 'ARCHIVED');
+        if (channels.length + routes.length + campaigns.length > 0) {
+          throw new ApiError({
+            type: 'conflict',
+            title: 'Agente em uso',
+            status: 409,
+            detail: `Desvincule este agente antes de excluir (${channels.length} canal(is), ${routes.length} rota(s), ${campaigns.length} campanha(s)).`,
+          });
+        }
         MOCK_TELEPHONY.tenants = MOCK_TELEPHONY.tenants.filter((t) => t.id !== id);
         return { deleted: true, id } as T;
       }
@@ -2307,7 +2358,43 @@ export async function handleMockApi<T = unknown>(
       MOCK_TELEPHONY.routes.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
       return { ok: true } as T;
     }
-    if (pathname === '/telephony/routes/simulate' && method === 'POST') return { matched: true, rule: MOCK_TELEPHONY.routes[0] ?? null } as T;
+    if (pathname === '/telephony/routes/simulate' && method === 'POST') {
+      const ch = String(body.channelType || 'VOICE');
+      const connId = body.connectionId ? String(body.connectionId) : '';
+      const matched = MOCK_TELEPHONY.routes.find((r: any) => {
+        if (r.active === false) return false;
+        const rCh = r.channelType || '*';
+        const rConn = r.connectionId || '*';
+        return (rCh === '*' || rCh === ch) && (rConn === '*' || !connId || rConn === connId);
+      });
+      if (matched) {
+        return {
+          matched: true,
+          matchedRule: matched,
+          resolvedTenantId: matched.tenantId,
+          source: 'inbound_route',
+          trace: [{ rule: matched.id, name: matched.name, matched: true, reason: 'casou' }],
+        } as T;
+      }
+      const conn = connId ? CONNECTIONS.find((c) => c.id === connId) : undefined;
+      if (conn?.tenantId) {
+        return {
+          matched: false,
+          matchedRule: null,
+          resolvedTenantId: conn.tenantId,
+          source: 'channel_default',
+          trace: [],
+        } as T;
+      }
+      const defTenant = MOCK_TELEPHONY.tenants[0]?.id ?? null;
+      return {
+        matched: false,
+        matchedRule: null,
+        resolvedTenantId: defTenant,
+        source: defTenant ? 'workspace_default' : 'none',
+        trace: [],
+      } as T;
+    }
     if (pathname === '/telephony/routes/test-call' && method === 'POST') return { ok: true, message: 'Teste de rota simulado em modo demo.' } as T;
     if (pathname === '/telephony/routes' && method === 'POST') {
       const item = { ...body, id: body.id || `rule-${nextUuid().slice(0, 6)}` };

@@ -18,6 +18,7 @@ import {
   PowerOff,
   Radio,
   RefreshCw,
+  Route,
   Save,
   Server,
   SlidersHorizontal,
@@ -42,6 +43,7 @@ import { ApiError, del, errorMessage, get, patch, post } from '../lib/api';
 import type { Connection, Simulation, Tabulation } from '../lib/types';
 import { fmtDateTime, fmtMoney } from '../lib/format';
 import { useAuth } from '../lib/auth';
+import { useExperienceMode } from '../lib/experience-mode';
 import {
   Alert,
   Badge,
@@ -104,6 +106,8 @@ function parseAllowedOriginsInput(raw: string): string[] {
 
 export function ChannelsPage() {
   const { me, can } = useAuth();
+  const { isAtLeast } = useExperienceMode();
+  const isAdvanced = isAtLeast('advanced');
   const isSuper = isSuperAdminRole(me?.role);
   const qc = useQueryClient();
   const toast = useToast();
@@ -141,6 +145,7 @@ export function ChannelsPage() {
     } catch {}
   };
   const [activeTab, setActiveTab] = useState<'conexoes' | 'enderecos'>('conexoes');
+  const effectiveTab = isSuper ? activeTab : 'conexoes';
   const canEdit = can('connections.write');
 
   const toggleActiveMutation = useMutation({
@@ -166,7 +171,7 @@ export function ChannelsPage() {
         title="Canais & Integrações"
         tooltip="Gerencie os canais de voz integrado ao voice-app, endpoints de disparo da Voll e parâmetros de conectividade."
         actions={
-          activeTab === 'conexoes' ? (
+          effectiveTab === 'conexoes' ? (
             <div className="flex items-center gap-2.5">
               <ViewModeToggle value={viewMode} onChange={handleViewModeChange} />
               {canEdit && (
@@ -184,7 +189,7 @@ export function ChannelsPage() {
       />
 
       <Tabs
-        value={activeTab}
+        value={effectiveTab}
         onValueChange={(v) => setActiveTab(v as 'conexoes' | 'enderecos')}
         tabs={[
           {
@@ -202,9 +207,6 @@ export function ChannelsPage() {
                     <h2 className="text-sm font-semibold text-slate-800">Conexões Operacionais & Canais Prioritários</h2>
                     <InfoTooltip content="Conexões ativas de discagem (Voice-App / Direct Call), APIs de gatilho Voll Plan e conectores." />
                   </div>
-                  <span className="text-xs text-slate-400 italic">
-                    Parâmetros avançados de simulação e resiliência acessíveis por canal
-                  </span>
                 </div>
 
                 {q.isLoading ? (
@@ -271,11 +273,11 @@ export function ChannelsPage() {
                                 Provedor: {PROVIDER_SHORT_LABEL[c.provider] || c.provider}
                                 {supportsVoiceAgent(c) && (
                                   <>
-                                    {' · '}Agente:{' '}
+                                    {' · '}Agente padrão:{' '}
                                     <strong>
                                       {tenantsQ.data?.tenants.find((t) => t.id === c.tenantId)?.name ??
                                         c.tenantId ??
-                                        'Padrão da Telefonia'}
+                                        'Padrão do workspace'}
                                     </strong>
                                   </>
                                 )}
@@ -490,6 +492,15 @@ export function ChannelsPage() {
                                   <span>Agente de voz</span>
                                 </button>
                               )}
+                              {isAdvanced && supportsVoiceAgent(c) && (
+                                <Link
+                                  to={`/rotas?connectionId=${encodeURIComponent(c.id)}`}
+                                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200 transition"
+                                >
+                                  <Route className="size-3 text-slate-600" />
+                                  <span>Rotas</span>
+                                </Link>
+                              )}
                               {canEdit && (
                                 <button
                                   type="button"
@@ -573,7 +584,7 @@ export function ChannelsPage() {
                                   {c.callerId && <div className="text-[11px] text-slate-400 font-sans">BINA: {c.callerId}</div>}
                                   {supportsVoiceAgent(c) && (
                                     <div className="text-[11px] text-brand-700 font-sans">
-                                      Agente: {tenantsQ.data?.tenants.find((t) => t.id === c.tenantId)?.name ?? c.tenantId ?? 'Padrão'}
+                                      Agente padrão: {tenantsQ.data?.tenants.find((t) => t.id === c.tenantId)?.name ?? c.tenantId ?? 'Fallback do workspace'}
                                     </div>
                                   )}
                                 </td>
@@ -622,6 +633,15 @@ export function ChannelsPage() {
                                         Agente de voz
                                       </Button>
                                     )}
+                                    {isAdvanced && supportsVoiceAgent(c) && (
+                                      <Link
+                                        to={`/rotas?connectionId=${encodeURIComponent(c.id)}`}
+                                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                      >
+                                        <Route className="size-3.5 text-slate-500" />
+                                        Rotas
+                                      </Link>
+                                    )}
                                     {canEdit && (
                                       <>
                                         <Button
@@ -639,9 +659,9 @@ export function ChannelsPage() {
                                           variant="secondary"
                                           icon={<SlidersHorizontal className="size-3.5" />}
                                           onClick={() => setEdit(c)}
-                                          title="Configurar canal e parâmetros avançados"
+                                          title="Configurar canal"
                                         >
-                                          Parâmetros avançados
+                                          Configurar
                                         </Button>
                                         <Button
                                           size="sm"
@@ -667,16 +687,20 @@ export function ChannelsPage() {
               </div>
             ),
           },
-          {
-            value: 'enderecos',
-            label: (
-              <span className="flex items-center gap-2">
-                <Server className="size-4" />
-                <span>Configurar Endereços Técnicos</span>
-              </span>
-            ),
-            content: <TechnicalEndpointsTab canEdit={canEdit} />,
-          },
+          ...(isSuper
+            ? [
+                {
+                  value: 'enderecos',
+                  label: (
+                    <span className="flex items-center gap-2">
+                      <Server className="size-4" />
+                      <span>Configurar Endereços Técnicos</span>
+                    </span>
+                  ),
+                  content: <TechnicalEndpointsTab canEdit={canEdit} />,
+                },
+              ]
+            : []),
         ]}
       />
 
@@ -2204,9 +2228,9 @@ function EditConnection({
           {showAdvanced && (
             <div className="mt-3 space-y-4 rounded-xl border border-slate-200 bg-white p-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div>
+                <div className="flex items-center gap-1.5">
                   <span className="text-xs font-semibold text-slate-800">Modo de Testes e Simulação de Entrega</span>
-                  <p className="text-[11px] text-slate-500">Útil para testar tolerância a falhas, reconciliação e atrasos de rede.</p>
+                  <InfoTooltip content="Útil para testar tolerância a falhas, reconciliação e atrasos de rede." />
                 </div>
                 {sim ? (
                   <Button
@@ -2333,8 +2357,8 @@ function BindVoiceAgentModal({
     <Modal
       open
       onOpenChange={(o) => !o && onClose()}
-      title={`Agente de Voz · ${connection.name}`}
-      description="Os agentes IA de voz têm fonte única de verdade em Telefonia → Agentes IA (Tenants)."
+      title={`Agente de Voz padrão · ${connection.name}`}
+      description="Os Agentes de Voz são reutilizáveis entre Canais, Rotas e Campanhas."
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
@@ -2349,10 +2373,10 @@ function BindVoiceAgentModal({
       }
     >
       <div className="space-y-4">
-        <Field label="Agente IA que atenderá esta conexão" hint="Altera voz, saudação e roteiro editados na Telefonia.">
+        <Field label="Agente padrão (fallback) deste canal" tooltip="Usado quando nenhuma Rota de Entrada ou Campanha sobrescrever o atendimento.">
           {(p) => (
             <Select id={p.id} disabled={!canEdit} value={tenantId} onChange={(e) => setTenantId(e.target.value)}>
-              <option value="">Padrão da Telefonia</option>
+              <option value="">Sem agente padrão (usa rotas ou padrão do workspace)</option>
               {tenants.map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.name} {t.voice ? `(${t.voice})` : ''}

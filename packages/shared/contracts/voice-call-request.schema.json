@@ -144,6 +144,22 @@
       "type": "integer",
       "minimum": 1
     },
+    "agentSource": {
+      "type": "string",
+      "enum": [
+        "campaign_override",
+        "channel_default",
+        "workspace_default"
+      ]
+    },
+    "trunkSource": {
+      "type": "string",
+      "enum": [
+        "campaign_override",
+        "outbound_route",
+        "channel_default"
+      ]
+    },
     "callback": {
       "type": "object",
       "properties": {

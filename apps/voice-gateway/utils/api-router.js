@@ -2129,9 +2129,15 @@ function createApiRouter({ activeBridges, tenantManager, fsPool, whisperPool, me
           return true;
         }
         if (m && m[1] === 'simulate' && req.method === 'POST') {
-          if (!body.did) throw new Error('"did" é obrigatório');
           sendJson(res, 200, routeManager.simulate(
-            { did: body.did, callerId: body.callerId || '', trunkId: body.trunkId || null },
+            {
+              channelType: body.channelType || 'VOICE',
+              connectionId: body.connectionId || null,
+              trunkId: body.trunkId || null,
+              did: body.did || '',
+              callerId: body.callerId || '',
+              origin: body.origin || '',
+            },
             tenantManager
           ));
           return true;

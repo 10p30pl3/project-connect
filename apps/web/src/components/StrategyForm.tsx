@@ -187,7 +187,10 @@ export function StrategyForm({
       </fieldset>
 
       <fieldset className="space-y-3 rounded-xl border border-slate-200/90 bg-slate-50/40 p-4">
-        <legend className="px-1.5 text-xs font-semibold uppercase tracking-wider text-slate-600">Tentativas, Limites e Retentativa</legend>
+        <legend className="inline-flex items-center gap-1.5 px-1.5 text-xs font-semibold uppercase tracking-wider text-slate-600">
+          <span>Tentativas, Limites e Retentativa</span>
+          <InfoTooltip content="Limites institucionais do Controle central prevalecem e não podem ser afrouxados pelo template." />
+        </legend>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Field label="Limite total por cliente" required error={e.limits?.total?.message}>
             {(p) => <Input id={p.id} type="number" min={1} aria-invalid={p.invalid} aria-describedby={p.describedBy} {...register('limits.total', num)} />}
@@ -218,15 +221,14 @@ export function StrategyForm({
             {(p) => <Input id={p.id} type="number" min={1} aria-invalid={p.invalid} aria-describedby={p.describedBy} {...register('retry.maxPerDestination', num)} />}
           </Field>
         </div>
-        <p className="text-xs text-slate-500">Limites institucionais do Controle central prevalecem e não podem ser afrouxados pelo template.</p>
       </fieldset>
 
       <fieldset className="space-y-3 rounded-xl border border-brand-200/80 bg-brand-50/20 p-4">
         <legend className="px-1.5 text-xs font-semibold uppercase tracking-wider text-brand-800">Otimização Consultiva (§22)</legend>
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3.5 py-2.5">
-          <div>
-            <div className="text-sm font-medium text-slate-900">Habilitar avaliação consultiva neste template</div>
-            <div className="text-xs text-slate-500">Calcula propensão, melhor janela horária e menor custo por CPC na Central de Decisão sem sobrescrever DNC ou limites.</div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-medium text-slate-900">Habilitar avaliação consultiva neste template</span>
+            <InfoTooltip content="Calcula propensão, melhor janela horária e menor custo por CPC na Central de Decisão sem sobrescrever DNC ou limites." />
           </div>
           <Checkbox
             label="Otimização ativa"
@@ -337,7 +339,10 @@ export function StrategyForm({
           )}
 
           <fieldset className="space-y-3 rounded-xl border border-slate-200/90 bg-slate-50/40 p-4">
-            <legend className="px-1.5 text-xs font-semibold uppercase tracking-wider text-slate-600">Regras por Tabulação</legend>
+            <legend className="inline-flex items-center gap-1.5 px-1.5 text-xs font-semibold uppercase tracking-wider text-slate-600">
+              <span>Regras por Tabulação</span>
+              <InfoTooltip content="Opt-out sempre aplica DNC automaticamente, independentemente da ação configurada." />
+            </legend>
             {!tabs.data ? (
               <p className="text-sm text-slate-500">Carregando tabulações…</p>
             ) : (
@@ -357,7 +362,6 @@ export function StrategyForm({
                 ))}
               </div>
             )}
-            {tabs.data?.items.some((t) => t.isOptOut) && <p className="text-xs text-slate-500">Opt-out sempre aplica DNC, independentemente da ação configurada.</p>}
           </fieldset>
         </div>
       </details>

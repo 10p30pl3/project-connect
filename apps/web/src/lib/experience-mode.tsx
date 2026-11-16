@@ -9,16 +9,19 @@ export const EXPERIENCE_MODE_META: Record<
   basic: {
     label: 'Básico',
     shortLabel: 'Básico',
-    description: 'Essencial: visão geral, campanhas, contatos, mailings, canais, agentes de voz, telefonia e consumo de tempo.',
+    description: 'Essencial do dia a dia: visão geral, campanhas, contatos, mailings, calendários, canais, agentes de voz, telefonia e consumo de tempo.',
     order: 0,
   },
   advanced: {
     label: 'Avançado',
     shortLabel: 'Avançado',
-    description: 'Completo: libera listas, jornadas, estratégias, tabulação, relatórios, inteligência, engenharia DSP/SIP, limites, auditoria e sistema.',
+    description: 'Operação completa: inclui modelos, inteligência, listas, jornadas, estratégias, tabulação, relatórios e governança.',
     order: 1,
   },
 };
+
+export const EXPERIENCE_MODE_TOOLTIP =
+  'Básico exibe os fluxos essenciais do dia a dia. Avançado libera listas, jornadas, estratégias, tabulação, relatórios e governança.';
 
 const STORAGE_KEY = 'voll-experience-mode';
 

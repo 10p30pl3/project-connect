@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Activity,
@@ -16,8 +17,14 @@ import {
   Sliders,
   Trash2,
 } from 'lucide-react';
-import { isSuperAdminRole } from '@voll/shared';
+import {
+  CONNECTION_CHANNEL_LABEL,
+  INBOUND_ROUTE_CHANNEL_SCOPES,
+  isSuperAdminRole,
+  type InboundRouteChannelScope,
+} from '@voll/shared';
 import { del, errorMessage, get, post, put } from '../../lib/api';
+import type { Connection } from '../../lib/types';
 import { useAuth } from '../../lib/auth';
 import { fmtDateTime } from '../../lib/format';
 import {
@@ -624,7 +631,20 @@ function TrunksAndProvidersPanel() {
   );
 }
 
-function InboundRoutesPanel() {
+const INBOUND_SCOPE_LABEL: Record<InboundRouteChannelScope, string> = {
+  '*': 'Todos os Canais (SIP + WebRTC)',
+  VOICE: 'Telefonia SIP (VOICE)',
+  WEBRTC: 'WebRTC & WhatsApp Calling',
+};
+
+const ROUTING_SOURCE_LABEL: Record<string, string> = {
+  inbound_route: 'Rota de Entrada',
+  channel_default: 'Agente padrão do Canal',
+  workspace_default: 'Padrão do Workspace',
+  none: 'Sem agente ativo',
+};
+
+export function InboundRoutesPanel({ initialConnectionId }: { initialConnectionId?: string }) {
   const { can } = useAuth();
   const qc = useQueryClient();
   const toast = useToast();
@@ -633,6 +653,10 @@ function InboundRoutesPanel() {
 
   const [editing, setEditing] = useState<any>(null);
   const [deletingRoute, setDeletingRoute] = useState<InboundRoute | null>(null);
+  const [filterConnId, setFilterConnId] = useState(initialConnectionId || '');
+  const [simChannelType, setSimChannelType] = useState<'VOICE' | 'WEBRTC'>('VOICE');
+  const [simConnectionId, setSimConnectionId] = useState(initialConnectionId || '');
+  const [simOrigin, setSimOrigin] = useState('');
   const [simDid, setSimDid] = useState('');
   const [simCaller, setSimCaller] = useState('5511999998888');
   const [simTo, setSimTo] = useState('');
@@ -641,13 +665,17 @@ function InboundRoutesPanel() {
   const routesQ = useQuery({ queryKey: ['telephony', 'routes'], queryFn: () => get<{ routes: InboundRoute[] }>('/telephony/routes'), retry: false });
   const tenantsQ = useQuery({ queryKey: ['telephony', 'tenants'], queryFn: () => get<{ tenants: TenantConfig[] }>('/telephony/tenants'), retry: false });
   const trunksQ = useQuery({ queryKey: ['telephony', 'trunks'], queryFn: () => get<{ trunks: TrunkItem[] }>('/telephony/trunks'), retry: false });
+  const connsQ = useQuery({ queryKey: ['connections'], queryFn: () => get<{ items: Connection[] }>('/connections'), retry: false });
+
+  const voiceConns = (connsQ.data?.items ?? []).filter((c) => c.channelType === 'VOICE' || c.channelType === 'WEBRTC');
 
   const saveM = useMutation({
     mutationFn: (payload: any) => post('/telephony/routes', payload),
     onSuccess: () => {
-      toast('success', 'Regra de entrada (DID) salva!');
+      toast('success', 'Regra de entrada salva!');
       setEditing(null);
       qc.invalidateQueries({ queryKey: ['telephony', 'routes'] });
+      qc.invalidateQueries({ queryKey: ['telephony', 'tenants', 'usages'] });
     },
     onError: (e) => toast('error', errorMessage(e)),
   });
@@ -663,6 +691,7 @@ function InboundRoutesPanel() {
     onSuccess: () => {
       toast('success', 'Regra excluída.');
       qc.invalidateQueries({ queryKey: ['telephony', 'routes'] });
+      qc.invalidateQueries({ queryKey: ['telephony', 'tenants', 'usages'] });
     },
     onError: (e) => toast('error', errorMessage(e)),
   });
@@ -674,7 +703,14 @@ function InboundRoutesPanel() {
   });
 
   const simM = useMutation({
-    mutationFn: () => post('/telephony/routes/simulate', { did: simDid.trim() || '*', callerId: simCaller.trim() }),
+    mutationFn: () =>
+      post('/telephony/routes/simulate', {
+        channelType: simChannelType,
+        ...(simConnectionId ? { connectionId: simConnectionId } : {}),
+        ...(simOrigin.trim() ? { origin: simOrigin.trim() } : {}),
+        did: simDid.trim() || '*',
+        callerId: simCaller.trim(),
+      }),
     onSuccess: (res) => setSimResult(res),
     onError: (e) => toast('error', errorMessage(e)),
   });
@@ -685,29 +721,48 @@ function InboundRoutesPanel() {
         to: simTo.trim(),
         ...(simDid.startsWith('rule:') ? { ruleId: simDid.slice(5) } : { did: simDid.trim() || '*' }),
       }),
-    onSuccess: () => toast('success', `Ligação de teste DID disparada para ${simTo.trim()}!`),
+    onSuccess: () => toast('success', `Ligação de teste disparada para ${simTo.trim()}!`),
     onError: (e) => toast('error', errorMessage(e)),
   });
 
   if (routesQ.isLoading) return <Loading />;
   if (routesQ.error) return <GatewayError error={routesQ.error} onRetry={() => routesQ.refetch()} />;
 
-  const routes = routesQ.data?.routes ?? [];
+  const allRoutes = routesQ.data?.routes ?? [];
+  const routes = filterConnId
+    ? allRoutes.filter((r) => !r.connectionId || r.connectionId === '*' || r.connectionId === filterConnId)
+    : allRoutes;
   const tenants = tenantsQ.data?.tenants ?? [];
   const trunks = trunksQ.data?.trunks ?? [];
+  const filterConn = filterConnId ? voiceConns.find((c) => c.id === filterConnId) : undefined;
 
   const move = (idx: number, dir: number) => {
-    const ids = routes.map((r) => r.id);
-    const target = idx + dir;
-    if (target < 0 || target >= ids.length) return;
-    [ids[idx], ids[target]] = [ids[target], ids[idx]];
+    const ids = allRoutes.map((r) => r.id);
+    const curId = routes[idx]?.id;
+    const dstId = routes[idx + dir]?.id;
+    if (!curId || !dstId) return;
+    const aIdx = ids.indexOf(curId);
+    const bIdx = ids.indexOf(dstId);
+    if (aIdx < 0 || bIdx < 0) return;
+    [ids[aIdx], ids[bIdx]] = [ids[bIdx], ids[aIdx]];
     reorderM.mutate(ids);
   };
 
   return (
     <div className="space-y-6">
+      {filterConnId && (
+        <div className="flex items-center justify-between rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-xs text-brand-900">
+          <span>
+            Exibindo rotas aplicáveis ao canal <strong>{filterConn?.name || filterConnId}</strong>
+          </span>
+          <Button size="sm" variant="ghost" onClick={() => setFilterConnId('')}>
+            Mostrar todas
+          </Button>
+        </div>
+      )}
       <Card
-        title="Rotas de Entrada (Tronco + DID → Agente IA)"
+        title="Rotas de Entrada (Canal + DID / Origem → Agente de Voz)"
+        tooltip="Regras avaliadas em ordem de prioridade para chamadas SIP, WebRTC Web Widget e WhatsApp Calling antes do fallback para o Agente padrão do Canal."
         actions={
           canManage && (
             <Button
@@ -718,9 +773,12 @@ function InboundRoutesPanel() {
                 setEditing({
                   id: '',
                   name: '',
-                  trunkId: trunks[0]?.id || '',
+                  channelType: (filterConn?.channelType === 'WEBRTC' ? 'WEBRTC' : filterConn?.channelType === 'VOICE' ? 'VOICE' : '*') as InboundRouteChannelScope,
+                  connectionId: filterConnId || '*',
+                  trunkId: '*',
                   didPattern: '*',
                   callerPattern: '*',
+                  originPattern: '*',
                   tenantId: tenants[0]?.id || 'default',
                   maxChannels: '',
                   amdMode: 'tenant_default',
@@ -731,38 +789,51 @@ function InboundRoutesPanel() {
                 })
               }
             >
-              Nova Regra DID
+              Nova Rota de Entrada
             </Button>
           )
         }
         padded={false}
       >
         {!routes.length ? (
-          <div className="p-6"><Empty title="Nenhuma regra DID configurada" /></div>
+          <div className="p-6"><Empty title="Nenhuma regra de entrada configurada" /></div>
         ) : (
           <TableWrap label="Rotas de entrada">
             <table className="data w-full">
               <thead>
                 <tr>
                   <th>Ordem</th>
-                  <th>Regra</th>
-                  <th>DID / Caller ID</th>
-                  <th>Tronco</th>
-                  <th>Agente IA</th>
+                  <th>Rota</th>
+                  <th>Canal &amp; Escopo</th>
+                  <th>DID / Origem / Chamador</th>
+                  <th>Agente de Voz</th>
                   <th>Status</th>
                   <th className="text-right">Ações</th>
                 </tr>
               </thead>
               <tbody>
-                {routes.map((r, i) => (
+                {routes.map((r, i) => {
+                  const boundConn = r.connectionId && r.connectionId !== '*' ? voiceConns.find((c) => c.id === r.connectionId) : undefined;
+                  const rAgent = tenants.find((t) => t.id === r.tenantId);
+                  return (
                   <tr key={r.id}>
                     <td className="tabular-nums text-xs font-semibold">#{i + 1}</td>
                     <td className="text-xs font-semibold">{r.name || r.id}</td>
-                    <td className="font-mono text-xs">
-                      DID: {r.didPattern || '*'} · Origem: {r.callerPattern || '*'}
+                    <td className="text-xs">
+                      <Badge tone={r.channelType === 'WEBRTC' ? 'brand' : r.channelType === 'VOICE' ? 'blue' : 'gray'}>
+                        {r.channelType && r.channelType !== '*' ? (CONNECTION_CHANNEL_LABEL[r.channelType as 'VOICE' | 'WEBRTC'] || r.channelType) : 'Todos (*)'}
+                      </Badge>
+                      <div className="mt-1 text-[11px] text-slate-500 truncate max-w-[180px]">
+                        {boundConn ? boundConn.name : r.connectionId && r.connectionId !== '*' ? r.connectionId : r.trunkId && r.trunkId !== '*' ? `Tronco: ${r.trunkId}` : 'Qualquer canal'}
+                      </div>
                     </td>
-                    <td className="text-xs">{r.trunkId || 'Qualquer'}</td>
-                    <td><Badge tone="brand">{r.tenantId || 'default'}</Badge></td>
+                    <td className="font-mono text-xs">
+                      <div>DID: {r.didPattern || '*'} · Cham.: {r.callerPattern || '*'}</div>
+                      {(r.originPattern && r.originPattern !== '*') && (
+                        <div className="text-[11px] text-slate-500">Origem Web: {r.originPattern}</div>
+                      )}
+                    </td>
+                    <td><Badge tone="brand">{rAgent?.name || r.tenantId || 'default'}</Badge></td>
                     <td><Badge tone={r.active !== false ? 'green' : 'red'}>{r.active !== false ? 'Ativa' : 'Inativa'}</Badge></td>
                     <td className="text-right whitespace-nowrap">
                       {canManage && (
@@ -778,9 +849,12 @@ function InboundRoutesPanel() {
                               setEditing({
                                 id: r.id,
                                 name: r.name || '',
-                                trunkId: r.trunkId || '',
+                                channelType: (r.channelType || '*') as InboundRouteChannelScope,
+                                connectionId: r.connectionId || '*',
+                                trunkId: r.trunkId || '*',
                                 didPattern: r.didPattern || '*',
                                 callerPattern: r.callerPattern || '*',
+                                originPattern: r.originPattern || '*',
                                 tenantId: r.tenantId || 'default',
                                 maxChannels: r.maxChannels != null ? String(r.maxChannels) : '',
                                 amdMode: r.amdMode || 'tenant_default',
@@ -796,34 +870,66 @@ function InboundRoutesPanel() {
                       )}
                     </td>
                   </tr>
-                ))}
+                );})}
               </tbody>
             </table>
           </TableWrap>
         )}
       </Card>
 
-      {/* Simulador e Ligação de Teste */}
-      <Card title="Simulador de Roteamento & Teste de Regra DID">
-        <div className="grid gap-3 sm:grid-cols-4 items-end">
-          <Field label="DID ou Prefixo">
+      {/* Simulador Multicanal & Ligação de Teste */}
+      <Card
+        title="Simulador de Precedência (Rota > Canal > Workspace)"
+        tooltip="Testa sem efeitos colaterais qual regra ou Agente padrão do Canal atenderá uma chamada receptiva (SIP, WebRTC Web ou WhatsApp Calling)."
+      >
+        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6 items-end">
+          <Field label="Tipo de Canal">
             {(f) => (
-              <Input id={f.id} value={simDid} onChange={(e) => setSimDid(e.target.value)} placeholder="5511989785888 ou rule:ID" />
+              <Select id={f.id} value={simChannelType} onChange={(e) => setSimChannelType(e.target.value as 'VOICE' | 'WEBRTC')}>
+                <option value="VOICE">Telefonia SIP (VOICE)</option>
+                <option value="WEBRTC">WebRTC / WhatsApp</option>
+              </Select>
             )}
           </Field>
-          <Field label="Caller ID Simulado">
-            {(f) => <Input id={f.id} value={simCaller} onChange={(e) => setSimCaller(e.target.value)} />}
+          <Field label="Canal">
+            {(f) => (
+              <Select id={f.id} value={simConnectionId} onChange={(e) => setSimConnectionId(e.target.value)}>
+                <option value="">Qualquer canal</option>
+                {voiceConns
+                  .filter((c) => c.channelType === simChannelType)
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+              </Select>
+            )}
           </Field>
-          <Field label="Telefone para Ligação de Teste">
-            {(f) => <Input id={f.id} value={simTo} onChange={(e) => setSimTo(e.target.value)} placeholder="5511999998888" />}
+          <Field label="DID / Número Meta">
+            {(f) => (
+              <Input id={f.id} value={simDid} onChange={(e) => setSimDid(e.target.value)} placeholder="5511989785888 ou *" />
+            )}
+          </Field>
+          <Field label="Origem Web (URL)">
+            {(f) => (
+              <Input id={f.id} value={simOrigin} onChange={(e) => setSimOrigin(e.target.value)} placeholder="https://vip.cliente.com" />
+            )}
+          </Field>
+          <Field label="Chamador (Caller ID)">
+            {(f) => <Input id={f.id} value={simCaller} onChange={(e) => setSimCaller(e.target.value)} />}
           </Field>
           <div className="flex gap-2">
             <Button size="sm" variant="secondary" loading={simM.isPending} onClick={() => simM.mutate()}>
-              Simular (Dry-Run)
+              Simular
             </Button>
+          </div>
+        </div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-3 items-end border-t border-slate-100 pt-3">
+          <Field label="Telefone para Ligação de Teste SIP">
+            {(f) => <Input id={f.id} value={simTo} onChange={(e) => setSimTo(e.target.value)} placeholder="5511999998888" />}
+          </Field>
+          <div className="flex gap-2">
             {canOperate && (
               <Button size="sm" variant="primary" loading={testCallM.isPending} disabled={!simTo.trim()} onClick={() => testCallM.mutate()}>
-                Testar Chamada
+                Disparar Chamada Teste SIP
               </Button>
             )}
           </div>
@@ -832,23 +938,33 @@ function InboundRoutesPanel() {
           <div className="mt-3 space-y-2">
             <div className="grid gap-2 rounded-lg border border-emerald-200 bg-emerald-50/70 p-3 text-xs sm:grid-cols-3">
               <div>
-                <span className="text-slate-500">Regra aplicada:</span>{' '}
-                <strong className="text-slate-900">{simResult.matchedRule?.name || simResult.matchedRule?.id || simResult.ruleId || 'Padrão / Nenhuma'}</strong>
+                <span className="text-slate-500">Origem da decisão:</span>{' '}
+                <strong className="text-slate-900">
+                  {ROUTING_SOURCE_LABEL[simResult.source] || simResult.matchedRule?.name || 'Padrão'}
+                </strong>
+                {simResult.matchedRule?.name && (
+                  <span className="block text-[11px] text-slate-600">Regra: {simResult.matchedRule.name}</span>
+                )}
               </div>
               <div>
                 <span className="text-slate-500">Agente destino:</span>{' '}
-                <strong className="text-brand-800">{simResult.resolvedTenantId || simResult.tenantId || 'default'}</strong>
+                <strong className="text-brand-800">
+                  {tenants.find((t) => t.id === (simResult.resolvedTenantId || simResult.tenantId))?.name ||
+                    simResult.resolvedTenantId ||
+                    simResult.tenantId ||
+                    'Nenhum ativo'}
+                </strong>
               </div>
               <div>
-                <span className="text-slate-500">Resultado:</span>{' '}
-                <Badge tone={simResult.matched !== false ? 'green' : 'amber'}>
-                  {simResult.matched !== false ? 'Roteamento Válido' : 'Sem correspondência'}
+                <span className="text-slate-500">Status:</span>{' '}
+                <Badge tone={simResult.resolvedTenantId ? 'green' : 'amber'}>
+                  {simResult.matched ? 'Casa Rota Específica' : simResult.resolvedTenantId ? 'Fallback Automático' : 'Sem agente'}
                 </Badge>
               </div>
             </div>
             <details>
               <summary className="cursor-pointer text-[11px] font-medium text-slate-500 hover:text-slate-800">
-                Ver resposta técnica JSON
+                Ver rastreamento técnico (trace)
               </summary>
               <pre className="mt-1.5 max-h-48 overflow-auto rounded-lg bg-slate-900 p-3 font-mono text-xs text-slate-100">
                 {JSON.stringify(simResult, null, 2)}
@@ -861,7 +977,7 @@ function InboundRoutesPanel() {
       <Modal
         open={!!editing}
         onOpenChange={(o) => !o && setEditing(null)}
-        title={editing?.id ? 'Editar Regra DID' : 'Nova Regra DID'}
+        title={editing?.id ? 'Editar Rota de Entrada' : 'Nova Rota de Entrada'}
         wide
         footer={
           <>
@@ -872,10 +988,13 @@ function InboundRoutesPanel() {
               onClick={() =>
                 saveM.mutate({
                   id: editing.id || undefined,
-                  name: editing.name.trim() || 'Regra DID',
-                  trunkId: editing.trunkId,
+                  name: editing.name.trim() || 'Rota de Entrada',
+                  channelType: editing.channelType || '*',
+                  connectionId: editing.connectionId || '*',
+                  trunkId: editing.trunkId || '*',
                   didPattern: editing.didPattern.trim() || '*',
                   callerPattern: editing.callerPattern.trim() || '*',
+                  originPattern: editing.originPattern.trim() || '*',
                   tenantId: editing.tenantId,
                   maxChannels: editing.maxChannels ? Number(editing.maxChannels) : null,
                   amdMode: editing.amdMode,
@@ -886,7 +1005,7 @@ function InboundRoutesPanel() {
                 })
               }
             >
-              Salvar Regra
+              Salvar Rota
             </Button>
           </>
         }
@@ -894,10 +1013,10 @@ function InboundRoutesPanel() {
         {editing && (
           <div className="space-y-3">
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Nome da Regra">
+              <Field label="Nome da Rota">
                 {(p) => <Input id={p.id} value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />}
               </Field>
-              <Field label="Agente Destino (Tenant)">
+              <Field label="Agente de Voz destino">
                 {(p) => (
                   <Select id={p.id} value={editing.tenantId} onChange={(e) => setEditing({ ...editing, tenantId: e.target.value })}>
                     {tenants.map((t) => <option key={t.id} value={t.id}>{t.name || t.id}</option>)}
@@ -905,17 +1024,43 @@ function InboundRoutesPanel() {
                 )}
               </Field>
             </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Field label="DID Pattern">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Escopo de Canal" tooltip="Define se esta regra se aplica a chamadas SIP, WebRTC/WhatsApp Calling ou qualquer canal.">
+                {(p) => (
+                  <Select id={p.id} value={editing.channelType || '*'} onChange={(e) => setEditing({ ...editing, channelType: e.target.value })}>
+                    {INBOUND_ROUTE_CHANNEL_SCOPES.map((sc) => (
+                      <option key={sc} value={sc}>{INBOUND_SCOPE_LABEL[sc]}</option>
+                    ))}
+                  </Select>
+                )}
+              </Field>
+              <Field label="Canal específico (Opcional)" tooltip="Restringe esta rota a um Canal específico de Configuração → Canais.">
+                {(p) => (
+                  <Select id={p.id} value={editing.connectionId || '*'} onChange={(e) => setEditing({ ...editing, connectionId: e.target.value })}>
+                    <option value="*">Qualquer canal do escopo</option>
+                    {voiceConns.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({CONNECTION_CHANNEL_LABEL[c.channelType]})
+                      </option>
+                    ))}
+                  </Select>
+                )}
+              </Field>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Field label="DID / Número Meta" tooltip="Ex.: 55114003*, ID do número WhatsApp ou * para qualquer.">
                 {(p) => <Input id={p.id} value={editing.didPattern} onChange={(e) => setEditing({ ...editing, didPattern: e.target.value })} />}
               </Field>
-              <Field label="Caller Pattern">
+              <Field label="Chamador (Caller ID)" tooltip="Prefixo ou número do cliente chamador (* para qualquer).">
                 {(p) => <Input id={p.id} value={editing.callerPattern} onChange={(e) => setEditing({ ...editing, callerPattern: e.target.value })} />}
               </Field>
-              <Field label="Tronco">
+              <Field label="Origem Web (URL)" tooltip="Domínio de origem para chamadas WebRTC Widget (ex.: https://vip.* ou *).">
+                {(p) => <Input id={p.id} value={editing.originPattern || '*'} onChange={(e) => setEditing({ ...editing, originPattern: e.target.value })} />}
+              </Field>
+              <Field label="Tronco SIP">
                 {(p) => (
-                  <Select id={p.id} value={editing.trunkId} onChange={(e) => setEditing({ ...editing, trunkId: e.target.value })}>
-                    <option value="">Qualquer tronco</option>
+                  <Select id={p.id} value={editing.trunkId || '*'} onChange={(e) => setEditing({ ...editing, trunkId: e.target.value })}>
+                    <option value="*">Qualquer tronco</option>
                     {trunks.map((t) => <option key={t.id} value={t.id}>{t.name || t.id}</option>)}
                   </Select>
                 )}
@@ -1001,7 +1146,7 @@ function InboundRoutesPanel() {
   );
 }
 
-function OutboundRoutesPanel() {
+export function OutboundRoutesPanel() {
   const { can } = useAuth();
   const qc = useQueryClient();
   const toast = useToast();
@@ -1831,19 +1976,57 @@ function VoiceFeaturesPanel() {
   );
 }
 
+function RoutesShortcutPanel() {
+  const routesQ = useQuery({ queryKey: ['telephony', 'routes'], queryFn: () => get<{ routes: InboundRoute[] }>('/telephony/routes'), retry: false });
+  const outQ = useQuery({ queryKey: ['telephony', 'outbound-routes'], queryFn: () => get<{ routes: OutboundRoute[] }>('/telephony/outbound-routes'), retry: false });
+  const inboundCount = routesQ.data?.routes?.length ?? 0;
+  const outboundCount = outQ.data?.routes?.length ?? 0;
+
+  return (
+    <Card
+      title="Rotas (Entrada e Saída)"
+      tooltip="Gerencie as Rotas de Entrada (SIP, WebRTC e WhatsApp Calling) e Rotas de Saída PSTN na área dedicada Configuração → Rotas."
+      actions={
+        <Link
+          to="/rotas"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-700 transition"
+        >
+          <Route className="size-3.5" aria-hidden />
+          <span>Gerenciar em Rotas →</span>
+        </Link>
+      }
+    >
+      <div className="grid gap-3 sm:grid-cols-2 text-xs">
+        <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 flex items-center justify-between">
+          <span className="font-semibold text-slate-800">Rotas de Entrada ativas</span>
+          <Badge tone="brand">{inboundCount}</Badge>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 flex items-center justify-between">
+          <span className="font-semibold text-slate-800">Rotas de Saída configuradas</span>
+          <Badge tone="blue">{outboundCount}</Badge>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 export function SettingsTabs() {
+  const { me } = useAuth();
+  const isSuper = isSuperAdminRole(me?.role);
   const [subTab, setSubTab] = useState('trunks');
+  const activeSubTab = !isSuper && subTab === 'dsp' ? 'trunks' : subTab;
 
   return (
     <Tabs
-      value={subTab}
+      value={activeSubTab}
       onValueChange={setSubTab}
       tabs={[
         { value: 'trunks', label: <span className="inline-flex items-center gap-1.5"><Network className="size-3.5" aria-hidden />Troncos SIP &amp; Provedores</span>, content: <TrunksAndProvidersPanel /> },
-        { value: 'inbound', label: <span className="inline-flex items-center gap-1.5"><Route className="size-3.5" aria-hidden />Rotas de Entrada (DID)</span>, content: <InboundRoutesPanel /> },
-        { value: 'outbound', label: <span className="inline-flex items-center gap-1.5"><Sliders className="size-3.5" aria-hidden />Rotas de Saída PSTN</span>, content: <OutboundRoutesPanel /> },
-        { value: 'ai', label: <span className="inline-flex items-center gap-1.5"><Cpu className="size-3.5" aria-hidden />Provedor IA &amp; Custos</span>, content: <AiProvidersAndCostsPanel /> },
-        { value: 'dsp', label: <span className="inline-flex items-center gap-1.5"><FlaskConical className="size-3.5" aria-hidden />Motores DSP &amp; 14 Features</span>, content: <VoiceFeaturesPanel /> },
+        { value: 'routes', label: <span className="inline-flex items-center gap-1.5"><Route className="size-3.5" aria-hidden />Rotas</span>, content: <RoutesShortcutPanel /> },
+        { value: 'ai', label: <span className="inline-flex items-center gap-1.5"><Cpu className="size-3.5" aria-hidden />{isSuper ? 'Provedor IA & Custos' : 'Chaves de IA (BYOK)'}</span>, content: <AiProvidersAndCostsPanel /> },
+        ...(isSuper
+          ? [{ value: 'dsp', label: <span className="inline-flex items-center gap-1.5"><FlaskConical className="size-3.5" aria-hidden />Motores DSP &amp; 14 Features</span>, content: <VoiceFeaturesPanel /> }]
+          : []),
       ]}
     />
   );

@@ -2103,6 +2103,25 @@ function ReviewStep({
     refetchInterval: 10_000,
   });
 
+  const outboundRoutesQ = useQuery({
+    queryKey: ['telephony', 'outbound-routes'],
+    queryFn: () =>
+      get<{ routes: Array<{ id: string; name?: string; trunkId?: string; active?: boolean }> }>(
+        '/telephony/outbound-routes',
+      ),
+    enabled: !isBasic,
+    retry: false,
+  });
+
+  const activeOutboundRoutes = (outboundRoutesQ.data?.routes ?? []).filter(
+    (r) => r.active !== false && (trunkIds.length === 0 || (r.trunkId && trunkIds.includes(r.trunkId))),
+  );
+  const outboundRoutesSummary =
+    activeOutboundRoutes.length > 0
+      ? activeOutboundRoutes.map((r) => r.name || r.id).slice(0, 2).join(', ') +
+        (activeOutboundRoutes.length > 2 ? ` +${activeOutboundRoutes.length - 2}` : '')
+      : undefined;
+
   const freeChannels = trunksQ.data?.availableChannels ?? 0;
   const totalChannels = trunksQ.data?.totalChannels ?? 0;
   const effectiveQuota = Math.max(0, Math.floor(freeChannels * dialMultiplier));
@@ -2438,6 +2457,25 @@ function ReviewStep({
                                       : 'Gateway de voz em modo local/simulado.'}
                                   </div>
                                 )}
+                                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/70 px-2.5 py-1.5 text-[11px] text-slate-600">
+                                  <span>
+                                    {allSelected ? (
+                                      <>
+                                        Regra:{' '}
+                                        <strong className="text-slate-800">Automático por Rotas de Saída</strong>
+                                        {outboundRoutesSummary ? ` (${outboundRoutesSummary})` : ''}
+                                      </>
+                                    ) : (
+                                      <>
+                                        Regra:{' '}
+                                        <strong className="text-brand-700">Sobrescrito na Campanha</strong> ({trunkIds.length} tronco(s))
+                                      </>
+                                    )}
+                                  </span>
+                                  <Link to="/rotas?tab=outbound" className="font-semibold text-brand-700 hover:underline whitespace-nowrap">
+                                    Gerenciar Rotas →
+                                  </Link>
+                                </div>
                               </div>
                             );
                           }}
@@ -2524,6 +2562,7 @@ function ReviewStep({
           calendarName={selectedCalendar?.name ?? extra.calendarName}
           trunksData={trunksQ.data}
           trunkIds={trunkIds}
+          outboundRoutesSummary={outboundRoutesSummary}
           dialMultiplier={dialMultiplier}
           effectiveQuota={effectiveQuota}
         />

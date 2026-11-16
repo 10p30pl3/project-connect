@@ -1,9 +1,9 @@
 import { NavLink } from 'react-router-dom';
 import { isSuperAdminRole } from '@voll/shared';
 import { NAV_GROUPS } from '../components/Layout';
-import { PageHeader } from '../components/ui';
+import { InfoTooltip, PageHeader } from '../components/ui';
 import { useAuth } from '../lib/auth';
-import { EXPERIENCE_MODE_META, useExperienceMode } from '../lib/experience-mode';
+import { EXPERIENCE_MODE_META, EXPERIENCE_MODE_TOOLTIP, useExperienceMode } from '../lib/experience-mode';
 
 /** Destino "Mais" da barra móvel: Operação, Dados e Configuração (§26.11). */
 export function MorePage() {
@@ -15,10 +15,11 @@ export function MorePage() {
     <div>
       <PageHeader title="Mais" />
       <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3">
-        <div className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
-          Nível da interface ({EXPERIENCE_MODE_META[mode].label})
+        <div className="mb-2 flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-slate-500">
+          <span>Modo da interface</span>
+          <InfoTooltip content={EXPERIENCE_MODE_TOOLTIP} />
         </div>
-        <div className="grid grid-cols-2 gap-1.5">
+        <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="Modo da interface">
           {(['basic', 'advanced'] as const).map((lvl) => (
             <button
               key={lvl}
@@ -37,11 +38,17 @@ export function MorePage() {
       </div>
       <div className="space-y-5">
         {NAV_GROUPS.map((g) => {
-          const visibleItems = g.items.filter((it) => isAtLeast(it.minMode ?? 'basic'));
+          const visibleItems = g.items.filter(
+            (it) => isAtLeast(it.minMode ?? 'basic') && (!it.superAdminOnly || isSuper),
+          );
           if (visibleItems.length === 0) return null;
+          const hideSingleHomonymousTitle =
+            visibleItems.length === 1 && visibleItems[0].label === g.title;
           return (
             <nav key={g.title} aria-label={g.title}>
-              <h2 className="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500">{g.title}</h2>
+              {!hideSingleHomonymousTitle && (
+                <h2 className="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500">{g.title}</h2>
+              )}
               <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
                 {visibleItems.map((it) => {
                   const label = it.to === '/consumo' && !isSuper ? 'Consumo de Tempo' : it.label;

@@ -2119,11 +2119,15 @@ async function originateOutboundCall(params) {
 
     const detectedLine = cleanTo.length >= 10 ? 'trunk_sip' : 'softphone';
     const hasExplicitTrunks = Array.isArray(params.trunkIds) && params.trunkIds.length > 0;
+    const outboundSource = params.trunkSource || (hasExplicitTrunks ? 'campaign_override' : 'outbound_route');
+    const resolvedAgentSource = params.agentSource || (params.tenantId ? 'channel_default' : 'workspace_default');
+    let matchedRouteName = null;
     if (!acquiredTrunkId && trunkManager && trunkManager.trunks && trunkManager.trunks.size > 0 && (detectedLine === 'trunk_sip' || hasExplicitTrunks)) {
       const matchedRoute = outboundRouteManager?.matchOutbound?.({
         destination: effectiveTo,
         trunkIds: hasExplicitTrunks ? params.trunkIds : null,
       });
+      matchedRouteName = matchedRoute?.name || null;
       const candidateTrunk = trunkManager.selectAvailableTrunk({
         trunkIds: hasExplicitTrunks ? params.trunkIds : null,
         preferredTrunkId: matchedRoute?.trunkId || params.trunkId || null,
@@ -2133,6 +2137,10 @@ async function originateOutboundCall(params) {
       }
       acquiredTrunkId = candidateTrunk;
     }
+
+    console.log(
+      `[Originate] To=${effectiveTo} Agent=${tenant.id} (${resolvedAgentSource}) Trunk=${acquiredTrunkId || 'auto'} (${outboundSource}${matchedRouteName ? `:${matchedRouteName}` : ''})`
+    );
 
     const customHeaders = {
       'X-Line-Type': detectedLine,
@@ -2726,7 +2734,7 @@ srf.invite(async (req, res) => {
   // 🛡️ [SIP FIREWALL] Proteção contra scanners públicos da internet
   // Se o IP não for de um tronco cadastrado (ex: DirectCall) e não for tráfego interno do FreeSWITCH/Docker:
   if (!inboundTrunkId && !isInternal) {
-    const { rule } = routeManager.match({ did: cleanCalled, callerId: req.callingNumber || '', trunkId: null });
+    const { rule } = routeManager.match({ channelType: 'VOICE', did: cleanCalled, callerId: req.callingNumber || '', trunkId: null });
     if (!rule && !isAiExt && !isEcho) {
       console.warn(`[${callId}] 🛡️ [SIP FIREWALL] Bloqueio de scanner externo: IP=${srcIp} tentou chamar destino não autorizado=${cleanCalled}`);
       return res.send(403);

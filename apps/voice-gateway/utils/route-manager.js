@@ -22,14 +22,48 @@ function matchPattern(pattern, value) {
   return v === pn;
 }
 
+function matchTextPattern(pattern, value) {
+  const p = String(pattern || '*').trim().replace(/\/+$/, '');
+  const v = String(value || '').trim().replace(/\/+$/, '');
+  if (!p || p === '*') return true;
+  if (!v) return false;
+  if (p.startsWith('re:')) {
+    try {
+      return new RegExp(p.slice(3), 'i').test(v);
+    } catch {
+      return false;
+    }
+  }
+  const lowP = p.toLowerCase();
+  const lowV = v.toLowerCase();
+  if (lowP.endsWith('*')) return lowV.startsWith(lowP.slice(0, -1));
+  return lowV === lowP;
+}
+
+function normalizeRule(rule) {
+  return {
+    channelType: '*',
+    connectionId: '*',
+    trunkId: '*',
+    didPattern: '*',
+    callerPattern: '*',
+    originPattern: '*',
+    ...rule,
+    channelType: rule?.channelType || '*',
+    connectionId: rule?.connectionId || '*',
+    trunkId: rule?.trunkId || '*',
+    originPattern: rule?.originPattern || '*',
+  };
+}
+
 /**
- * Regras de roteamento de entrada: Tronco + DID + Caller ID -> Agente (Tenant) + políticas.
+ * Regras de roteamento de entrada: Canal/Tronco + DID + Origem + Caller ID -> Agente (Tenant) + políticas.
  * Primeira regra ativa que casar (menor prioridade primeiro) vence.
  */
 class RouteManager {
   constructor(file = null) {
     this.file = file || path.join(__dirname, '..', 'config', 'routes.json');
-    this.routes = readJsonList(this.file);
+    this.routes = readJsonList(this.file).map(normalizeRule);
     this.activeByRule = new Map();
   }
 
@@ -40,7 +74,7 @@ class RouteManager {
   list() {
     return [...this.routes]
       .sort((a, b) => a.priority - b.priority)
-      .map((r) => ({ ...r, usedChannels: this.activeByRule.get(r.id) || 0 }));
+      .map((r) => ({ ...normalizeRule(r), usedChannels: this.activeByRule.get(r.id) || 0 }));
   }
 
   get(id) {
@@ -62,11 +96,14 @@ class RouteManager {
     const idx = data.id ? this.routes.findIndex((r) => r.id === data.id) : -1;
     const base = idx >= 0 ? this.routes[idx] : null;
     const maxPriority = this.routes.reduce((m, r) => Math.max(m, r.priority), 0);
-    const rule = {
+    const rule = normalizeRule({
       name: 'Regra',
+      channelType: '*',
+      connectionId: '*',
       trunkId: '*',
       didPattern: '*',
       callerPattern: '*',
+      originPattern: '*',
       amdMode: 'tenant_default',
       bargeinGraceSec: null,
       recordingEnabled: 'tenant_default',
@@ -77,7 +114,7 @@ class RouteManager {
       ...data,
       id: base?.id || data.id || `r-${Date.now().toString(36)}`,
       priority: Number.isFinite(Number(data.priority)) ? Number(data.priority) : base?.priority ?? maxPriority + 10
-    };
+    });
     rule.maxChannels = rule.maxChannels ? Math.max(1, parseInt(rule.maxChannels, 10)) : null;
     rule.active = rule.active !== false;
     if (idx >= 0) this.routes[idx] = rule;
@@ -101,22 +138,37 @@ class RouteManager {
     this.persist();
   }
 
-  match({ did, callerId, trunkId }) {
+  match({ did, callerId, trunkId, channelType = 'VOICE', connectionId = null, origin = '' }) {
     const trace = [];
-    for (const r of [...this.routes].sort((a, b) => a.priority - b.priority)) {
+    for (const raw of [...this.routes].sort((a, b) => a.priority - b.priority)) {
+      const r = normalizeRule(raw);
       if (!r.active) {
         trace.push({ rule: r.id, name: r.name, matched: false, reason: 'inativa' });
         continue;
       }
+      const okChannel = !r.channelType || r.channelType === '*' || !channelType || r.channelType === channelType;
+      const okConn = !r.connectionId || r.connectionId === '*' || r.connectionId === connectionId;
       const okTrunk = r.trunkId === '*' || !r.trunkId || r.trunkId === trunkId;
       const okDid = matchPattern(r.didPattern, did);
       const okCaller = matchPattern(r.callerPattern, callerId);
-      const matched = okTrunk && okDid && okCaller;
+      const okOrigin = matchTextPattern(r.originPattern, origin);
+      const matched = okChannel && okConn && okTrunk && okDid && okCaller && okOrigin;
       trace.push({
         rule: r.id,
         name: r.name,
         matched,
-        reason: matched ? 'casou' : `não casou (${[!okTrunk && 'tronco', !okDid && 'DID', !okCaller && 'caller'].filter(Boolean).join(', ')})`
+        reason: matched
+          ? 'casou'
+          : `não casou (${[
+              !okChannel && 'canal',
+              !okConn && 'conexão',
+              !okTrunk && 'tronco',
+              !okDid && 'DID',
+              !okCaller && 'caller',
+              !okOrigin && 'origem'
+            ]
+              .filter(Boolean)
+              .join(', ')})`
       });
       if (matched) return { rule: r, trace };
     }
@@ -124,10 +176,10 @@ class RouteManager {
   }
 
   /** Simulação sem efeitos colaterais (dry-run) */
-  simulate({ did, callerId, trunkId }, tenantManager) {
-    const { rule, trace } = this.match({ did, callerId, trunkId });
+  simulate({ did = '', callerId = '', trunkId = null, channelType = 'VOICE', connectionId = null, origin = '' }, tenantManager) {
+    const { rule, trace } = this.match({ did, callerId, trunkId, channelType, connectionId, origin });
     let tenant = null;
-    let source = 'rule';
+    let source = 'inbound_route';
     if (rule) {
       tenant = tenantManager.tenants.get(rule.tenantId) || null;
     } else {

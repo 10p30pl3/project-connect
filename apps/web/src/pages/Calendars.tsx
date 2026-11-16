@@ -145,8 +145,7 @@ export function CalendarsPage() {
     <div className="space-y-4">
       <PageHeader
         title="Calendários"
-        subtitle="Defina os dias da semana, janelas de horários, fuso e feriados em que as campanhas podem operar."
-        tooltip="O calendário determina quando a campanha está autorizada a disparar. Disponível nos modos Básico e Avançado."
+        tooltip="Define os dias da semana, janelas de horários, fuso e feriados em que as campanhas podem operar."
         actions={
           <div className="flex items-center gap-2">
             <label className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600">

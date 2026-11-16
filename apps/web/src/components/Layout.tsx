@@ -29,6 +29,7 @@ import {
   Megaphone,
   Menu,
   Plus,
+  Route,
   Settings,
   Settings2,
   ShieldAlert,
@@ -40,11 +41,12 @@ import {
 import { useAuth } from '../lib/auth';
 import {
   EXPERIENCE_MODE_META,
+  EXPERIENCE_MODE_TOOLTIP,
   useExperienceMode,
   type ExperienceMode,
 } from '../lib/experience-mode';
 import { AttemptDrawer } from './AttemptDrawer';
-import { Alert, BrandLogo, Button, Field, Input, Modal, Select, useToast } from './ui';
+import { Alert, BrandLogo, Button, Field, InfoTooltip, Input, Modal, Select, useToast } from './ui';
 import { type ReactNode, useState } from 'react';
 
 export type SubNavItem = { to: string; label: string; end?: boolean };
@@ -54,6 +56,7 @@ export type NavItem = {
   icon: ReactNode;
   end?: boolean;
   minMode?: ExperienceMode;
+  superAdminOnly?: boolean;
   matchPrefixes?: string[];
   subItems?: SubNavItem[];
 };
@@ -180,6 +183,13 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
         minMode: 'basic',
       },
       {
+        to: '/rotas',
+        label: 'Rotas',
+        icon: <Route className={ico} aria-hidden />,
+        matchPrefixes: ['/rotas'],
+        minMode: 'advanced',
+      },
+      {
         to: '/telefonia',
         label: 'Telefonia',
         icon: <PhoneCall className={ico} aria-hidden />,
@@ -224,17 +234,13 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
         matchPrefixes: ['/observabilidade', '/audit'],
         minMode: 'advanced',
       },
-    ],
-  },
-  {
-    title: 'Sistema',
-    items: [
       {
         to: '/sistema',
         label: 'Sistema',
         icon: <Settings className={ico} aria-hidden />,
         matchPrefixes: ['/sistema'],
         minMode: 'advanced',
+        superAdminOnly: true,
       },
     ],
   },
@@ -344,7 +350,7 @@ function UserMenu({ sidebar = false }: { sidebar?: boolean } = {}) {
 }
 
 function WorkspaceSwitcher() {
-  const { me, can } = useAuth();
+  const { me } = useAuth();
   const qc = useQueryClient();
   const toast = useToast();
   const [createOpen, setCreateOpen] = useState(false);
@@ -392,7 +398,9 @@ function WorkspaceSwitcher() {
       role: me.role,
     },
   ];
-  const canCreateWs = can('workspace.provision') || (Boolean(me.demoMode) && me.role === 'ADMIN');
+  const isSuper = isSuperAdminRole(me?.role);
+  const canCreateWs = isSuper;
+  const canSwitchWs = workspaces.length > 1;
 
   return (
     <>
@@ -400,7 +408,7 @@ function WorkspaceSwitcher() {
         <div className="flex items-center justify-between text-[10.5px] font-bold uppercase tracking-wider text-slate-500">
           <span className="inline-flex items-center gap-1">
             <Building2 className="size-3 text-brand-700" aria-hidden />
-            Empresa Ativa
+            Empresa
           </span>
           {canCreateWs && (
             <button
@@ -414,33 +422,39 @@ function WorkspaceSwitcher() {
             </button>
           )}
         </div>
-        <Select
-          value={me.workspace.id}
-          disabled={selectWsM.isPending}
-          onChange={(e) => {
-            const nextId = e.target.value;
-            if (!nextId || nextId === me.workspace.id) return;
-            setActiveWorkspaceId(nextId);
-            selectWsM.mutate(nextId);
-          }}
-          aria-label="Selecionar empresa ativa"
-          className="h-8 text-xs font-medium"
-        >
-          {workspaces.map((w) => (
-            <option key={w.id} value={w.id}>
-              {w.name}
-              {w.isMaster ? ' (Master)' : ''}
-            </option>
-          ))}
-        </Select>
+        {canSwitchWs ? (
+          <Select
+            value={me.workspace.id}
+            disabled={selectWsM.isPending}
+            onChange={(e) => {
+              const nextId = e.target.value;
+              if (!nextId || nextId === me.workspace.id) return;
+              setActiveWorkspaceId(nextId);
+              selectWsM.mutate(nextId);
+            }}
+            aria-label="Selecionar empresa ativa"
+            className="h-8 text-xs font-medium"
+          >
+            {workspaces.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+                {w.isMaster ? ' (Master)' : ''}
+              </option>
+            ))}
+          </Select>
+        ) : (
+          <div className="truncate px-1 text-xs font-semibold text-slate-800">
+            {me.workspace.name}
+          </div>
+        )}
       </div>
 
-      <Modal
-        open={createOpen}
-        onOpenChange={setCreateOpen}
-        title="Provisionar Nova Empresa (Tenant)"
-        description="Cria um novo workspace isolado com plano comercial, franquia de minutos e tabulações padrão."
-        footer={
+      {canCreateWs && (
+        <Modal
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          title="Provisionar Nova Empresa (Tenant)"
+          footer={
           <>
             <Button variant="secondary" onClick={() => setCreateOpen(false)}>
               Cancelar
@@ -485,7 +499,10 @@ function WorkspaceSwitcher() {
             </Field>
           </div>
           {isSuperAdminRole(me?.role) && (
-            <Field label="Tarifa Venda PSTN (R$/min — visível apenas ao Super Admin)">
+            <Field
+              label="Tarifa Venda PSTN (R$/min)"
+              tooltip="Visível e editável apenas para Super Admin no provisionamento da empresa."
+            >
               {(f) => (
                 <Input
                   id={f.id}
@@ -499,6 +516,7 @@ function WorkspaceSwitcher() {
           )}
         </div>
       </Modal>
+      )}
     </>
   );
 }
@@ -553,12 +571,12 @@ export function Layout() {
         <div className="border-b border-slate-100 p-3 space-y-2">
           <WorkspaceSwitcher />
           <UserMenu sidebar />
-          <div className="rounded-lg border border-slate-200/80 bg-slate-50/70 p-1.5" title={EXPERIENCE_MODE_META[mode].description}>
+          <div className="rounded-lg border border-slate-200/80 bg-slate-50/70 p-1.5">
             <div className="mb-1 flex items-center justify-between px-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-              <span>Nível da interface</span>
-              <span className="font-semibold text-brand-700">{EXPERIENCE_MODE_META[mode].label}</span>
+              <span>Modo da interface</span>
+              <InfoTooltip content={EXPERIENCE_MODE_TOOLTIP} />
             </div>
-            <div className="grid grid-cols-2 gap-1" role="group" aria-label="Nível de complexidade da interface">
+            <div className="grid grid-cols-2 gap-1" role="group" aria-label="Modo da interface">
               {(['basic', 'advanced'] as const).map((lvl) => (
                 <button
                   key={lvl}
@@ -579,11 +597,19 @@ export function Layout() {
         </div>
         <nav aria-label="Navegação principal" className="flex-1 overflow-y-auto px-3 py-3">
           {NAV_GROUPS.map((g) => {
-            const visibleItems = g.items.filter((it) => isAtLeast(it.minMode ?? 'basic'));
+            const visibleItems = g.items.filter(
+              (it) => isAtLeast(it.minMode ?? 'basic') && (!it.superAdminOnly || isSuper),
+            );
             if (visibleItems.length === 0) return null;
+            const hideSingleHomonymousTitle =
+              visibleItems.length === 1 && visibleItems[0].label === g.title;
             return (
               <div key={g.title} className="mb-3.5">
-                <div className="px-2.5 pb-1 pt-1.5 text-[10.5px] font-bold uppercase tracking-[0.6px] text-slate-400">{g.title}</div>
+                {!hideSingleHomonymousTitle && (
+                  <div className="px-2.5 pb-1 pt-1.5 text-[10.5px] font-bold uppercase tracking-[0.6px] text-slate-400">
+                    {g.title}
+                  </div>
+                )}
                 <ul className="space-y-1">
                   {visibleItems.map((it) => {
                     const isAnySubActive = it.subItems?.some((sub) => isRouteActive(sub.to, loc.pathname, loc.search, sub.end)) ?? false;

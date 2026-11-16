@@ -994,7 +994,7 @@ export function CallsTab({
               </Field>
             )}
           </div>
-          <Field label="Agente de Voz (Tenant)">
+          <Field label="Agente de Voz">
             {(f) => (
               <Select id={f.id} value={origTenantId} onChange={(e) => setOrigTenantId(e.target.value)}>
                 {!tenants.length && <option value="default">default</option>}

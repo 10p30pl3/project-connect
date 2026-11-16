@@ -340,7 +340,7 @@ export function ReportsPage() {
                   : 'border-slate-200/90 bg-white hover:border-slate-300 hover:bg-slate-50/70',
               )}
             >
-              <div className="flex items-center justify-between gap-1 mb-1">
+              <div className="flex items-center justify-between gap-1">
                 <div className="flex items-center gap-2 min-w-0">
                   <div
                     className={clsx(
@@ -361,9 +361,6 @@ export function ReportsPage() {
                 </div>
                 <InfoTooltip content={t.tooltip} className="shrink-0" />
               </div>
-              <span className="text-[10px] text-slate-500 line-clamp-1">
-                {t.subtitle}
-              </span>
             </button>
           );
         })}
@@ -422,9 +419,6 @@ function PenetrationReport({
             </h3>
             <InfoTooltip content="Acompanha a velocidade de consumo da base de contatos pelo motor de discagem. Mostra o saldo de contatos virgens na fila, registros em ciclo de retentativa, contatos esgotados por limite e concluídos." />
           </div>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Visão consolidada do inventário: base trabalhada, saldo disponível na fila e taxas de esgotamento operacional.
-          </p>
         </div>
         <div className="flex items-center gap-3">
           <div className="rounded-xl bg-slate-50 border border-slate-200/80 px-3.5 py-1.5 text-right">
@@ -621,9 +615,6 @@ function ConnectFunnelReport({
             </h3>
             <InfoTooltip content="Mede o funil técnico de telecomunicações e conversão: Discadas → Atendidas (ASR) → Filtro de Caixa Postal (AMD) → Atendimento Humano (Alô) → Contato com a Pessoa Certa (CPC) → Conversão." />
           </div>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Acompanhamento técnico de completamento de chamadas, detecção de voz humana e efetividade de CPC.
-          </p>
         </div>
         <div className="flex items-center gap-3">
           <div className="rounded-xl bg-slate-50 border border-slate-200/80 px-3.5 py-1.5 text-right">
@@ -776,9 +767,6 @@ function RetryEffectivenessReport({
             </h3>
             <InfoTooltip content="Avalia a conversão obtida a cada nova tentativa (1ª até a Nª discada), calculando o ponto de corte ótimo onde novas insistências geram custo telefônico sem aumento proporcional de conversão." />
           </div>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Curva de rendimento incremental por tentativa e ponto de corte ótimo sugerido para calibrar a estratégia.
-          </p>
         </div>
         <div className="flex items-center gap-3">
           <div className="rounded-xl bg-slate-50 border border-slate-200/80 px-3.5 py-1.5 text-right">
@@ -907,9 +895,6 @@ function BestTimeReport({
             </h3>
             <InfoTooltip content="Cruza o histórico de atendimentos e CPCs hora a hora ao longo dos dias da semana para identificar janelas de alta receptividade do público e calibrar as réguas da estratégia." />
           </div>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Distribuição da taxa de contato efetivo (CPC) por bloco horário e dia da semana.
-          </p>
         </div>
         <div className="flex items-center gap-3">
           <div className="rounded-xl bg-slate-50 border border-slate-200/80 px-3.5 py-1.5 text-right">
@@ -1043,9 +1028,6 @@ function DispositionsReport({
             </h3>
             <InfoTooltip content="Agrupamento das tabulações registradas pelos canais e operadores em: Produtivas (acordos e promessas), Improdutivas (caixas postais e ocupados), Cadastrais (higienização de telefones inexistentes/terceiros) e Bloqueio (Opt-Out)." />
           </div>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Auditoria completa de encerramento de contatos, efetividade comercial e higienização cadastral da base.
-          </p>
         </div>
         <div className="flex items-center gap-3">
           <div className="rounded-xl bg-slate-50 border border-slate-200/80 px-3.5 py-1.5 text-right">

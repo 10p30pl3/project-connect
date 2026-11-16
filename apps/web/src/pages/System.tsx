@@ -14,6 +14,7 @@ import {
   XCircle,
   Database,
 } from 'lucide-react';
+import { isSuperAdminRole } from '@voll/shared';
 import { errorMessage, get, post } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import {
@@ -27,6 +28,7 @@ import {
   Modal,
   PageHeader,
   Select,
+  SuperAdminGuard,
   useToast,
 } from '../components/ui';
 
@@ -50,10 +52,11 @@ type AiTestResponse = {
 };
 
 export function SystemPage() {
-  const { can } = useAuth();
+  const { me, can } = useAuth();
+  const isSuper = isSuperAdminRole(me?.role);
   const qc = useQueryClient();
   const toast = useToast();
-  const canControlSystem = can('control.write');
+  const canControlSystem = isSuper && can('control.write');
 
   const [showKey, setShowKey] = useState(false);
   const [apiKey, setApiKey] = useState<string>('');
@@ -211,11 +214,12 @@ export function SystemPage() {
   };
 
   return (
-    <div className="space-y-6 pb-12">
-      <PageHeader
-        title="Sistema"
-        tooltip="Configurações gerais da plataforma, credenciais da OpenAI API e parâmetros operacionais do Voll Plan."
-      />
+    <SuperAdminGuard allowed={isSuper}>
+      <div className="space-y-6 pb-12">
+        <PageHeader
+          title="Sistema"
+          tooltip="Configurações gerais da plataforma, credenciais da OpenAI API e parâmetros operacionais do Voll Plan."
+        />
 
       {/* Grid Principal */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -417,12 +421,9 @@ export function SystemPage() {
                 <span>Gerenciamento da Base de Dados</span>
               </div>
             }
-            tooltip="Controle do estado dos dados do workspace: comece com a base zerada para importar seus próprios arquivos ou recarregue a base de demonstração."
+            tooltip="Alterne entre ambiente zerado para testes reais (preservando Telefonia e Agentes de IA) e recarga de dados de demonstração."
           >
             <div className="space-y-3 text-sm">
-              <p className="text-slate-600">
-                Gerencie o estado da base entre ambiente limpo para testes reais (preservando Telefonia e Agentes de IA) e dados de exemplo.
-              </p>
               <div className="flex flex-wrap items-center gap-3 pt-1">
                 <Button
                   type="button"
@@ -551,6 +552,7 @@ export function SystemPage() {
           </Card>
         </div>
       </div>
-    </div>
+      </div>
+    </SuperAdminGuard>
   );
 }

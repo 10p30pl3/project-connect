@@ -361,8 +361,7 @@ export function BillingPage() {
         <>
           <Alert tone="info" title={`Plano Ativo · ${data.workspace.name}`}>
             Plano <strong>{data.workspace.planName}</strong> · Franquia contratada de{' '}
-            <strong>{data.timeSummary.includedMinutes.toLocaleString('pt-BR')} minutos/mês</strong>. O painel de cliente
-            exibe estritamente seu consumo de tempo de atendimento e saldo de franquia.
+            <strong>{data.timeSummary.includedMinutes.toLocaleString('pt-BR')} minutos/mês</strong>.
           </Alert>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

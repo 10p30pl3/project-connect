@@ -14,7 +14,7 @@ import {
   jsonInit,
   proxyJson,
   PUBLIC_WEBRTC_LONG_TIMEOUT_MS,
-  resolveWorkspaceVoiceAgent,
+  resolveInboundVoiceRouting,
 } from './telephony.js';
 
 const META_GRAPH_VERSION = 'v21.0';
@@ -148,8 +148,15 @@ export async function whatsappCallingRoutes(app: FastifyInstance) {
         const sdpOffer = String(ev.session?.sdp || '').trim();
         if (!sdpOffer) continue;
 
-        const tenantId = await resolveWorkspaceVoiceAgent(conn.workspace_id, conn.config?.tenantId);
-        if (!tenantId) {
+        const routing = await resolveInboundVoiceRouting({
+          workspaceId: conn.workspace_id,
+          channelType: 'WEBRTC',
+          connectionId: conn.id,
+          did: phoneNumberId,
+          callerId: ev.from ? String(ev.from) : '',
+          channelDefaultTenantId: conn.config?.tenantId,
+        });
+        if (!routing.tenantId) {
           throw new HttpError(
             422,
             'Agente de voz pendente',
@@ -176,7 +183,7 @@ export async function whatsappCallingRoutes(app: FastifyInstance) {
             conn.workspace_id,
             '/v1/webrtc/offer',
             jsonInit('POST', {
-              tenantId,
+              tenantId: routing.tenantId,
               sdpOffer,
               caller: ev.from ? String(ev.from) : 'whatsapp-caller',
               metadata: {
@@ -185,6 +192,8 @@ export async function whatsappCallingRoutes(app: FastifyInstance) {
                 workspaceId: conn.workspace_id,
                 whatsappCallId,
                 callerPhone: ev.from ? String(ev.from) : null,
+                agentSource: routing.source,
+                ...(routing.matchedRule?.id ? { routeId: routing.matchedRule.id } : {}),
                 ...(endedCallbackBaseUrl ? { endedCallbackBaseUrl } : {}),
               },
             }),

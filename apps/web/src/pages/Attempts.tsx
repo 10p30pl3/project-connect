@@ -23,7 +23,7 @@ export function AttemptsPage() {
   const reset = pager.reset;
   return (
     <div>
-      <PageHeader title="Tentativas" subtitle="Operação de todas as campanhas — reservas, envios, retornos e reconciliações" />
+      <PageHeader title="Tentativas" tooltip="Operação de todas as campanhas — reservas, envios, retornos e reconciliações" />
       <div className="mb-3 grid gap-3 sm:grid-cols-3">
         <Field label="Buscar">
           {(p) => (

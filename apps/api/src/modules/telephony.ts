@@ -6,7 +6,15 @@
  */
 import { Readable } from 'node:stream';
 import type { FastifyInstance, FastifyReply } from 'fastify';
-import { isReadOnlyRole, isSuperAdminRole, PublicWebRtcOfferSchema } from '@voll/shared';
+import {
+  InboundRouteSimulateSchema,
+  InboundRouteUpsertSchema,
+  isReadOnlyRole,
+  isSuperAdminRole,
+  PublicWebRtcOfferSchema,
+  type VoiceAgentUsageSummary,
+  type VoiceRoutingSource,
+} from '@voll/shared';
 import { getPool, one, q } from '../db/pool.js';
 import { actor, requireRoles, CAN } from '../auth/context.js';
 import { HttpError, parse } from '../lib/problem.js';
@@ -419,6 +427,107 @@ function normalizeAudioFilters(raw: unknown, base: AudioFiltersConfig = DEFAULT_
 
 export const PUBLIC_WEBRTC_LONG_TIMEOUT_MS = LONG_TIMEOUT_MS;
 
+function matchInboundPattern(pattern: unknown, value: unknown, normalizePhone: boolean): boolean {
+  const rawP = String(pattern ?? '*').trim().replace(/\/+$/, '');
+  const rawV = String(value ?? '').trim().replace(/\/+$/, '');
+  if (!rawP || rawP === '*') return true;
+  if (!rawV) return false;
+  const cleanPhone = (s: string) => s.replace(/^sip:/i, '').replace(/@.*$/, '').replace(/^\+/, '').trim();
+  const p = normalizePhone ? cleanPhone(rawP) : rawP.toLowerCase();
+  const v = normalizePhone ? cleanPhone(rawV) : rawV.toLowerCase();
+  if (p.startsWith('re:')) {
+    try {
+      return new RegExp(rawP.slice(3), 'i').test(v);
+    } catch {
+      return false;
+    }
+  }
+  if (p.endsWith('*')) return v.startsWith(p.slice(0, -1));
+  return v === p;
+}
+
+export type InboundVoiceRoutingResolution = {
+  tenantId: string | null;
+  source: VoiceRoutingSource;
+  matchedRule: any | null;
+  trace: Array<{ rule: string; name?: string; matched: boolean; reason: string }>;
+};
+
+export async function resolveInboundVoiceRouting(ctx: {
+  workspaceId: string;
+  channelType: 'VOICE' | 'WEBRTC';
+  connectionId?: string | null;
+  trunkId?: string | null;
+  did?: string | null;
+  callerId?: string | null;
+  origin?: string | null;
+  channelDefaultTenantId?: string | null;
+}): Promise<InboundVoiceRoutingResolution> {
+  const trace: Array<{ rule: string; name?: string; matched: boolean; reason: string }> = [];
+  const rawRoutes = await proxyJson(ctx.workspaceId, '/v1/routes').catch(() => null);
+  const routes = Array.isArray(rawRoutes?.routes) ? rawRoutes.routes : [];
+
+  if (routes.length > 0) {
+    const ownership = await syncAndFetchOwnership('route', routes);
+    const agentOwnership = await syncAndFetchOwnership('agent', []);
+    const workspaceRoutes = routes
+      .filter((r: any) => ownership.get(String(r?.id ?? ''))?.workspace_id === ctx.workspaceId)
+      .sort((a: any, b: any) => Number(a?.priority ?? 9999) - Number(b?.priority ?? 9999));
+
+    for (const r of workspaceRoutes) {
+      if (r?.active === false) {
+        trace.push({ rule: String(r.id), name: r.name, matched: false, reason: 'inativa' });
+        continue;
+      }
+      const rCh = String(r?.channelType || '*').trim();
+      const rConn = String(r?.connectionId || '*').trim();
+      const rTrunk = String(r?.trunkId || '*').trim();
+      const okChannel = rCh === '*' || rCh === ctx.channelType;
+      const okConn = rConn === '*' || (Boolean(ctx.connectionId) && rConn === ctx.connectionId);
+      const okTrunk = rTrunk === '*' || (Boolean(ctx.trunkId) && rTrunk === ctx.trunkId);
+      const okDid = matchInboundPattern(r?.didPattern, ctx.did, true);
+      const okCaller = matchInboundPattern(r?.callerPattern, ctx.callerId, true);
+      const okOrigin = matchInboundPattern(r?.originPattern, ctx.origin, false);
+      const matched = okChannel && okConn && okTrunk && okDid && okCaller && okOrigin;
+      trace.push({
+        rule: String(r.id),
+        name: r.name,
+        matched,
+        reason: matched
+          ? 'casou'
+          : `não casou (${[
+              !okChannel && 'canal',
+              !okConn && 'conexão',
+              !okTrunk && 'tronco',
+              !okDid && 'DID',
+              !okCaller && 'caller',
+              !okOrigin && 'origem',
+            ]
+              .filter(Boolean)
+              .join(', ')})`,
+      });
+      if (matched && r?.tenantId) {
+        const tid = String(r.tenantId).trim();
+        const own = agentOwnership.get(tid);
+        if (own && own.workspace_id && own.workspace_id !== ctx.workspaceId && !own.is_global_default) {
+          continue;
+        }
+        return { tenantId: tid, source: 'inbound_route', matchedRule: r, trace };
+      }
+    }
+  }
+
+  const chDefault = String(ctx.channelDefaultTenantId ?? '').trim();
+  if (chDefault) {
+    const valid = await resolveWorkspaceVoiceAgent(ctx.workspaceId, chDefault);
+    if (valid) return { tenantId: valid, source: 'channel_default', matchedRule: null, trace };
+  }
+
+  const wsDefault = await resolveWorkspaceVoiceAgent(ctx.workspaceId, null);
+  if (wsDefault) return { tenantId: wsDefault, source: 'workspace_default', matchedRule: null, trace };
+  return { tenantId: null, source: 'none', matchedRule: null, trace };
+}
+
 export async function resolveWorkspaceVoiceAgent(
   workspaceId: string,
   configuredTenantId?: string | null,
@@ -592,16 +701,23 @@ export async function telephonyPublicRoutes(app: FastifyInstance) {
       throw new HttpError(403, 'Modo Web desabilitado', 'Este canal WebRTC opera somente para WhatsApp Calling.');
     }
 
+    const requestOrigin = extractRequestOrigin(req);
     const allowedOrigins: string[] = Array.isArray(conn.config?.allowedOrigins) ? conn.config.allowedOrigins : [];
     if (allowedOrigins.length > 0 && !allowedOrigins.includes('*')) {
-      const origin = extractRequestOrigin(req);
-      if (!origin || !allowedOrigins.includes(origin)) {
+      if (!requestOrigin || !allowedOrigins.includes(requestOrigin)) {
         throw new HttpError(403, 'Origem não autorizada', 'Domínio de origem não permitido para este widget.');
       }
     }
 
-    const tenantId = await resolveWorkspaceVoiceAgent(conn.workspace_id, conn.config?.tenantId);
-    if (!tenantId) {
+    const routing = await resolveInboundVoiceRouting({
+      workspaceId: conn.workspace_id,
+      channelType: 'WEBRTC',
+      connectionId: conn.id,
+      callerId: body.caller || 'web-visitor',
+      origin: requestOrigin,
+      channelDefaultTenantId: conn.config?.tenantId,
+    });
+    if (!routing.tenantId) {
       throw new HttpError(
         422,
         'Agente de voz pendente',
@@ -613,7 +729,7 @@ export async function telephonyPublicRoutes(app: FastifyInstance) {
       conn.workspace_id,
       '/v1/webrtc/offer',
       jsonInit('POST', {
-        tenantId,
+        tenantId: routing.tenantId,
         sdpOffer: body.sdpOffer,
         caller: body.caller || 'web-visitor',
         metadata: {
@@ -621,6 +737,8 @@ export async function telephonyPublicRoutes(app: FastifyInstance) {
           source: 'web_widget',
           connectionId: conn.id,
           workspaceId: conn.workspace_id,
+          agentSource: routing.source,
+          ...(routing.matchedRule?.id ? { routeId: routing.matchedRule.id } : {}),
         },
       }),
       LONG_TIMEOUT_MS,
@@ -1159,7 +1277,112 @@ export async function telephonyRoutes(app: FastifyInstance) {
     return reply.send(res.body);
   });
 
-  // ---------------- Agentes de Voz (Tenants) ----------------
+  // ---------------- Agentes de Voz & Mapa de Vínculos ----------------
+  async function getVoiceAgentUsagesMap(workspaceId: string, singleAgentId?: string): Promise<Map<string, VoiceAgentUsageSummary>> {
+    const map = new Map<string, VoiceAgentUsageSummary>();
+    const ensureEntry = (agentId: string): VoiceAgentUsageSummary => {
+      let cur = map.get(agentId);
+      if (!cur) {
+        cur = { agentId, channels: [], routes: [], campaigns: [], templates: [], totalReferences: 0 };
+        map.set(agentId, cur);
+      }
+      return cur;
+    };
+    if (singleAgentId) ensureEntry(singleAgentId);
+
+    const connRows = await q<{ id: string; name: string; channel_type: string; active: boolean; tenant_id: string }>(
+      getPool(),
+      `SELECT id, name, channel_type::text AS channel_type, active, config->>'tenantId' AS tenant_id
+         FROM connections
+        WHERE workspace_id = $1
+          AND COALESCE(config->>'tenantId', '') <> ''
+          AND ($2::text IS NULL OR config->>'tenantId' = $2)`,
+      [workspaceId, singleAgentId ?? null],
+    ).catch(() => []);
+    for (const row of connRows) {
+      ensureEntry(row.tenant_id).channels.push({
+        id: row.id,
+        name: row.name,
+        channelType: row.channel_type,
+        active: Boolean(row.active),
+      });
+    }
+
+    const campRows = await q<{ id: string; name: string; status: string; voice_agent_id: string }>(
+      getPool(),
+      `SELECT id, name, status::text AS status, voice_agent_id
+         FROM campaigns
+        WHERE workspace_id = $1
+          AND status <> 'ARCHIVED'
+          AND COALESCE(voice_agent_id, '') <> ''
+          AND ($2::text IS NULL OR voice_agent_id = $2)`,
+      [workspaceId, singleAgentId ?? null],
+    ).catch(() => []);
+    for (const row of campRows) {
+      ensureEntry(row.voice_agent_id).campaigns.push({
+        id: row.id,
+        name: row.name,
+        status: row.status,
+      });
+    }
+
+    const tplRows = await q<{ id: string; name: string; voice_agent_id: string }>(
+      getPool(),
+      `SELECT ct.id, ct.name, c.voice_agent_id
+         FROM campaign_templates ct
+         JOIN campaigns c ON c.id = ct.source_campaign_id
+        WHERE ct.workspace_id = $1
+          AND COALESCE(c.voice_agent_id, '') <> ''
+          AND ($2::text IS NULL OR c.voice_agent_id = $2)`,
+      [workspaceId, singleAgentId ?? null],
+    ).catch(() => []);
+    for (const row of tplRows) {
+      ensureEntry(row.voice_agent_id).templates.push({
+        id: row.id,
+        name: row.name,
+      });
+    }
+
+    const rawRoutes = await proxyJson(workspaceId, '/v1/routes').catch(() => ({ routes: [] }));
+    const gwRoutes = Array.isArray(rawRoutes?.routes) ? rawRoutes.routes : [];
+    if (gwRoutes.length > 0) {
+      const routeOwnership = await syncAndFetchOwnership('route', gwRoutes);
+      for (const rt of gwRoutes) {
+        const rid = String(rt?.id ?? '');
+        const tid = String(rt?.tenantId ?? '').trim();
+        if (!rid || !tid) continue;
+        if (singleAgentId && tid !== singleAgentId) continue;
+        if (routeOwnership.get(rid)?.workspace_id !== workspaceId) continue;
+        ensureEntry(tid).routes.push({
+          id: rid,
+          name: String(rt?.name || rid),
+          channelType: String(rt?.channelType || '*'),
+          active: rt?.active !== false,
+        });
+      }
+    }
+
+    for (const entry of map.values()) {
+      entry.totalReferences =
+        entry.channels.length + entry.routes.length + entry.campaigns.length + entry.templates.length;
+    }
+    return map;
+  }
+
+  app.get('/telephony/tenants/usages', async (req) => {
+    const a = actor(req);
+    const map = await getVoiceAgentUsagesMap(a.workspaceId);
+    return { items: Object.fromEntries(map.entries()) };
+  });
+
+  app.get<{ Params: { id: string } }>('/telephony/tenants/:id/usages', async (req) => {
+    const a = actor(req);
+    await ensureOwnershipSynced(a.workspaceId, 'agent', '/v1/tenants', 'tenants');
+    await assertCanCreateOrModifyResource('agent', req.params.id, a.workspaceId, a.role);
+    const map = await getVoiceAgentUsagesMap(a.workspaceId, req.params.id);
+    return map.get(req.params.id)!;
+  });
+
   app.get('/telephony/tenants', async (req) => {
     const a = actor(req);
     const raw = await proxyJson(a.workspaceId, '/v1/tenants');
@@ -1206,6 +1429,20 @@ export async function telephonyRoutes(app: FastifyInstance) {
     const a = actor(req);
     await ensureOwnershipSynced(a.workspaceId, 'agent', '/v1/tenants', 'tenants');
     await assertCanCreateOrModifyResource('agent', req.params.id, a.workspaceId, a.role);
+    const usageMap = await getVoiceAgentUsagesMap(a.workspaceId, req.params.id);
+    const usage = usageMap.get(req.params.id);
+    if (usage && usage.totalReferences > 0) {
+      const parts: string[] = [];
+      if (usage.channels.length) parts.push(`${usage.channels.length} canal(is): ${usage.channels.map((c) => c.name).join(', ')}`);
+      if (usage.routes.length) parts.push(`${usage.routes.length} rota(s): ${usage.routes.map((r) => r.name).join(', ')}`);
+      if (usage.campaigns.length) parts.push(`${usage.campaigns.length} campanha(s): ${usage.campaigns.map((c) => c.name).join(', ')}`);
+      if (usage.templates.length) parts.push(`${usage.templates.length} modelo(s): ${usage.templates.map((t) => t.name).join(', ')}`);
+      throw new HttpError(
+        409,
+        'Agente em uso',
+        `Desvincule este agente antes de excluir (${parts.join(' | ')}).`,
+      );
+    }
     const r = await proxyJson(a.workspaceId, `/v1/tenants/${enc(req.params.id)}`, { method: 'DELETE' });
     await getPool()
       .query(`DELETE FROM workspace_voice_resources WHERE resource_type='agent' AND resource_id=$1`, [req.params.id])
@@ -1465,12 +1702,32 @@ export async function telephonyRoutes(app: FastifyInstance) {
     return { ...raw, routes: filtered, count: filtered.length };
   });
 
+  async function validateInboundRouteRefs(workspaceId: string, role: any, parsed: Record<string, any>) {
+    if (parsed.tenantId) {
+      await ensureOwnershipSynced(workspaceId, 'agent', '/v1/tenants', 'tenants');
+      await assertCanCreateOrModifyResource('agent', String(parsed.tenantId), workspaceId, role);
+    }
+    const connId = String(parsed.connectionId || '*').trim();
+    if (connId && connId !== '*') {
+      const conn = await one<{ workspace_id: string }>(getPool(), `SELECT workspace_id FROM connections WHERE id=$1`, [connId]).catch(() => null);
+      if (!conn || conn.workspace_id !== workspaceId) {
+        throw new HttpError(403, 'Canal não autorizado', 'Este Canal pertence a outro workspace ou não existe.');
+      }
+    }
+    const trunkId = String(parsed.trunkId || '*').trim();
+    if (trunkId && trunkId !== '*') {
+      await ensureOwnershipSynced(workspaceId, 'trunk', '/v1/trunks', 'trunks');
+      await assertCanCreateOrModifyResource('trunk', trunkId, workspaceId, role);
+    }
+  }
+
   app.post('/telephony/routes', manageGuard, async (req) => {
     const a = actor(req);
-    const body = (req.body ?? {}) as Record<string, any>;
+    const body = parse(InboundRouteUpsertSchema, req.body);
     const rid = String(body.id || '').trim();
     await ensureOwnershipSynced(a.workspaceId, 'route', '/v1/routes', 'routes');
     if (rid) await assertCanCreateOrModifyResource('route', rid, a.workspaceId, a.role);
+    await validateInboundRouteRefs(a.workspaceId, a.role, body);
     const r = await proxyJson(a.workspaceId, '/v1/routes', jsonInit('POST', body));
     const savedId = String(r?.route?.id || r?.id || rid || '');
     if (savedId) await upsertResourceOwnership('route', savedId, a.workspaceId, false);
@@ -1486,14 +1743,44 @@ export async function telephonyRoutes(app: FastifyInstance) {
     }
     return proxyJson(a.workspaceId, '/v1/routes/reorder', jsonInit('POST', { ids }));
   });
-  app.post<{ Body: { ruleId?: string; tenantId?: string } }>('/telephony/routes/simulate', operateGuard, async (req) => {
+  app.post<{ Body: Record<string, any> }>('/telephony/routes/simulate', operateGuard, async (req) => {
     const a = actor(req);
-    const ruleId = req.body?.ruleId ? String(req.body.ruleId) : '';
+    const raw = req.body ?? {};
+    const ruleId = raw?.ruleId ? String(raw.ruleId) : '';
     if (ruleId) {
       await ensureOwnershipSynced(a.workspaceId, 'route', '/v1/routes', 'routes');
       await assertCanCreateOrModifyResource('route', ruleId, a.workspaceId, a.role);
     }
-    return proxyJson(a.workspaceId, '/v1/routes/simulate', jsonInit('POST', req.body ?? {}));
+    const simInput = parse(InboundRouteSimulateSchema, raw);
+    let channelDefaultTenantId: string | null = null;
+    if (simInput.connectionId && simInput.connectionId !== '*') {
+      const conn = await one<{ workspace_id: string; config: any }>(
+        getPool(),
+        `SELECT workspace_id, config FROM connections WHERE id=$1`,
+        [simInput.connectionId],
+      ).catch(() => null);
+      if (!conn || conn.workspace_id !== a.workspaceId) {
+        throw new HttpError(403, 'Canal não autorizado', 'Este Canal pertence a outro workspace.');
+      }
+      channelDefaultTenantId = conn.config?.tenantId ? String(conn.config.tenantId) : null;
+    }
+    const resolution = await resolveInboundVoiceRouting({
+      workspaceId: a.workspaceId,
+      channelType: simInput.channelType,
+      connectionId: simInput.connectionId && simInput.connectionId !== '*' ? simInput.connectionId : null,
+      trunkId: simInput.trunkId && simInput.trunkId !== '*' ? simInput.trunkId : null,
+      did: simInput.did ?? '',
+      callerId: simInput.callerId ?? '',
+      origin: simInput.origin ?? '',
+      channelDefaultTenantId,
+    });
+    return {
+      matched: resolution.source === 'inbound_route',
+      matchedRule: resolution.matchedRule,
+      resolvedTenantId: resolution.tenantId,
+      source: resolution.source,
+      trace: resolution.trace,
+    };
   });
   app.post<{ Body: { ruleId?: string; tenantId?: string } }>('/telephony/routes/test-call', operateGuard, async (req) => {
     const a = actor(req);
@@ -1514,7 +1801,9 @@ export async function telephonyRoutes(app: FastifyInstance) {
     const a = actor(req);
     await ensureOwnershipSynced(a.workspaceId, 'route', '/v1/routes', 'routes');
     await assertCanCreateOrModifyResource('route', req.params.id, a.workspaceId, a.role);
-    const r = await proxyJson(a.workspaceId, `/v1/routes/${enc(req.params.id)}`, jsonInit('PUT', req.body ?? {}));
+    const raw = (req.body ?? {}) as Record<string, any>;
+    await validateInboundRouteRefs(a.workspaceId, a.role, raw);
+    const r = await proxyJson(a.workspaceId, `/v1/routes/${enc(req.params.id)}`, jsonInit('PUT', raw));
     await upsertResourceOwnership('route', req.params.id, a.workspaceId, false);
     return r;
   });

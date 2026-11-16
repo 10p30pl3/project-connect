@@ -8,7 +8,7 @@ import type { CampaignSummary, Overview } from '../lib/types';
 import { fmtDateTime, fmtMoney, fmtNumber } from '../lib/format';
 import { useAuth } from '../lib/auth';
 import { useExperienceMode } from '../lib/experience-mode';
-import { Button, btnClass, CampaignStatusBadge, Card, Empty, ErrorState, Field, Input, Loading, Modal, PageHeader, Stat, TableWrap, useToast } from '../components/ui';
+import { Button, btnClass, CampaignStatusBadge, Card, Empty, ErrorState, Field, InfoTooltip, Input, Loading, Modal, PageHeader, Stat, TableWrap, useToast } from '../components/ui';
 import { SaveAsTemplateModal } from '../components/SaveAsTemplateModal';
 
 export function CampaignsPage() {
@@ -59,10 +59,8 @@ export function CampaignsPage() {
   });
 
   const shortcuts = [
-    { to: '/campanhas/nova', label: 'Nova campanha', desc: 'Configuração manual estruturada: Mailing, Público, Acionamento e Revisão.', icon: Rocket, perm: 'campaigns.create' as const },
-    { to: '/campanhas/modelos', label: 'Modelos de campanhas', desc: 'Jornadas e estratégias salvas para criar campanhas em 1 clique.', icon: Bookmark, perm: 'campaigns.create' as const },
-    { to: '/contatos', label: 'Bases & Contatos', desc: 'Base unificada com estudo de propensão e DNC.', icon: Users, perm: 'contacts.write' as const },
-    { to: '/mailings/importar', label: 'Importar mailing', desc: 'Upload de arquivo CSV/XLSX com auto-detecção.', icon: Database, perm: 'mailings.write' as const },
+    { to: '/contatos', label: 'Bases & Contatos', tooltip: 'Base unificada com estudo de propensão e bloqueios DNC.', icon: Users, perm: 'contacts.write' as const, minMode: 'basic' as const },
+    { to: '/mailings/importar', label: 'Importar mailing', tooltip: 'Upload de arquivo CSV ou XLSX com auto-detecção de colunas.', icon: Database, perm: 'mailings.write' as const, minMode: 'basic' as const },
   ];
 
   const canOperate = can('campaigns.operate');
@@ -74,11 +72,13 @@ export function CampaignsPage() {
         tooltip="Gerencie campanhas ativas, pausadas e agendadas com controle em tempo real de réguas e estratégias."
         actions={
           <div className="flex items-center gap-2">
-            <Link to="/campanhas/modelos">
-              <Button variant="secondary" icon={<Bookmark className="size-3.5" />}>
-                Modelos de campanhas
-              </Button>
-            </Link>
+            {isAtLeast('advanced') && (
+              <Link to="/campanhas/modelos">
+                <Button variant="secondary" icon={<Bookmark className="size-3.5" />}>
+                  Modelos de campanhas
+                </Button>
+              </Link>
+            )}
             {can('campaigns.create') && (
               <Link to="/campanhas/nova">
                 <Button variant="primary" icon={<Rocket className="size-3.5" />}>
@@ -90,23 +90,23 @@ export function CampaignsPage() {
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2">
         {shortcuts.map((s) =>
-          can(s.perm) ? (
+          can(s.perm) && isAtLeast(s.minMode) ? (
             <Link
               key={s.to}
               to={s.to}
-              className="group flex items-start gap-3.5 rounded-xl border border-slate-200/90 bg-white p-4 shadow-xs transition-all hover:border-brand-300 hover:bg-brand-50/30 hover:shadow-sm"
+              className="group flex items-center gap-3 rounded-xl border border-slate-200/90 bg-white px-4 py-3 shadow-xs transition-all hover:border-brand-300 hover:bg-brand-50/30 hover:shadow-sm"
             >
-              <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-200/60 transition-colors group-hover:bg-brand-700 group-hover:text-white">
-                <s.icon className="size-4.5" aria-hidden />
+              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-700 ring-1 ring-inset ring-brand-200/60 transition-colors group-hover:bg-brand-700 group-hover:text-white">
+                <s.icon className="size-4" aria-hidden />
               </span>
-              <span className="min-w-0 flex-1">
-                <span className="flex items-center justify-between font-semibold text-slate-900 group-hover:text-brand-800">
+              <span className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1.5 font-semibold text-slate-900 group-hover:text-brand-800">
                   {s.label}
-                  <ArrowRight className="size-3.5 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-brand-700" aria-hidden />
+                  <InfoTooltip content={s.tooltip} />
                 </span>
-                <span className="mt-0.5 block text-xs leading-relaxed text-slate-600">{s.desc}</span>
+                <ArrowRight className="size-3.5 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-brand-700" aria-hidden />
               </span>
             </Link>
           ) : null,

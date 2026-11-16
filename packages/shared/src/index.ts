@@ -789,6 +789,9 @@ export const VoiceCallRequestSchema = z.object({
   agentOverrides: VoiceAgentOverridesSchema.optional(),
   /** versão do agente de voz cadastrado na conexão; o gateway recusa se o tenant estiver em outra versão */
   agentVersion: z.number().int().min(1).optional(),
+  /** rastreabilidade explícita da regra de precedência (Campanha > Canal > Workspace / Rota de Saída) */
+  agentSource: z.enum(['campaign_override', 'channel_default', 'workspace_default']).optional(),
+  trunkSource: z.enum(['campaign_override', 'outbound_route', 'channel_default']).optional(),
   callback: z.object({ url: z.string().url(), secret: z.string().min(16) }),
 });
 export type VoiceCallRequest = z.infer<typeof VoiceCallRequestSchema>;
@@ -1405,5 +1408,85 @@ export const DEFAULT_CHANNEL_ENDPOINTS: ChannelEndpointConfig = {
     webhookUrl: 'https://api.vollconnect.com.br/webhooks/rcs',
   },
 };
+
+// ---------------------------------------------------------------- Arquitetura Telefonia: Canal, Agentes e Rotas (006)
+export const INBOUND_ROUTE_CHANNEL_SCOPES = ['*', 'VOICE', 'WEBRTC'] as const;
+export type InboundRouteChannelScope = (typeof INBOUND_ROUTE_CHANNEL_SCOPES)[number];
+
+export const VOICE_ROUTING_SOURCES = [
+  'inbound_route',
+  'channel_default',
+  'workspace_default',
+  'campaign_override',
+  'outbound_route',
+  'none',
+] as const;
+export type VoiceRoutingSource = (typeof VOICE_ROUTING_SOURCES)[number];
+
+export const InboundRouteUpsertSchema = z.object({
+  id: z.string().max(80).optional(),
+  name: z.string().min(1, 'Informe o nome da rota').max(80),
+  channelType: z.enum(INBOUND_ROUTE_CHANNEL_SCOPES).default('*'),
+  connectionId: z.string().max(80).default('*'),
+  trunkId: z.string().max(80).default('*'),
+  didPattern: z.string().max(120).default('*'),
+  callerPattern: z.string().max(120).default('*'),
+  originPattern: z.string().max(200).default('*'),
+  tenantId: z.string().min(1, 'Selecione o Agente de Voz de destino').max(120),
+  priority: z.number().int().min(1).max(10000).optional(),
+  maxChannels: z.number().int().min(1).nullable().optional(),
+  amdMode: z.enum(['tenant_default', 'enabled', 'disabled']).optional(),
+  recordingEnabled: z.enum(['tenant_default', 'enabled', 'disabled']).optional(),
+  crosstalkFilterMode: z.enum(['tenant_default', 'atual', 'wespeaker', 'ecapa', 'none']).optional(),
+  bargeinGraceSec: z.number().min(0).max(10).nullable().optional(),
+  active: z.boolean().default(true),
+});
+export type InboundRouteUpsert = z.infer<typeof InboundRouteUpsertSchema>;
+
+export const InboundRouteSimulateSchema = z.object({
+  channelType: z.enum(['VOICE', 'WEBRTC']).default('VOICE'),
+  connectionId: z.string().max(80).optional(),
+  trunkId: z.string().max(80).optional(),
+  did: z.string().max(120).optional(),
+  callerId: z.string().max(120).optional(),
+  origin: z.string().max(240).optional(),
+});
+export type InboundRouteSimulate = z.infer<typeof InboundRouteSimulateSchema>;
+
+export const VoiceAgentUsageSummarySchema = z.object({
+  agentId: z.string(),
+  channels: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      channelType: z.string(),
+      active: z.boolean(),
+    }),
+  ),
+  routes: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      channelType: z.string(),
+      active: z.boolean(),
+    }),
+  ),
+  campaigns: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      status: z.string(),
+    }),
+  ),
+  templates: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+    }),
+  ),
+  totalReferences: z.number().int().min(0),
+});
+export type VoiceAgentUsageSummary = z.infer<typeof VoiceAgentUsageSummarySchema>;
+
 
 

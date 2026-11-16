@@ -293,7 +293,14 @@ export function ActivationRightInspector({
                   ['Identificador', selectedAgent.id],
                   ['Duração máxima', selectedAgent.maxDurationSec ? `${selectedAgent.maxDurationSec}s` : 'Padrão do gateway'],
                   ['AMD / STT', `${selectedAgent.amd?.enabled ? 'AMD ativo' : 'AMD inativo'} · ${selectedAgent.stt?.enabled !== false ? 'Transcrição ativa' : 'Transcrição inativa'}`],
-                  ['Vínculo do canal', boundChannelAgentName ? `Padrão do canal: ${boundChannelAgentName}` : 'Escolha específica da campanha'],
+                  [
+                    'Origem do agente',
+                    boundChannelAgentName && selectedConnection?.tenantId === selectedAgent.id
+                      ? `Herdado do Canal (${boundChannelAgentName})`
+                      : selectedConnection?.tenantId
+                        ? `Sobrescrito na Campanha (padrão do canal: ${boundChannelAgentName ?? selectedConnection.tenantId})`
+                        : 'Selecionado na Campanha',
+                  ],
                 ]}
               />
               {selectedAgent.instructions && (
@@ -480,6 +487,7 @@ export function ReviewRightInspector({
   calendarName,
   trunksData,
   trunkIds,
+  outboundRoutesSummary,
   dialMultiplier,
   effectiveQuota,
 }: {
@@ -497,6 +505,7 @@ export function ReviewRightInspector({
   calendarName?: string;
   trunksData?: TrunkAvailabilityResponse;
   trunkIds: string[];
+  outboundRoutesSummary?: string;
   dialMultiplier: number;
   effectiveQuota: number;
 }) {
@@ -585,7 +594,13 @@ export function ReviewRightInspector({
           </div>
           <KeyValue
             items={[
-              ['Troncos selecionados', trunkIds.length === 0 ? `Todos ativos (${trunksData?.trunks.length ?? 0})` : `${trunkIds.length} específico(s)`],
+              [
+                'Regra de saída',
+                trunkIds.length === 0
+                  ? `Automático por Rotas de Saída (${outboundRoutesSummary || 'padrão'})`
+                  : `Sobrescrito na Campanha (${trunkIds.length} tronco(s))`,
+              ],
+              ['Troncos elegíveis', trunkIds.length === 0 ? `Todos ativos (${trunksData?.trunks.length ?? 0})` : `${trunkIds.length} específico(s)`],
               ['Canais livres / totais', `${trunksData?.availableChannels ?? 0} / ${trunksData?.totalChannels ?? 0}`],
               ['Multiplicador', `${dialMultiplier}x`],
               ['Gateway', trunksData?.gatewayOnline ? 'Online' : trunksData?.gatewayConfigured ? 'Offline' : 'Simulado'],

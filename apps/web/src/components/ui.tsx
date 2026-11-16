@@ -377,6 +377,33 @@ export function Empty({ title, children, action }: { title: ReactNode; children?
   );
 }
 
+/** Restringe a renderização de áreas ou controles especiais exclusivamente ao Super Admin. */
+export function SuperAdminGuard({
+  allowed,
+  children,
+  backHref = '/',
+}: {
+  allowed: boolean;
+  children: ReactNode;
+  backHref?: string;
+}) {
+  if (!allowed) {
+    return (
+      <Empty
+        title="Acesso restrito ao Super Admin"
+        action={
+          <a href={backHref} className={btnClass('secondary')}>
+            Voltar para Visão geral
+          </a>
+        }
+      >
+        Esta área contém controles especiais de plataforma disponíveis apenas para o perfil Super Admin.
+      </Empty>
+    );
+  }
+  return <>{children}</>;
+}
+
 // ------------------------------------------------------------------ Form fields
 type FieldProps = {
   label: ReactNode;

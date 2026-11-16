@@ -46,6 +46,7 @@ const CalendarsPage = lazyNamed(() => import('./pages/Calendars'), 'CalendarsPag
 const TabulationsPage = lazyNamed(() => import('./pages/Tabulations'), 'TabulationsPage');
 const ChannelsPage = lazyNamed(() => import('./pages/Channels'), 'ChannelsPage');
 const VoiceAgentsPage = lazyNamed(() => import('./pages/VoiceAgents'), 'VoiceAgentsPage');
+const RoutesPage = lazyNamed(() => import('./pages/Routes'), 'RoutesPage');
 const TelephonyPage = lazyNamed(() => import('./pages/Telephony'), 'TelephonyPage');
 const LimitsPage = lazyNamed(() => import('./pages/Limits'), 'LimitsPage');
 const ObservabilityPage = lazyNamed(() => import('./pages/Observability'), 'ObservabilityPage');
@@ -118,6 +119,7 @@ export const router = createBrowserRouter([
           { path: '/tabulacoes', element: <S><TabulationsPage /></S> },
           { path: '/canais', element: <S><ChannelsPage /></S> },
           { path: '/agentes-de-voz', element: <S><VoiceAgentsPage /></S> },
+          { path: '/rotas', element: <S><RoutesPage /></S> },
           { path: '/telefonia', element: <S><TelephonyPage /></S> },
           { path: '/relatorios', element: <S><ReportsPage /></S> },
           { path: '/consumo', element: <S><BillingPage /></S> },

@@ -136,6 +136,13 @@ export const voiceAppAdapter: ConnectorAdapter = {
     }
 
     const campaignTrunkIds = Array.isArray(row.campaign_trunk_ids) ? row.campaign_trunk_ids.map(String).filter(Boolean) : [];
+    const agentSource: VoiceCallRequest['agentSource'] = campaignAgentId
+      ? 'campaign_override'
+      : (connection.config as any)?.tenantId
+        ? 'channel_default'
+        : 'workspace_default';
+    const trunkSource: VoiceCallRequest['trunkSource'] =
+      campaignTrunkIds.length > 0 ? 'campaign_override' : 'outbound_route';
     const payload: VoiceCallRequest = {
       attemptId: attempt.id,
       traceId: attempt.trace_id,
@@ -146,6 +153,8 @@ export const voiceAppAdapter: ConnectorAdapter = {
       callerId: ep.callerId,
       ...(callerIdPool ? { callerIdPool } : {}),
       tenantId: ep.tenantId,
+      agentSource,
+      trunkSource,
       contact: {
         externalId: row.contact_ext_id,
         name: row.contact_name ?? 'Cliente',

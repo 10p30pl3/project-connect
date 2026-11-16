@@ -715,7 +715,10 @@ function EligibilityTab({ id }: { id: string }) {
         <Stat label="Reconciliação" value={fmtNumber(e.cards.reconciliation)} tone={e.cards.reconciliation ? 'warn' : undefined} />
         <Stat label="Encerrados" value={fmtNumber(e.cards.finished)} />
       </div>
-      <p className="text-xs text-slate-500">Avaliado em {fmtDateTime(e.evaluatedAt)} — todos os números vêm do mesmo instante lógico.</p>
+      <div className="flex items-center gap-1.5 text-xs text-slate-500">
+        <span>Avaliado em {fmtDateTime(e.evaluatedAt)}</span>
+        <InfoTooltip content="Todos os números desta aba vêm do mesmo instante lógico de avaliação." />
+      </div>
       <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtrar por motivo">
         <button
           type="button"

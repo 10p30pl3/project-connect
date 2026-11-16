@@ -1,5 +1,8 @@
+import type { InboundRouteChannelScope, VoiceAgentUsageSummary, VoiceRoutingSource } from '@voll/shared';
 import { ApiError, errorMessage } from '../../lib/api';
 import { Alert, Button } from '../../components/ui';
+
+export type { InboundRouteChannelScope, VoiceAgentUsageSummary, VoiceRoutingSource };
 
 export type ClusterNode = {
   id?: string;
@@ -162,16 +165,28 @@ export type ProviderItem = {
 export type InboundRoute = {
   id: string;
   name?: string;
+  channelType?: InboundRouteChannelScope;
+  connectionId?: string;
   trunkId?: string;
   didPattern?: string;
   callerPattern?: string;
+  originPattern?: string;
   tenantId?: string;
+  priority?: number;
   maxChannels?: number | null;
   amdMode?: string;
   bargeinGraceSec?: number | null;
   recordingEnabled?: string;
   crosstalkFilterMode?: string;
   active?: boolean;
+};
+
+export type InboundRouteSimulationResult = {
+  matched?: boolean;
+  matchedRule: InboundRoute | null;
+  resolvedTenantId: string | null;
+  source: VoiceRoutingSource;
+  trace?: Array<{ rule: string; name?: string; matched: boolean; reason: string }>;
 };
 
 export type OutboundRoute = {
