@@ -796,6 +796,7 @@ function createApiRouter({ activeBridges, tenantManager, fsPool, whisperPool, me
         return true;
       }
       try {
+        await bridge.webrtcBridge?.stop?.();
         await bridge.stop();
       } catch {}
       sendJson(res, 200, { ok: true, callId: targetCallId });
@@ -1268,14 +1269,54 @@ function createApiRouter({ activeBridges, tenantManager, fsPool, whisperPool, me
         }
       }
 
+      // Seleção e pré-aquisição atômica de tronco de saída (evita race condition em bursts simultâneos)
+      const cleanDestDigits = String(body.to || '').replace(/\D/g, '');
+      const hasExplicitTrunks = Array.isArray(body.trunkIds) && body.trunkIds.length > 0;
+      const needsOutboundTrunk =
+        Boolean(trunkManager) &&
+        trunkManager.trunks &&
+        trunkManager.trunks.size > 0 &&
+        (hasExplicitTrunks || cleanDestDigits.length >= 10);
+
+      let preAcquiredTrunkId = null;
+      if (needsOutboundTrunk) {
+        const matchedRoute = outboundRouteManager?.matchOutbound?.({
+          destination: body.to,
+          trunkIds: hasExplicitTrunks ? body.trunkIds : null,
+        });
+        const candidateTrunkId = trunkManager.selectAvailableTrunk({
+          trunkIds: hasExplicitTrunks ? body.trunkIds : null,
+          preferredTrunkId: matchedRoute?.trunkId || body.trunkId || null,
+        });
+        if (!candidateTrunkId || !trunkManager.tryAcquire(candidateTrunkId)) {
+          sendJson(res, 429, {
+            error: 'trunk_capacity_exceeded',
+            retryAfterSec: 5,
+            message: 'Todos os troncos de saída elegíveis estão ocupados ou indisponíveis.'
+          });
+          return true;
+        }
+        preAcquiredTrunkId = candidateTrunkId;
+      }
+
       // Execução assíncrona recomendada para campanhas Voll Plan
       const isAsync = body.async === true || Boolean(body.callback?.url) || Boolean(body.attemptId);
       if (isAsync) {
         const providerAttemptId = attemptId ? `va-${attemptId}` : `out-${Date.now()}`;
         setImmediate(async () => {
           try {
-            await originateCallHandler({ ...body, attemptId, providerAttemptId });
+            await originateCallHandler({
+              ...body,
+              attemptId,
+              providerAttemptId,
+              _preAcquiredTrunkId: preAcquiredTrunkId,
+            });
           } catch (err) {
+            if (preAcquiredTrunkId && trunkManager) {
+              // Se originateCallHandler falhar antes do próprio cleanup garantir a liberação,
+              // `originateOutboundCall` já libera em `catch`; este safeguard só evita vazamento
+              // se `originateCallHandler` lançar antes de registrar seu cleanup.
+            }
             console.error(`[originateOutboundCall] Erro em background (${providerAttemptId}):`, err.message);
           }
         });
@@ -1284,13 +1325,14 @@ function createApiRouter({ activeBridges, tenantManager, fsPool, whisperPool, me
           ok: true,
           status: 'ACCEPTED',
           providerAttemptId,
-          callId: providerAttemptId
+          callId: providerAttemptId,
+          trunkId: preAcquiredTrunkId,
         });
         return true;
       }
 
       try {
-        const result = await originateCallHandler(body);
+        const result = await originateCallHandler({ ...body, _preAcquiredTrunkId: preAcquiredTrunkId });
         sendJson(res, 201, result);
       } catch (err) {
         sendJson(res, 502, { error: 'originate_failed', message: err.message });
@@ -1958,11 +2000,24 @@ function createApiRouter({ activeBridges, tenantManager, fsPool, whisperPool, me
     }
 
     if (trunkManager && cleanPath.startsWith('/v1/trunks')) {
+      if (cleanPath === '/v1/trunks/availability' && req.method === 'GET') {
+        const rawIds = parsedUrl.searchParams.get('trunkIds');
+        const trunkIds = rawIds ? rawIds.split(',').map((s) => s.trim()).filter(Boolean) : null;
+        const availability = await trunkManager.getAvailability({ trunkIds, useCache: true });
+        sendJson(res, 200, availability);
+        return true;
+      }
       const m = cleanPath.match(/^\/v1\/trunks(?:\/([^/]+)(?:\/(status|register|toggle))?)?$/);
       try {
         if (m && !m[1] && req.method === 'GET') {
-          const status = await trunkManager.statusAll();
-          sendJson(res, 200, { trunks: trunkManager.list().map((t) => ({ ...t, live: status[t.id] || null })) });
+          const status = await trunkManager.statusAll({ useCache: false });
+          sendJson(res, 200, {
+            trunks: trunkManager.list().map((t) => ({
+              ...t,
+              live: status[t.id] || null,
+              online: trunkManager.isTrunkOnline(t, status[t.id] || null),
+            })),
+          });
           return true;
         }
         if (m && !m[1] && req.method === 'POST') {

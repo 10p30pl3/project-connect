@@ -6,13 +6,14 @@
  */
 import { Readable } from 'node:stream';
 import type { FastifyInstance, FastifyReply } from 'fastify';
-import { isReadOnlyRole, isSuperAdminRole } from '@voll/shared';
+import { isReadOnlyRole, isSuperAdminRole, PublicWebRtcOfferSchema } from '@voll/shared';
 import { getPool, one, q } from '../db/pool.js';
 import { actor, requireRoles, CAN } from '../auth/context.js';
-import { HttpError } from '../lib/problem.js';
+import { HttpError, parse } from '../lib/problem.js';
 import { audit } from '../lib/audit.js';
 import { decryptSecret, encryptSecret, maskSecret } from '../lib/crypto.js';
 import { idempotencyGuard } from '../lib/idempotency.js';
+import { loadWorkspaceTrunkSnapshot } from '../engine/trunk-capacity.js';
 
 const DEFAULT_TIMEOUT_MS = 8000;
 const LONG_TIMEOUT_MS = 20000;
@@ -35,7 +36,7 @@ async function getMasterWorkspaceId(): Promise<string | null> {
   return row?.id ?? null;
 }
 
-async function syncAndFetchOwnership(
+export async function syncAndFetchOwnership(
   type: VoiceResourceType,
   gatewayItems: any[],
 ): Promise<Map<string, ResourceOwnership>> {
@@ -416,7 +417,113 @@ function normalizeAudioFilters(raw: unknown, base: AudioFiltersConfig = DEFAULT_
   };
 }
 
-function jsonInit(method: string, body?: unknown): RequestInit {
+export const PUBLIC_WEBRTC_LONG_TIMEOUT_MS = LONG_TIMEOUT_MS;
+
+export async function resolveWorkspaceVoiceAgent(
+  workspaceId: string,
+  configuredTenantId?: string | null,
+): Promise<string | null> {
+  const preferred = String(configuredTenantId ?? '').trim();
+  if (preferred) {
+    const own = await one<{ workspace_id: string | null; is_global_default: boolean }>(
+      getPool(),
+      `SELECT workspace_id, is_global_default
+         FROM workspace_voice_resources
+        WHERE resource_type = 'agent' AND resource_id = $1`,
+      [preferred],
+    ).catch(() => null);
+    if (own && own.workspace_id && own.workspace_id !== workspaceId && !own.is_global_default) {
+      throw new HttpError(403, 'Agente de voz inválido', 'O agente vinculado ao canal pertence a outro workspace.');
+    }
+    return preferred;
+  }
+
+  const fallback = await one<{ resource_id: string }>(
+    getPool(),
+    `SELECT resource_id
+       FROM workspace_voice_resources
+      WHERE resource_type = 'agent'
+        AND (workspace_id = $1 OR is_global_default = true)
+      ORDER BY (workspace_id = $1) DESC, created_at ASC
+      LIMIT 1`,
+    [workspaceId],
+  ).catch(() => null);
+  return fallback?.resource_id ?? null;
+}
+
+const publicWebRtcCallWorkspace = new Map<string, { workspaceId: string; expiresAt: number }>();
+const publicOfferIpHits = new Map<string, number[]>();
+
+function checkPublicOfferRateLimit(ip: string, limit = 20, windowMs = 60_000): boolean {
+  const now = Date.now();
+  const hits = (publicOfferIpHits.get(ip) ?? []).filter((t) => now - t < windowMs);
+  if (hits.length >= limit) {
+    publicOfferIpHits.set(ip, hits);
+    return false;
+  }
+  hits.push(now);
+  publicOfferIpHits.set(ip, hits);
+  if (publicOfferIpHits.size > 2000) {
+    for (const [k, list] of publicOfferIpHits) {
+      if (list.every((t) => now - t >= windowMs)) publicOfferIpHits.delete(k);
+    }
+  }
+  return true;
+}
+
+function extractRequestOrigin(req: any): string {
+  const rawOrigin = String(req.headers?.origin || '').trim().replace(/\/+$/, '');
+  if (rawOrigin) return rawOrigin;
+  const referer = String(req.headers?.referer || '').trim();
+  if (referer) {
+    try {
+      return new URL(referer).origin;
+    } catch {
+      return '';
+    }
+  }
+  return '';
+}
+
+async function fetchWidgetScript(): Promise<string> {
+  const masterId = await getMasterWorkspaceId();
+  const baseUrl = String(process.env.VOICE_APP_BASE_URL || '').trim().replace(/\/+$/, '');
+  let res: Response;
+  if (masterId) {
+    res = await callGateway(masterId, '/voll-voice-widget.js');
+  } else if (baseUrl) {
+    const token = String(process.env.VOICE_APP_TOKEN || process.env.API_AUTH_TOKEN || '').trim();
+    res = await fetch(`${baseUrl}/voll-voice-widget.js`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+    });
+  } else {
+    throw new HttpError(503, 'Widget WebRTC indisponível', 'Gateway de voz não configurado.');
+  }
+  if (!res.ok) {
+    throw new HttpError(res.status === 404 ? 404 : 502, 'Widget WebRTC indisponível', `HTTP ${res.status}`);
+  }
+  return res.text();
+}
+
+async function resolvePublicCallWorkspace(callId: string, req: any): Promise<string | null> {
+  const cached = publicWebRtcCallWorkspace.get(callId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.workspaceId;
+  }
+  const widgetKey = String(req.headers?.['x-widget-key'] || '').trim();
+  if (widgetKey) {
+    const row = await one<{ workspace_id: string }>(
+      getPool(),
+      `SELECT workspace_id FROM connections WHERE channel_type='WEBRTC'::channel_type AND config->>'publicWidgetKey'=$1 LIMIT 1`,
+      [widgetKey],
+    ).catch(() => null);
+    if (row?.workspace_id) return row.workspace_id;
+  }
+  return getMasterWorkspaceId();
+}
+
+export function jsonInit(method: string, body?: unknown): RequestInit {
   if (body === undefined || method === 'GET' || method === 'HEAD') {
     return { method };
   }
@@ -429,26 +536,135 @@ function jsonInit(method: string, body?: unknown): RequestInit {
 
 export async function telephonyPublicRoutes(app: FastifyInstance) {
   app.get('/telephony/webrtc/widget.js', async (_req, reply) => {
-    const masterId = await getMasterWorkspaceId();
-    const baseUrl = String(process.env.VOICE_APP_BASE_URL || '').trim().replace(/\/+$/, '');
-    let res: Response;
-    if (masterId) {
-      res = await callGateway(masterId, '/voll-voice-widget.js');
-    } else if (baseUrl) {
-      const token = String(process.env.VOICE_APP_TOKEN || process.env.API_AUTH_TOKEN || '').trim();
-      res = await fetch(`${baseUrl}/voll-voice-widget.js`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
-      });
-    } else {
-      throw new HttpError(503, 'Widget WebRTC indisponível', 'Gateway de voz não configurado.');
-    }
-    if (!res.ok) {
-      throw new HttpError(res.status === 404 ? 404 : 502, 'Widget WebRTC indisponível', `HTTP ${res.status}`);
-    }
-    const script = await res.text();
+    const script = await fetchWidgetScript();
     reply.header('Content-Type', 'application/javascript; charset=utf-8');
     return reply.send(script);
+  });
+
+  app.options('/public/webrtc/*', async (_req, reply) => {
+    reply
+      .header('Access-Control-Allow-Origin', '*')
+      .header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
+      .header('Access-Control-Allow-Headers', 'Content-Type, X-WebRTC-Control-Token, X-Widget-Key')
+      .code(204);
+    return reply.send();
+  });
+
+  app.get('/public/webrtc/widget.js', async (_req, reply) => {
+    const script = await fetchWidgetScript();
+    reply
+      .header('Content-Type', 'application/javascript; charset=utf-8')
+      .header('Access-Control-Allow-Origin', '*')
+      .header('Cache-Control', 'no-store');
+    return reply.send(script);
+  });
+
+  app.post('/public/webrtc/offer', async (req, reply) => {
+    reply.header('Access-Control-Allow-Origin', '*');
+    const clientIp =
+      String(req.headers['x-forwarded-for'] ?? '')
+        .split(',')[0]
+        ?.trim() ||
+      req.ip ||
+      'unknown';
+    if (!checkPublicOfferRateLimit(clientIp)) {
+      throw new HttpError(429, 'Limite excedido', 'Muitas tentativas de conexão WebRTC. Aguarde um minuto.');
+    }
+
+    const body = parse(PublicWebRtcOfferSchema, req.body);
+    const conn = await one<{ id: string; workspace_id: string; active: boolean; config: any }>(
+      getPool(),
+      `SELECT id, workspace_id, active, config
+         FROM connections
+        WHERE channel_type = 'WEBRTC'::channel_type
+          AND config->>'publicWidgetKey' = $1
+        LIMIT 1`,
+      [body.publicWidgetKey],
+    );
+    if (!conn) {
+      throw new HttpError(401, 'Chave do widget inválida', 'Chave pública WebRTC não reconhecida.');
+    }
+    if (!conn.active) {
+      throw new HttpError(403, 'Canal WebRTC inativo', 'Este canal WebRTC está desabilitado no momento.');
+    }
+    const mode = conn.config?.webrtcMode ?? 'BOTH';
+    if (mode === 'WHATSAPP_CALLING') {
+      throw new HttpError(403, 'Modo Web desabilitado', 'Este canal WebRTC opera somente para WhatsApp Calling.');
+    }
+
+    const allowedOrigins: string[] = Array.isArray(conn.config?.allowedOrigins) ? conn.config.allowedOrigins : [];
+    if (allowedOrigins.length > 0 && !allowedOrigins.includes('*')) {
+      const origin = extractRequestOrigin(req);
+      if (!origin || !allowedOrigins.includes(origin)) {
+        throw new HttpError(403, 'Origem não autorizada', 'Domínio de origem não permitido para este widget.');
+      }
+    }
+
+    const tenantId = await resolveWorkspaceVoiceAgent(conn.workspace_id, conn.config?.tenantId);
+    if (!tenantId) {
+      throw new HttpError(
+        422,
+        'Agente de voz pendente',
+        'Vincule um agente de voz ao canal WebRTC em Configuração → Canais antes de atender chamadas.',
+      );
+    }
+
+    const gwRes = await proxyJson(
+      conn.workspace_id,
+      '/v1/webrtc/offer',
+      jsonInit('POST', {
+        tenantId,
+        sdpOffer: body.sdpOffer,
+        caller: body.caller || 'web-visitor',
+        metadata: {
+          ...(body.metadata ?? {}),
+          source: 'web_widget',
+          connectionId: conn.id,
+          workspaceId: conn.workspace_id,
+        },
+      }),
+      LONG_TIMEOUT_MS,
+    );
+
+    if (gwRes?.callId) {
+      publicWebRtcCallWorkspace.set(String(gwRes.callId), {
+        workspaceId: conn.workspace_id,
+        expiresAt: Date.now() + 2 * 60 * 60 * 1000,
+      });
+    }
+    return gwRes;
+  });
+
+  app.post<{ Params: { callId: string } }>('/public/webrtc/:callId/ice', async (req, reply) => {
+    reply.header('Access-Control-Allow-Origin', '*');
+    const workspaceId = await resolvePublicCallWorkspace(req.params.callId, req);
+    if (!workspaceId) {
+      throw new HttpError(404, 'Sessão WebRTC não encontrada', 'Sessão expirada ou inexistente.');
+    }
+    const controlToken = String(req.headers['x-webrtc-control-token'] || (req.body as any)?.controlToken || '').trim();
+    return proxyJson(workspaceId, `/v1/webrtc/${enc(req.params.callId)}/ice`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(controlToken ? { 'X-WebRTC-Control-Token': controlToken } : {}),
+      },
+      body: JSON.stringify(req.body ?? {}),
+    });
+  });
+
+  app.delete<{ Params: { callId: string } }>('/public/webrtc/:callId', async (req, reply) => {
+    reply.header('Access-Control-Allow-Origin', '*');
+    const workspaceId = await resolvePublicCallWorkspace(req.params.callId, req);
+    if (!workspaceId) {
+      throw new HttpError(404, 'Sessão WebRTC não encontrada', 'Sessão expirada ou inexistente.');
+    }
+    const controlToken = String(req.headers['x-webrtc-control-token'] || (req.query as any)?.controlToken || '').trim();
+    const out = await proxyJson(workspaceId, `/v1/webrtc/${enc(req.params.callId)}`, {
+      method: 'DELETE',
+      headers: controlToken ? { 'X-WebRTC-Control-Token': controlToken } : undefined,
+    });
+    publicWebRtcCallWorkspace.delete(req.params.callId);
+    return out;
   });
 }
 
@@ -1076,6 +1292,28 @@ export async function telephonyRoutes(app: FastifyInstance) {
   });
 
   // ---------------- Troncos SIP Híbridos (Global Default + Tenant BYOK) & Provedores ----------------
+  app.get('/telephony/trunks/availability', async (req) => {
+    const a = actor(req);
+    const snap = await loadWorkspaceTrunkSnapshot(getPool(), a.workspaceId);
+    const qObj = (req.query as { trunkIds?: string } | undefined) ?? {};
+    const requestedIds = String(qObj.trunkIds || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const allow = requestedIds.length > 0 ? new Set(requestedIds) : null;
+    const outbound = snap.trunks.filter((t) => t.direction !== 'inbound');
+    const scoped = allow ? outbound.filter((t) => allow.has(t.id)) : outbound;
+    const onlineScoped = scoped.filter((t) => t.active && t.online);
+    return {
+      trunks: outbound,
+      totalChannels: onlineScoped.reduce((s, t) => s + t.maxChannels, 0),
+      activeCalls: scoped.reduce((s, t) => s + t.activeCalls, 0),
+      availableChannels: onlineScoped.reduce((s, t) => s + t.availableChannels, 0),
+      gatewayConfigured: snap.gatewayConfigured,
+      gatewayOnline: snap.gatewayOnline,
+    };
+  });
+
   app.get('/telephony/trunks', async (req) => {
     const a = actor(req);
     const isSuper = isSuperAdminRole(a.role);

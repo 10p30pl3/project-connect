@@ -265,6 +265,36 @@ export async function seed(opts: { withSampleMailing?: boolean; workspaceId?: st
         ],
       ))!.id as string;
     })();
+    const webrtcConn = await (async () => {
+      const ex = await one(c, `SELECT id FROM connections WHERE workspace_id=$1 AND channel_type='WEBRTC'::channel_type LIMIT 1`, [wsId]);
+      if (ex) return ex.id as string;
+      const defaultAgent = await one<{ resource_id: string }>(
+        c,
+        `SELECT resource_id
+           FROM workspace_voice_resources
+          WHERE resource_type='agent'
+            AND (workspace_id=$1 OR is_global_default=true)
+          ORDER BY (workspace_id=$1) DESC, created_at ASC
+          LIMIT 1`,
+        [wsId],
+      ).catch(() => null);
+      return (await one(
+        c,
+        `INSERT INTO connections (workspace_id, name, channel_type, provider, config, webhook_secret, tariff, tariff_updated_at, active)
+         VALUES ($1, 'Canal WebRTC · Web & WhatsApp Calling', 'WEBRTC', 'WEBRTC_NATIVE', $2, $3, NULL, NULL, true) RETURNING id`,
+        [
+          wsId,
+          JSON.stringify({
+            webrtcMode: 'BOTH',
+            publicWidgetKey: `wrtc_${randomBytes(16).toString('hex')}`,
+            allowedOrigins: [],
+            whatsappVerifyToken: `wtok_${randomBytes(16).toString('hex')}`,
+            ...(defaultAgent?.resource_id ? { tenantId: defaultAgent.resource_id } : {}),
+          }),
+          randomBytes(24).toString('hex'),
+        ],
+      ))!.id as string;
+    })();
 
     const whatsapp = await conn('WhatsApp simulado', 'WHATSAPP', 0.05, {
       READ_NO_REPLY: 4, REPLIED: 2, CONVERSION: 1, OPT_OUT: 0.3, RESULT_UNKNOWN: 0.3,

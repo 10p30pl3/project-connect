@@ -36,6 +36,9 @@ import type {
   AuditRow,
   Block,
   CampaignDetail,
+  CampaignDialerStatus,
+  CampaignHistoryChange,
+  CampaignHistoryItem,
   CampaignTemplate,
   Connection,
   ContactDetail,
@@ -212,6 +215,27 @@ const CONNECTIONS: Connection[] = [
       duplicateRate: 0.1,
       noReturnRate: 0.05,
     },
+  },
+  {
+    id: uuid(36),
+    name: 'Canal WebRTC · Web & WhatsApp Calling',
+    channelType: 'WEBRTC',
+    provider: 'WEBRTC_NATIVE',
+    tenantId: 'default',
+    tariff: null,
+    tariffUpdatedAt: null,
+    active: true,
+    simulation: null,
+    webrtcMode: 'BOTH',
+    publicWidgetKey: 'wrtc_demo_0001',
+    allowedOrigins: [],
+    whatsappPhoneNumberId: '',
+    whatsappBusinessAccountId: '',
+    whatsappVerifyToken: 'wtok_demo_0001',
+    hasWhatsappAppSecret: false,
+    hasWhatsappAccessToken: false,
+    whatsappAppSecretMasked: null,
+    whatsappAccessTokenMasked: null,
   },
 ];
 
@@ -487,6 +511,7 @@ let CALENDARS: OperationCalendar[] = [];
 const ATTEMPTS: Map<string, AttemptDetail> = new Map();
 let CONTROL: Control = { dailyLimit: null, totalLimit: null, globalSuspension: false };
 let AUDITS: AuditRow[] = [];
+let CAMPAIGN_HISTORY: Record<string, CampaignHistoryItem[]> = {};
 let DRAFT: DraftEnvelope = null;
 
 export function resetDatabaseToZero() {
@@ -497,6 +522,7 @@ export function resetDatabaseToZero() {
   CAMPAIGN_TEMPLATES = [];
   ATTEMPTS.clear();
   AUDITS = [];
+  CAMPAIGN_HISTORY = {};
   DRAFT = null;
 }
 
@@ -1047,6 +1073,56 @@ export function seedSampleDemoData() {
       after: { status: 'RUNNING' },
     },
   ];
+
+  CAMPAIGN_HISTORY = {};
+  for (const camp of CAMPAIGNS) {
+    CAMPAIGN_HISTORY[camp.id] = [
+      {
+        id: nextUuid(),
+        action: 'campaign.create',
+        actorId: DEMO_USERS.ADMIN.id,
+        actorName: DEMO_USERS.ADMIN.name,
+        actorEmail: DEMO_USERS.ADMIN.email,
+        reason: null,
+        at: camp.createdAt,
+        changes: [
+          { field: 'name', label: 'Nome', before: null, after: camp.name },
+          { field: 'journeyVersionId', label: 'Jornada', before: null, after: camp.journeyName },
+          { field: 'strategyVersionId', label: 'Estratégia', before: null, after: `${camp.strategyName} (v${camp.strategyVersion})` },
+          ...(camp.calendarName ? [{ field: 'calendarId', label: 'Calendário de operação', before: null, after: camp.calendarName }] : []),
+        ],
+      },
+    ];
+  }
+  if (CAMPAIGN_HISTORY[CAMPAIGN_1_ID]) {
+    CAMPAIGN_HISTORY[CAMPAIGN_1_ID].unshift({
+      id: nextUuid(),
+      action: 'campaign.start',
+      actorId: DEMO_USERS.ADMIN.id,
+      actorName: DEMO_USERS.ADMIN.name,
+      actorEmail: DEMO_USERS.ADMIN.email,
+      reason: 'Início imediato na criação',
+      at: '2026-10-20T10:05:00Z',
+      changes: [{ field: 'status', label: 'Status', before: CAMPAIGN_STATUS_LABEL.READY, after: CAMPAIGN_STATUS_LABEL.RUNNING }],
+    });
+  }
+}
+
+function pushCampaignHistory(
+  campaignId: string,
+  entry: Omit<CampaignHistoryItem, 'id' | 'at'> & { at?: string },
+) {
+  const item: CampaignHistoryItem = {
+    id: nextUuid(),
+    at: entry.at ?? new Date().toISOString(),
+    action: entry.action,
+    actorId: entry.actorId,
+    actorName: entry.actorName,
+    actorEmail: entry.actorEmail,
+    reason: entry.reason,
+    changes: entry.changes,
+  };
+  CAMPAIGN_HISTORY[campaignId] = [item, ...(CAMPAIGN_HISTORY[campaignId] ?? [])];
 }
 
 function seedAttempts() {
@@ -2320,18 +2396,35 @@ export async function handleMockApi<T = unknown>(
   if (pathname === '/connections' && method === 'GET') return { items: CONNECTIONS } as T;
   if (pathname === '/connections' && method === 'POST') {
     const b = (opts.body ?? {}) as any;
-    const isSimulated = b.provider === 'SIMULATED';
+    const isWebRtc = b.channelType === 'WEBRTC' || b.provider === 'WEBRTC_NATIVE';
+    const provider = isWebRtc && (!b.provider || b.provider === 'SIMULATED') ? 'WEBRTC_NATIVE' : (b.provider || 'SIMULATED');
+    const isSimulated = !isWebRtc && provider === 'SIMULATED';
     const newConn: Connection = {
       id: nextUuid(),
-      name: b.name?.trim() || 'Nova Conexão',
-      channelType: b.channelType || 'VOICE',
-      provider: b.provider || 'SIMULATED',
+      name: b.name?.trim() || (isWebRtc ? 'Canal WebRTC · Web & WhatsApp Calling' : 'Nova Conexão'),
+      channelType: isWebRtc ? 'WEBRTC' : (b.channelType || 'VOICE'),
+      provider,
+      tenantId: b.tenantId ? String(b.tenantId).trim() : null,
       tariff: b.tariff !== undefined && b.tariff !== null ? Number(b.tariff) : null,
       tariffUpdatedAt: b.tariff !== null && b.tariff !== undefined ? new Date().toISOString() : null,
       active: b.active !== undefined ? Boolean(b.active) : true,
       endpointUrl: b.endpointUrl?.trim() || null,
       callerId: b.callerId?.trim() || null,
       authToken: b.authToken?.trim() || null,
+      ...(isWebRtc
+        ? {
+            webrtcMode: b.webrtcMode ?? 'BOTH',
+            publicWidgetKey: `wrtc_${Math.random().toString(36).slice(2, 12)}`,
+            allowedOrigins: Array.isArray(b.allowedOrigins) ? b.allowedOrigins : [],
+            whatsappPhoneNumberId: b.whatsappPhoneNumberId?.trim() || null,
+            whatsappBusinessAccountId: b.whatsappBusinessAccountId?.trim() || null,
+            whatsappVerifyToken: b.whatsappVerifyToken?.trim() || `wtok_${Math.random().toString(36).slice(2, 12)}`,
+            hasWhatsappAppSecret: Boolean(b.whatsappAppSecret && b.whatsappAppSecret !== '***'),
+            hasWhatsappAccessToken: Boolean(b.whatsappAccessToken && b.whatsappAccessToken !== '***'),
+            whatsappAppSecretMasked: b.whatsappAppSecret ? '••••mock' : null,
+            whatsappAccessTokenMasked: b.whatsappAccessToken ? '••••mock' : null,
+          }
+        : {}),
       simulation: isSimulated
         ? (b.simulation ?? {
             outcomes: { NO_ANSWER: 3, BUSY: 1, CPC_NO_DEAL: 2, CONVERSION: 1.5, OPT_OUT: 0.3, RESULT_UNKNOWN: 0.2 },
@@ -2368,9 +2461,23 @@ export async function handleMockApi<T = unknown>(
       }
       if (body.active !== undefined) c.active = body.active;
       if (body.provider !== undefined) c.provider = body.provider;
+      if (body.tenantId !== undefined) c.tenantId = body.tenantId;
       if (body.endpointUrl !== undefined) c.endpointUrl = body.endpointUrl;
       if (body.callerId !== undefined) c.callerId = body.callerId;
       if (body.authToken !== undefined) c.authToken = body.authToken;
+      if (body.webrtcMode !== undefined) c.webrtcMode = body.webrtcMode;
+      if (body.allowedOrigins !== undefined) c.allowedOrigins = body.allowedOrigins;
+      if (body.whatsappPhoneNumberId !== undefined) c.whatsappPhoneNumberId = body.whatsappPhoneNumberId;
+      if (body.whatsappBusinessAccountId !== undefined) c.whatsappBusinessAccountId = body.whatsappBusinessAccountId;
+      if (body.whatsappVerifyToken !== undefined) c.whatsappVerifyToken = body.whatsappVerifyToken;
+      if (body.whatsappAppSecret && body.whatsappAppSecret !== '***' && !String(body.whatsappAppSecret).startsWith('••••')) {
+        c.hasWhatsappAppSecret = true;
+        c.whatsappAppSecretMasked = `••••${String(body.whatsappAppSecret).slice(-4)}`;
+      }
+      if (body.whatsappAccessToken && body.whatsappAccessToken !== '***' && !String(body.whatsappAccessToken).startsWith('••••')) {
+        c.hasWhatsappAccessToken = true;
+        c.whatsappAccessTokenMasked = `••••${String(body.whatsappAccessToken).slice(-4)}`;
+      }
       if (body.simulation !== undefined) c.simulation = body.simulation;
     }
     return (c ?? CONNECTIONS[0]) as T;
@@ -2796,6 +2903,7 @@ export async function handleMockApi<T = unknown>(
       calendarId: cal?.id ?? null,
       calendarName: cal?.name ?? null,
       calendar: cal,
+      voiceAgentId: body.voiceAgentId ?? null,
       createdAt: now,
       startedAt: status === 'RUNNING' ? now : null,
       scheduledAt: body.scheduledAt ?? null,
@@ -2806,6 +2914,20 @@ export async function handleMockApi<T = unknown>(
       strategy: { id: s?.id ?? uuid(50), version: sv?.version ?? 1, config: sv?.config ?? ({} as any) },
     };
     CAMPAIGNS.unshift(camp);
+    pushCampaignHistory(camp.id, {
+      action: 'campaign.create',
+      actorId: me.id ?? null,
+      actorName: me.name,
+      actorEmail: me.email,
+      reason: null,
+      at: now,
+      changes: [
+        { field: 'name', label: 'Nome', before: null, after: camp.name },
+        { field: 'journeyVersionId', label: 'Jornada', before: null, after: camp.journeyName },
+        { field: 'strategyVersionId', label: 'Estratégia', before: null, after: `${camp.strategyName} (v${camp.strategyVersion})` },
+        ...(camp.calendarName ? [{ field: 'calendarId', label: 'Calendário de operação', before: null, after: camp.calendarName }] : []),
+      ],
+    });
     if (body.templateId) {
       const tmpl = CAMPAIGN_TEMPLATES.find((t) => t.id === body.templateId);
       if (tmpl) tmpl.usageCount = (tmpl.usageCount || 0) + 1;
@@ -2867,12 +2989,208 @@ export async function handleMockApi<T = unknown>(
       before: { status: beforeStatus },
       after: { status: c.status },
     });
+    pushCampaignHistory(c.id, {
+      action: `campaign.${act}`,
+      actorId: me.id ?? null,
+      actorName: me.name,
+      actorEmail: me.email,
+      reason: body?.reason ?? null,
+      changes: [{ field: 'status', label: 'Status', before: CAMPAIGN_STATUS_LABEL[beforeStatus], after: CAMPAIGN_STATUS_LABEL[c.status] }],
+    });
     return c as T;
+  }
+  const campDialerMatch = pathname.match(/^\/campaigns\/([^/]+)\/dialer-status$/);
+  if (campDialerMatch && method === 'GET') {
+    const c = CAMPAIGNS.find((x) => x.id === campDialerMatch[1]);
+    if (!c) throw new ApiError({ type: 'not_found', title: 'Campanha não encontrada', status: 404 });
+    const status: CampaignDialerStatus = {
+      campaignId: c.id,
+      trunkIds: [],
+      dialMultiplier: 1,
+      loadedTotal: c.progress.members,
+      activeDialing: c.status === 'RUNNING' ? Math.min(2, c.progress.active) : 0,
+      queuedWaitingTrunk: 0,
+      completedOrSkipped: c.progress.finished,
+      availableTrunkSlots: 10,
+      totalTrunkChannels: 10,
+      effectiveQuota: 10,
+      waitingReason: 'NONE',
+      canEditDialerConfig: true,
+      trunks: [],
+    };
+    return status as T;
+  }
+  const campHistoryMatch = pathname.match(/^\/campaigns\/([^/]+)\/history$/);
+  if (campHistoryMatch && method === 'GET') {
+    const c = CAMPAIGNS.find((x) => x.id === campHistoryMatch[1]);
+    if (!c) throw new ApiError({ type: 'not_found', title: 'Campanha não encontrada', status: 404 });
+    return { items: CAMPAIGN_HISTORY[c.id] ?? [] } as T;
   }
   const campMatch = pathname.match(/^\/campaigns\/([^/]+)$/);
   if (campMatch && method === 'GET') {
     const c = CAMPAIGNS.find((c) => c.id === campMatch[1]);
     if (!c) throw new ApiError({ type: 'not_found', title: 'Campanha não encontrada', status: 404 });
+    return c as T;
+  }
+  if (campMatch && method === 'PATCH') {
+    const c = CAMPAIGNS.find((x) => x.id === campMatch[1]);
+    if (!c) throw new ApiError({ type: 'not_found', title: 'Campanha não encontrada', status: 404 });
+    if (c.status === 'ARCHIVED' || c.status === 'CLOSED' || c.status === 'COMPLETED') {
+      throw new ApiError({
+        type: 'conflict',
+        title: 'Campanha não pode ser editada',
+        status: 409,
+        detail: 'Campanhas concluídas, encerradas ou arquivadas não permitem alteração de configurações.',
+      });
+    }
+    const changes: CampaignHistoryChange[] = [];
+
+    if (body.name !== undefined) {
+      const nextName = String(body.name).trim();
+      if (!nextName) {
+        throw new ApiError({ type: 'validation', title: 'Verifique os campos', status: 422, fieldErrors: { name: 'Informe o nome da campanha' } });
+      }
+      if (nextName !== c.name) {
+        changes.push({ field: 'name', label: 'Nome', before: c.name, after: nextName });
+        c.name = nextName;
+      }
+    }
+
+    if (body.description !== undefined) {
+      const nextDesc = body.description ? String(body.description).trim() || null : null;
+      if ((c.description ?? null) !== nextDesc) {
+        changes.push({ field: 'description', label: 'Descrição', before: c.description ?? null, after: nextDesc });
+        c.description = nextDesc;
+      }
+    }
+
+    if (body.listVersionId !== undefined) {
+      const prevId = c.listVersion?.id ?? null;
+      const nextId = body.listVersionId ?? null;
+      if (prevId !== nextId) {
+        const prevList = prevId ? LISTS.find((l) => l.versions.some((v) => v.id === prevId)) : null;
+        const nextList = nextId ? LISTS.find((l) => l.versions.some((v) => v.id === nextId)) : null;
+        if (nextId && !nextList) {
+          throw new ApiError({ type: 'validation', title: 'Verifique os campos', status: 422, fieldErrors: { listVersionId: 'Lista não encontrada' } });
+        }
+        const nextVer = nextList?.versions.find((v) => v.id === nextId) ?? null;
+        changes.push({
+          field: 'listVersionId',
+          label: 'Lista',
+          before: prevList ? `${prevList.name} (v${c.listVersion?.version ?? 1})` : null,
+          after: nextList && nextVer ? `${nextList.name} (v${nextVer.version})` : null,
+        });
+        c.listVersion = nextVer ? { id: nextVer.id, version: nextVer.version, membershipMode: nextVer.membershipMode } : null;
+        c.audience = nextList ? { type: 'LIST', name: nextList.name } : { type: 'MAILING', name: c.mailing.name };
+      }
+    }
+
+    if (body.journeyVersionId !== undefined) {
+      const nextJourney = JOURNEYS.find((j) => j.latestVersion?.id === body.journeyVersionId);
+      if (!nextJourney?.latestVersion) {
+        throw new ApiError({ type: 'validation', title: 'Verifique os campos', status: 422, fieldErrors: { journeyVersionId: 'Jornada não encontrada' } });
+      }
+      const beforeLabel = `${c.journeyName} (v${c.journey.version})`;
+      const afterLabel = `${nextJourney.name} (v${nextJourney.latestVersion.version})`;
+      if (beforeLabel !== afterLabel || c.journey.id !== nextJourney.id) {
+        changes.push({ field: 'journeyVersionId', label: 'Jornada', before: beforeLabel, after: afterLabel });
+        c.journeyName = nextJourney.name;
+        c.journey = { id: nextJourney.id, version: nextJourney.latestVersion.version, steps: nextJourney.latestVersion.steps };
+      }
+    }
+
+    if (body.strategyVersionId !== undefined) {
+      const nextStrat = STRATEGIES.find((s) => s.versions.some((v) => v.id === body.strategyVersionId));
+      const nextVer = nextStrat?.versions.find((v) => v.id === body.strategyVersionId);
+      if (!nextStrat || !nextVer) {
+        throw new ApiError({ type: 'validation', title: 'Verifique os campos', status: 422, fieldErrors: { strategyVersionId: 'Estratégia não encontrada' } });
+      }
+      const beforeLabel = `${c.strategyName} (v${c.strategyVersion})`;
+      const afterLabel = `${nextStrat.name} (v${nextVer.version})`;
+      if (beforeLabel !== afterLabel || c.strategy.id !== nextStrat.id) {
+        changes.push({ field: 'strategyVersionId', label: 'Estratégia', before: beforeLabel, after: afterLabel });
+        c.strategyName = nextStrat.name;
+        c.strategyVersion = nextVer.version;
+        c.strategy = { id: nextStrat.id, version: nextVer.version, config: nextVer.config };
+      }
+    }
+
+    if (body.calendarId !== undefined) {
+      const nextCalId = body.calendarId ?? null;
+      if ((c.calendarId ?? null) !== nextCalId) {
+        const nextCal = nextCalId ? CALENDARS.find((cal) => cal.id === nextCalId) ?? null : null;
+        if (nextCalId && !nextCal) {
+          throw new ApiError({ type: 'validation', title: 'Verifique os campos', status: 422, fieldErrors: { calendarId: 'Calendário não encontrado' } });
+        }
+        changes.push({
+          field: 'calendarId',
+          label: 'Calendário de operação',
+          before: c.calendarName ?? null,
+          after: nextCal?.name ?? null,
+        });
+        c.calendarId = nextCal?.id ?? null;
+        c.calendarName = nextCal?.name ?? null;
+        c.calendar = nextCal;
+      }
+    }
+
+    if (body.voiceAgentId !== undefined) {
+      const nextVoice = body.voiceAgentId ?? null;
+      if ((c.voiceAgentId ?? null) !== nextVoice) {
+        changes.push({
+          field: 'voiceAgentId',
+          label: 'Agente de voz',
+          before: c.voiceAgentId ?? null,
+          after: nextVoice,
+        });
+        c.voiceAgentId = nextVoice;
+      }
+    }
+
+    if (body.scheduledAt !== undefined) {
+      const nextSched = body.scheduledAt ?? null;
+      if ((c.scheduledAt ?? null) !== nextSched) {
+        if (c.status !== 'READY' && c.status !== 'SCHEDULED') {
+          throw new ApiError({
+            type: 'validation',
+            title: 'Verifique os campos',
+            status: 422,
+            fieldErrors: { scheduledAt: 'Agendamento só pode ser alterado antes do início da campanha' },
+          });
+        }
+        changes.push({
+          field: 'scheduledAt',
+          label: 'Agendamento',
+          before: c.scheduledAt ?? null,
+          after: nextSched,
+        });
+        c.scheduledAt = nextSched;
+      }
+    }
+
+    if (changes.length > 0) {
+      const reason = body.reason?.trim() || null;
+      pushCampaignHistory(c.id, {
+        action: 'campaign.updated',
+        actorId: me.id ?? null,
+        actorName: me.name,
+        actorEmail: me.email,
+        reason,
+        changes,
+      });
+      AUDITS.unshift({
+        id: AUDITS.length + 1,
+        at: new Date().toISOString(),
+        user: { name: me.name },
+        action: 'campaign.updated',
+        entity: 'campaign',
+        entityId: c.id,
+        reason,
+        before: Object.fromEntries(changes.map((ch) => [ch.field, ch.before])),
+        after: Object.fromEntries(changes.map((ch) => [ch.field, ch.after])),
+      });
+    }
+
     return c as T;
   }
 

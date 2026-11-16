@@ -357,6 +357,9 @@ export function JourneysSection({
   const toast = useToast();
   const q = useQuery({ queryKey: ['journeys'], queryFn: () => get<{ items: Journey[] }>('/journeys') });
   const conns = useQuery({ queryKey: ['connections'], queryFn: () => get<{ items: Connection[] }>('/connections') });
+  const outboundConnections = (conns.data?.items ?? []).filter((c) =>
+    (CHANNEL_TYPES as readonly string[]).includes(c.channelType),
+  );
 
   const [localOpen, setLocalOpen] = useState(false);
   const open = extOpen !== undefined ? extOpen : localOpen;
@@ -419,7 +422,7 @@ export function JourneysSection({
               key={j.id}
               journey={j}
               canEdit={canEdit}
-              connections={conns.data?.items ?? []}
+              connections={outboundConnections}
               onDelete={(item) => setDeletingJourney(item)}
             />
           ))}
@@ -497,7 +500,7 @@ export function JourneysSection({
           <EditableJourneyCard
             journey={q.data?.items.find((x) => x.id === editJourneyInModal.id) ?? editJourneyInModal}
             canEdit={canEdit}
-            connections={conns.data?.items ?? []}
+            connections={outboundConnections}
             onDelete={(item) => {
               setEditJourneyInModal(null);
               setDeletingJourney(item);
@@ -581,7 +584,10 @@ function NewJourneyDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
     },
     onError: (e) => setErrors(e instanceof ApiError && Object.keys(e.fieldErrors).length ? e.fieldErrors : { form: errorMessage(e) }),
   });
-  const connsFor = (c?: ChannelType) => conns.data?.items.filter((x) => x.channelType === c && x.active) ?? [];
+  const connsFor = (c?: ChannelType) =>
+    (conns.data?.items ?? []).filter(
+      (x) => (CHANNEL_TYPES as readonly string[]).includes(x.channelType) && x.channelType === c && x.active,
+    );
   function submit() {
     const e: Record<string, string> = {};
     if (!name.trim()) e.name = 'Informe o nome';

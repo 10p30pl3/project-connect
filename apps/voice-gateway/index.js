@@ -2027,7 +2027,16 @@ fsPool.start();
 
 // Handler para Originação de Chamadas Ativas (POST /v1/calls)
 async function originateOutboundCall(params) {
+  let acquiredTrunkId = params._preAcquiredTrunkId || null;
+  let trunkSlotReleased = false;
+  const releaseTrunkSlotOnce = () => {
+    if (trunkSlotReleased) return;
+    trunkSlotReleased = true;
+    if (acquiredTrunkId && trunkManager) trunkManager.release(acquiredTrunkId);
+  };
+
   if (isShuttingDown || !fsPool.hasHealthyNode()) {
+    releaseTrunkSlotOnce();
     throw new Error('Serviço indisponível ou sem nós FreeSWITCH saudáveis');
   }
 
@@ -2061,6 +2070,7 @@ async function originateOutboundCall(params) {
 
   const slotCheck = tenantManager.tryAcquireSlot(tenant);
   if (!slotCheck.allowed) {
+    releaseTrunkSlotOnce();
     throw new Error(slotCheck.reason);
   }
 
@@ -2108,8 +2118,25 @@ async function originateOutboundCall(params) {
     }
 
     const detectedLine = cleanTo.length >= 10 ? 'trunk_sip' : 'softphone';
+    const hasExplicitTrunks = Array.isArray(params.trunkIds) && params.trunkIds.length > 0;
+    if (!acquiredTrunkId && trunkManager && trunkManager.trunks && trunkManager.trunks.size > 0 && (detectedLine === 'trunk_sip' || hasExplicitTrunks)) {
+      const matchedRoute = outboundRouteManager?.matchOutbound?.({
+        destination: effectiveTo,
+        trunkIds: hasExplicitTrunks ? params.trunkIds : null,
+      });
+      const candidateTrunk = trunkManager.selectAvailableTrunk({
+        trunkIds: hasExplicitTrunks ? params.trunkIds : null,
+        preferredTrunkId: matchedRoute?.trunkId || params.trunkId || null,
+      });
+      if (!candidateTrunk || !trunkManager.tryAcquire(candidateTrunk)) {
+        throw new Error('trunk_capacity_exceeded: Todos os troncos de saída elegíveis estão ocupados ou indisponíveis.');
+      }
+      acquiredTrunkId = candidateTrunk;
+    }
+
     const customHeaders = {
       'X-Line-Type': detectedLine,
+      ...(acquiredTrunkId ? { 'X-Trunk-ID': acquiredTrunkId } : {}),
       ...(params.headers || {})
     };
 
@@ -2190,6 +2217,7 @@ async function originateOutboundCall(params) {
           channelUuid: endpoint ? endpoint.uuid : null,
           direction: 'outbound',
           tenantId: tenant.id,
+          trunkId: acquiredTrunkId,
           caller: from,
           called: to,
           fsNodeId: fsNode.id,
@@ -2287,6 +2315,7 @@ async function originateOutboundCall(params) {
       }
       activeBridges.delete(callId);
       releaseTenantSlotOnce();
+      releaseTrunkSlotOnce();
       if (releaseNodeSlot) releaseNodeSlot();
       if (endpoint) {
         try { endpoint.destroy(); } catch {}
@@ -2315,6 +2344,7 @@ async function originateOutboundCall(params) {
       callId,
       channelUuid: getChannelUuid(endpoint),
       tenantId: tenant.id,
+      trunkId: acquiredTrunkId,
       from,
       to,
       mediaNode: fsNode.id,
@@ -2323,6 +2353,7 @@ async function originateOutboundCall(params) {
     };
   } catch (err) {
     releaseTenantSlotOnce();
+    releaseTrunkSlotOnce();
     if (releaseNodeSlot) releaseNodeSlot();
     if (endpoint) {
       try {
@@ -2435,6 +2466,9 @@ async function startWebRtcSession({ tenantId, sdpOffer, caller = 'web-visitor', 
   }
 
   const callId = `webrtc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const callDirection = metadata?.source === 'whatsapp_calling' ? 'whatsapp_calling' : 'web_webrtc';
+  const calledTarget = callDirection === 'whatsapp_calling' ? `whatsapp:${tenant.id}` : `web:${tenant.id}`;
+  const startedAtMs = Date.now();
   const webrtcBridge = new WebRtcMediaBridge();
   let bridge = null;
   let sipHandoffState = null;
@@ -2471,10 +2505,10 @@ async function startWebRtcSession({ tenantId, sdpOffer, caller = 'web-visitor', 
     callHistoryManager.recordCallEnd({
       callId,
       channelUuid: callId,
-      direction: 'web_webrtc',
+      direction: callDirection,
       tenantId: tenant.id,
       caller,
-      called: `web:${tenant.id}`,
+      called: calledTarget,
       stsEngine: (tenant.stsEngine || 'openai').toLowerCase(),
       recordingFile: recInfo?.recordingFile || null,
       transcriptFile: recInfo?.transcriptFile || null,
@@ -2483,6 +2517,39 @@ async function startWebRtcSession({ tenantId, sdpOffer, caller = 'web-visitor', 
       correlationId: bridge?.correlationId || callId,
       failureStage: bridge?.failureStage || 'none'
     });
+
+    const callbackUrl = metadata?.endedCallbackUrl
+      ? String(metadata.endedCallbackUrl)
+      : metadata?.endedCallbackBaseUrl
+        ? `${String(metadata.endedCallbackBaseUrl).replace(/\/+$/, '')}/${encodeURIComponent(callId)}/ended`
+        : '';
+    if (callbackUrl && typeof globalThis.fetch === 'function') {
+      const gwToken = String(process.env.API_AUTH_TOKEN || '').trim();
+      const durationSec = Math.max(0, Math.round((Date.now() - startedAtMs) / 1000));
+      const failureStage = String(bridge?.failureStage || 'none');
+      const endedBy =
+        failureStage.includes('timeout') || failureStage.includes('duration')
+          ? 'timeout'
+          : failureStage !== 'none'
+            ? 'error'
+            : 'agent';
+      globalThis
+        .fetch(callbackUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(gwToken ? { Authorization: `Bearer ${gwToken}` } : {})
+          },
+          body: JSON.stringify({
+            reason: failureStage !== 'none' ? failureStage : 'hangup',
+            durationSec,
+            endedBy
+          }),
+          signal: AbortSignal.timeout(5000)
+        })
+        .catch(() => {});
+    }
+
     releaseTenantSlotOnce();
   };
 
@@ -2552,10 +2619,10 @@ async function startWebRtcSession({ tenantId, sdpOffer, caller = 'web-visitor', 
     callHistoryManager.recordCallStart({
       callId,
       channelUuid: callId,
-      direction: 'web_webrtc',
+      direction: callDirection,
       tenantId: tenant.id,
       caller,
-      called: `web:${tenant.id}`,
+      called: calledTarget,
       stsEngine: (tenant.stsEngine || 'openai').toLowerCase(),
       amdEnabled: false,
       sttEnabled: Boolean(tenant.stt?.enabled),
@@ -2576,7 +2643,7 @@ async function startWebRtcSession({ tenantId, sdpOffer, caller = 'web-visitor', 
       endpoint,
       dialog: null,
       caller,
-      called: `web:${tenant.id}`,
+      called: calledTarget,
       mediaBridge: webrtcBridge
     });
 

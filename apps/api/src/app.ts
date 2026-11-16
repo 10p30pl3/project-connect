@@ -23,6 +23,7 @@ import { reportRoutes } from './modules/reports.js';
 import { aiRoutes } from './modules/ai.js';
 import { voiceAgentRoutes } from './modules/voice-agent.js';
 import { telephonyPublicRoutes, telephonyRoutes } from './modules/telephony.js';
+import { whatsappCallingRoutes } from './modules/whatsapp-calling.js';
 import { billingRoutes } from './modules/billing.js';
 import { validateEnv } from './config/env-validator.js';
 import { ensureUpcomingPartitions } from './db/partition-service.js';
@@ -148,7 +149,8 @@ export async function buildApp(opts: BuildOptions = {}): Promise<FastifyInstance
     async (api) => {
       await authRoutes(api, { loginRateMax: opts.loginRateMax ?? 20 });
       await connectorRoutes(api); // público, autenticado por HMAC
-      await telephonyPublicRoutes(api); // entrega pública do bundle estático /voll-voice-widget.js
+      await telephonyPublicRoutes(api); // widget público /public/webrtc/* e bundle legado /telephony/webrtc/widget.js
+      await whatsappCallingRoutes(api); // webhooks Meta /webhooks/whatsapp-calling/* e callback interno /internal/webrtc/*
       await api.register(async (p) => {
         p.addHook('preHandler', authenticate);
         await overviewRoutes(p);

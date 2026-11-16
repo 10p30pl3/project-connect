@@ -79,6 +79,20 @@ class OutboundRouteManager {
     return this.routes.get(String(id)) || null;
   }
 
+  /** Seleciona a melhor rota de saída ativa para o destino, opcionalmente filtrada por `trunkIds` permitidos */
+  matchOutbound({ destination, trunkIds = null } = {}) {
+    const dest = String(destination || '').replace(/^\+/, '').trim();
+    const allow = Array.isArray(trunkIds) && trunkIds.length > 0 ? new Set(trunkIds.map(String)) : null;
+    for (const r of this.list()) {
+      if (!r.active) continue;
+      if (allow && !allow.has(String(r.trunkId))) continue;
+      try {
+        if (new RegExp(r.pattern).test(dest)) return r;
+      } catch {}
+    }
+    return null;
+  }
+
   validate(data) {
     if (!data || !data.name || !String(data.name).trim()) {
       throw new Error('"name" (nome da rota) é obrigatório');

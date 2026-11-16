@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
@@ -329,6 +330,33 @@ export async function authRoutes(app: FastifyInstance, opts: { loginRateMax: num
             [ws!.id, t.code, t.name, t.is_cpc, t.is_conversion, t.is_optout, t.is_invalid, t.channels ?? ['VOICE', 'WHATSAPP', 'SMS', 'EMAIL']],
           );
         }
+
+        const defaultAgent = await one<{ resource_id: string }>(
+          c,
+          `SELECT resource_id
+             FROM workspace_voice_resources
+            WHERE resource_type = 'agent'
+              AND (workspace_id = $1 OR is_global_default = true)
+            ORDER BY (workspace_id = $1) DESC, created_at ASC
+            LIMIT 1`,
+          [ws!.id],
+        ).catch(() => null);
+
+        await c.query(
+          `INSERT INTO connections (workspace_id, name, channel_type, provider, config, webhook_secret, tariff, tariff_updated_at, active)
+           VALUES ($1, 'Canal WebRTC · Web & WhatsApp Calling', 'WEBRTC', 'WEBRTC_NATIVE', $2, $3, NULL, NULL, true)`,
+          [
+            ws!.id,
+            JSON.stringify({
+              webrtcMode: 'BOTH',
+              publicWidgetKey: `wrtc_${randomBytes(16).toString('hex')}`,
+              allowedOrigins: [],
+              whatsappVerifyToken: `wtok_${randomBytes(16).toString('hex')}`,
+              ...(defaultAgent?.resource_id ? { tenantId: defaultAgent.resource_id } : {}),
+            }),
+            randomBytes(24).toString('hex'),
+          ],
+        );
 
         if (a.userId) {
           await c.query(

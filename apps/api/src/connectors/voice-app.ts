@@ -62,16 +62,20 @@ export const voiceAppAdapter: ConnectorAdapter = {
       contact_name: string | null;
       contact_ext_id: string;
       contact_attrs: Record<string, unknown> | null;
+      campaign_trunk_ids: string[] | null;
+      campaign_voice_agent_id: string | null;
       tabulation_rules: Record<string, unknown> | null;
       voice_overrides: Record<string, unknown> | null;
     }>(
       db,
       `SELECT a.workspace_id, a.campaign_id, a.contact_id,
               c.name AS contact_name, c.external_id AS contact_ext_id, c.attributes AS contact_attrs,
+              cam.trunk_ids AS campaign_trunk_ids, cam.voice_agent_id AS campaign_voice_agent_id,
               sv.config->'tabulationRules' AS tabulation_rules,
               sv.config->'voiceOverrides' AS voice_overrides
          FROM attempts a
          JOIN contacts c ON c.id = a.contact_id
+         JOIN campaigns cam ON cam.id = a.campaign_id
          LEFT JOIN strategy_versions sv ON sv.id = a.strategy_version_id
         WHERE a.id = $1`,
       [attempt.id],
@@ -79,11 +83,13 @@ export const voiceAppAdapter: ConnectorAdapter = {
     if (!row) return { status: 'REJECTED', reason: 'ATTEMPT_NOT_FOUND' };
 
     const ep = await resolveEndpoint(db, connection.config, row.workspace_id);
-    // agente de voz cadastrado na conexão: o tenant no gateway é a própria conexão, na versão publicada
+    const campaignAgentId = typeof row.campaign_voice_agent_id === 'string' ? row.campaign_voice_agent_id.trim() : '';
+    // agente de voz: prioriza escolha explícita da campanha (`campaigns.voice_agent_id`); caso contrário, herda da conexão
     const agent = agentState(connection.config);
     let agentVersion: number | undefined;
     let callerIdPool: string[] | undefined;
-    if (agent.agent) {
+    const applyEmbeddedConnectionAgent = Boolean(agent.agent) && (!campaignAgentId || campaignAgentId === connection.id);
+    if (applyEmbeddedConnectionAgent && agent.agent) {
       if (!agent.inSync) {
         return { status: 'REJECTED', reason: `VOICE_AGENT_NOT_SYNCED: versão ${agent.version} ainda não publicada no gateway` };
       }
@@ -94,6 +100,8 @@ export const voiceAppAdapter: ConnectorAdapter = {
       if (agent.agent.allowedCallerIds?.length) {
         callerIdPool = agent.agent.allowedCallerIds;
       }
+    } else if (campaignAgentId) {
+      ep.tenantId = campaignAgentId;
     }
     if (!ep.baseUrl || !ep.callerId) {
       return { status: 'REJECTED', reason: 'VOICE_APP_NOT_CONFIGURED: informe endereço do gateway e caller ID' };
@@ -127,6 +135,7 @@ export const voiceAppAdapter: ConnectorAdapter = {
       webhookSecret = c?.webhook_secret;
     }
 
+    const campaignTrunkIds = Array.isArray(row.campaign_trunk_ids) ? row.campaign_trunk_ids.map(String).filter(Boolean) : [];
     const payload: VoiceCallRequest = {
       attemptId: attempt.id,
       traceId: attempt.trace_id,
@@ -145,6 +154,7 @@ export const voiceAppAdapter: ConnectorAdapter = {
       campaign: { id: row.campaign_id },
       limits: { maxDurationSec: ep.maxDurationSec },
       allowedTabulations: row.tabulation_rules ? Object.keys(row.tabulation_rules) : undefined,
+      ...(campaignTrunkIds.length > 0 ? { trunkIds: campaignTrunkIds } : {}),
       ...(row.voice_overrides ? { agentOverrides: row.voice_overrides as any } : {}),
       agentVersion,
       callback: {
@@ -179,11 +189,16 @@ export const voiceAppAdapter: ConnectorAdapter = {
       const isExplicitCapacity503 =
         res.status === 503 &&
         (body?.error === 'capacity_exceeded' || body?.error === 'tenant_capacity_exceeded');
-      // 429 ou 503 explícito de capacidade indisponível ANTES da aceitação: o worker reagenda sem consumir tentativa
+      // 429 (ex.: trunk_capacity_exceeded) ou 503 explícito de capacidade indisponível ANTES da aceitação:
+      // o worker reagenda sem consumir tentativa nem descartar o contato da fila
       if (res.status === 429 || isExplicitCapacity503) {
-        throw new TransientConnectorError(`Gateway de voz sem capacidade (HTTP ${res.status})`);
+        const detailMsg = body?.error === 'trunk_capacity_exceeded' ? 'trunk_capacity_exceeded' : `HTTP ${res.status}`;
+        throw new TransientConnectorError(`Gateway de voz sem capacidade (${detailMsg})`);
       }
       if (res.status === 200 || res.status === 201 || res.status === 202) {
+        if (body?.trunkId) {
+          await db.query(`UPDATE attempts SET trunk_id = $2 WHERE id = $1`, [attempt.id, String(body.trunkId)]).catch(() => {});
+        }
         return { status: 'ACCEPTED', providerAttemptId: body.providerAttemptId || body.callId || body.id || `va-${attempt.id}` };
       }
       if (res.status === 409 && body?.error === 'agent_version_mismatch') {

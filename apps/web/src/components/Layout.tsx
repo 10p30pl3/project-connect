@@ -170,7 +170,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
         label: 'Canais',
         icon: <Cable className={ico} aria-hidden />,
         matchPrefixes: ['/canais'],
-        minMode: 'advanced',
+        minMode: 'basic',
       },
       {
         to: '/agentes-de-voz',

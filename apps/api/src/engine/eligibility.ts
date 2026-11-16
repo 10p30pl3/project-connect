@@ -146,12 +146,15 @@ export type CampaignRuntime = {
   membershipMode: 'SNAPSHOT' | 'DYNAMIC' | null;
   timezone: string;
   calendar?: OperationCalendarLike | null;
+  trunkIds: string[];
+  dialMultiplier: number;
 };
 
 export async function loadCampaignRuntime(db: Db, campaignId: string): Promise<CampaignRuntime | null> {
   const rows = await q(
     db,
     `SELECT c.id, c.workspace_id, c.status, c.mailing_id, c.list_version_id, c.journey_version_id, c.strategy_version_id, c.calendar_id,
+            c.trunk_ids, c.dial_multiplier,
             jv.steps, sv.config, sv.version AS strategy_version, lv.membership_mode, w.timezone
        FROM campaigns c
        JOIN journey_versions jv ON jv.id = c.journey_version_id
@@ -200,6 +203,8 @@ export async function loadCampaignRuntime(db: Db, campaignId: string): Promise<C
     membershipMode: r.membership_mode,
     timezone: r.timezone,
     calendar,
+    trunkIds: Array.isArray(r.trunk_ids) ? r.trunk_ids.map(String) : [],
+    dialMultiplier: r.dial_multiplier !== null && r.dial_multiplier !== undefined ? Number(r.dial_multiplier) : 1,
   };
 }
 

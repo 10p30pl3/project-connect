@@ -4,6 +4,12 @@ import { getPool, one, q, tx, type Client } from '../db/pool.js';
 import { buildContexts, evaluateEnrollment, loadCampaignRuntime, type EnrollmentRow } from './eligibility.js';
 import { logEvent } from './events.js';
 import { inCalendar } from './calendar.js';
+import {
+  campaignUsesVoiceGateway,
+  computeCampaignQuota,
+  createWorkspaceTrunkBudgetPool,
+  type WorkspaceTrunkBudgetPool,
+} from './trunk-capacity.js';
 
 const STEP_SKIP_REASONS: ReasonCode[] = ['NO_DESTINATION', 'CHANNEL_EXHAUSTED', 'DESTINATION_BLOCKED'];
 
@@ -110,8 +116,12 @@ export async function reserveEnrollment(campaignId: string, enrollmentId: string
   }
 }
 
-/** Uma rodada de distribuição para a campanha (§4.1: lote e máximo pendente da estratégia). */
-export async function runReservations(campaignId: string, now: Date = new Date()): Promise<{ reserved: number; evaluated: number }> {
+/** Uma rodada de distribuição para a campanha (§4.1: lote, máximo pendente e capacidade real de troncos). */
+export async function runReservations(
+  campaignId: string,
+  now: Date = new Date(),
+  trunkPool?: WorkspaceTrunkBudgetPool,
+): Promise<{ reserved: number; evaluated: number }> {
   const pool = getPool();
   const rt = await loadCampaignRuntime(pool, campaignId);
   if (!rt || rt.status !== 'RUNNING') return { reserved: 0, evaluated: 0 };
@@ -124,8 +134,30 @@ export async function runReservations(campaignId: string, now: Date = new Date()
     `SELECT count(*)::int AS n FROM attempts WHERE campaign_id=$1 AND state IN ('RESERVED','SENT','AWAITING_FEEDBACK','RECONCILIATION')`,
     [campaignId],
   );
-  const budget = Math.min(rt.strategy.distribution.batchSize, rt.strategy.distribution.maxPending - pending);
-  if (budget <= 0) return { reserved: 0, evaluated: 0 };
+  const strategyBudget = Math.min(rt.strategy.distribution.batchSize, rt.strategy.distribution.maxPending - pending);
+  if (strategyBudget <= 0) return { reserved: 0, evaluated: 0 };
+
+  let budget = strategyBudget;
+  let activePool: WorkspaceTrunkBudgetPool | null = null;
+  let tracksTrunkBudget = false;
+  const usesGateway = rt.trunkIds.length > 0 || (await campaignUsesVoiceGateway(pool, rt.workspaceId, rt.steps));
+  if (usesGateway) {
+    activePool = trunkPool ?? createWorkspaceTrunkBudgetPool(pool);
+    const snapshot = await activePool.getOrLoad(rt.workspaceId);
+    if (snapshot.gatewayConfigured || rt.trunkIds.length > 0) {
+      tracksTrunkBudget = true;
+      if (!snapshot.gatewayOnline) {
+        return { reserved: 0, evaluated: 0 };
+      }
+      const qRes = computeCampaignQuota({
+        snapshot,
+        selectedTrunkIds: rt.trunkIds,
+        dialMultiplier: rt.dialMultiplier,
+      });
+      budget = Math.min(strategyBudget, qRes.effectiveQuota);
+      if (budget <= 0) return { reserved: 0, evaluated: 0 };
+    }
+  }
 
   const defaultTz = rt.timezone || 'America/Sao_Paulo';
 
@@ -174,6 +206,9 @@ export async function runReservations(campaignId: string, now: Date = new Date()
   }
   if (notTried.length) {
     await pool.query(`UPDATE enrollments SET last_evaluated_at=$2 WHERE id = ANY($1)`, [notTried, now]);
+  }
+  if (tracksTrunkBudget && activePool && reserved > 0) {
+    activePool.consume(rt.workspaceId, rt.trunkIds, reserved);
   }
   return { reserved, evaluated: cands.length };
 }

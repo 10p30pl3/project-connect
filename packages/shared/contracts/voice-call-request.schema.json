@@ -96,6 +96,14 @@
         "minLength": 1
       }
     },
+    "trunkIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "maxItems": 50
+    },
     "agentOverrides": {
       "type": "object",
       "properties": {

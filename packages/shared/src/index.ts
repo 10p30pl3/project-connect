@@ -43,6 +43,21 @@ export const CHANNEL_LABEL: Record<ChannelType, string> = {
   EMAIL: 'E-mail',
 };
 
+export const CONNECTION_CHANNEL_TYPES = ['VOICE', 'WHATSAPP', 'SMS', 'EMAIL', 'WEBRTC'] as const;
+export type ConnectionChannelType = (typeof CONNECTION_CHANNEL_TYPES)[number];
+export const CONNECTION_CHANNEL_LABEL: Record<ConnectionChannelType, string> = {
+  ...CHANNEL_LABEL,
+  WEBRTC: 'WebRTC',
+};
+
+export const WEBRTC_MODES = ['WEB', 'WHATSAPP_CALLING', 'BOTH'] as const;
+export type WebRtcMode = (typeof WEBRTC_MODES)[number];
+export const WEBRTC_MODE_LABEL: Record<WebRtcMode, string> = {
+  WEB: 'Somente Web Widget',
+  WHATSAPP_CALLING: 'Somente WhatsApp Calling',
+  BOTH: 'Web Widget + WhatsApp Calling',
+};
+
 export const CAMPAIGN_STATUS = ['READY', 'SCHEDULED', 'RUNNING', 'PAUSED', 'CLOSED', 'COMPLETED', 'ARCHIVED'] as const;
 export type CampaignStatus = (typeof CAMPAIGN_STATUS)[number];
 export const CAMPAIGN_STATUS_LABEL: Record<CampaignStatus, string> = {
@@ -333,6 +348,14 @@ export const ConnectionUpdateSchema = z.object({
   callerId: z.string().nullable().optional(),
   authToken: z.string().nullable().optional(),
   tenantId: z.string().max(120).nullable().optional(),
+  webrtcMode: z.enum(WEBRTC_MODES).optional(),
+  allowedOrigins: z.array(z.string()).optional(),
+  whatsappPhoneNumberId: z.string().max(80).nullable().optional(),
+  whatsappBusinessAccountId: z.string().max(80).nullable().optional(),
+  whatsappVerifyToken: z.string().max(160).nullable().optional(),
+  whatsappAppSecret: z.string().max(240).nullable().optional(),
+  whatsappAccessToken: z.string().max(512).nullable().optional(),
+  rotateWidgetKey: z.boolean().optional(),
   simulation: z
     .object({
       /** pesos por resultado simulado */
@@ -350,12 +373,20 @@ export const ConnectionUpdateSchema = z.object({
 
 export const ConnectionCreateSchema = z.object({
   name: z.string().min(1, 'Informe o nome da conexão').max(100),
-  channelType: z.enum(['VOICE', 'WHATSAPP', 'SMS', 'EMAIL']),
+  channelType: z.enum(CONNECTION_CHANNEL_TYPES),
   provider: z.string().min(1).default('SIMULATED'),
   tariff: z.number().min(0, 'A tarifa deve ser maior ou igual a zero').nullable().optional(),
   endpointUrl: z.string().nullable().optional(),
   callerId: z.string().nullable().optional(),
   authToken: z.string().nullable().optional(),
+  tenantId: z.string().max(120).nullable().optional(),
+  webrtcMode: z.enum(WEBRTC_MODES).optional(),
+  allowedOrigins: z.array(z.string()).optional(),
+  whatsappPhoneNumberId: z.string().max(80).nullable().optional(),
+  whatsappBusinessAccountId: z.string().max(80).nullable().optional(),
+  whatsappVerifyToken: z.string().max(160).nullable().optional(),
+  whatsappAppSecret: z.string().max(240).nullable().optional(),
+  whatsappAccessToken: z.string().max(512).nullable().optional(),
   simulation: z
     .object({
       outcomes: z.record(z.string(), z.number().min(0)),
@@ -368,6 +399,21 @@ export const ConnectionCreateSchema = z.object({
     .optional(),
 });
 export type ConnectionCreate = z.infer<typeof ConnectionCreateSchema>;
+
+export const PublicWebRtcOfferSchema = z.object({
+  publicWidgetKey: z.string().min(4).max(160),
+  sdpOffer: z.string().min(10),
+  caller: z.string().max(120).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+export type PublicWebRtcOffer = z.infer<typeof PublicWebRtcOfferSchema>;
+
+export const InternalWebRtcEndedSchema = z.object({
+  reason: z.string().max(160).optional(),
+  durationSec: z.number().min(0).optional(),
+  endedBy: z.enum(['agent', 'caller', 'timeout', 'error']).optional(),
+});
+export type InternalWebRtcEnded = z.infer<typeof InternalWebRtcEndedSchema>;
 
 export const ContactCreateSchema = z.object({
   name: z.string().min(1, 'Informe o nome do contato'),
@@ -490,6 +536,52 @@ export interface OperationCalendar {
   updatedAt?: string;
 }
 
+export const CampaignDialerConfigSchema = z.object({
+  trunkIds: z.array(z.string().min(1)).max(50).default([]),
+  dialMultiplier: z.number().min(0.5, 'Multiplicador mínimo é 0,5x').max(5, 'Multiplicador máximo é 5x').default(1),
+});
+export type CampaignDialerConfig = z.infer<typeof CampaignDialerConfigSchema>;
+
+export interface TrunkAvailability {
+  id: string;
+  name: string;
+  direction: 'inbound' | 'outbound' | 'both';
+  active: boolean;
+  online: boolean;
+  maxChannels: number;
+  activeCalls: number;
+  availableChannels: number;
+  statusMessage?: string | null;
+}
+
+export type CampaignDialerWaitingReason =
+  | 'NONE'
+  | 'NO_ELIGIBLE_TRUNKS'
+  | 'ALL_TRUNKS_BUSY'
+  | 'OUTSIDE_CALENDAR'
+  | 'PAUSED'
+  | 'GLOBAL_SUSPENSION';
+
+export interface CampaignDialerStatus {
+  campaignId: string;
+  trunkIds: string[];
+  dialMultiplier: number;
+  loadedTotal: number;
+  activeDialing: number;
+  queuedWaitingTrunk: number;
+  completedOrSkipped: number;
+  availableTrunkSlots: number;
+  totalTrunkChannels: number;
+  effectiveQuota: number;
+  waitingReason: CampaignDialerWaitingReason;
+  canEditDialerConfig: boolean;
+  trunks: TrunkAvailability[];
+}
+
+export function isDialerManagerRole(role?: string | null): boolean {
+  return role === 'MANAGER' || role === 'ADMIN' || role === 'SUPER_ADMIN';
+}
+
 export const CreateCampaignSchema = z
   .object({
     name: z.string().min(1, 'Informe o nome da campanha'),
@@ -499,10 +591,13 @@ export const CreateCampaignSchema = z
     journeyVersionId: z.string().uuid(),
     strategyVersionId: z.string().uuid(),
     calendarId: z.string().uuid().nullable().optional(),
+    voiceAgentId: z.string().min(1).max(120).nullable().optional(),
     purposeCode: z.enum(OPERATION_PURPOSES).optional(),
     audienceSegment: z.enum(AUDIENCE_SEGMENTS).optional(),
     startMode: z.enum(['NOW', 'SCHEDULE', 'READY']),
     scheduledAt: z.string().datetime({ offset: true }).nullable().optional(),
+    trunkIds: z.array(z.string().min(1)).max(50).optional(),
+    dialMultiplier: z.number().min(0.5).max(5).optional(),
   })
   .superRefine((c, ctx) => {
     if (c.startMode === 'SCHEDULE') {
@@ -511,6 +606,39 @@ export const CreateCampaignSchema = z
         ctx.addIssue({ code: 'custom', path: ['scheduledAt'], message: 'A data deve ser futura' });
     }
   });
+
+export const UpdateCampaignSchema = z.object({
+  name: z.string().trim().min(1, 'Informe o nome da campanha').max(120).optional(),
+  description: z.string().trim().max(500).nullable().optional(),
+  listVersionId: z.string().uuid().nullable().optional(),
+  journeyVersionId: z.string().uuid().optional(),
+  strategyVersionId: z.string().uuid().optional(),
+  calendarId: z.string().uuid().nullable().optional(),
+  voiceAgentId: z.string().min(1).max(120).nullable().optional(),
+  scheduledAt: z.string().datetime({ offset: true }).nullable().optional(),
+  trunkIds: z.array(z.string().min(1)).max(50).optional(),
+  dialMultiplier: z.number().min(0.5).max(5).optional(),
+  reason: z.string().trim().max(240).optional(),
+});
+export type UpdateCampaignInput = z.infer<typeof UpdateCampaignSchema>;
+
+export interface CampaignHistoryChange {
+  field: string;
+  label: string;
+  before: string | null;
+  after: string | null;
+}
+
+export interface CampaignHistoryItem {
+  id: string;
+  action: string;
+  actorId: string | null;
+  actorName: string;
+  actorEmail: string | null;
+  reason: string | null;
+  at: string;
+  changes: CampaignHistoryChange[];
+}
 
 export const CampaignTemplateCreateSchema = z.object({
   name: z.string().min(1, 'Informe o nome do modelo'),
@@ -655,6 +783,8 @@ export const VoiceCallRequestSchema = z.object({
   limits: z.object({ maxDurationSec: z.number().int().min(10).max(3600) }),
   /** códigos de tabulação que o gateway pode devolver nesta tentativa (snapshot da estratégia) */
   allowedTabulations: z.array(z.string().min(1)).optional(),
+  /** lista opcional de troncos de saída permitidos para esta chamada; vazio/omitido usa rota padrão */
+  trunkIds: z.array(z.string().min(1)).max(50).optional(),
   /** overrides opcionais por campanha/estratégia */
   agentOverrides: VoiceAgentOverridesSchema.optional(),
   /** versão do agente de voz cadastrado na conexão; o gateway recusa se o tenant estiver em outra versão */

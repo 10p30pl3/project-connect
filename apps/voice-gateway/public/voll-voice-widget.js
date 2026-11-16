@@ -9,6 +9,7 @@
       this.tenantId = opts.tenantId || opts.agentId || 'default';
       this.sessionToken = opts.sessionToken || null;
       this.publicWidgetKey = opts.publicWidgetKey || null;
+      this.apiPrefix = (opts.apiPrefix || (this.publicWidgetKey ? '/api/public/webrtc' : '/v1/webrtc')).replace(/\/+$/, '');
       this.apiToken = opts.apiToken || null;
       this.getToken = typeof opts.getToken === 'function' ? opts.getToken : null;
       this.caller = opts.caller || 'web-visitor';
@@ -106,12 +107,13 @@
 
         const headers = { 'Content-Type': 'application/json' };
         if (this.apiToken) headers['Authorization'] = `Bearer ${this.apiToken}`;
+        if (this.publicWidgetKey) headers['X-Widget-Key'] = this.publicWidgetKey;
 
-        const resp = await global.fetch(`${this.serverUrl}/v1/webrtc/offer`, {
+        const resp = await global.fetch(`${this.serverUrl}${this.apiPrefix}/offer`, {
           method: 'POST',
           headers,
           body: JSON.stringify({
-            tenantId: this.tenantId,
+            ...(this.publicWidgetKey ? {} : { tenantId: this.tenantId }),
             sessionToken: token || undefined,
             publicWidgetKey: this.publicWidgetKey || undefined,
             caller: this.caller,
@@ -169,7 +171,7 @@
           if (ctrl) delHeaders['X-WebRTC-Control-Token'] = ctrl;
           if (this.publicWidgetKey) delHeaders['X-Widget-Key'] = this.publicWidgetKey;
           if (this.apiToken) delHeaders['Authorization'] = `Bearer ${this.apiToken}`;
-          global.fetch(`${this.serverUrl}/v1/webrtc/${encodeURIComponent(cid)}`, {
+          global.fetch(`${this.serverUrl}${this.apiPrefix}/${encodeURIComponent(cid)}`, {
             method: 'DELETE',
             headers: delHeaders
           }).catch(() => {});
@@ -321,14 +323,20 @@
     mount: mountWidget
   };
 
-  // Auto-mount se carregado via <script data-voll-auto="true">
+  // Auto-mount se carregado via <script data-voll-auto="true"> ou <script data-widget-key="...">
   if (global.document && global.document.currentScript) {
     const s = global.document.currentScript;
-    if (s.getAttribute('data-voll-auto') === 'true') {
+    const scriptUrl = s.src ? new URL(s.src, global.location?.href) : null;
+    const widgetKey = s.getAttribute('data-widget-key') || scriptUrl?.searchParams.get('key') || undefined;
+    const shouldAutoMount =
+      s.getAttribute('data-voll-auto') === 'true' ||
+      (Boolean(widgetKey) && s.getAttribute('data-voll-auto') !== 'false');
+    if (shouldAutoMount) {
       const init = () => mountWidget({
-        serverUrl: s.getAttribute('data-server-url') || new URL(s.src).origin,
+        serverUrl: s.getAttribute('data-server-url') || scriptUrl?.origin || '',
         tenantId: s.getAttribute('data-agent-id') || 'default',
-        publicWidgetKey: s.getAttribute('data-widget-key') || undefined,
+        publicWidgetKey: widgetKey,
+        apiPrefix: s.getAttribute('data-api-prefix') || undefined,
         accentColor: s.getAttribute('data-accent') || undefined,
         title: s.getAttribute('data-title') || undefined
       });

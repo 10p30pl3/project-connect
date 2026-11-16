@@ -20,7 +20,42 @@ import { badRequest, conflict, forbidden, notFound, parse, unprocessable } from 
 import { audit } from '../lib/audit.js';
 import { DEFAULT_SIMULATION } from '../connectors/simulated.js';
 
+function isRealSecret(value?: string | null): value is string {
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  return Boolean(trimmed) && trimmed !== '***' && !trimmed.startsWith('••••');
+}
+
+function maskSecret(value?: unknown): string | null {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const trimmed = value.trim();
+  return trimmed.length <= 4 ? '***' : `••••${trimmed.slice(-4)}`;
+}
+
+function normalizeOrigins(origins?: string[] | null): string[] {
+  if (!Array.isArray(origins)) return [];
+  const seen = new Set<string>();
+  for (const item of origins) {
+    const clean = String(item ?? '').trim().replace(/\/+$/, '');
+    if (clean) seen.add(clean);
+  }
+  return Array.from(seen);
+}
+
+async function assertWorkspaceVoiceAgent(c: any, workspaceId: string, tenantId: string) {
+  const own = await one<{ workspace_id: string | null }>(
+    c,
+    `SELECT workspace_id FROM workspace_voice_resources WHERE resource_type='agent' AND resource_id=$1`,
+    [tenantId],
+  ).catch(() => null);
+  if (own && own.workspace_id && own.workspace_id !== workspaceId) {
+    throw forbidden('Este Agente de Voz pertence a outra empresa.');
+  }
+}
+
 function connectionDto(r: any, isSuper = false) {
+  const cfg = r.config ?? {};
+  const isWebRtc = r.channel_type === 'WEBRTC' || r.provider === 'WEBRTC_NATIVE';
   return {
     id: r.id,
     name: r.name,
@@ -29,8 +64,22 @@ function connectionDto(r: any, isSuper = false) {
     tariff: isSuper ? r.tariff : null,
     tariffUpdatedAt: isSuper ? r.tariff_updated_at : null,
     active: r.active,
-    tenantId: r.config?.tenantId ?? null,
-    simulation: r.provider === 'SIMULATED' ? { ...DEFAULT_SIMULATION, ...(r.config?.simulation ?? {}) } : null,
+    tenantId: cfg.tenantId ?? null,
+    simulation: r.provider === 'SIMULATED' ? { ...DEFAULT_SIMULATION, ...(cfg.simulation ?? {}) } : null,
+    ...(isWebRtc
+      ? {
+          webrtcMode: cfg.webrtcMode ?? 'BOTH',
+          publicWidgetKey: cfg.publicWidgetKey ?? null,
+          allowedOrigins: Array.isArray(cfg.allowedOrigins) ? cfg.allowedOrigins : [],
+          whatsappPhoneNumberId: cfg.whatsappPhoneNumberId ?? null,
+          whatsappBusinessAccountId: cfg.whatsappBusinessAccountId ?? null,
+          whatsappVerifyToken: cfg.whatsappVerifyToken ?? null,
+          hasWhatsappAppSecret: Boolean(cfg.whatsappAppSecret),
+          hasWhatsappAccessToken: Boolean(cfg.whatsappAccessToken),
+          whatsappAppSecretMasked: maskSecret(cfg.whatsappAppSecret),
+          whatsappAccessTokenMasked: maskSecret(cfg.whatsappAccessToken),
+        }
+      : {}),
   };
 }
 
@@ -164,19 +213,88 @@ export async function catalogRoutes(app: FastifyInstance) {
     return { items: rows.map((r) => connectionDto(r, isSuper)) };
   });
 
+function applyWebRtcConfigFields(
+  nextConfig: Record<string, any>,
+  body: Record<string, any>,
+  isCreate: boolean,
+) {
+  if (body.webrtcMode !== undefined) {
+    nextConfig.webrtcMode = body.webrtcMode;
+  } else if (isCreate && !nextConfig.webrtcMode) {
+    nextConfig.webrtcMode = 'BOTH';
+  }
+
+  if ((isCreate && !nextConfig.publicWidgetKey) || body.rotateWidgetKey) {
+    nextConfig.publicWidgetKey = `wrtc_${crypto.randomBytes(16).toString('hex')}`;
+  } else if (!nextConfig.publicWidgetKey) {
+    nextConfig.publicWidgetKey = `wrtc_${crypto.randomBytes(16).toString('hex')}`;
+  }
+
+  if (body.allowedOrigins !== undefined) {
+    nextConfig.allowedOrigins = normalizeOrigins(body.allowedOrigins);
+  } else if (isCreate && !Array.isArray(nextConfig.allowedOrigins)) {
+    nextConfig.allowedOrigins = [];
+  }
+
+  for (const field of ['whatsappPhoneNumberId', 'whatsappBusinessAccountId'] as const) {
+    if (body[field] !== undefined) {
+      const v = body[field] ? String(body[field]).trim() : '';
+      if (v) nextConfig[field] = v;
+      else delete nextConfig[field];
+    }
+  }
+
+  if (body.whatsappVerifyToken !== undefined) {
+    const v = body.whatsappVerifyToken ? String(body.whatsappVerifyToken).trim() : '';
+    if (v) nextConfig.whatsappVerifyToken = v;
+    else if (isCreate) nextConfig.whatsappVerifyToken = `wtok_${crypto.randomBytes(16).toString('hex')}`;
+    else delete nextConfig.whatsappVerifyToken;
+  } else if (isCreate && !nextConfig.whatsappVerifyToken) {
+    nextConfig.whatsappVerifyToken = `wtok_${crypto.randomBytes(16).toString('hex')}`;
+  }
+
+  for (const secretField of ['whatsappAppSecret', 'whatsappAccessToken'] as const) {
+    if (body[secretField] === null || body[secretField] === '') {
+      delete nextConfig[secretField];
+    } else if (isRealSecret(body[secretField])) {
+      nextConfig[secretField] = body[secretField].trim();
+    }
+  }
+}
+
   app.post('/connections', { preHandler: requireRoles(...CAN.admin) }, async (req, reply) => {
     const body = parse(ConnectionCreateSchema, req.body);
     const a = actor(req);
     const isSuper = isSuperAdminRole(a.role);
     const tariff = isSuper ? (body.tariff ?? null) : null;
     const secret = crypto.randomBytes(24).toString('hex');
+    const effectiveProvider =
+      body.channelType === 'WEBRTC' && (!body.provider || body.provider === 'SIMULATED')
+        ? 'WEBRTC_NATIVE'
+        : body.provider;
+
     const created = await tx(async (c) => {
+      const nextConfig: Record<string, any> = {};
+      if (body.tenantId?.trim()) {
+        await assertWorkspaceVoiceAgent(c, a.workspaceId, body.tenantId.trim());
+        nextConfig.tenantId = body.tenantId.trim();
+      }
+      if (body.channelType === 'WEBRTC' || effectiveProvider === 'WEBRTC_NATIVE') {
+        applyWebRtcConfigFields(nextConfig, body, true);
+      } else if (effectiveProvider === 'SIMULATED') {
+        nextConfig.simulation = body.simulation ?? DEFAULT_SIMULATION;
+      } else {
+        if (body.endpointUrl?.trim()) nextConfig.endpointUrl = body.endpointUrl.trim();
+        if (body.callerId?.trim()) nextConfig.defaultCallerId = body.callerId.trim();
+        if (body.authToken?.trim()) nextConfig.authToken = body.authToken.trim();
+      }
+
       const ins = await one(
         c,
         `INSERT INTO connections (workspace_id, name, channel_type, provider, config, webhook_secret, tariff, tariff_updated_at, active)
          VALUES ($1, $2, $3, $4, $5, $6, $7, CASE WHEN $7 IS NOT NULL THEN now() ELSE null END, true)
          RETURNING *`,
-        [a.workspaceId, body.name, body.channelType, body.provider, JSON.stringify({ simulation: DEFAULT_SIMULATION }), secret, tariff],
+        [a.workspaceId, body.name, body.channelType, effectiveProvider, JSON.stringify(nextConfig), secret, tariff],
       );
       await audit(c, a, 'connection.create', 'connection', ins!.id, { after: connectionDto(ins, isSuper) });
       return connectionDto(ins, isSuper);
@@ -199,14 +317,7 @@ export async function catalogRoutes(app: FastifyInstance) {
       if (body.tenantId !== undefined) {
         const nextTid = body.tenantId ? String(body.tenantId).trim() : null;
         if (nextTid) {
-          const own = await one<{ workspace_id: string | null }>(
-            c,
-            `SELECT workspace_id FROM workspace_voice_resources WHERE resource_type='agent' AND resource_id=$1`,
-            [nextTid],
-          ).catch(() => null);
-          if (own && own.workspace_id && own.workspace_id !== a.workspaceId) {
-            throw forbidden('Este Agente de Voz pertence a outra empresa.');
-          }
+          await assertWorkspaceVoiceAgent(c, a.workspaceId, nextTid);
           nextConfig.tenantId = nextTid;
           // Telefonia passa a ser a fonte única de verdade deste vínculo
           delete nextConfig.voiceAgent;
@@ -215,6 +326,9 @@ export async function catalogRoutes(app: FastifyInstance) {
         } else {
           delete nextConfig.tenantId;
         }
+      }
+      if (before.channel_type === 'WEBRTC' || before.provider === 'WEBRTC_NATIVE') {
+        applyWebRtcConfigFields(nextConfig, body, false);
       }
       const tariffChanged = isSuper && body.tariff !== undefined && body.tariff !== before.tariff;
       const after = await one(
@@ -226,8 +340,20 @@ export async function catalogRoutes(app: FastifyInstance) {
         [before.id, body.name ?? null, body.active ?? null, JSON.stringify(nextConfig), tariffChanged, body.tariff ?? null],
       );
       await audit(c, a, 'connection.update', 'connection', before.id, {
-        before: { name: before.name, tariff: before.tariff, active: before.active, tenantId: before.config?.tenantId ?? null },
-        after: { name: after.name, tariff: after.tariff, active: after.active, tenantId: after.config?.tenantId ?? null },
+        before: {
+          name: before.name,
+          tariff: before.tariff,
+          active: before.active,
+          tenantId: before.config?.tenantId ?? null,
+          webrtcMode: before.config?.webrtcMode ?? null,
+        },
+        after: {
+          name: after.name,
+          tariff: after.tariff,
+          active: after.active,
+          tenantId: after.config?.tenantId ?? null,
+          webrtcMode: after.config?.webrtcMode ?? null,
+        },
       });
       return connectionDto(after, isSuper);
     });

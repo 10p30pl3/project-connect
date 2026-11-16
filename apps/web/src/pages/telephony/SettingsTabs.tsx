@@ -178,8 +178,15 @@ function TrunksAndProvidersPanel() {
               </thead>
               <tbody>
                 {trunks.map((t) => {
-                  const liveState = String(t.live?.state || t.live?.status || '');
-                  const reged = liveState.toUpperCase().includes('REGED') || liveState.toUpperCase().includes('UP');
+                  const liveState = String(t.live?.state || '');
+                  const liveStatus = String(t.live?.status || '');
+                  const liveLabel = [liveState, liveStatus].filter(Boolean).join(' · ') || 'Desconhecido';
+                  const isOnline =
+                    typeof (t as any).online === 'boolean'
+                      ? Boolean((t as any).online)
+                      : liveStatus.toUpperCase() === 'UP' ||
+                        liveState.toUpperCase().includes('REGED') ||
+                        (liveState.toUpperCase() === 'NOREG' && liveStatus.toUpperCase() !== 'DOWN');
                   return (
                     <tr key={t.id}>
                       <td>
@@ -197,8 +204,8 @@ function TrunksAndProvidersPanel() {
                         <div className="text-[11px] text-slate-500">{t.register ? 'REGISTER' : 'Sem registro'} · {t.direction || 'both'}</div>
                       </td>
                       <td>
-                        <Badge tone={reged ? 'green' : liveState ? 'amber' : 'gray'}>
-                          {liveState || 'Desconhecido'}
+                        <Badge tone={isOnline ? 'green' : liveState || liveStatus ? 'amber' : 'gray'}>
+                          {liveLabel}
                         </Badge>
                         {t.live?.pingMs != null && (
                           <div className="mt-0.5 font-mono text-[10px] text-slate-500">Ping: {t.live.pingMs}ms</div>

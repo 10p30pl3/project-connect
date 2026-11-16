@@ -5,6 +5,7 @@ import { config } from '../config.js';
 import { releaseCapacity, transition } from './events.js';
 import { materializeEnrollments } from './materialize.js';
 import { runReservations } from './reserve.js';
+import { createWorkspaceTrunkBudgetPool } from './trunk-capacity.js';
 import { processOutbox } from './dispatch.js';
 
 /** Reserva vencida sem envio → liberada, sem consumo nem custo (AC02). */
@@ -129,6 +130,7 @@ export async function tick(opts: { deliver?: Deliver; now?: Date } = {}) {
     `SELECT c.id, c.materialized_at, lv.membership_mode FROM campaigns c
        LEFT JOIN list_versions lv ON lv.id = c.list_version_id WHERE c.status='RUNNING'`,
   );
+  const trunkPool = createWorkspaceTrunkBudgetPool(getPool());
   for (const r of running) {
     const dynamic = r.membership_mode === 'DYNAMIC';
     const last = lastDynamic.get(r.id) ?? 0;
@@ -136,7 +138,7 @@ export async function tick(opts: { deliver?: Deliver; now?: Date } = {}) {
       await materializeEnrollments(getPool(), r.id);
       lastDynamic.set(r.id, now.getTime());
     }
-    stats.reserved += (await runReservations(r.id, now)).reserved;
+    stats.reserved += (await runReservations(r.id, now, trunkPool)).reserved;
   }
   stats.dispatched = (await processOutbox(50, now)).processed;
   stats.delivered = await deliverSimEvents(opts.deliver ?? httpDeliver, now);

@@ -28,10 +28,15 @@ import {
 } from 'lucide-react';
 import {
   CHANNEL_LABEL,
+  CONNECTION_CHANNEL_LABEL,
   DEFAULT_CHANNEL_ENDPOINTS,
+  WEBRTC_MODES,
+  WEBRTC_MODE_LABEL,
   isSuperAdminRole,
   type ChannelEndpointConfig,
   type ChannelType,
+  type ConnectionChannelType,
+  type WebRtcMode,
 } from '@voll/shared';
 import { ApiError, del, errorMessage, get, patch, post } from '../lib/api';
 import type { Connection, Simulation, Tabulation } from '../lib/types';
@@ -62,6 +67,7 @@ import {
 
 export const PROVIDER_LABEL: Record<string, string> = {
   VOICE_APP: 'Voice-App IA (FreeSWITCH + Tronco Direct Call)',
+  WEBRTC_NATIVE: 'WebRTC Nativo (Web Widget & WhatsApp Calling)',
   API_TRIGGER: 'API de Gatilhos & Webhooks Voll Plan',
   META_CLOUD: 'Meta Cloud API Oficial (WhatsApp)',
   SIP_TRUNK: 'Tronco SIP Direto (PABX / IP)',
@@ -72,6 +78,7 @@ export const PROVIDER_LABEL: Record<string, string> = {
 
 export const PROVIDER_SHORT_LABEL: Record<string, string> = {
   VOICE_APP: 'Voice-App IA · Tronco Direct Call',
+  WEBRTC_NATIVE: 'WebRTC Nativo · Web & WhatsApp Calling',
   API_TRIGGER: 'API de Gatilhos & Disparos Voll',
   META_CLOUD: 'Meta Cloud API Oficial',
   SIP_TRUNK: 'Tronco SIP Direto',
@@ -79,6 +86,21 @@ export const PROVIDER_SHORT_LABEL: Record<string, string> = {
   SENDGRID: 'SendGrid',
   SIMULATED: 'Simulador (Demo)',
 };
+
+function supportsVoiceAgent(c: Connection): boolean {
+  return c.provider === 'VOICE_APP' || c.channelType === 'WEBRTC' || c.provider === 'WEBRTC_NATIVE';
+}
+
+function isWebRtcConnection(c: Connection): boolean {
+  return c.channelType === 'WEBRTC' || c.provider === 'WEBRTC_NATIVE';
+}
+
+function parseAllowedOriginsInput(raw: string): string[] {
+  return raw
+    .split(/[\n,]+/)
+    .map((s) => s.trim().replace(/\/+$/, ''))
+    .filter(Boolean);
+}
 
 export function ChannelsPage() {
   const { me, can } = useAuth();
@@ -201,10 +223,15 @@ export function ChannelsPage() {
                           {/* Header do Card */}
                           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/70 p-4">
                             <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-bold text-sm text-slate-900 truncate">{c.name}</span>
-                                <Badge tone="gray">{CHANNEL_LABEL[c.channelType]}</Badge>
-                                {c.provider === 'VOICE_APP' ? (
+                                <Badge tone="gray">{CONNECTION_CHANNEL_LABEL[c.channelType]}</Badge>
+                                {isWebRtcConnection(c) ? (
+                                  <Badge tone="brand">
+                                    <Radio className="size-3 mr-1 inline" aria-hidden />
+                                    {WEBRTC_MODE_LABEL[c.webrtcMode ?? 'BOTH']}
+                                  </Badge>
+                                ) : c.provider === 'VOICE_APP' ? (
                                   <Badge tone="blue">Voice-App IA</Badge>
                                 ) : c.provider === 'API_TRIGGER' ? (
                                   <Badge tone="brand">Gatilho API</Badge>
@@ -242,7 +269,7 @@ export function ChannelsPage() {
                               </div>
                               <span className="text-[11px] text-slate-500">
                                 Provedor: {PROVIDER_SHORT_LABEL[c.provider] || c.provider}
-                                {c.provider === 'VOICE_APP' && (
+                                {supportsVoiceAgent(c) && (
                                   <>
                                     {' · '}Agente:{' '}
                                     <strong>
@@ -256,7 +283,7 @@ export function ChannelsPage() {
                               </span>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
-                              {c.provider === 'VOICE_APP' && (
+                              {supportsVoiceAgent(c) && (
                                 <Button size="sm" variant="secondary" icon={<Bot className="size-3.5" />} onClick={() => setAgentFor(c)}>
                                   Agente de voz
                                 </Button>
@@ -306,7 +333,7 @@ export function ChannelsPage() {
                                 <li className="flex items-center gap-2">
                                   <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs">
                                     <strong>1. Canal &amp; Conector</strong>
-                                    <span className="text-slate-500"> · {CHANNEL_LABEL[c.channelType]}</span>
+                                    <span className="text-slate-500"> · {CONNECTION_CHANNEL_LABEL[c.channelType]}</span>
                                     <span className="block text-slate-500">
                                       {PROVIDER_SHORT_LABEL[c.provider] || c.provider}
                                     </span>
@@ -329,7 +356,20 @@ export function ChannelsPage() {
                                 )}
                                 <li className="flex items-center gap-2">
                                   <ArrowRight className="size-4 text-slate-400" aria-hidden />
-                                  {!isSimulated ? (
+                                  {isWebRtcConnection(c) ? (
+                                    <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs">
+                                      <strong>{isSuper ? '3.' : '2.'} Atendimento &amp; TLS</strong>
+                                      <span className="text-slate-500 block">
+                                        {WEBRTC_MODE_LABEL[c.webrtcMode ?? 'BOTH']}
+                                      </span>
+                                      <span className="block text-slate-500">
+                                        {typeof window !== 'undefined' &&
+                                        (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+                                          ? 'HTTPS Pronto (Microfone)'
+                                          : 'Requer HTTPS (Microfone)'}
+                                      </span>
+                                    </span>
+                                  ) : !isSimulated ? (
                                     <span className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs">
                                       <strong>{isSuper ? '3.' : '2.'} Endpoint &amp; Origem</strong>
                                       <span className="text-slate-500 block truncate max-w-[210px]" title={c.endpointUrl || 'Padrão do Workspace'}>
@@ -354,6 +394,77 @@ export function ChannelsPage() {
                               </ol>
                             </div>
 
+                            {isWebRtcConnection(c) && (
+                              <div className="grid gap-2 sm:grid-cols-2">
+                                {(c.webrtcMode ?? 'BOTH') !== 'WHATSAPP_CALLING' && (
+                                  <div className="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2 flex items-center justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                        <span>Web Widget</span>
+                                        <InfoTooltip content="Incorpore este script no seu site externo. Visitantes conectam usando a chave pública exclusiva deste canal sem precisar de login." />
+                                      </div>
+                                      <code className="block truncate font-mono text-xs text-slate-800">
+                                        {c.publicWidgetKey || 'chave-pendente'}
+                                      </code>
+                                    </div>
+                                    <Button
+                                      size="sm"
+                                      variant="secondary"
+                                      onClick={() => {
+                                        const origin = typeof window !== 'undefined' ? window.location.origin : '';
+                                        const tag = `<script src="${origin}/api/public/webrtc/widget.js" data-widget-key="${c.publicWidgetKey ?? ''}"></script>`;
+                                        navigator.clipboard?.writeText(tag);
+                                        toast('info', 'Snippet do Web Widget copiado.');
+                                      }}
+                                    >
+                                      Copiar tag
+                                    </Button>
+                                  </div>
+                                )}
+
+                                {(c.webrtcMode ?? 'BOTH') !== 'WEB' && (
+                                  <div className="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2 flex items-center justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                                        <span>WhatsApp Calling</span>
+                                        <InfoTooltip content="Configure a URL do webhook e o Verify Token no Meta Business Suite (campo calls) para receber ligações de voz no agente vinculado." />
+                                      </div>
+                                      <span className="text-xs font-medium text-slate-700 truncate block">
+                                        {c.whatsappPhoneNumberId && c.hasWhatsappAppSecret && c.hasWhatsappAccessToken
+                                          ? `Número Meta ${c.whatsappPhoneNumberId}`
+                                          : 'Credenciais Meta pendentes'}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <Button
+                                        size="sm"
+                                        variant="secondary"
+                                        onClick={() => {
+                                          const origin = typeof window !== 'undefined' ? window.location.origin : '';
+                                          navigator.clipboard?.writeText(`${origin}/api/webhooks/whatsapp-calling/${c.id}`);
+                                          toast('info', 'URL do webhook WhatsApp Calling copiada.');
+                                        }}
+                                      >
+                                        Webhook
+                                      </Button>
+                                      {c.whatsappVerifyToken && (
+                                        <Button
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() => {
+                                            navigator.clipboard?.writeText(c.whatsappVerifyToken || '');
+                                            toast('info', 'Verify Token copiado.');
+                                          }}
+                                        >
+                                          Token
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
                             {/* Barra inferior do Card */}
                             <div className="pt-2.5 flex items-center justify-between border-t border-slate-100">
                               <div className="flex items-center gap-1.5 text-xs">
@@ -369,7 +480,7 @@ export function ChannelsPage() {
                                 )}
                               </div>
 
-                              {c.provider === 'VOICE_APP' && (
+                              {supportsVoiceAgent(c) && (
                                 <button
                                   type="button"
                                   onClick={() => setAgentFor(c)}
@@ -425,14 +536,32 @@ export function ChannelsPage() {
                                     )}
                                   </div>
                                 </td>
-                                <td>{CHANNEL_LABEL[c.channelType]}</td>
+                                <td>
+                                  <div className="flex items-center gap-1.5">
+                                    <span>{CONNECTION_CHANNEL_LABEL[c.channelType]}</span>
+                                    {isWebRtcConnection(c) && (
+                                      <Badge tone="brand">
+                                        <Radio className="size-3 mr-1 inline" aria-hidden />
+                                        {c.webrtcMode === 'WEB'
+                                          ? 'Web Widget'
+                                          : c.webrtcMode === 'WHATSAPP_CALLING'
+                                            ? 'WhatsApp'
+                                            : 'Web + WA'}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </td>
                                 <td>
                                   <span className="text-xs font-semibold text-slate-700">
                                     {PROVIDER_SHORT_LABEL[c.provider] || c.provider}
                                   </span>
                                 </td>
                                 <td className="text-xs font-mono text-slate-600">
-                                  {c.endpointUrl ? (
+                                  {isWebRtcConnection(c) ? (
+                                    <span className="text-slate-600">
+                                      Widget: {c.publicWidgetKey ? `${c.publicWidgetKey.slice(0, 12)}…` : 'auto'}
+                                    </span>
+                                  ) : c.endpointUrl ? (
                                     <span className="truncate max-w-[200px] block" title={c.endpointUrl}>
                                       {c.endpointUrl}
                                     </span>
@@ -442,7 +571,7 @@ export function ChannelsPage() {
                                     <span className="text-slate-400">Padrão Workspace</span>
                                   )}
                                   {c.callerId && <div className="text-[11px] text-slate-400 font-sans">BINA: {c.callerId}</div>}
-                                  {c.provider === 'VOICE_APP' && (
+                                  {supportsVoiceAgent(c) && (
                                     <div className="text-[11px] text-brand-700 font-sans">
                                       Agente: {tenantsQ.data?.tenants.find((t) => t.id === c.tenantId)?.name ?? c.tenantId ?? 'Padrão'}
                                     </div>
@@ -488,7 +617,7 @@ export function ChannelsPage() {
                                 </td>
                                 <td className="text-right">
                                   <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                                    {c.provider === 'VOICE_APP' && (
+                                    {supportsVoiceAgent(c) && (
                                       <Button size="sm" variant="secondary" icon={<Bot className="size-3.5" />} onClick={() => setAgentFor(c)}>
                                         Agente de voz
                                       </Button>
@@ -535,66 +664,6 @@ export function ChannelsPage() {
                     </TableWrap>
                   </Card>
                 )}
-
-                <Card
-                  title={
-                    <span className="flex items-center gap-2">
-                      <Radio className="size-4 text-brand-600" aria-hidden />
-                      <span>Canal WebRTC &amp; Web Voice Widget</span>
-                    </span>
-                  }
-                  tooltip="Sinalização WebRTC e widget web servidos via proxy autenticado do portal (/api/telephony/webrtc/* e /voll-voice-widget.js), sem expor a porta interna do gateway. Navegadores exigem HTTPS fora de localhost para captura de microfone."
-                  actions={
-                    <Badge
-                      tone={
-                        typeof window !== 'undefined' &&
-                        (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-                          ? 'green'
-                          : 'amber'
-                      }
-                    >
-                      {typeof window !== 'undefined' &&
-                      (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-                        ? 'HTTPS Pronto'
-                        : 'Requer HTTPS (Microfone)'}
-                    </Badge>
-                  }
-                >
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
-                      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Proxy de Sinalização WebRTC</div>
-                      <div className="mt-1 flex items-center justify-between gap-2">
-                        <code className="truncate font-mono text-xs text-slate-800">/api/telephony/webrtc/offer</code>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => {
-                            navigator.clipboard?.writeText(`${window.location.origin}/api/telephony/webrtc/offer`);
-                            toast('info', 'Endpoint WebRTC copiado.');
-                          }}
-                        >
-                          Copiar
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
-                      <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Script Web Voice Widget</div>
-                      <div className="mt-1 flex items-center justify-between gap-2">
-                        <code className="truncate font-mono text-xs text-slate-800">/voll-voice-widget.js</code>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => {
-                            navigator.clipboard?.writeText(`<script src="${window.location.origin}/voll-voice-widget.js"></script>`);
-                            toast('info', 'Tag do widget WebRTC copiada.');
-                          }}
-                        >
-                          Copiar
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
               </div>
             ),
           },
@@ -1382,6 +1451,157 @@ function TechnicalEndpointsTab({ canEdit }: { canEdit: boolean }) {
   );
 }
 
+function WebRtcConfigFields({
+  webrtcMode,
+  setWebrtcMode,
+  allowedOriginsText,
+  setAllowedOriginsText,
+  whatsappPhoneNumberId,
+  setWhatsappPhoneNumberId,
+  whatsappBusinessAccountId,
+  setWhatsappBusinessAccountId,
+  whatsappVerifyToken,
+  setWhatsappVerifyToken,
+  whatsappAppSecret,
+  setWhatsappAppSecret,
+  whatsappAccessToken,
+  setWhatsappAccessToken,
+  hasWhatsappAppSecret,
+  hasWhatsappAccessToken,
+}: {
+  webrtcMode: WebRtcMode;
+  setWebrtcMode: (v: WebRtcMode) => void;
+  allowedOriginsText: string;
+  setAllowedOriginsText: (v: string) => void;
+  whatsappPhoneNumberId: string;
+  setWhatsappPhoneNumberId: (v: string) => void;
+  whatsappBusinessAccountId: string;
+  setWhatsappBusinessAccountId: (v: string) => void;
+  whatsappVerifyToken: string;
+  setWhatsappVerifyToken: (v: string) => void;
+  whatsappAppSecret: string;
+  setWhatsappAppSecret: (v: string) => void;
+  whatsappAccessToken: string;
+  setWhatsappAccessToken: (v: string) => void;
+  hasWhatsappAppSecret?: boolean;
+  hasWhatsappAccessToken?: boolean;
+}) {
+  const showWeb = webrtcMode === 'WEB' || webrtcMode === 'BOTH';
+  const showWhatsApp = webrtcMode === 'WHATSAPP_CALLING' || webrtcMode === 'BOTH';
+
+  return (
+    <fieldset className="space-y-3.5 rounded-xl border border-slate-200/90 bg-white p-4">
+      <legend className="px-1.5 text-xs font-semibold uppercase tracking-wider text-slate-600">
+        Configuração WebRTC (Web Widget &amp; WhatsApp Calling)
+      </legend>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Field
+          label="Modalidade de atendimento"
+          tooltip="Define se este canal atende via Web Voice Widget incorporado, chamadas receptivas de WhatsApp Business Calling ou ambos."
+        >
+          {(p) => (
+            <Select id={p.id} value={webrtcMode} onChange={(e) => setWebrtcMode(e.target.value as WebRtcMode)}>
+              {WEBRTC_MODES.map((mode) => (
+                <option key={mode} value={mode}>
+                  {WEBRTC_MODE_LABEL[mode]}
+                </option>
+              ))}
+            </Select>
+          )}
+        </Field>
+
+        {showWeb && (
+          <Field
+            label="Origens permitidas (Web Widget)"
+            tooltip="Opcional. Liste domínios separados por vírgula (ex.: https://app.empresa.com). Vazio permite qualquer origem HTTPS."
+          >
+            {(p) => (
+              <Input
+                id={p.id}
+                value={allowedOriginsText}
+                onChange={(e) => setAllowedOriginsText(e.target.value)}
+                placeholder="https://meusite.com.br, https://app.meusite.com.br"
+              />
+            )}
+          </Field>
+        )}
+      </div>
+
+      {showWhatsApp && (
+        <div className="space-y-3 rounded-lg border border-slate-200/80 bg-slate-50/60 p-3">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+            <span>Credenciais WhatsApp Business Calling (Meta Cloud API)</span>
+            <InfoTooltip content="Opcional para Web Widget. Preencha ao habilitar recebimento de chamadas de voz via webhook oficial da Meta." />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field label="Phone Number ID (Meta)" tooltip="Identificador numérico do telefone no WhatsApp Business API.">
+              {(p) => (
+                <Input
+                  id={p.id}
+                  value={whatsappPhoneNumberId}
+                  onChange={(e) => setWhatsappPhoneNumberId(e.target.value)}
+                  placeholder="Ex: 109283746501234"
+                />
+              )}
+            </Field>
+            <Field label="WABA ID (Opcional)" tooltip="WhatsApp Business Account ID no Meta Business Suite.">
+              {(p) => (
+                <Input
+                  id={p.id}
+                  value={whatsappBusinessAccountId}
+                  onChange={(e) => setWhatsappBusinessAccountId(e.target.value)}
+                  placeholder="Ex: 987654321098765"
+                />
+              )}
+            </Field>
+            <Field
+              label="Verify Token do Webhook"
+              tooltip="Token usado na validação GET do webhook na Meta. Deixe em branco para gerar automaticamente."
+            >
+              {(p) => (
+                <Input
+                  id={p.id}
+                  value={whatsappVerifyToken}
+                  onChange={(e) => setWhatsappVerifyToken(e.target.value)}
+                  placeholder="Gerado automaticamente se vazio"
+                />
+              )}
+            </Field>
+            <Field
+              label="Meta App Secret"
+              tooltip="Chave secreta do aplicativo Meta para validar a assinatura HMAC X-Hub-Signature-256 nos webhooks."
+            >
+              {(p) => (
+                <Input
+                  id={p.id}
+                  type="password"
+                  value={whatsappAppSecret}
+                  onChange={(e) => setWhatsappAppSecret(e.target.value)}
+                  placeholder={hasWhatsappAppSecret ? '•••••••• (configurado — digite para substituir)' : 'App Secret do Meta Developers'}
+                />
+              )}
+            </Field>
+          </div>
+          <Field
+            label="Access Token Graph API"
+            tooltip="Token Bearer permanente da Meta Cloud API para aceitar e encerrar chamadas WhatsApp Calling."
+          >
+            {(p) => (
+              <Input
+                id={p.id}
+                type="password"
+                value={whatsappAccessToken}
+                onChange={(e) => setWhatsappAccessToken(e.target.value)}
+                placeholder={hasWhatsappAccessToken ? '•••••••• (configurado — digite para substituir)' : 'EAAG...'}
+              />
+            )}
+          </Field>
+        </div>
+      )}
+    </fieldset>
+  );
+}
+
 function NewConnectionDialog({
   open,
   onOpenChange,
@@ -1396,9 +1616,16 @@ function NewConnectionDialog({
   const qc = useQueryClient();
   const toast = useToast();
   const [name, setName] = useState('Discador IA · Tronco Direct Call');
-  const [channelType, setChannelType] = useState<ChannelType>('VOICE');
+  const [channelType, setChannelType] = useState<ConnectionChannelType>('VOICE');
   const [provider, setProvider] = useState('VOICE_APP');
   const [tenantId, setTenantId] = useState(tenants[0]?.id ?? '');
+  const [webrtcMode, setWebrtcMode] = useState<WebRtcMode>('BOTH');
+  const [allowedOriginsText, setAllowedOriginsText] = useState('');
+  const [whatsappPhoneNumberId, setWhatsappPhoneNumberId] = useState('');
+  const [whatsappBusinessAccountId, setWhatsappBusinessAccountId] = useState('');
+  const [whatsappVerifyToken, setWhatsappVerifyToken] = useState('');
+  const [whatsappAppSecret, setWhatsappAppSecret] = useState('');
+  const [whatsappAccessToken, setWhatsappAccessToken] = useState('');
   const [endpointUrl, setEndpointUrl] = useState('http://192.168.15.36:8090/v1/calls');
   const [callerId, setCallerId] = useState('+5511989785888');
   const [authToken, setAuthToken] = useState('');
@@ -1410,9 +1637,18 @@ function NewConnectionDialog({
   const [noReturnRate, setNoReturnRate] = useState(0.05);
   const [err, setErr] = useState<string | null>(null);
 
+  const isWebRtc = channelType === 'WEBRTC' || provider === 'WEBRTC_NATIVE';
+
   const handleProviderChange = (newProv: string) => {
     setProvider(newProv);
-    if (newProv === 'VOICE_APP') {
+    if (newProv === 'WEBRTC_NATIVE') {
+      setName('Canal WebRTC · Web & WhatsApp Calling');
+      setChannelType('WEBRTC');
+      setWebrtcMode('BOTH');
+      setEndpointUrl('');
+      setCallerId('');
+      setTariff('');
+    } else if (newProv === 'VOICE_APP') {
       setName('Discador IA · Tronco Direct Call');
       setChannelType('VOICE');
       setEndpointUrl('http://192.168.15.36:8090/v1/calls');
@@ -1438,6 +1674,7 @@ function NewConnectionDialog({
       setTariff('0.06');
     } else if (newProv === 'SIMULATED') {
       setName('Canal Simulado (Sandbox)');
+      if (channelType === 'WEBRTC') setChannelType('VOICE');
       setEndpointUrl('');
       setCallerId('');
       setTariff('0.05');
@@ -1449,14 +1686,25 @@ function NewConnectionDialog({
       post<Connection>('/connections', {
         name: name.trim(),
         channelType,
-        provider: provider.trim() || 'VOICE_APP',
-        endpointUrl: endpointUrl.trim() || null,
-        callerId: callerId.trim() || null,
-        authToken: authToken.trim() || null,
+        provider: isWebRtc ? 'WEBRTC_NATIVE' : (provider.trim() || 'VOICE_APP'),
+        endpointUrl: isWebRtc ? null : endpointUrl.trim() || null,
+        callerId: isWebRtc ? null : callerId.trim() || null,
+        authToken: isWebRtc ? null : authToken.trim() || null,
         ...(isSuper ? { tariff: tariff === '' ? null : Number(tariff) } : {}),
-        ...(provider === 'VOICE_APP' && tenantId ? { tenantId } : {}),
+        ...((provider === 'VOICE_APP' || isWebRtc) && tenantId ? { tenantId } : {}),
+        ...(isWebRtc
+          ? {
+              webrtcMode,
+              allowedOrigins: parseAllowedOriginsInput(allowedOriginsText),
+              whatsappPhoneNumberId: whatsappPhoneNumberId.trim() || null,
+              whatsappBusinessAccountId: whatsappBusinessAccountId.trim() || null,
+              whatsappVerifyToken: whatsappVerifyToken.trim() || null,
+              whatsappAppSecret: whatsappAppSecret.trim() || null,
+              whatsappAccessToken: whatsappAccessToken.trim() || null,
+            }
+          : {}),
         simulation:
-          provider === 'SIMULATED' || showAdvanced
+          !isWebRtc && (provider === 'SIMULATED' || showAdvanced)
             ? {
                 outcomes: { NO_ANSWER: 3, BUSY: 1, CPC_NO_DEAL: 2, CONVERSION: 1.5, OPT_OUT: 0.3, RESULT_UNKNOWN: 0.2 },
                 minDelaySeconds: minDelay,
@@ -1472,6 +1720,13 @@ function NewConnectionDialog({
       setName('Discador IA · Tronco Direct Call');
       setChannelType('VOICE');
       setProvider('VOICE_APP');
+      setWebrtcMode('BOTH');
+      setAllowedOriginsText('');
+      setWhatsappPhoneNumberId('');
+      setWhatsappBusinessAccountId('');
+      setWhatsappVerifyToken('');
+      setWhatsappAppSecret('');
+      setWhatsappAccessToken('');
       setTariff('0.08');
       setErr(null);
       onOpenChange(false);
@@ -1485,7 +1740,7 @@ function NewConnectionDialog({
       onOpenChange={onOpenChange}
       wide
       title="Nova Conexão ou Canal de API"
-      description="Cadastre um canal de voz integrado ao voice-app, API de gatilhos do Voll Plan ou conector oficial."
+      description="Cadastre um canal de voz integrado ao voice-app, WebRTC (Web & WhatsApp Calling), API de gatilhos ou conector oficial."
       footer={
         <>
           <Button onClick={() => onOpenChange(false)}>Cancelar</Button>
@@ -1509,11 +1764,12 @@ function NewConnectionDialog({
           <legend className="px-1.5 text-xs font-semibold uppercase tracking-wider text-slate-600">Identificação &amp; Provedor</legend>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Nome da conexão" required>
-              {(p) => <Input id={p.id} autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Discador IA · Tronco Direct Call" />}
+              {(p) => <Input id={p.id} autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: Canal WebRTC · Web & WhatsApp Calling" />}
             </Field>
             <Field label="Provedor do conector" required>
               {(p) => (
                 <Select id={p.id} value={provider} onChange={(e) => handleProviderChange(e.target.value)}>
+                  <option value="WEBRTC_NATIVE">WebRTC Nativo (Web Widget &amp; WhatsApp Calling)</option>
                   <option value="VOICE_APP">Voice-App IA (FreeSWITCH + Tronco Direct Call)</option>
                   <option value="API_TRIGGER">API de Gatilhos &amp; Webhooks Voll Plan</option>
                   <option value="META_CLOUD">Meta Cloud API Oficial (WhatsApp)</option>
@@ -1529,8 +1785,17 @@ function NewConnectionDialog({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Tipo do canal" required>
               {(p) => (
-                <Select id={p.id} value={channelType} onChange={(e) => setChannelType(e.target.value as ChannelType)}>
+                <Select
+                  id={p.id}
+                  value={channelType}
+                  onChange={(e) => {
+                    const next = e.target.value as ConnectionChannelType;
+                    setChannelType(next);
+                    if (next === 'WEBRTC') handleProviderChange('WEBRTC_NATIVE');
+                  }}
+                >
                   <option value="VOICE">Discador (Voz)</option>
+                  <option value="WEBRTC">WebRTC (Web &amp; WhatsApp Calling)</option>
                   <option value="WHATSAPP">WhatsApp</option>
                   <option value="SMS">SMS / RCS</option>
                   <option value="EMAIL">E-mail</option>
@@ -1553,8 +1818,8 @@ function NewConnectionDialog({
               </Field>
             )}
           </div>
-          {provider === 'VOICE_APP' && (
-            <Field label="Agente IA responsável (Telefonia)" hint="Gerenciado na aba Telefonia → Agentes IA.">
+          {(provider === 'VOICE_APP' || isWebRtc) && (
+            <Field label="Agente IA responsável (Telefonia)" tooltip="Gerenciado na aba Telefonia → Agentes IA. Atende às sessões recebidas neste canal.">
               {(p) => (
                 <Select id={p.id} value={tenantId} onChange={(e) => setTenantId(e.target.value)}>
                   <option value="">Padrão da Telefonia</option>
@@ -1569,6 +1834,24 @@ function NewConnectionDialog({
           )}
         </fieldset>
 
+        {isWebRtc ? (
+          <WebRtcConfigFields
+            webrtcMode={webrtcMode}
+            setWebrtcMode={setWebrtcMode}
+            allowedOriginsText={allowedOriginsText}
+            setAllowedOriginsText={setAllowedOriginsText}
+            whatsappPhoneNumberId={whatsappPhoneNumberId}
+            setWhatsappPhoneNumberId={setWhatsappPhoneNumberId}
+            whatsappBusinessAccountId={whatsappBusinessAccountId}
+            setWhatsappBusinessAccountId={setWhatsappBusinessAccountId}
+            whatsappVerifyToken={whatsappVerifyToken}
+            setWhatsappVerifyToken={setWhatsappVerifyToken}
+            whatsappAppSecret={whatsappAppSecret}
+            setWhatsappAppSecret={setWhatsappAppSecret}
+            whatsappAccessToken={whatsappAccessToken}
+            setWhatsappAccessToken={setWhatsappAccessToken}
+          />
+        ) : (
         <fieldset className="space-y-3.5 rounded-xl border border-slate-200/90 bg-white p-4">
           <legend className="px-1.5 text-xs font-semibold uppercase tracking-wider text-slate-600">Conexão de API &amp; Gateway Técnico</legend>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1605,6 +1888,7 @@ function NewConnectionDialog({
             )}
           </Field>
         </fieldset>
+        )}
 
         {/* Botão de Parâmetros Avançados */}
         <div>
@@ -1680,9 +1964,17 @@ function EditConnection({
   const qc = useQueryClient();
   const toast = useToast();
   const tabs = useQuery({ queryKey: ['tabulations'], queryFn: () => get<{ items: Tabulation[] }>('/tabulations') });
+  const isWebRtc = isWebRtcConnection(c);
   const [name, setName] = useState(c.name);
   const [provider, setProvider] = useState(c.provider);
   const [tenantId, setTenantId] = useState(c.tenantId || '');
+  const [webrtcMode, setWebrtcMode] = useState<WebRtcMode>(c.webrtcMode ?? 'BOTH');
+  const [allowedOriginsText, setAllowedOriginsText] = useState((c.allowedOrigins ?? []).join(', '));
+  const [whatsappPhoneNumberId, setWhatsappPhoneNumberId] = useState(c.whatsappPhoneNumberId || '');
+  const [whatsappBusinessAccountId, setWhatsappBusinessAccountId] = useState(c.whatsappBusinessAccountId || '');
+  const [whatsappVerifyToken, setWhatsappVerifyToken] = useState(c.whatsappVerifyToken || '');
+  const [whatsappAppSecret, setWhatsappAppSecret] = useState('');
+  const [whatsappAccessToken, setWhatsappAccessToken] = useState('');
   const [endpointUrl, setEndpointUrl] = useState(c.endpointUrl || '');
   const [callerId, setCallerId] = useState(c.callerId || '');
   const [authToken, setAuthToken] = useState(c.authToken || '');
@@ -1717,11 +2009,24 @@ function EditConnection({
     m.mutate({
       name: name.trim(),
       provider,
-      endpointUrl: endpointUrl.trim() || null,
-      callerId: callerId.trim() || null,
-      authToken: authToken.trim() || null,
+      ...(isWebRtc
+        ? {
+            tenantId: tenantId || null,
+            webrtcMode,
+            allowedOrigins: parseAllowedOriginsInput(allowedOriginsText),
+            whatsappPhoneNumberId: whatsappPhoneNumberId.trim() || null,
+            whatsappBusinessAccountId: whatsappBusinessAccountId.trim() || null,
+            whatsappVerifyToken: whatsappVerifyToken.trim() || null,
+            ...(whatsappAppSecret.trim() ? { whatsappAppSecret: whatsappAppSecret.trim() } : {}),
+            ...(whatsappAccessToken.trim() ? { whatsappAccessToken: whatsappAccessToken.trim() } : {}),
+          }
+        : {
+            endpointUrl: endpointUrl.trim() || null,
+            callerId: callerId.trim() || null,
+            authToken: authToken.trim() || null,
+            ...(provider === 'VOICE_APP' ? { tenantId: tenantId || null } : {}),
+          }),
       ...(isSuper ? { tariff: t } : {}),
-      ...(provider === 'VOICE_APP' ? { tenantId: tenantId || null } : {}),
       active,
       simulation: sim,
     });
@@ -1739,7 +2044,7 @@ function EditConnection({
       onOpenChange={(o) => !o && onClose()}
       wide
       title={`Configurar ${c.name}`}
-      description={`Canal ${CHANNEL_LABEL[c.channelType]} · Provedor ${PROVIDER_SHORT_LABEL[c.provider] || c.provider}`}
+      description={`Canal ${CONNECTION_CHANNEL_LABEL[c.channelType]} · Provedor ${PROVIDER_SHORT_LABEL[c.provider] || c.provider}`}
       footer={
         <>
           <Button onClick={onClose}>Cancelar</Button>
@@ -1761,6 +2066,7 @@ function EditConnection({
             <Field label="Provedor do conector" required>
               {(p) => (
                 <Select id={p.id} value={provider} onChange={(e) => setProvider(e.target.value)}>
+                  <option value="WEBRTC_NATIVE">WebRTC Nativo (Web Widget &amp; WhatsApp Calling)</option>
                   <option value="VOICE_APP">Voice-App IA (Tronco Direct Call / FreeSWITCH)</option>
                   <option value="API_TRIGGER">API de Gatilhos &amp; Webhooks Voll Plan</option>
                   <option value="META_CLOUD">Meta Cloud API Oficial (WhatsApp)</option>
@@ -1789,8 +2095,8 @@ function EditConnection({
                 )}
               </Field>
             )}
-            {provider === 'VOICE_APP' && (
-              <Field label="Agente IA vinculado (Telefonia)" hint="Edite voz e prompt na área de Telefonia.">
+            {(provider === 'VOICE_APP' || isWebRtc) && (
+              <Field label="Agente IA vinculado (Telefonia)" tooltip="Edite voz e prompt na área de Telefonia.">
                 {(p) => (
                   <Select id={p.id} value={tenantId} onChange={(e) => setTenantId(e.target.value)}>
                     <option value="">Padrão da Telefonia</option>
@@ -1806,13 +2112,33 @@ function EditConnection({
             <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 h-[58px] self-end">
               <div>
                 <div className="text-sm font-medium text-slate-800">Disponibilidade</div>
-                <div className="text-xs text-slate-500">Permite despachar tentativas por este canal</div>
+                <div className="text-xs text-slate-500">Permite ativar atendimentos neste canal</div>
               </div>
               <Checkbox label="Conexão ativa" checked={active} onChange={(e) => setActive(e.target.checked)} />
             </div>
           </div>
         </fieldset>
 
+        {isWebRtc ? (
+          <WebRtcConfigFields
+            webrtcMode={webrtcMode}
+            setWebrtcMode={setWebrtcMode}
+            allowedOriginsText={allowedOriginsText}
+            setAllowedOriginsText={setAllowedOriginsText}
+            whatsappPhoneNumberId={whatsappPhoneNumberId}
+            setWhatsappPhoneNumberId={setWhatsappPhoneNumberId}
+            whatsappBusinessAccountId={whatsappBusinessAccountId}
+            setWhatsappBusinessAccountId={setWhatsappBusinessAccountId}
+            whatsappVerifyToken={whatsappVerifyToken}
+            setWhatsappVerifyToken={setWhatsappVerifyToken}
+            whatsappAppSecret={whatsappAppSecret}
+            setWhatsappAppSecret={setWhatsappAppSecret}
+            whatsappAccessToken={whatsappAccessToken}
+            setWhatsappAccessToken={setWhatsappAccessToken}
+            hasWhatsappAppSecret={c.hasWhatsappAppSecret}
+            hasWhatsappAccessToken={c.hasWhatsappAccessToken}
+          />
+        ) : (
         <fieldset className="space-y-3.5 rounded-xl border border-slate-200/90 bg-white p-4">
           <legend className="px-1.5 text-xs font-semibold uppercase tracking-wider text-slate-600">Conexão de API &amp; Gateway Técnico</legend>
           <div className="grid items-start gap-4 sm:grid-cols-2">
@@ -1849,6 +2175,7 @@ function EditConnection({
             )}
           </Field>
         </fieldset>
+        )}
 
         {/* Botão de Parâmetros Avançados com seção retrátil */}
         <div>

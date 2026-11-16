@@ -5,12 +5,16 @@ import type {
   CalendarHoliday,
   CalendarHolidayCreate,
   CalendarWindow,
+  CampaignDialerStatus,
   CampaignDraft,
+  CampaignHistoryChange,
+  CampaignHistoryItem,
   CampaignStatus,
   CampaignTemplate,
   CampaignTemplateCreate,
   ChannelType,
   ColumnMapping,
+  ConnectionChannelType,
   EnrollmentState,
   JourneyStep,
   OperationCalendar,
@@ -18,19 +22,28 @@ import type {
   ReasonCode,
   Role,
   StrategyConfig,
+  TrunkAvailability,
+  UpdateCampaignInput,
+  WebRtcMode,
   ListFilter,
 } from '@voll/shared';
 import type { ContactIntelligenceRationale } from './intelligence-rationale';
 
 export type {
+  CampaignDialerStatus,
+  CampaignHistoryChange,
+  CampaignHistoryItem,
   ContactIntelligenceRationale,
   CampaignTemplate,
   CampaignTemplateCreate,
   OperationCalendar,
   CalendarHoliday,
+  TrunkAvailability,
   CalendarWindow,
   CalendarCreate,
   CalendarHolidayCreate,
+  UpdateCampaignInput,
+  WebRtcMode,
 };
 
 export type WorkspaceOption = {
@@ -170,7 +183,7 @@ export type Simulation = {
 export type Connection = {
   id: string;
   name: string;
-  channelType: ChannelType;
+  channelType: ConnectionChannelType;
   provider: string;
   tariff: number | null;
   tariffUpdatedAt: string | null;
@@ -180,6 +193,16 @@ export type Connection = {
   callerId?: string | null;
   authToken?: string | null;
   simulation?: Simulation | null;
+  webrtcMode?: WebRtcMode;
+  publicWidgetKey?: string | null;
+  allowedOrigins?: string[];
+  whatsappPhoneNumberId?: string | null;
+  whatsappBusinessAccountId?: string | null;
+  whatsappVerifyToken?: string | null;
+  hasWhatsappAppSecret?: boolean;
+  hasWhatsappAccessToken?: boolean;
+  whatsappAppSecretMasked?: string | null;
+  whatsappAccessTokenMasked?: string | null;
 };
 export type JourneyStepView = JourneyStep & { connectionName?: string };
 export type Journey = { id: string; name: string; latestVersion: { id: string; version: number; steps: JourneyStepView[] } | null };
@@ -213,6 +236,9 @@ export type CampaignSummary = {
   strategyVersion: number;
   calendarId?: string | null;
   calendarName?: string | null;
+  voiceAgentId?: string | null;
+  trunkIds?: string[];
+  dialMultiplier?: number;
   createdAt: string;
   startedAt: string | null;
   archivedAt?: string | null;
@@ -229,6 +255,15 @@ export type CampaignDetail = CampaignSummary & {
   scheduledAt: string | null;
 };
 export type Campaign = CampaignDetail;
+
+export type TrunkAvailabilityResponse = {
+  trunks: TrunkAvailability[];
+  totalChannels: number;
+  activeCalls: number;
+  availableChannels: number;
+  gatewayConfigured: boolean;
+  gatewayOnline: boolean;
+};
 
 export type AttemptRow = {
   id: string;

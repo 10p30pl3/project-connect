@@ -9,13 +9,13 @@ export const EXPERIENCE_MODE_META: Record<
   basic: {
     label: 'Básico',
     shortLabel: 'Básico',
-    description: 'Essencial: visão geral, campanhas, contatos, mailings, agentes de voz, telefonia e consumo de tempo.',
+    description: 'Essencial: visão geral, campanhas, contatos, mailings, canais, agentes de voz, telefonia e consumo de tempo.',
     order: 0,
   },
   advanced: {
     label: 'Avançado',
     shortLabel: 'Avançado',
-    description: 'Completo: libera listas, jornadas, estratégias, tabulação, canais, relatórios, inteligência, engenharia DSP/SIP, limites, auditoria e sistema.',
+    description: 'Completo: libera listas, jornadas, estratégias, tabulação, relatórios, inteligência, engenharia DSP/SIP, limites, auditoria e sistema.',
     order: 1,
   },
 };
