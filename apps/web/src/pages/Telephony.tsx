@@ -52,8 +52,8 @@ export function TelephonyPage() {
 
   const rawParamTab = searchParams.get('tab');
   const normalizedInitial =
-    rawParamTab === 'trunks'
-      ? 'settings'
+    rawParamTab === 'settings'
+      ? 'trunks'
       : rawParamTab && rawParamTab !== 'calls' && rawParamTab !== 'tenants'
         ? rawParamTab
         : 'recordings';
@@ -70,8 +70,8 @@ export function TelephonyPage() {
       navigate('/agentes-de-voz', { replace: true });
       return;
     }
-    if (paramTab === 'trunks') {
-      setTabState('settings');
+    if (paramTab === 'settings') {
+      setTabState('trunks');
       return;
     }
     if (paramTab && paramTab !== tab) setTabState(paramTab);
