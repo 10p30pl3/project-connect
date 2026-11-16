@@ -22,7 +22,7 @@ import {
   Textarea,
   useToast,
 } from '../../components/ui';
-import { GatewayError, type TenantConfig, type VoiceAgentUsageSummary } from './types';
+import { GatewayError, type StsEngine, type TenantConfig, type VoiceAgentUsageSummary } from './types';
 
 const DEFAULT_PROMPT =
   'Você é o assistente virtual oficial da Voll Solutions. Seja cordial, claro e objetivo. Responda em português do Brasil com frases naturais e curtas adequadas a uma ligação telefônica.';
@@ -64,13 +64,28 @@ type TenantForm = {
   name: string;
   extension: string;
   dids: string;
-  stsEngine: 'openai' | 'elevenlabs';
+  stsEngine: StsEngine;
   voice: string;
   openaiModel: string;
   openaiPromptId: string;
+  openaiVadType: 'server_vad' | 'semantic_vad';
+  openaiVadEagerness: 'low' | 'medium' | 'high' | 'auto';
+  openaiTemperature: number;
+  openaiSpeed: number;
+  openaiMaxOutputTokens: string;
+  openaiTranscriptionModel: 'whisper-1' | 'gpt-4o-mini-transcribe' | 'gpt-4o-transcribe';
+  openaiTranscriptionLanguage: 'pt' | 'en' | 'es' | 'auto';
+  openaiInterruptResponse: boolean;
+  vadThreshold: number;
+  prefixPaddingMs: number;
+  silenceDurationMs: number;
   elevenlabsAgentId: string;
   elevenlabsModel: string;
   elevenlabsVoiceId: string;
+  elevenlabsStability: number;
+  elevenlabsSimilarityBoost: number;
+  elevenlabsSpeed: number;
+  elevenlabsOptimizeLatency: number;
   greetingInstructions: string;
   instructions: string;
   maxConcurrentCalls: number;
@@ -89,19 +104,41 @@ type TenantForm = {
   crosstalkThreshold: string;
 };
 
+function normalizeEngine(raw?: string | null): StsEngine {
+  if (raw === 'elevenlabs') return 'elevenlabs';
+  if (raw === 'openai_live') return 'openai_live';
+  return 'openai';
+}
+
 function toForm(t?: TenantConfig | null): TenantForm {
+  const stsEngine = normalizeEngine(t?.stsEngine);
   return {
     id: t?.id ?? '',
     name: t?.name ?? '',
     extension: t?.extension ?? '',
     dids: (t?.dids ?? ['*']).join(', '),
-    stsEngine: t?.stsEngine === 'elevenlabs' ? 'elevenlabs' : 'openai',
+    stsEngine,
     voice: t?.voice ?? 'marin',
-    openaiModel: t?.openaiModel ?? 'gpt-realtime-2.1-mini',
+    openaiModel: t?.openaiModel ?? (stsEngine === 'openai_live' ? 'gpt-realtime' : 'gpt-realtime-2.1-mini'),
     openaiPromptId: t?.openaiPromptId ?? '',
+    openaiVadType: t?.openaiVadType ?? (stsEngine === 'openai_live' ? 'semantic_vad' : 'server_vad'),
+    openaiVadEagerness: t?.openaiVadEagerness ?? 'medium',
+    openaiTemperature: t?.openaiTemperature ?? 0.8,
+    openaiSpeed: t?.openaiSpeed ?? 1.0,
+    openaiMaxOutputTokens: t?.openaiMaxOutputTokens != null ? String(t.openaiMaxOutputTokens) : '',
+    openaiTranscriptionModel: t?.openaiTranscriptionModel ?? 'whisper-1',
+    openaiTranscriptionLanguage: t?.openaiTranscriptionLanguage ?? 'pt',
+    openaiInterruptResponse: t?.openaiInterruptResponse !== false,
+    vadThreshold: t?.vadThreshold ?? 0.45,
+    prefixPaddingMs: t?.prefixPaddingMs ?? 160,
+    silenceDurationMs: t?.silenceDurationMs ?? 280,
     elevenlabsAgentId: t?.elevenlabsAgentId ?? '',
     elevenlabsModel: t?.elevenlabsModel ?? 'eleven_turbo_v2_5',
     elevenlabsVoiceId: t?.elevenlabsVoiceId ?? 'Rachel',
+    elevenlabsStability: t?.elevenlabsStability ?? 0.5,
+    elevenlabsSimilarityBoost: t?.elevenlabsSimilarityBoost ?? 0.75,
+    elevenlabsSpeed: t?.elevenlabsSpeed ?? 1.0,
+    elevenlabsOptimizeLatency: t?.elevenlabsOptimizeLatency ?? 3,
     greetingInstructions: t?.greetingInstructions ?? DEFAULT_GREETING,
     instructions: t?.instructions ?? DEFAULT_PROMPT,
     maxConcurrentCalls: t?.maxConcurrentCalls ?? 200,
@@ -158,9 +195,24 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
         voice: form.voice,
         openaiModel: form.openaiModel,
         openaiPromptId: form.openaiPromptId.trim() || null,
+        openaiVadType: form.openaiVadType,
+        openaiVadEagerness: form.openaiVadEagerness,
+        openaiTemperature: Number(form.openaiTemperature) || 0.8,
+        openaiSpeed: Number(form.openaiSpeed) || 1.0,
+        openaiMaxOutputTokens: form.openaiMaxOutputTokens.trim() ? Number(form.openaiMaxOutputTokens) : null,
+        openaiTranscriptionModel: form.openaiTranscriptionModel,
+        openaiTranscriptionLanguage: form.openaiTranscriptionLanguage,
+        openaiInterruptResponse: form.openaiInterruptResponse,
+        vadThreshold: Number(form.vadThreshold) || 0.45,
+        prefixPaddingMs: Number(form.prefixPaddingMs) || 160,
+        silenceDurationMs: Number(form.silenceDurationMs) || 280,
         elevenlabsAgentId: form.elevenlabsAgentId.trim() || null,
         elevenlabsModel: form.elevenlabsModel,
         elevenlabsVoiceId: form.elevenlabsVoiceId,
+        elevenlabsStability: Number(form.elevenlabsStability),
+        elevenlabsSimilarityBoost: Number(form.elevenlabsSimilarityBoost),
+        elevenlabsSpeed: Number(form.elevenlabsSpeed) || 1.0,
+        elevenlabsOptimizeLatency: Number(form.elevenlabsOptimizeLatency),
         greetingInstructions: form.greetingInstructions.trim() || null,
         instructions: form.instructions.trim(),
         maxConcurrentCalls: Number(form.maxConcurrentCalls) || 200,
@@ -253,7 +305,9 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
               </thead>
               <tbody>
                 {tenants.map((t) => {
-                  const isEleven = t.stsEngine === 'elevenlabs';
+                  const eng = normalizeEngine(t.stsEngine);
+                  const isEleven = eng === 'elevenlabs';
+                  const isLive = eng === 'openai_live';
                   const usage = usagesMap[t.id];
                   const usageTooltip = usage && usage.totalReferences > 0
                     ? [
@@ -272,8 +326,8 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
                         {isAtLeast('advanced') && <div className="font-mono text-[11px] text-slate-500">{t.id}</div>}
                       </td>
                       <td className="text-xs">
-                        <Badge tone={isEleven ? 'blue' : 'brand'}>
-                          {isEleven ? 'ElevenLabs STS' : 'OpenAI Realtime'}
+                        <Badge tone={isEleven ? 'blue' : isLive ? 'green' : 'brand'}>
+                          {isEleven ? 'ElevenLabs STS' : isLive ? 'OpenAI Live' : 'OpenAI Realtime'}
                         </Badge>
                         <div className="mt-1 text-[11px] text-slate-600">
                           {isEleven
@@ -441,21 +495,37 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
                   <Select
                     id={f.id}
                     value={editing.form.stsEngine}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const nextEngine = e.target.value as StsEngine;
+                      const prevEngine = editing.form.stsEngine;
+                      let nextVadType = editing.form.openaiVadType;
+                      let nextModel = editing.form.openaiModel;
+                      if (nextEngine === 'openai_live' && prevEngine !== 'openai_live') {
+                        if (editing.form.openaiVadType === 'server_vad') nextVadType = 'semantic_vad';
+                        if (editing.form.openaiModel === 'gpt-realtime-2.1-mini') nextModel = 'gpt-realtime';
+                      } else if (nextEngine === 'openai' && prevEngine === 'openai_live') {
+                        if (editing.form.openaiVadType === 'semantic_vad') nextVadType = 'server_vad';
+                      }
                       setEditing({
                         ...editing,
-                        form: { ...editing.form, stsEngine: e.target.value as 'openai' | 'elevenlabs' },
-                      })
-                    }
+                        form: {
+                          ...editing.form,
+                          stsEngine: nextEngine,
+                          openaiVadType: nextVadType,
+                          openaiModel: nextModel,
+                        },
+                      });
+                    }}
                   >
                     <option value="openai">OpenAI Realtime API</option>
+                    <option value="openai_live">OpenAI Live API</option>
                     <option value="elevenlabs">ElevenLabs Conversational AI (STS)</option>
                   </Select>
                 )}
               </Field>
             </div>
 
-            {editing.form.stsEngine === 'openai' ? (
+            {editing.form.stsEngine !== 'elevenlabs' ? (
               <div className="space-y-3">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Field label="Modelo OpenAI">
@@ -604,18 +674,446 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
               />
             </div>
 
-            {/* Engenharia Acústica & DSP (Accordion Colapsável) */}
+            {/* Parâmetros Avançados (API do Motor + Engenharia Acústica, SIP & DSP) */}
             <div className="rounded-xl border border-slate-200 bg-slate-50/70">
               <button
                 type="button"
                 onClick={() => setShowDsp((v) => !v)}
                 className="flex w-full items-center justify-between px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:text-slate-900 cursor-pointer"
               >
-                <span>Engenharia Acústica, SIP &amp; Parâmetros DSP (Avançado)</span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span>Parâmetros avançados</span>
+                  <InfoTooltip
+                    content={
+                      editing.form.stsEngine === 'elevenlabs'
+                        ? 'Ajustes finos da ElevenLabs (estabilidade, similaridade, velocidade, latência) e engenharia SIP/DSP.'
+                        : 'Ajustes finos da OpenAI (VAD, agilidade de turno, temperatura, velocidade, transcrição, tokens) e engenharia SIP/DSP.'
+                    }
+                  />
+                </span>
                 {showDsp ? <ChevronUp className="size-4" aria-hidden /> : <ChevronDown className="size-4" aria-hidden />}
               </button>
               {showDsp && (
-                <div className="space-y-3 border-t border-slate-200 p-4">
+                <div className="space-y-4 border-t border-slate-200 p-4">
+                  {/* Parâmetros específicos da API selecionada */}
+                  <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      {editing.form.stsEngine === 'elevenlabs'
+                        ? 'Parâmetros da API — ElevenLabs STS'
+                        : editing.form.stsEngine === 'openai_live'
+                          ? 'Parâmetros da API — OpenAI Live'
+                          : 'Parâmetros da API — OpenAI Realtime'}
+                    </div>
+
+                    {editing.form.stsEngine !== 'elevenlabs' ? (
+                      <>
+                        <div className="grid gap-3 sm:grid-cols-3">
+                          <Field
+                            label="Detecção de turno (VAD)"
+                            tooltip="server_vad detecta fim de fala por silêncio acústico; semantic_vad avalia contexto semântico antes de responder."
+                          >
+                            {(f) => (
+                              <Select
+                                id={f.id}
+                                value={editing.form.openaiVadType}
+                                onChange={(e) =>
+                                  setEditing({
+                                    ...editing,
+                                    form: { ...editing.form, openaiVadType: e.target.value as 'server_vad' | 'semantic_vad' },
+                                  })
+                                }
+                              >
+                                <option value="server_vad">Server VAD (Acústico)</option>
+                                <option value="semantic_vad">Semantic VAD (Contextual)</option>
+                              </Select>
+                            )}
+                          </Field>
+                          {editing.form.openaiVadType === 'semantic_vad' ? (
+                            <Field
+                              label="Agilidade do turno"
+                              tooltip="Controla o quão rápido o agente assume a palavra após uma pausa semântica do cliente."
+                            >
+                              {(f) => (
+                                <Select
+                                  id={f.id}
+                                  value={editing.form.openaiVadEagerness}
+                                  onChange={(e) =>
+                                    setEditing({
+                                      ...editing,
+                                      form: {
+                                        ...editing.form,
+                                        openaiVadEagerness: e.target.value as 'low' | 'medium' | 'high' | 'auto',
+                                      },
+                                    })
+                                  }
+                                >
+                                  <option value="low">Baixa (espera mais)</option>
+                                  <option value="medium">Média (equilibrado)</option>
+                                  <option value="high">Alta (resposta rápida)</option>
+                                  <option value="auto">Automática</option>
+                                </Select>
+                              )}
+                            </Field>
+                          ) : (
+                            <Field
+                              label="Sensibilidade VAD (0.1–0.95)"
+                              tooltip="Limiar de energia de fala para o Server VAD disparar detecção de voz."
+                            >
+                              {(f) => (
+                                <Input
+                                  id={f.id}
+                                  type="number"
+                                  min={0.1}
+                                  max={0.95}
+                                  step={0.05}
+                                  value={editing.form.vadThreshold}
+                                  onChange={(e) =>
+                                    setEditing({
+                                      ...editing,
+                                      form: { ...editing.form, vadThreshold: Number(e.target.value) },
+                                    })
+                                  }
+                                />
+                              )}
+                            </Field>
+                          )}
+                          <Field
+                            label="Temperatura (0.6–1.2)"
+                            tooltip="Controla a variabilidade e espontaneidade das respostas faladas do agente."
+                          >
+                            {(f) => (
+                              <Input
+                                id={f.id}
+                                type="number"
+                                min={0.6}
+                                max={1.2}
+                                step={0.05}
+                                value={editing.form.openaiTemperature}
+                                onChange={(e) =>
+                                  setEditing({
+                                    ...editing,
+                                    form: { ...editing.form, openaiTemperature: Number(e.target.value) },
+                                  })
+                                }
+                              />
+                            )}
+                          </Field>
+                        </div>
+
+                        {editing.form.openaiVadType === 'server_vad' && (
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <Field
+                              label="Prefix Padding (ms)"
+                              tooltip="Áudio preservado antes da detecção de início de fala (0 a 1000 ms)."
+                            >
+                              {(f) => (
+                                <Input
+                                  id={f.id}
+                                  type="number"
+                                  min={0}
+                                  max={1000}
+                                  step={10}
+                                  value={editing.form.prefixPaddingMs}
+                                  onChange={(e) =>
+                                    setEditing({
+                                      ...editing,
+                                      form: { ...editing.form, prefixPaddingMs: Number(e.target.value) },
+                                    })
+                                  }
+                                />
+                              )}
+                            </Field>
+                            <Field
+                              label="Silêncio fim de turno (ms)"
+                              tooltip="Tempo de silêncio após a fala para concluir o turno do cliente (100 a 2000 ms)."
+                            >
+                              {(f) => (
+                                <Input
+                                  id={f.id}
+                                  type="number"
+                                  min={100}
+                                  max={2000}
+                                  step={20}
+                                  value={editing.form.silenceDurationMs}
+                                  onChange={(e) =>
+                                    setEditing({
+                                      ...editing,
+                                      form: { ...editing.form, silenceDurationMs: Number(e.target.value) },
+                                    })
+                                  }
+                                />
+                              )}
+                            </Field>
+                          </div>
+                        )}
+
+                        <div className="grid gap-3 sm:grid-cols-3">
+                          <Field
+                            label="Velocidade da fala (0.25–1.5)"
+                            tooltip="Velocidade de síntese de áudio da resposta (1.0 = velocidade natural)."
+                          >
+                            {(f) => (
+                              <Input
+                                id={f.id}
+                                type="number"
+                                min={0.25}
+                                max={1.5}
+                                step={0.05}
+                                value={editing.form.openaiSpeed}
+                                onChange={(e) =>
+                                  setEditing({
+                                    ...editing,
+                                    form: { ...editing.form, openaiSpeed: Number(e.target.value) },
+                                  })
+                                }
+                              />
+                            )}
+                          </Field>
+                          <Field
+                            label="Máx. tokens de resposta"
+                            tooltip="Limite máximo de tokens por turno (64 a 4096). Deixe vazio para ilimitado."
+                          >
+                            {(f) => (
+                              <Input
+                                id={f.id}
+                                type="number"
+                                min={64}
+                                max={4096}
+                                placeholder="Ilimitado"
+                                value={editing.form.openaiMaxOutputTokens}
+                                onChange={(e) =>
+                                  setEditing({
+                                    ...editing,
+                                    form: { ...editing.form, openaiMaxOutputTokens: e.target.value },
+                                  })
+                                }
+                              />
+                            )}
+                          </Field>
+                          <Field
+                            label="Prompt ID (opcional)"
+                            tooltip="Identificador de prompt salvo no painel da OpenAI (usado se não houver instruções manuais)."
+                          >
+                            {(f) => (
+                              <Input
+                                id={f.id}
+                                placeholder="pmpt_..."
+                                value={editing.form.openaiPromptId}
+                                onChange={(e) =>
+                                  setEditing({
+                                    ...editing,
+                                    form: { ...editing.form, openaiPromptId: e.target.value },
+                                  })
+                                }
+                              />
+                            )}
+                          </Field>
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-3 items-end">
+                          <Field
+                            label="Modelo de transcrição"
+                            tooltip="Modelo utilizado para transcrever a fala do cliente na entrada."
+                          >
+                            {(f) => (
+                              <Select
+                                id={f.id}
+                                value={editing.form.openaiTranscriptionModel}
+                                onChange={(e) =>
+                                  setEditing({
+                                    ...editing,
+                                    form: {
+                                      ...editing.form,
+                                      openaiTranscriptionModel: e.target.value as
+                                        | 'whisper-1'
+                                        | 'gpt-4o-mini-transcribe'
+                                        | 'gpt-4o-transcribe',
+                                    },
+                                  })
+                                }
+                              >
+                                <option value="whisper-1">whisper-1</option>
+                                <option value="gpt-4o-mini-transcribe">gpt-4o-mini-transcribe</option>
+                                <option value="gpt-4o-transcribe">gpt-4o-transcribe</option>
+                              </Select>
+                            )}
+                          </Field>
+                          <Field
+                            label="Idioma da transcrição"
+                            tooltip="Idioma esperado do cliente para aumentar a precisão do reconhecimento de fala."
+                          >
+                            {(f) => (
+                              <Select
+                                id={f.id}
+                                value={editing.form.openaiTranscriptionLanguage}
+                                onChange={(e) =>
+                                  setEditing({
+                                    ...editing,
+                                    form: {
+                                      ...editing.form,
+                                      openaiTranscriptionLanguage: e.target.value as 'pt' | 'en' | 'es' | 'auto',
+                                    },
+                                  })
+                                }
+                              >
+                                <option value="pt">Português (pt)</option>
+                                <option value="en">Inglês (en)</option>
+                                <option value="es">Espanhol (es)</option>
+                                <option value="auto">Detecção automática</option>
+                              </Select>
+                            )}
+                          </Field>
+                          <div className="pb-1.5">
+                            <Checkbox
+                              label={
+                                <span className="inline-flex items-center gap-1">
+                                  <span>Interrupção imediata (Barge-in)</span>
+                                  <InfoTooltip content="Interrompe a fala do agente imediatamente quando o cliente começa a falar." />
+                                </span>
+                              }
+                              checked={editing.form.openaiInterruptResponse}
+                              onChange={(e) =>
+                                setEditing({
+                                  ...editing,
+                                  form: { ...editing.form, openaiInterruptResponse: e.target.checked },
+                                })
+                              }
+                            />
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <Field
+                          label="Estabilidade da voz (0–1)"
+                          tooltip="Valores maiores tornam a voz mais constante; valores menores aumentam a expressividade."
+                        >
+                          {(f) => (
+                            <Input
+                              id={f.id}
+                              type="number"
+                              min={0}
+                              max={1}
+                              step={0.05}
+                              value={editing.form.elevenlabsStability}
+                              onChange={(e) =>
+                                setEditing({
+                                  ...editing,
+                                  form: { ...editing.form, elevenlabsStability: Number(e.target.value) },
+                                })
+                              }
+                            />
+                          )}
+                        </Field>
+                        <Field
+                          label="Similaridade (0–1)"
+                          tooltip="Fidelidade ao timbre original da voz ElevenLabs selecionada."
+                        >
+                          {(f) => (
+                            <Input
+                              id={f.id}
+                              type="number"
+                              min={0}
+                              max={1}
+                              step={0.05}
+                              value={editing.form.elevenlabsSimilarityBoost}
+                              onChange={(e) =>
+                                setEditing({
+                                  ...editing,
+                                  form: { ...editing.form, elevenlabsSimilarityBoost: Number(e.target.value) },
+                                })
+                              }
+                            />
+                          )}
+                        </Field>
+                        <Field
+                          label="Velocidade da fala (0.7–1.2)"
+                          tooltip="Velocidade de locução da ElevenLabs (1.0 = padrão)."
+                        >
+                          {(f) => (
+                            <Input
+                              id={f.id}
+                              type="number"
+                              min={0.7}
+                              max={1.2}
+                              step={0.05}
+                              value={editing.form.elevenlabsSpeed}
+                              onChange={(e) =>
+                                setEditing({
+                                  ...editing,
+                                  form: { ...editing.form, elevenlabsSpeed: Number(e.target.value) },
+                                })
+                              }
+                            />
+                          )}
+                        </Field>
+                        <Field
+                          label="Otimização de latência (0–4)"
+                          tooltip="Nível de otimização de streaming de áudio da ElevenLabs (0 = padrão, 4 = latência mínima)."
+                        >
+                          {(f) => (
+                            <Input
+                              id={f.id}
+                              type="number"
+                              min={0}
+                              max={4}
+                              step={1}
+                              value={editing.form.elevenlabsOptimizeLatency}
+                              onChange={(e) =>
+                                setEditing({
+                                  ...editing,
+                                  form: { ...editing.form, elevenlabsOptimizeLatency: Number(e.target.value) },
+                                })
+                              }
+                            />
+                          )}
+                        </Field>
+                        <Field
+                          label="Sensibilidade VAD (0.1–0.95)"
+                          tooltip="Limiar local de detecção de voz humana antes do envio."
+                        >
+                          {(f) => (
+                            <Input
+                              id={f.id}
+                              type="number"
+                              min={0.1}
+                              max={0.95}
+                              step={0.05}
+                              value={editing.form.vadThreshold}
+                              onChange={(e) =>
+                                setEditing({
+                                  ...editing,
+                                  form: { ...editing.form, vadThreshold: Number(e.target.value) },
+                                })
+                              }
+                            />
+                          )}
+                        </Field>
+                        <Field
+                          label="Silêncio fim de turno (ms)"
+                          tooltip="Tempo de silêncio de referência para encerrar o turno de fala (100 a 2000 ms)."
+                        >
+                          {(f) => (
+                            <Input
+                              id={f.id}
+                              type="number"
+                              min={100}
+                              max={2000}
+                              step={20}
+                              value={editing.form.silenceDurationMs}
+                              onChange={(e) =>
+                                setEditing({
+                                  ...editing,
+                                  form: { ...editing.form, silenceDurationMs: Number(e.target.value) },
+                                })
+                              }
+                            />
+                          )}
+                        </Field>
+                      </div>
+                    )}
+                  </div>
+
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Field label="Ramal Interno (ex: 9000)">
                       {(f) => (

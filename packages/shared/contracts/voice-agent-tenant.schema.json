@@ -21,20 +21,136 @@
       "type": "string",
       "enum": [
         "openai",
+        "openai_live",
         "elevenlabs"
       ]
     },
     "openaiModel": {
       "type": "string"
     },
+    "openaiPromptId": {
+      "anyOf": [
+        {
+          "type": "string",
+          "maxLength": 120
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "openaiVadType": {
+      "type": "string",
+      "enum": [
+        "server_vad",
+        "semantic_vad"
+      ]
+    },
+    "openaiVadEagerness": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "auto"
+      ]
+    },
+    "openaiTemperature": {
+      "type": "number",
+      "minimum": 0.6,
+      "maximum": 1.2
+    },
+    "openaiSpeed": {
+      "type": "number",
+      "minimum": 0.25,
+      "maximum": 1.5
+    },
+    "openaiMaxOutputTokens": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 64,
+          "maximum": 4096
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "openaiTranscriptionModel": {
+      "type": "string",
+      "enum": [
+        "whisper-1",
+        "gpt-4o-mini-transcribe",
+        "gpt-4o-transcribe"
+      ]
+    },
+    "openaiTranscriptionLanguage": {
+      "type": "string",
+      "enum": [
+        "pt",
+        "en",
+        "es",
+        "auto"
+      ]
+    },
+    "openaiInterruptResponse": {
+      "type": "boolean"
+    },
+    "vadThreshold": {
+      "type": "number",
+      "minimum": 0.1,
+      "maximum": 0.95
+    },
+    "prefixPaddingMs": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000
+    },
+    "silenceDurationMs": {
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 2000
+    },
     "voice": {
       "type": "string"
+    },
+    "elevenlabsAgentId": {
+      "anyOf": [
+        {
+          "type": "string",
+          "maxLength": 120
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "elevenlabsVoiceId": {
       "type": "string"
     },
     "elevenlabsModel": {
       "type": "string"
+    },
+    "elevenlabsStability": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "elevenlabsSimilarityBoost": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "elevenlabsSpeed": {
+      "type": "number",
+      "minimum": 0.7,
+      "maximum": 1.2
+    },
+    "elevenlabsOptimizeLatency": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4
     },
     "instructions": {
       "type": "string",

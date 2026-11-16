@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { normalizeStsEngine } = require('./openai-session-params');
 
 const DEFAULT_VOLL_PROMPT = `**Você é o assistente virtual da Voll Solutions**, empresa brasileira especializada em soluções de atendimento digital e chatbots com IA generativa para empresas.
 
@@ -162,13 +163,28 @@ class TenantManager {
       extension: '9000',
       dids: ['*'],
       active: true,
-      stsEngine: process.env.STS_DEFAULT_ENGINE || 'openai', // 'openai' ou 'elevenlabs'
+      stsEngine: normalizeStsEngine(process.env.STS_DEFAULT_ENGINE, 'openai'), // 'openai', 'openai_live' ou 'elevenlabs'
       openaiApiKey: process.env.OPENAI_API_KEY,
       openaiModel: process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime-2.1-mini',
       openaiPromptId: process.env.OPENAI_PROMPT_ID || null,
+      openaiVadType: 'server_vad',
+      openaiVadEagerness: 'medium',
+      openaiTemperature: 0.8,
+      openaiSpeed: 1.0,
+      openaiMaxOutputTokens: null,
+      openaiTranscriptionModel: 'whisper-1',
+      openaiTranscriptionLanguage: 'pt',
+      openaiInterruptResponse: true,
+      vadThreshold: 0.45,
+      prefixPaddingMs: 160,
+      silenceDurationMs: 280,
       elevenlabsAgentId: process.env.ELEVENLABS_AGENT_ID || 'agent_01jvsk3cr8ep3an7shbcnfvt8d',
       elevenlabsVoiceId: process.env.ELEVENLABS_VOICE_ID || 'Rachel',
       elevenlabsModel: process.env.ELEVENLABS_MODEL || 'eleven_turbo_v2_5',
+      elevenlabsStability: 0.5,
+      elevenlabsSimilarityBoost: 0.75,
+      elevenlabsSpeed: 1.0,
+      elevenlabsOptimizeLatency: 3,
       elevenlabsApiKey: process.env.ELEVENLABS_API_KEY || null,
       instructions: process.env.OPENAI_AGENT_INSTRUCTIONS || DEFAULT_VOLL_PROMPT,
       greetingInstructions: process.env.GREETING_INSTRUCTIONS || 'Diga cordialmente de forma curta e amigável: \'Olá! Sou o assistente virtual da Voll Solutions. Como posso ajudar você hoje?\'',
@@ -394,7 +410,8 @@ class TenantManager {
       throw new Error('O campo "id" do tenant é obrigatório');
     }
     const defaultTenant = this.getDefaultTenant();
-    const existing = this.tenants.get(data.id) || defaultTenant;
+    const existingRaw = this.tenants.get(data.id);
+    const existing = existingRaw || defaultTenant;
     const isMasked = (val) => typeof val === 'string' && val.includes('...');
     const sanitizedData = { ...data };
     if (isMasked(sanitizedData.openaiApiKey)) {
@@ -407,6 +424,12 @@ class TenantManager {
       ...defaultTenant,
       ...existing,
       ...sanitizedData,
+      stsEngine: normalizeStsEngine(sanitizedData.stsEngine ?? existing.stsEngine, defaultTenant.stsEngine),
+      openaiVadType:
+        sanitizedData.openaiVadType ??
+        (normalizeStsEngine(sanitizedData.stsEngine ?? existing.stsEngine) === 'openai_live' && !existingRaw?.openaiVadType
+          ? 'semantic_vad'
+          : existing.openaiVadType ?? defaultTenant.openaiVadType),
       extension: data.extension !== undefined
         ? (String(data.extension || '').trim() || null)
         : (existing.extension || (data.id === 'default' ? '9000' : null)),

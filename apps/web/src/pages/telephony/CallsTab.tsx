@@ -1000,7 +1000,13 @@ export function CallsTab({
                 {!tenants.length && <option value="default">default</option>}
                 {tenants.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.name || t.id} ({t.stsEngine === 'elevenlabs' ? 'ElevenLabs' : 'OpenAI'})
+                    {t.name || t.id} (
+                    {t.stsEngine === 'elevenlabs'
+                      ? 'ElevenLabs'
+                      : t.stsEngine === 'openai_live'
+                        ? 'OpenAI Live'
+                        : 'OpenAI Realtime'}
+                    )
                   </option>
                 ))}
               </Select>

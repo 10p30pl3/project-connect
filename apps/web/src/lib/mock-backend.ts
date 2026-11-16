@@ -1478,6 +1478,37 @@ const MOCK_TELEPHONY = {
       stt: { enabled: true },
       crosstalkFilter: { mode: 'ecapa', ratio: 0.45, threshold: null },
     },
+    {
+      id: 'live1',
+      name: 'live1',
+      extension: '9002',
+      dids: ['*'],
+      stsEngine: 'openai_live',
+      voice: 'alloy',
+      openaiModel: 'gpt-realtime',
+      openaiVadType: 'semantic_vad',
+      openaiVadEagerness: 'medium',
+      openaiTemperature: 0.8,
+      openaiSpeed: 1.0,
+      openaiTranscriptionModel: 'whisper-1',
+      openaiTranscriptionLanguage: 'pt',
+      openaiInterruptResponse: true,
+      elevenlabsModel: 'eleven_turbo_v2_5',
+      elevenlabsVoiceId: 'Rachel',
+      instructions:
+        'Você é o assistente virtual oficial da Voll Solutions. Seja cordial, claro e objetivo. Responda em português do Brasil.',
+      greetingInstructions:
+        "Diga cordialmente de forma curta e amigável: 'Olá! Sou o assistente virtual da Voll Solutions. Como posso ajudar você hoje?'",
+      maxConcurrentCalls: 200,
+      maxCallsPerSecond: 30,
+      maxDurationSec: 180,
+      audioCodec: 'pcmu',
+      dtmf: { enabled: true, debounceMs: 1200 },
+      active: true,
+      amd: { enabled: true, mode: 'active' },
+      stt: { enabled: true },
+      crosstalkFilter: { mode: 'atual', ratio: 0.45, threshold: null },
+    },
   ] as any[],
   extensions: [
     { id: '1000', name: 'Ramal 1000', password: '1234', effectiveCallerIdName: 'Ramal 1000', context: 'default', callgroup: 'default', enabled: true, registered: false },
@@ -2498,6 +2529,13 @@ export async function handleMockApi<T = unknown>(
       endpointUrl: b.endpointUrl?.trim() || null,
       callerId: b.callerId?.trim() || null,
       authToken: b.authToken?.trim() || null,
+      hasAuthToken: Boolean(b.authToken && b.authToken !== '***' && !String(b.authToken).startsWith('••••')),
+      authTokenMasked: b.authToken ? `••••${String(b.authToken).slice(-4)}` : null,
+      technical: b.technical ?? null,
+      hasVoiceAppToken: Boolean(b.technical?.voice?.voiceAppToken),
+      voiceAppTokenMasked: b.technical?.voice?.voiceAppToken ? `••••${String(b.technical.voice.voiceAppToken).slice(-4)}` : null,
+      hasSmtpPassword: Boolean(b.technical?.email?.smtpPassword),
+      smtpPasswordMasked: b.technical?.email?.smtpPassword ? `••••${String(b.technical.email.smtpPassword).slice(-4)}` : null,
       ...(isWebRtc
         ? {
             webrtcMode: b.webrtcMode ?? 'BOTH',
@@ -2551,7 +2589,34 @@ export async function handleMockApi<T = unknown>(
       if (body.tenantId !== undefined) c.tenantId = body.tenantId;
       if (body.endpointUrl !== undefined) c.endpointUrl = body.endpointUrl;
       if (body.callerId !== undefined) c.callerId = body.callerId;
-      if (body.authToken !== undefined) c.authToken = body.authToken;
+      if (body.authToken === null) {
+        c.authToken = null;
+        c.hasAuthToken = false;
+        c.authTokenMasked = null;
+      } else if (body.authToken && body.authToken !== '***' && !String(body.authToken).startsWith('••••')) {
+        c.authToken = body.authToken;
+        c.hasAuthToken = true;
+        c.authTokenMasked = `••••${String(body.authToken).slice(-4)}`;
+      }
+      if (body.technical) {
+        c.technical = { ...(c.technical ?? {}), ...body.technical };
+        const vat = body.technical.voice?.voiceAppToken;
+        if (vat === null) {
+          c.hasVoiceAppToken = false;
+          c.voiceAppTokenMasked = null;
+        } else if (vat && vat !== '***' && !String(vat).startsWith('••••')) {
+          c.hasVoiceAppToken = true;
+          c.voiceAppTokenMasked = `••••${String(vat).slice(-4)}`;
+        }
+        const sp = body.technical.email?.smtpPassword;
+        if (sp === null) {
+          c.hasSmtpPassword = false;
+          c.smtpPasswordMasked = null;
+        } else if (sp && sp !== '***' && !String(sp).startsWith('••••')) {
+          c.hasSmtpPassword = true;
+          c.smtpPasswordMasked = `••••${String(sp).slice(-4)}`;
+        }
+      }
       if (body.webrtcMode !== undefined) c.webrtcMode = body.webrtcMode;
       if (body.allowedOrigins !== undefined) c.allowedOrigins = body.allowedOrigins;
       if (body.whatsappPhoneNumberId !== undefined) c.whatsappPhoneNumberId = body.whatsappPhoneNumberId;
@@ -2578,6 +2643,24 @@ export async function handleMockApi<T = unknown>(
     }
     CONNECTIONS.splice(idx, 1);
     return { deleted: true, id: connMatch[1] } as T;
+  }
+
+  const connTestMatch = pathname.match(/^\/connections\/([^/]+)\/test$/);
+  if ((pathname === '/connections/test' || connTestMatch) && method === 'POST') {
+    const target = connTestMatch ? CONNECTIONS.find((x) => x.id === connTestMatch[1]) : null;
+    const b = (opts.body ?? {}) as any;
+    const channelType = b.channelType ?? target?.channelType ?? 'VOICE';
+    const endpointUrl = b.endpointUrl ?? target?.endpointUrl ?? b.technical?.voice?.voiceAppBaseUrl ?? b.technical?.whatsapp?.apiBaseUrl;
+    return {
+      ok: true,
+      channelType,
+      status: 'Conectado (Simulado)',
+      code: 200,
+      latencyMs: 38,
+      details: endpointUrl
+        ? `Validação local concluída para ${channelType} em ${endpointUrl}.`
+        : `Validação local concluída para ${channelType} usando configuração padrão do workspace.`,
+    } as T;
   }
 
   // ---------------------------------------------------------------- Endereços Técnicos dos Canais

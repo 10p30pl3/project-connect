@@ -158,7 +158,12 @@ export function ExtensionsTab({ onDialExtension }: { onDialExtension?: () => voi
                   <div className="min-w-0">
                     <div className="truncate text-xs font-bold text-slate-900">{t.name || t.id}</div>
                     <div className="text-[11px] text-slate-500">
-                      {t.stsEngine === 'elevenlabs' ? 'ElevenLabs STS' : 'OpenAI Realtime'} · {t.stsEngine === 'elevenlabs' ? (t.elevenlabsVoiceId || 'Rachel') : (t.voice || 'marin')}
+                      {t.stsEngine === 'elevenlabs'
+                        ? 'ElevenLabs STS'
+                        : t.stsEngine === 'openai_live'
+                          ? 'OpenAI Live'
+                          : 'OpenAI Realtime'}{' '}
+                      · {t.stsEngine === 'elevenlabs' ? (t.elevenlabsVoiceId || 'Rachel') : (t.voice || 'marin')}
                     </div>
                   </div>
                 </div>

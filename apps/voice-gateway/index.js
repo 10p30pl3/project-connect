@@ -44,9 +44,10 @@ const aiProviderManager = require('./utils/ai-provider-manager');
 const ElevenLabsS2SBridge = require('./media/elevenlabs-s2s-bridge');
 const { sendVollPlanWebhook } = require('./utils/voll-webhook');
 const { buildConnectorEvent } = require('./utils/voll-contract');
+const { buildOpenAiSessionUpdate, normalizeStsEngine } = require('./utils/openai-session-params');
 
 function createAiBridge(tenant, sipHeaders) {
-  const engine = (tenant?.stsEngine || 'openai').toLowerCase();
+  const engine = normalizeStsEngine(tenant?.stsEngine);
   if (engine === 'elevenlabs') {
     return new ElevenLabsS2SBridge(tenant, sipHeaders, { callHistoryManager });
   }
@@ -1407,48 +1408,13 @@ class OpenAIS2SBridge {
       return;
     }
 
-    // 6. Envia configuração da sessão compatível com OpenAI Realtime GA (type: 'realtime')
-    const sessionUpdate = {
-      type: 'session.update',
-      session: {
-        type: 'realtime',
-        audio: {
-          input: {
-            transcription: {
-              model: 'whisper-1',
-              language: 'pt',
-              prompt: 'Voll, Voll Solutions, atendimento ao cliente, inteligência artificial, automações, planos, quanto custa, demonstração'
-            },
-            turn_detection: {
-              type: 'server_vad',
-              threshold: vadThreshold,
-              prefix_padding_ms: prefixPaddingMs,
-              silence_duration_ms: silenceDurationMs
-            }
-          }
-        }
-      }
-    };
-
-    if (this.useG711) {
-      sessionUpdate.session.audio.input.format = { type: 'audio/pcmu' };
-      sessionUpdate.session.audio.output = {
-        format: { type: 'audio/pcmu' }
-      };
-    }
-
-    if (this.tenant.voice) {
-      sessionUpdate.session.audio.output = {
-        ...(sessionUpdate.session.audio.output || {}),
-        voice: this.tenant.voice
-      };
-    }
-
-    if (this.tenant.instructions) {
-      sessionUpdate.session.instructions = this.tenant.instructions;
-    } else if (this.tenant.openaiPromptId) {
-      sessionUpdate.session.prompt = { id: this.tenant.openaiPromptId };
-    }
+    // 6. Envia configuração da sessão compatível com OpenAI Realtime / Live (type: 'realtime')
+    const sessionUpdate = buildOpenAiSessionUpdate(this.tenant, {
+      useG711: this.useG711,
+      vadThreshold,
+      prefixPaddingMs,
+      silenceDurationMs
+    });
 
     const outcomeTool = buildOutcomeToolSchema(
       this.tenant?._activeAllowedTabulations,

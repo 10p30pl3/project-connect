@@ -12,9 +12,11 @@ import type {
   CampaignStatus,
   CampaignTemplate,
   CampaignTemplateCreate,
+  ChannelTechnicalOverrides,
   ChannelType,
   ColumnMapping,
   ConnectionChannelType,
+  ConnectionTestResult,
   EnrollmentState,
   JourneyStep,
   OperationCalendar,
@@ -192,6 +194,13 @@ export type Connection = {
   endpointUrl?: string | null;
   callerId?: string | null;
   authToken?: string | null;
+  hasAuthToken?: boolean;
+  authTokenMasked?: string | null;
+  hasVoiceAppToken?: boolean;
+  voiceAppTokenMasked?: string | null;
+  hasSmtpPassword?: boolean;
+  smtpPasswordMasked?: string | null;
+  technical?: ChannelTechnicalOverrides | null;
   simulation?: Simulation | null;
   webrtcMode?: WebRtcMode;
   publicWidgetKey?: string | null;
@@ -204,6 +213,7 @@ export type Connection = {
   whatsappAppSecretMasked?: string | null;
   whatsappAccessTokenMasked?: string | null;
 };
+export type { ConnectionTestResult };
 export type JourneyStepView = JourneyStep & { connectionName?: string };
 export type Journey = { id: string; name: string; latestVersion: { id: string; version: number; steps: JourneyStepView[] } | null };
 export type StrategyVersion = { id: string; version: number; config: StrategyConfig; publishedAt: string };

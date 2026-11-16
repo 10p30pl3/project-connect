@@ -339,6 +339,78 @@ export const JourneyVersionCreateSchema = z.object({
 });
 export type JourneyVersionCreate = z.infer<typeof JourneyVersionCreateSchema>;
 
+export const ChannelTechnicalOverridesSchema = z.object({
+  whatsapp: z
+    .object({
+      apiBaseUrl: z.string().max(300).optional(),
+      apiVersion: z.string().max(32).optional(),
+      webhookUrl: z.string().max(300).optional(),
+    })
+    .optional(),
+  voice: z
+    .object({
+      sipServer: z.string().max(200).optional(),
+      sipPort: z.number().int().min(1).max(65535).optional(),
+      sipTransport: z.enum(['UDP', 'TCP', 'TLS']).optional(),
+      outboundProxy: z.string().max(200).optional(),
+      webrtcGatewayUrl: z.string().max(300).optional(),
+      cdrWebhookUrl: z.string().max(300).optional(),
+      voiceAppBaseUrl: z.string().max(300).optional(),
+      voiceAppToken: z.string().max(512).nullable().optional(),
+      maxConcurrent: z.number().int().min(1).max(10000).optional(),
+      maxConcurrentPerWorkspace: z.number().int().min(1).max(10000).optional(),
+    })
+    .optional(),
+  sms: z
+    .object({
+      smppHost: z.string().max(200).optional(),
+      smppPort: z.number().int().min(1).max(65535).optional(),
+      systemType: z.string().max(80).optional(),
+      dlrWebhookUrl: z.string().max(300).optional(),
+      defaultSenderId: z.string().max(60).optional(),
+    })
+    .optional(),
+  email: z
+    .object({
+      smtpHost: z.string().max(200).optional(),
+      smtpPort: z.number().int().min(1).max(65535).optional(),
+      smtpSecurity: z.enum(['STARTTLS', 'SSL', 'TLS']).optional(),
+      smtpUser: z.string().max(200).optional(),
+      smtpPassword: z.string().max(512).nullable().optional(),
+      fromAddress: z.string().max(200).optional(),
+      fromName: z.string().max(120).optional(),
+      eventsWebhookUrl: z.string().max(300).optional(),
+    })
+    .optional(),
+  rcs: z
+    .object({
+      rbmApiUrl: z.string().max(300).optional(),
+      agentId: z.string().max(200).optional(),
+      webhookUrl: z.string().max(300).optional(),
+    })
+    .optional(),
+});
+export type ChannelTechnicalOverrides = z.infer<typeof ChannelTechnicalOverridesSchema>;
+
+export const ConnectionTestRequestSchema = z.object({
+  channelType: z.enum(CONNECTION_CHANNEL_TYPES).optional(),
+  provider: z.string().optional(),
+  endpointUrl: z.string().nullable().optional(),
+  authToken: z.string().nullable().optional(),
+  technical: ChannelTechnicalOverridesSchema.nullable().optional(),
+});
+export type ConnectionTestRequest = z.infer<typeof ConnectionTestRequestSchema>;
+
+export const ConnectionTestResultSchema = z.object({
+  ok: z.boolean(),
+  channelType: z.enum(CONNECTION_CHANNEL_TYPES),
+  status: z.string(),
+  code: z.number().int(),
+  latencyMs: z.number().int().min(0),
+  details: z.string(),
+});
+export type ConnectionTestResult = z.infer<typeof ConnectionTestResultSchema>;
+
 export const ConnectionUpdateSchema = z.object({
   name: z.string().min(1).optional(),
   tariff: z.number().min(0).nullable().optional(),
@@ -356,6 +428,7 @@ export const ConnectionUpdateSchema = z.object({
   whatsappAppSecret: z.string().max(240).nullable().optional(),
   whatsappAccessToken: z.string().max(512).nullable().optional(),
   rotateWidgetKey: z.boolean().optional(),
+  technical: ChannelTechnicalOverridesSchema.nullable().optional(),
   simulation: z
     .object({
       /** pesos por resultado simulado */
@@ -375,6 +448,7 @@ export const ConnectionCreateSchema = z.object({
   name: z.string().min(1, 'Informe o nome da conexão').max(100),
   channelType: z.enum(CONNECTION_CHANNEL_TYPES),
   provider: z.string().min(1).default('SIMULATED'),
+  active: z.boolean().optional(),
   tariff: z.number().min(0, 'A tarifa deve ser maior ou igual a zero').nullable().optional(),
   endpointUrl: z.string().nullable().optional(),
   callerId: z.string().nullable().optional(),
@@ -387,6 +461,7 @@ export const ConnectionCreateSchema = z.object({
   whatsappVerifyToken: z.string().max(160).nullable().optional(),
   whatsappAppSecret: z.string().max(240).nullable().optional(),
   whatsappAccessToken: z.string().max(512).nullable().optional(),
+  technical: ChannelTechnicalOverridesSchema.nullable().optional(),
   simulation: z
     .object({
       outcomes: z.record(z.string(), z.number().min(0)),
@@ -917,6 +992,14 @@ export const VoiceAgentSchema = z
   });
 export type VoiceAgent = z.infer<typeof VoiceAgentSchema>;
 
+export const STS_ENGINES = ['openai', 'openai_live', 'elevenlabs'] as const;
+export type StsEngine = (typeof STS_ENGINES)[number];
+export const STS_ENGINE_LABEL: Record<StsEngine, string> = {
+  openai: 'OpenAI Realtime',
+  openai_live: 'OpenAI Live',
+  elevenlabs: 'ElevenLabs STS',
+};
+
 /**
  * Agente publicado no gateway (`PUT /v1/tenants/:connectionId`). O tenant do gateway passa a ser a
  * conexão de voz do Voll Plan, que pertence a um único workspace.
@@ -927,11 +1010,28 @@ export const VoiceAgentTenantSchema = z
     name: z.string().min(1),
     vollWorkspaceId: z.string().uuid(),
     vollAgentVersion: z.number().int().min(1),
-    stsEngine: z.enum(['openai', 'elevenlabs']),
+    stsEngine: z.enum(STS_ENGINES),
     openaiModel: z.string().optional(),
+    openaiPromptId: z.string().max(120).nullable().optional(),
+    openaiVadType: z.enum(['server_vad', 'semantic_vad']).optional(),
+    openaiVadEagerness: z.enum(['low', 'medium', 'high', 'auto']).optional(),
+    openaiTemperature: z.number().min(0.6).max(1.2).optional(),
+    openaiSpeed: z.number().min(0.25).max(1.5).optional(),
+    openaiMaxOutputTokens: z.number().int().min(64).max(4096).nullable().optional(),
+    openaiTranscriptionModel: z.enum(['whisper-1', 'gpt-4o-mini-transcribe', 'gpt-4o-transcribe']).optional(),
+    openaiTranscriptionLanguage: z.enum(['pt', 'en', 'es', 'auto']).optional(),
+    openaiInterruptResponse: z.boolean().optional(),
+    vadThreshold: z.number().min(0.1).max(0.95).optional(),
+    prefixPaddingMs: z.number().int().min(0).max(1000).optional(),
+    silenceDurationMs: z.number().int().min(100).max(2000).optional(),
     voice: z.string().optional(),
+    elevenlabsAgentId: z.string().max(120).nullable().optional(),
     elevenlabsVoiceId: z.string().optional(),
     elevenlabsModel: z.string().optional(),
+    elevenlabsStability: z.number().min(0).max(1).optional(),
+    elevenlabsSimilarityBoost: z.number().min(0).max(1).optional(),
+    elevenlabsSpeed: z.number().min(0.7).max(1.2).optional(),
+    elevenlabsOptimizeLatency: z.number().int().min(0).max(4).optional(),
     instructions: z.string().min(20),
     greetingInstructions: z.string().nullable(),
     firstMessageMode: z.enum(['assistant-speaks-first', 'assistant-waits-for-user']).optional(),

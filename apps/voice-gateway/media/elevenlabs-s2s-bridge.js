@@ -376,8 +376,25 @@ class ElevenLabsS2SBridge extends EventEmitter {
             if (greetingText) {
               agentOverride.first_message = String(greetingText);
             }
-            if (Object.keys(agentOverride).length > 0) {
-              initPayload.conversation_config_override = { agent: agentOverride };
+            const ttsOverride = {};
+            if (this.tenant.elevenlabsVoiceId) ttsOverride.voice_id = String(this.tenant.elevenlabsVoiceId);
+            if (Number.isFinite(Number(this.tenant.elevenlabsStability))) {
+              ttsOverride.stability = Math.min(1, Math.max(0, Number(this.tenant.elevenlabsStability)));
+            }
+            if (Number.isFinite(Number(this.tenant.elevenlabsSimilarityBoost))) {
+              ttsOverride.similarity_boost = Math.min(1, Math.max(0, Number(this.tenant.elevenlabsSimilarityBoost)));
+            }
+            if (Number.isFinite(Number(this.tenant.elevenlabsSpeed))) {
+              ttsOverride.speed = Math.min(1.2, Math.max(0.7, Number(this.tenant.elevenlabsSpeed)));
+            }
+            if (Number.isFinite(Number(this.tenant.elevenlabsOptimizeLatency))) {
+              ttsOverride.optimize_streaming_latency = Math.min(4, Math.max(0, Math.round(Number(this.tenant.elevenlabsOptimizeLatency))));
+            }
+            if (Object.keys(agentOverride).length > 0 || Object.keys(ttsOverride).length > 0) {
+              initPayload.conversation_config_override = {
+                ...(Object.keys(agentOverride).length > 0 ? { agent: agentOverride } : {}),
+                ...(Object.keys(ttsOverride).length > 0 ? { tts: ttsOverride } : {}),
+              };
             }
           }
 

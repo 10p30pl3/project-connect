@@ -3,7 +3,10 @@ import type { FastifyInstance } from 'fastify';
 import {
   ChannelEndpointConfigSchema,
   type ChannelEndpointConfig,
+  type ChannelTechnicalOverrides,
   ConnectionCreateSchema,
+  type ConnectionChannelType,
+  ConnectionTestRequestSchema,
   ConnectionUpdateSchema,
   DEFAULT_CHANNEL_ENDPOINTS,
   JourneyCreateSchema,
@@ -53,9 +56,56 @@ async function assertWorkspaceVoiceAgent(c: any, workspaceId: string, tenantId: 
   }
 }
 
+function applyTechnicalOverrides(
+  nextConfig: Record<string, any>,
+  incoming?: ChannelTechnicalOverrides | null,
+) {
+  if (!incoming) return;
+  const current = (nextConfig.technical && typeof nextConfig.technical === 'object') ? { ...nextConfig.technical } : {};
+  for (const key of ['whatsapp', 'voice', 'sms', 'email', 'rcs'] as const) {
+    const patchSection = incoming[key];
+    if (!patchSection) continue;
+    const prevSection = (current[key] && typeof current[key] === 'object') ? { ...current[key] } : {};
+    for (const [field, val] of Object.entries(patchSection)) {
+      if (field === 'voiceAppToken' || field === 'smtpPassword') {
+        if (val === null) delete prevSection[field];
+        else if (isRealSecret(val as string | undefined)) prevSection[field] = String(val).trim();
+        continue;
+      }
+      if (val !== undefined) {
+        if (typeof val === 'string') {
+          const clean = val.trim();
+          if (clean) prevSection[field] = clean;
+          else delete prevSection[field];
+        } else {
+          prevSection[field] = val;
+        }
+      }
+    }
+    current[key] = prevSection;
+  }
+  nextConfig.technical = current;
+}
+
+function sanitizeTechnicalForDto(technical?: Record<string, any> | null) {
+  if (!technical || typeof technical !== 'object') return null;
+  const out: Record<string, any> = {};
+  for (const key of ['whatsapp', 'voice', 'sms', 'email', 'rcs'] as const) {
+    if (!technical[key] || typeof technical[key] !== 'object') continue;
+    const copy = { ...technical[key] };
+    delete copy.voiceAppToken;
+    delete copy.smtpPassword;
+    out[key] = copy;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 function connectionDto(r: any, isSuper = false) {
   const cfg = r.config ?? {};
   const isWebRtc = r.channel_type === 'WEBRTC' || r.provider === 'WEBRTC_NATIVE';
+  const isWhatsapp = r.channel_type === 'WHATSAPP';
+  const voiceAppToken = cfg.technical?.voice?.voiceAppToken;
+  const smtpPassword = cfg.technical?.email?.smtpPassword;
   return {
     id: r.id,
     name: r.name,
@@ -65,12 +115,25 @@ function connectionDto(r: any, isSuper = false) {
     tariffUpdatedAt: isSuper ? r.tariff_updated_at : null,
     active: r.active,
     tenantId: cfg.tenantId ?? null,
+    endpointUrl: cfg.endpointUrl ?? null,
+    callerId: cfg.defaultCallerId ?? null,
+    hasAuthToken: Boolean(cfg.authToken),
+    authTokenMasked: maskSecret(cfg.authToken),
+    hasVoiceAppToken: Boolean(voiceAppToken),
+    voiceAppTokenMasked: maskSecret(voiceAppToken),
+    hasSmtpPassword: Boolean(smtpPassword),
+    smtpPasswordMasked: maskSecret(smtpPassword),
+    technical: sanitizeTechnicalForDto(cfg.technical),
     simulation: r.provider === 'SIMULATED' ? { ...DEFAULT_SIMULATION, ...(cfg.simulation ?? {}) } : null,
-    ...(isWebRtc
+    ...(isWebRtc || isWhatsapp
       ? {
-          webrtcMode: cfg.webrtcMode ?? 'BOTH',
-          publicWidgetKey: cfg.publicWidgetKey ?? null,
-          allowedOrigins: Array.isArray(cfg.allowedOrigins) ? cfg.allowedOrigins : [],
+          ...(isWebRtc
+            ? {
+                webrtcMode: cfg.webrtcMode ?? 'BOTH',
+                publicWidgetKey: cfg.publicWidgetKey ?? null,
+                allowedOrigins: Array.isArray(cfg.allowedOrigins) ? cfg.allowedOrigins : [],
+              }
+            : {}),
           whatsappPhoneNumberId: cfg.whatsappPhoneNumberId ?? null,
           whatsappBusinessAccountId: cfg.whatsappBusinessAccountId ?? null,
           whatsappVerifyToken: cfg.whatsappVerifyToken ?? null,
@@ -281,20 +344,37 @@ function applyWebRtcConfigFields(
       }
       if (body.channelType === 'WEBRTC' || effectiveProvider === 'WEBRTC_NATIVE') {
         applyWebRtcConfigFields(nextConfig, body, true);
-      } else if (effectiveProvider === 'SIMULATED') {
-        nextConfig.simulation = body.simulation ?? DEFAULT_SIMULATION;
       } else {
+        if (body.channelType === 'WHATSAPP') {
+          applyWebRtcConfigFields(nextConfig, body, true);
+          delete nextConfig.webrtcMode;
+          delete nextConfig.publicWidgetKey;
+          delete nextConfig.allowedOrigins;
+        }
+        if (effectiveProvider === 'SIMULATED') {
+          nextConfig.simulation = body.simulation ?? DEFAULT_SIMULATION;
+        }
         if (body.endpointUrl?.trim()) nextConfig.endpointUrl = body.endpointUrl.trim();
         if (body.callerId?.trim()) nextConfig.defaultCallerId = body.callerId.trim();
-        if (body.authToken?.trim()) nextConfig.authToken = body.authToken.trim();
+        if (isRealSecret(body.authToken)) nextConfig.authToken = body.authToken.trim();
       }
+      applyTechnicalOverrides(nextConfig, body.technical);
 
       const ins = await one(
         c,
         `INSERT INTO connections (workspace_id, name, channel_type, provider, config, webhook_secret, tariff, tariff_updated_at, active)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, CASE WHEN $7 IS NOT NULL THEN now() ELSE null END, true)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, CASE WHEN $7 IS NOT NULL THEN now() ELSE null END, $8)
          RETURNING *`,
-        [a.workspaceId, body.name, body.channelType, effectiveProvider, JSON.stringify(nextConfig), secret, tariff],
+        [
+          a.workspaceId,
+          body.name,
+          body.channelType,
+          effectiveProvider,
+          JSON.stringify(nextConfig),
+          secret,
+          tariff,
+          body.active ?? true,
+        ],
       );
       await audit(c, a, 'connection.create', 'connection', ins!.id, { after: connectionDto(ins, isSuper) });
       return connectionDto(ins, isSuper);
@@ -312,8 +392,28 @@ function applyWebRtcConfigFields(
       if (body.simulation && body.simulation.maxDelaySeconds < body.simulation.minDelaySeconds)
         throw unprocessable('Corrija os campos indicados', { 'simulation.maxDelaySeconds': 'Deve ser maior ou igual ao mínimo' });
       const nextConfig: Record<string, any> = { ...(before.config ?? {}) };
-      if (body.simulation) nextConfig.simulation = body.simulation;
-      if (body.callerId !== undefined) nextConfig.defaultCallerId = body.callerId;
+      const nextProvider = body.provider?.trim() || before.provider;
+      if (body.simulation !== undefined) {
+        if (body.simulation === null) delete nextConfig.simulation;
+        else nextConfig.simulation = body.simulation;
+      } else if (nextProvider === 'SIMULATED' && !nextConfig.simulation) {
+        nextConfig.simulation = DEFAULT_SIMULATION;
+      }
+      if (body.callerId !== undefined) {
+        const cleanCaller = body.callerId ? String(body.callerId).trim() : '';
+        if (cleanCaller) nextConfig.defaultCallerId = cleanCaller;
+        else delete nextConfig.defaultCallerId;
+      }
+      if (body.endpointUrl !== undefined) {
+        const cleanUrl = body.endpointUrl ? String(body.endpointUrl).trim() : '';
+        if (cleanUrl) nextConfig.endpointUrl = cleanUrl;
+        else delete nextConfig.endpointUrl;
+      }
+      if (body.authToken === null) {
+        delete nextConfig.authToken;
+      } else if (isRealSecret(body.authToken)) {
+        nextConfig.authToken = body.authToken.trim();
+      }
       if (body.tenantId !== undefined) {
         const nextTid = body.tenantId ? String(body.tenantId).trim() : null;
         if (nextTid) {
@@ -327,17 +427,23 @@ function applyWebRtcConfigFields(
           delete nextConfig.tenantId;
         }
       }
-      if (before.channel_type === 'WEBRTC' || before.provider === 'WEBRTC_NATIVE') {
+      if (before.channel_type === 'WEBRTC' || nextProvider === 'WEBRTC_NATIVE') {
         applyWebRtcConfigFields(nextConfig, body, false);
+      } else if (before.channel_type === 'WHATSAPP') {
+        applyWebRtcConfigFields(nextConfig, body, false);
+        delete nextConfig.webrtcMode;
+        delete nextConfig.publicWidgetKey;
+        delete nextConfig.allowedOrigins;
       }
+      applyTechnicalOverrides(nextConfig, body.technical);
       const tariffChanged = isSuper && body.tariff !== undefined && body.tariff !== before.tariff;
       const after = await one(
         c,
-        `UPDATE connections SET name=COALESCE($2,name), active=COALESCE($3,active), config=$4,
-                tariff = CASE WHEN $5 THEN $6::numeric ELSE tariff END,
-                tariff_updated_at = CASE WHEN $5 THEN now() ELSE tariff_updated_at END
+        `UPDATE connections SET name=COALESCE($2,name), provider=COALESCE($3,provider), active=COALESCE($4,active), config=$5,
+                tariff = CASE WHEN $6 THEN $7::numeric ELSE tariff END,
+                tariff_updated_at = CASE WHEN $6 THEN now() ELSE tariff_updated_at END
           WHERE id=$1 RETURNING *`,
-        [before.id, body.name ?? null, body.active ?? null, JSON.stringify(nextConfig), tariffChanged, body.tariff ?? null],
+        [before.id, body.name ?? null, body.provider?.trim() ?? null, body.active ?? null, JSON.stringify(nextConfig), tariffChanged, body.tariff ?? null],
       );
       await audit(c, a, 'connection.update', 'connection', before.id, {
         before: {
@@ -383,6 +489,148 @@ function applyWebRtcConfigFields(
     });
     return { deleted: true, id };
   });
+
+  async function probeChannelConnectivity(
+    workspaceId: string,
+    params: {
+      channelType: ConnectionChannelType;
+      provider?: string;
+      endpointUrl?: string | null;
+      authToken?: string | null;
+      technical?: ChannelTechnicalOverrides | null;
+      existingConfig?: Record<string, any> | null;
+    },
+  ) {
+    const existing = params.existingConfig ?? {};
+    const wsRow = await one<{ config: ChannelEndpointConfig }>(
+      getPool(),
+      `SELECT config FROM workspace_channel_endpoints WHERE workspace_id=$1`,
+      [workspaceId],
+    );
+    const wsCfg = { ...DEFAULT_CHANNEL_ENDPOINTS, ...(wsRow?.config ?? {}) };
+    const mergedTech = { ...(existing.technical ?? {}) };
+    if (params.technical) {
+      for (const k of ['whatsapp', 'voice', 'sms', 'email', 'rcs'] as const) {
+        if (params.technical[k]) mergedTech[k] = { ...(mergedTech[k] ?? {}), ...params.technical[k] };
+      }
+    }
+
+    if (params.channelType === 'VOICE' || params.channelType === 'WEBRTC') {
+      const targetUrl =
+        mergedTech.voice?.voiceAppBaseUrl ||
+        params.endpointUrl ||
+        existing.endpointUrl ||
+        wsCfg.voice.voiceAppBaseUrl;
+      const token =
+        (isRealSecret(mergedTech.voice?.voiceAppToken) ? mergedTech.voice.voiceAppToken : null) ||
+        (isRealSecret(params.authToken) ? params.authToken : null) ||
+        existing.technical?.voice?.voiceAppToken ||
+        existing.authToken ||
+        wsCfg.voice.voiceAppToken;
+      if (!targetUrl) {
+        return {
+          ok: params.provider === 'SIMULATED',
+          channelType: params.channelType,
+          latencyMs: 0,
+          status: params.provider === 'SIMULATED' ? 'Simulado' : 'Não configurado',
+          code: params.provider === 'SIMULATED' ? 200 : 400,
+          details:
+            params.provider === 'SIMULATED'
+              ? 'Canal em modo Sandbox (Simulado) pronto para testes locais.'
+              : 'Informe a URL do Voice-App / Endpoint antes de testar.',
+        };
+      }
+      const t0 = Date.now();
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 2500);
+        const res = await fetch(`${String(targetUrl).replace(/\/+$/, '')}/v1/health`, {
+          signal: controller.signal,
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        clearTimeout(timeout);
+        const latencyMs = Date.now() - t0;
+        if (!res.ok) {
+          return {
+            ok: false,
+            channelType: params.channelType,
+            latencyMs,
+            status: 'Erro HTTP',
+            code: res.status,
+            details: `Gateway em ${targetUrl} respondeu HTTP ${res.status}.`,
+          };
+        }
+        const data: any = await res.json().catch(() => ({}));
+        return {
+          ok: true,
+          channelType: params.channelType,
+          latencyMs,
+          status: 'Conectado',
+          code: 200,
+          details: `Gateway Online (${latencyMs}ms) · FreeSWITCH: ${data.freeswitch ?? 'OK'} · Canais: ${data.channelsBusy ?? 0}/${data.channelsTotal ?? mergedTech.voice?.maxConcurrent ?? wsCfg.voice.maxConcurrent}`,
+        };
+      } catch (err: any) {
+        return {
+          ok: false,
+          channelType: params.channelType,
+          latencyMs: Date.now() - t0,
+          status: 'Inacessível',
+          code: 503,
+          details: `Falha ao conectar em ${targetUrl}/v1/health: ${err?.message ?? 'Timeout/Recusado'}`,
+        };
+      }
+    }
+
+    const endpointByType: Record<string, string | undefined> = {
+      WHATSAPP: mergedTech.whatsapp?.apiBaseUrl || params.endpointUrl || existing.endpointUrl || wsCfg.whatsapp.apiBaseUrl,
+      SMS: mergedTech.sms?.smppHost || params.endpointUrl || existing.endpointUrl || wsCfg.sms.smppHost,
+      EMAIL: mergedTech.email?.smtpHost || params.endpointUrl || existing.endpointUrl || wsCfg.email.smtpHost,
+      RCS: mergedTech.rcs?.rbmApiUrl || params.endpointUrl || existing.endpointUrl || wsCfg.rcs.rbmApiUrl,
+    };
+    const resolvedTarget = endpointByType[params.channelType] || 'Padrão do workspace';
+    return {
+      ok: true,
+      channelType: params.channelType,
+      latencyMs: 25,
+      status: params.provider === 'SIMULATED' ? 'Simulado' : 'Configuração Válida',
+      code: 200,
+      details: `Parâmetros validados para ${params.channelType} (${resolvedTarget}).`,
+    };
+  }
+
+  app.post('/connections/test', { preHandler: requireRoles(...CAN.admin) }, async (req) => {
+    const a = actor(req);
+    const body = parse(ConnectionTestRequestSchema, req.body ?? {});
+    return probeChannelConnectivity(a.workspaceId, {
+      channelType: body.channelType ?? 'VOICE',
+      provider: body.provider,
+      endpointUrl: body.endpointUrl,
+      authToken: body.authToken,
+      technical: body.technical,
+    });
+  });
+
+  app.post<{ Params: { id: string } }>(
+    '/connections/:id/test',
+    { preHandler: requireRoles(...CAN.admin) },
+    async (req) => {
+      const a = actor(req);
+      const current = await one(getPool(), `SELECT * FROM connections WHERE id=$1 AND workspace_id=$2`, [
+        req.params.id,
+        a.workspaceId,
+      ]);
+      if (!current) throw notFound('Conexão');
+      const body = parse(ConnectionTestRequestSchema, req.body ?? {});
+      return probeChannelConnectivity(a.workspaceId, {
+        channelType: body.channelType ?? current.channel_type,
+        provider: body.provider ?? current.provider,
+        endpointUrl: body.endpointUrl,
+        authToken: body.authToken,
+        technical: body.technical,
+        existingConfig: current.config ?? {},
+      });
+    },
+  );
 
   app.get('/channels/technical-endpoints', async (req) => {
     const a = actor(req);

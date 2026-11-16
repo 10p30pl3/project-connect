@@ -81,6 +81,8 @@ export type RecordingItem = {
   transcriptFile?: string | null;
 };
 
+export type StsEngine = 'openai' | 'openai_live' | 'elevenlabs';
+
 export type TenantConfig = {
   id: string;
   name?: string;
@@ -88,13 +90,28 @@ export type TenantConfig = {
   dids?: string[];
   instructions?: string;
   greetingInstructions?: string | null;
-  stsEngine?: 'openai' | 'elevenlabs' | string;
+  stsEngine?: StsEngine | string;
   openaiPromptId?: string | null;
   voice?: string;
   openaiModel?: string;
+  openaiVadType?: 'server_vad' | 'semantic_vad';
+  openaiVadEagerness?: 'low' | 'medium' | 'high' | 'auto';
+  openaiTemperature?: number;
+  openaiSpeed?: number;
+  openaiMaxOutputTokens?: number | null;
+  openaiTranscriptionModel?: 'whisper-1' | 'gpt-4o-mini-transcribe' | 'gpt-4o-transcribe';
+  openaiTranscriptionLanguage?: 'pt' | 'en' | 'es' | 'auto';
+  openaiInterruptResponse?: boolean;
+  vadThreshold?: number;
+  prefixPaddingMs?: number;
+  silenceDurationMs?: number;
   elevenlabsAgentId?: string | null;
   elevenlabsModel?: string;
   elevenlabsVoiceId?: string;
+  elevenlabsStability?: number;
+  elevenlabsSimilarityBoost?: number;
+  elevenlabsSpeed?: number;
+  elevenlabsOptimizeLatency?: number;
   maxConcurrentCalls?: number;
   maxCallsPerSecond?: number;
   maxDurationSec?: number;
