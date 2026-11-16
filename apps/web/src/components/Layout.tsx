@@ -141,6 +141,34 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
     title: 'Configuração',
     items: [
       {
+        to: '/agentes-de-voz',
+        label: 'Agentes de Voz',
+        icon: <Bot className={ico} aria-hidden />,
+        matchPrefixes: ['/agentes-de-voz'],
+        minMode: 'basic',
+      },
+      {
+        to: '/telefonia',
+        label: 'Gravações',
+        icon: <PhoneCall className={ico} aria-hidden />,
+        matchPrefixes: ['/telefonia'],
+        minMode: 'basic',
+      },
+      {
+        to: '/canais',
+        label: 'Canais',
+        icon: <Cable className={ico} aria-hidden />,
+        matchPrefixes: ['/canais'],
+        minMode: 'basic',
+      },
+      {
+        to: '/calendarios',
+        label: 'Calendários',
+        icon: <CalendarDays className={ico} aria-hidden />,
+        matchPrefixes: ['/calendarios'],
+        minMode: 'basic',
+      },
+      {
         to: '/jornadas',
         label: 'Jornadas',
         icon: <Compass className={ico} aria-hidden />,
@@ -155,46 +183,11 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
         minMode: 'advanced',
       },
       {
-        to: '/calendarios',
-        label: 'Calendários',
-        icon: <CalendarDays className={ico} aria-hidden />,
-        matchPrefixes: ['/calendarios'],
-        minMode: 'basic',
-      },
-      {
         to: '/tabulacoes',
         label: 'Tabulação',
         icon: <BookMarked className={ico} aria-hidden />,
         matchPrefixes: ['/tabulacoes'],
         minMode: 'advanced',
-      },
-      {
-        to: '/canais',
-        label: 'Canais',
-        icon: <Cable className={ico} aria-hidden />,
-        matchPrefixes: ['/canais'],
-        minMode: 'basic',
-      },
-      {
-        to: '/agentes-de-voz',
-        label: 'Agentes de Voz',
-        icon: <Bot className={ico} aria-hidden />,
-        matchPrefixes: ['/agentes-de-voz'],
-        minMode: 'basic',
-      },
-      {
-        to: '/rotas',
-        label: 'Rotas',
-        icon: <Route className={ico} aria-hidden />,
-        matchPrefixes: ['/rotas'],
-        minMode: 'advanced',
-      },
-      {
-        to: '/telefonia',
-        label: 'Telefonia',
-        icon: <PhoneCall className={ico} aria-hidden />,
-        matchPrefixes: ['/telefonia'],
-        minMode: 'basic',
       },
     ],
   },
@@ -210,7 +203,7 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       },
       {
         to: '/consumo',
-        label: 'Billing & Consumo',
+        label: 'Consumo',
         icon: <DollarSign className={ico} aria-hidden />,
         matchPrefixes: ['/consumo', '/billing'],
         minMode: 'basic',
@@ -616,7 +609,14 @@ export function Layout() {
                     const isParentDirectActive = isRouteActive(it.to, loc.pathname, loc.search, it.end);
                     const isPrefixMatched = it.matchPrefixes?.some((p) => loc.pathname === p || loc.pathname.startsWith(p + '/')) ?? false;
                     const isParentActive = isParentDirectActive || isAnySubActive || isPrefixMatched;
-                    const itemLabel = it.to === '/consumo' && !isSuper ? 'Consumo de Tempo' : it.label;
+                    const itemLabel =
+                      it.to === '/telefonia'
+                        ? !isAtLeast('advanced')
+                          ? 'Gravações'
+                          : 'Telefonia'
+                        : it.to === '/consumo' && !isSuper
+                          ? 'Consumo de Tempo'
+                          : it.label;
                     const itemIcon = it.to === '/consumo' && !isSuper ? <Clock className={ico} aria-hidden /> : it.icon;
 
                     return (

@@ -417,6 +417,12 @@ export function ChannelFormModal({ open, connection, isSuper, tenants, onClose }
             )}
           </div>
 
+          {isVoiceOrWebRtc && !tenantId && (
+            <Alert tone="warn">
+              Canal sem agente padrão definido. Para atender chamadas, vincule um Agente de Voz ou configure uma Rota de Entrada em Telefonia → Rotas.
+            </Alert>
+          )}
+
           {isVoiceOrWebRtc && !isWebRtc && (
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="BINA Padrão (Caller ID)" tooltip="Número exibido ao destinatário nas chamadas de saída.">

@@ -24,6 +24,10 @@ import type {
   ReasonCode,
   Role,
   StrategyConfig,
+  TelephonySetupStatus,
+  TelephonySetupStep,
+  TelephonySetupStepId,
+  TelephonySetupWarning,
   TrunkAvailability,
   UpdateCampaignInput,
   WebRtcMode,
@@ -213,7 +217,7 @@ export type Connection = {
   whatsappAppSecretMasked?: string | null;
   whatsappAccessTokenMasked?: string | null;
 };
-export type { ConnectionTestResult };
+export type { ConnectionTestResult, TelephonySetupStatus, TelephonySetupStep, TelephonySetupStepId, TelephonySetupWarning };
 export type JourneyStepView = JourneyStep & { connectionName?: string };
 export type Journey = { id: string; name: string; latestVersion: { id: string; version: number; steps: JourneyStepView[] } | null };
 export type StrategyVersion = { id: string; version: number; config: StrategyConfig; publishedAt: string };

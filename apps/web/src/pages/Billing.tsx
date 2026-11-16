@@ -324,7 +324,7 @@ export function BillingPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={isSuper ? 'Billing Multi-Tenant & Consumíveis' : 'Consumo de Tempo & Franquia'}
+        title="Consumo"
         tooltip={
           isSuper
             ? 'Visão financeira exclusiva do Super Admin com tarifas PSTN, custos OpenAI/ElevenLabs, consumíveis omnichannel, receita estimada e margem líquida por empresa.'

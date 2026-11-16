@@ -2383,6 +2383,117 @@ export async function handleMockApi<T = unknown>(
       }
     }
 
+    if (pathname === '/telephony/setup-status' && method === 'GET') {
+      const mode = searchParams.get('mode') === 'basic' ? 'basic' : 'advanced';
+      const activeTrunks = MOCK_TELEPHONY.trunks.filter((t: any) => t.active !== false);
+      const voiceConns = CONNECTIONS.filter((c) => (c.channelType === 'VOICE' || c.channelType === 'WEBRTC') && c.active);
+      const warnings: any[] = [];
+      for (const r of MOCK_TELEPHONY.outboundRoutes as any[]) {
+        if (r.enabled !== false && activeTrunks.length === 0) {
+          warnings.push({
+            code: 'outbound_route_without_trunk',
+            resourceId: r.id,
+            resourceName: r.name || r.id,
+            message: `Rota de saída "${r.name || r.id}" sem tronco SIP ativo.`,
+          });
+        }
+      }
+      for (const ch of voiceConns) {
+        const hasAgent = Boolean(ch.tenantId && MOCK_TELEPHONY.tenants.some((t: any) => t.id === ch.tenantId));
+        const hasRoute = (MOCK_TELEPHONY.routes as any[]).some(
+          (r) => r.active !== false && (!r.connectionId || r.connectionId === '*' || r.connectionId === ch.id),
+        );
+        if (!hasAgent && !hasRoute) {
+          warnings.push({
+            code: 'channel_without_coverage',
+            resourceId: ch.id,
+            resourceName: ch.name,
+            message: `Canal "${ch.name}" sem agente padrão e sem rota de entrada ativa.`,
+          });
+        }
+      }
+      const steps: any[] = [];
+      if (mode === 'advanced') {
+        steps.push({
+          id: 'trunk',
+          order: 1,
+          label: 'Tronco SIP',
+          status: activeTrunks.length > 0 ? 'complete' : 'pending',
+          optional: false,
+          readOnly: false,
+          reason: activeTrunks.length > 0 ? null : 'Nenhum tronco SIP cadastrado.',
+          href: '/telefonia?tab=trunks',
+          count: activeTrunks.length,
+        });
+      }
+      steps.push({
+        id: 'agent',
+        order: 2,
+        label: 'Agente de Voz',
+        status: MOCK_TELEPHONY.tenants.length > 0 ? 'complete' : 'pending',
+        optional: false,
+        readOnly: false,
+        reason: MOCK_TELEPHONY.tenants.length > 0 ? null : 'Nenhum agente criado.',
+        href: '/agentes-de-voz',
+        count: MOCK_TELEPHONY.tenants.length,
+      });
+      steps.push({
+        id: 'channel',
+        order: 3,
+        label: 'Canal (Voz / WebRTC)',
+        status: voiceConns.length === 0 ? 'pending' : warnings.some((w) => w.code === 'channel_without_coverage') ? 'problem' : 'complete',
+        optional: false,
+        readOnly: false,
+        reason: voiceConns.length === 0 ? 'Nenhum canal de voz ativo.' : null,
+        href: '/canais',
+        count: voiceConns.length,
+      });
+      if (mode === 'advanced') {
+        steps.push({
+          id: 'routes',
+          order: 4,
+          label: 'Rotas (Entrada / Saída)',
+          status: MOCK_TELEPHONY.routes.length + MOCK_TELEPHONY.outboundRoutes.length > 0 ? 'complete' : 'pending',
+          optional: false,
+          readOnly: false,
+          reason: null,
+          href: '/telefonia?tab=routes',
+          count: MOCK_TELEPHONY.routes.length + MOCK_TELEPHONY.outboundRoutes.length,
+        });
+        steps.push({
+          id: 'extension',
+          order: 5,
+          label: 'Ramal Interno (Opcional)',
+          status: MOCK_TELEPHONY.extensions.length > 0 ? 'complete' : 'pending',
+          optional: true,
+          readOnly: false,
+          reason: null,
+          href: '/telefonia?tab=extensions',
+          count: MOCK_TELEPHONY.extensions.length,
+        });
+      }
+      steps.push({
+        id: 'test',
+        order: 6,
+        label: 'Teste de Chamada',
+        status: MOCK_TELEPHONY.recordings.length > 0 ? 'complete' : 'pending',
+        optional: false,
+        readOnly: false,
+        reason: null,
+        href: '/?dial=1',
+        count: MOCK_TELEPHONY.recordings.length,
+      });
+      const actionable = steps.filter((s) => !s.optional && s.status !== 'complete');
+      return {
+        mode,
+        steps,
+        nextStepId: actionable[0]?.id ?? null,
+        pendingCount: actionable.length,
+        warnings,
+        partial: false,
+      } as T;
+    }
+
     if (pathname === '/telephony/routes' && method === 'GET') return { routes: MOCK_TELEPHONY.routes } as T;
     if (pathname === '/telephony/routes/reorder' && method === 'POST') {
       const ids: string[] = Array.isArray(body.ids) ? body.ids : [];

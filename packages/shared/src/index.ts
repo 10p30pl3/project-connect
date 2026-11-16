@@ -1588,5 +1588,73 @@ export const VoiceAgentUsageSummarySchema = z.object({
 });
 export type VoiceAgentUsageSummary = z.infer<typeof VoiceAgentUsageSummarySchema>;
 
+// ---------------------------------------------------------------------------
+// Ordem Guiada de Configuração de Telefonia + Catálogo OpenAI por Motor (009)
+// ---------------------------------------------------------------------------
+
+export const TELEPHONY_SETUP_ORDER = ['trunk', 'agent', 'channel', 'routes', 'extension', 'test'] as const;
+export const TelephonySetupStepIdSchema = z.enum(TELEPHONY_SETUP_ORDER);
+export type TelephonySetupStepId = z.infer<typeof TelephonySetupStepIdSchema>;
+
+export const TelephonySetupStepStatusSchema = z.enum(['pending', 'complete', 'problem']);
+export type TelephonySetupStepStatus = z.infer<typeof TelephonySetupStepStatusSchema>;
+
+export const TelephonySetupStepSchema = z.object({
+  id: TelephonySetupStepIdSchema,
+  order: z.number().int().min(1).max(6),
+  label: z.string(),
+  status: TelephonySetupStepStatusSchema,
+  optional: z.boolean(),
+  readOnly: z.boolean(),
+  reason: z.string().nullable(),
+  href: z.string().nullable(),
+  count: z.number().int().min(0),
+});
+export type TelephonySetupStep = z.infer<typeof TelephonySetupStepSchema>;
+
+export const TelephonySetupWarningCodeSchema = z.enum([
+  'outbound_route_without_trunk',
+  'inbound_route_agent_missing',
+  'inbound_route_agent_inactive',
+  'channel_without_coverage',
+]);
+export type TelephonySetupWarningCode = z.infer<typeof TelephonySetupWarningCodeSchema>;
+
+export const TelephonySetupWarningSchema = z.object({
+  code: TelephonySetupWarningCodeSchema,
+  resourceId: z.string(),
+  resourceName: z.string(),
+  message: z.string(),
+});
+export type TelephonySetupWarning = z.infer<typeof TelephonySetupWarningSchema>;
+
+export const TelephonySetupStatusSchema = z.object({
+  mode: z.enum(['basic', 'advanced']),
+  steps: z.array(TelephonySetupStepSchema),
+  nextStepId: TelephonySetupStepIdSchema.nullable(),
+  pendingCount: z.number().int().min(0),
+  warnings: z.array(TelephonySetupWarningSchema),
+  partial: z.boolean(),
+});
+export type TelephonySetupStatus = z.infer<typeof TelephonySetupStatusSchema>;
+
+export const OPENAI_ENGINE_MODELS: Record<
+  'openai' | 'openai_live',
+  { default: string; options: { id: string; label: string }[] }
+> = {
+  openai: {
+    default: 'gpt-realtime-2.1-mini',
+    options: [{ id: 'gpt-realtime-2.1-mini', label: 'gpt-realtime-2.1-mini (Rápido & Econômico)' }],
+  },
+  openai_live: {
+    default: 'gpt-live-1-mini',
+    options: [{ id: 'gpt-live-1-mini', label: 'gpt-live-1-mini (Rápido & Econômico)' }],
+  },
+};
+
+export function defaultOpenAiModel(engine: string | undefined | null): string {
+  return engine === 'openai_live' ? OPENAI_ENGINE_MODELS.openai_live.default : OPENAI_ENGINE_MODELS.openai.default;
+}
+
 
 

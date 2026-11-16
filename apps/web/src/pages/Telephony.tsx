@@ -8,10 +8,13 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  Cpu,
   Disc,
+  FlaskConical,
+  Network,
   PhoneCall,
   RefreshCw,
-  Settings,
+  Route,
   SlidersHorizontal,
   Smartphone,
 } from 'lucide-react';
@@ -20,10 +23,17 @@ import { get } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useExperienceMode } from '../lib/experience-mode';
 import { AdvancedMonitorModal } from '../components/AdvancedMonitorModal';
+import { TelephonySetupGuide } from '../components/TelephonySetupGuide';
 import { Badge, Button, PageHeader, Stat, Tabs } from '../components/ui';
 import { ExtensionsTab } from './telephony/ExtensionsTab';
 import { RecordingsTab } from './telephony/RecordingsTab';
-import { SettingsTabs } from './telephony/SettingsTabs';
+import {
+  AiProvidersAndCostsPanel,
+  InboundRoutesPanel,
+  OutboundRoutesPanel,
+  TrunksAndProvidersPanel,
+  VoiceFeaturesPanel,
+} from './telephony/SettingsTabs';
 import {
   fmtUptime,
   type AiProvider,
@@ -190,7 +200,7 @@ export function TelephonyPage() {
 
       {/* KPIs focados em Gravações, Infraestrutura SIP e Consumo */}
       <div className={`grid gap-3 sm:grid-cols-2 ${isAtLeast('advanced') ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}>
-        <Stat label="Gravações Estéreo" value={recsQ.data?.count ?? recsQ.data?.recordings?.length ?? 0} />
+        <Stat label="Gravações" value={recsQ.data?.count ?? recsQ.data?.recordings?.length ?? 0} />
         {isAtLeast('advanced') && (
           <Stat
             label="Ramais SIP"
@@ -213,21 +223,42 @@ export function TelephonyPage() {
         )}
       </div>
 
-      {/* Navegação Telefonia */}
+      <TelephonySetupGuide />
+
+      {/* Navegação Telefonia — ordem recomendada: Troncos → Rotas → Ramais → Gravações → Provedor IA → Motores DSP */}
       <Tabs
         value={tab}
         onValueChange={setTab}
         tabs={[
-          {
-            value: 'recordings',
-            label: (
-              <span className="inline-flex items-center gap-1.5">
-                <Disc className="size-3.5" aria-hidden />
-                {mode === 'basic' ? 'Gravações' : 'Gravações Estéreo'}
-              </span>
-            ),
-            content: <RecordingsTab />,
-          },
+          ...(isAtLeast('advanced') || tab === 'trunks' || tab === 'settings'
+            ? [
+                {
+                  value: 'trunks',
+                  label: (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Network className="size-3.5" aria-hidden />
+                      Troncos SIP &amp; Provedores
+                    </span>
+                  ),
+                  content: <TrunksAndProvidersPanel />,
+                },
+                {
+                  value: 'routes',
+                  label: (
+                    <span className="inline-flex items-center gap-1.5">
+                      <Route className="size-3.5" aria-hidden />
+                      Rotas
+                    </span>
+                  ),
+                  content: (
+                    <div className="space-y-6">
+                      <InboundRoutesPanel initialConnectionId={searchParams.get('connectionId') ?? undefined} />
+                      <OutboundRoutesPanel />
+                    </div>
+                  ),
+                },
+              ]
+            : []),
           ...(isAtLeast('advanced') || tab === 'extensions'
             ? [
                 {
@@ -242,18 +273,42 @@ export function TelephonyPage() {
                 },
               ]
             : []),
-          ...(isAtLeast('advanced') || tab === 'settings'
+          {
+            value: 'recordings',
+            label: (
+              <span className="inline-flex items-center gap-1.5">
+                <Disc className="size-3.5" aria-hidden />
+                Gravações
+              </span>
+            ),
+            content: <RecordingsTab />,
+          },
+          ...(isAtLeast('advanced') || tab === 'trunks' || tab === 'settings'
             ? [
                 {
-                  value: 'settings',
+                  value: 'ai',
                   label: (
                     <span className="inline-flex items-center gap-1.5">
-                      <Settings className="size-3.5" aria-hidden />
-                      Configurações
+                      <Cpu className="size-3.5" aria-hidden />
+                      {isSuper ? 'Provedor IA & Custos' : 'Chaves de IA (BYOK)'}
                     </span>
                   ),
-                  content: <SettingsTabs />,
+                  content: <AiProvidersAndCostsPanel />,
                 },
+                ...(isSuper
+                  ? [
+                      {
+                        value: 'dsp',
+                        label: (
+                          <span className="inline-flex items-center gap-1.5">
+                            <FlaskConical className="size-3.5" aria-hidden />
+                            Motores DSP &amp; 14 Features
+                          </span>
+                        ),
+                        content: <VoiceFeaturesPanel />,
+                      },
+                    ]
+                  : []),
               ]
             : []),
         ]}

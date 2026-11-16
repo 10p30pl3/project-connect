@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { OPENAI_ENGINE_MODELS, defaultOpenAiModel } from '@voll/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bot, ChevronDown, ChevronUp, Edit, PhoneOutgoing, Plus, RotateCcw, Trash2, Volume2 } from 'lucide-react';
-import { del, errorMessage, get, post, put } from '../../lib/api';
+import { API_BASE, del, errorMessage, get, post, put } from '../../lib/api';
 import { useAuth } from '../../lib/auth';
 import { useExperienceMode } from '../../lib/experience-mode';
 import {
@@ -43,16 +44,73 @@ const OPENAI_VOICES: { id: string; label: string; style: string; pitch: number; 
   { id: 'verse', label: 'Verse', style: 'Masculina · Jovem & Energética', pitch: 0.96, rate: 1.05 },
 ];
 
-function previewVoiceSample(voiceLabel: string, style: string, pitch = 1, rate = 1) {
+const ELEVENLABS_MODELS = [
+  { id: 'eleven_turbo_v2_5', label: 'eleven_turbo_v2_5 (Rápido & Multilíngue)' },
+  { id: 'eleven_flash_v2_5', label: 'eleven_flash_v2_5 (Latência Mínima)' },
+  { id: 'eleven_multilingual_v2', label: 'eleven_multilingual_v2 (Alta Expressividade)' },
+  { id: 'eleven_turbo_v2', label: 'eleven_turbo_v2 (Legado)' },
+];
+
+const ELEVENLABS_VOICES: { id: string; apiId: string; label: string; style: string; pitch: number; rate: number }[] = [
+  { id: 'Rachel', apiId: '21m00Tcm4TlvDq8ikWAM', label: 'Rachel', style: 'Feminina · Natural & Calma', pitch: 1.06, rate: 1.0 },
+  { id: 'Adam', apiId: 'pNInz6obpgDQGcFmaJgB', label: 'Adam', style: 'Masculina · Profissional & Firme', pitch: 0.88, rate: 0.98 },
+  { id: 'Bella', apiId: 'EXAVITQu4vr4xnSDxMaL', label: 'Bella', style: 'Feminina · Acolhedora & Suave', pitch: 1.12, rate: 0.98 },
+  { id: 'Antoni', apiId: 'ErXwobaYiN019PkySvjV', label: 'Antoni', style: 'Masculina · Dinâmica & Clara', pitch: 0.94, rate: 1.02 },
+  { id: 'Domi', apiId: 'AZnzlk1XvdvUeBnXmlld', label: 'Domi', style: 'Feminina · Assertiva & Executiva', pitch: 1.04, rate: 1.02 },
+  { id: 'Josh', apiId: 'TxGEqnHWrfWFTfGW9XjX', label: 'Josh', style: 'Masculina · Jovem & Conversacional', pitch: 0.96, rate: 1.04 },
+  { id: 'Arnold', apiId: 'VR6AewLTigWG4xSOukaG', label: 'Arnold', style: 'Masculina · Grave & Autoritária', pitch: 0.84, rate: 0.96 },
+  { id: 'Sam', apiId: 'yoZ06aMxZJJ28mfd3POQ', label: 'Sam', style: 'Masculina · Neutra & Equilibrada', pitch: 0.92, rate: 1.0 },
+];
+
+let activeSampleAudio: HTMLAudioElement | null = null;
+
+async function previewVoiceSample(
+  voiceLabel: string,
+  style: string,
+  pitch = 1,
+  rate = 1,
+  opts?: { engine?: StsEngine; voiceId?: string; model?: string },
+) {
+  const engine = opts?.engine ?? 'openai';
+  const voiceId = (opts?.voiceId || voiceLabel).trim();
+  const sampleText = `Olá! Eu sou a voz ${voiceLabel} da Voll Solutions. ${style.split('·')[0].trim()} para atendimento telefônico.`;
+
+  try {
+    if (activeSampleAudio) {
+      activeSampleAudio.pause();
+      activeSampleAudio = null;
+    }
+    const res = await fetch(`${API_BASE}/telephony/voice-preview`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        engine,
+        voice: engine === 'elevenlabs' ? voiceId : voiceId.toLowerCase(),
+        model: opts?.model,
+        text: sampleText,
+      }),
+    });
+    if (res.ok) {
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      activeSampleAudio = audio;
+      audio.onended = () => URL.revokeObjectURL(url);
+      await audio.play();
+      return;
+    }
+  } catch {
+    // fallback para Web Speech API caso TTS remoto não esteja disponível
+  }
+
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
   try {
     window.speechSynthesis.cancel();
-    const utt = new SpeechSynthesisUtterance(
-      `Olá! Eu sou a voz ${voiceLabel} da Voll Solutions. ${style.split('·')[0].trim()} para atendimento telefônico.`,
-    );
+    const utt = new SpeechSynthesisUtterance(sampleText);
     utt.lang = 'pt-BR';
-    utt.pitch = pitch;
-    utt.rate = rate;
+    utt.pitch = Math.max(0.5, Math.min(1.6, pitch));
+    utt.rate = Math.max(0.75, Math.min(1.3, rate));
     window.speechSynthesis.speak(utt);
   } catch {
     // ignore speech synthesis blocked
@@ -119,7 +177,7 @@ function toForm(t?: TenantConfig | null): TenantForm {
     dids: (t?.dids ?? ['*']).join(', '),
     stsEngine,
     voice: t?.voice ?? 'marin',
-    openaiModel: t?.openaiModel ?? (stsEngine === 'openai_live' ? 'gpt-realtime' : 'gpt-realtime-2.1-mini'),
+    openaiModel: t?.openaiModel?.trim() || defaultOpenAiModel(stsEngine),
     openaiPromptId: t?.openaiPromptId ?? '',
     openaiVadType: t?.openaiVadType ?? (stsEngine === 'openai_live' ? 'semantic_vad' : 'server_vad'),
     openaiVadEagerness: t?.openaiVadEagerness ?? 'medium',
@@ -295,6 +353,7 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
                 <tr>
                   <th>{mode === 'basic' ? 'Agente' : 'Agente / ID'}</th>
                   <th>Motor STS &amp; Voz</th>
+                  <th>Ramal Interno</th>
                   {isAtLeast('advanced') && <th>Ramal / DIDs</th>}
                   {isAtLeast('advanced') && <th>Pipeline (AMD/STT/Crosstalk)</th>}
                   <th>{mode === 'basic' ? 'Duração Máx.' : 'Limites'}</th>
@@ -334,6 +393,11 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
                             ? `${t.elevenlabsVoiceId || 'Rachel'} · ${t.elevenlabsModel || 'turbo_v2_5'}`
                             : `${t.voice || 'marin'} · ${t.openaiModel || 'gpt-realtime-mini'}`}
                         </div>
+                      </td>
+                      <td className="text-xs">
+                        <span className="font-mono font-semibold text-slate-800">
+                          {t.extension || (t.id === 'default' ? '9000' : '—')}
+                        </span>
                       </td>
                       {isAtLeast('advanced') && (
                         <td className="text-xs">
@@ -446,7 +510,7 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
         {editing && (
           <div className="space-y-4">
             {/* Camada Essencial */}
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-4">
               <Field label="Nome de Exibição" required>
                 {(f) => (
                   <Input
@@ -502,9 +566,10 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
                       let nextModel = editing.form.openaiModel;
                       if (nextEngine === 'openai_live' && prevEngine !== 'openai_live') {
                         if (editing.form.openaiVadType === 'server_vad') nextVadType = 'semantic_vad';
-                        if (editing.form.openaiModel === 'gpt-realtime-2.1-mini') nextModel = 'gpt-realtime';
+                        nextModel = defaultOpenAiModel('openai_live');
                       } else if (nextEngine === 'openai' && prevEngine === 'openai_live') {
                         if (editing.form.openaiVadType === 'semantic_vad') nextVadType = 'server_vad';
+                        nextModel = defaultOpenAiModel('openai');
                       }
                       setEditing({
                         ...editing,
@@ -523,24 +588,47 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
                   </Select>
                 )}
               </Field>
+              <Field label="Ramal Interno (ex: 9000)">
+                {(f) => (
+                  <Input
+                    id={f.id}
+                    value={editing.form.extension}
+                    onChange={(e) => setEditing({ ...editing, form: { ...editing.form, extension: e.target.value } })}
+                    placeholder="9000"
+                  />
+                )}
+              </Field>
             </div>
 
             {editing.form.stsEngine !== 'elevenlabs' ? (
               <div className="space-y-3">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Field label="Modelo OpenAI">
-                    {(f) => (
-                      <Select
-                        id={f.id}
-                        value={editing.form.openaiModel}
-                        onChange={(e) => setEditing({ ...editing, form: { ...editing.form, openaiModel: e.target.value } })}
-                      >
-                        <option value="gpt-realtime-2.1-mini">gpt-realtime-2.1-mini (Rápido &amp; Econômico)</option>
-                        <option value="gpt-realtime-2.1">gpt-realtime-2.1 (Máxima Fluidez)</option>
-                        <option value="gpt-realtime-mini">gpt-realtime-mini</option>
-                        <option value="gpt-realtime">gpt-realtime</option>
-                      </Select>
-                    )}
+                    {(f) => {
+                      const catalog =
+                        editing.form.stsEngine === 'openai_live'
+                          ? OPENAI_ENGINE_MODELS.openai_live
+                          : OPENAI_ENGINE_MODELS.openai;
+                      const hasSavedLegacy =
+                        Boolean(editing.form.openaiModel) &&
+                        !catalog.options.some((o) => o.id === editing.form.openaiModel);
+                      return (
+                        <Select
+                          id={f.id}
+                          value={editing.form.openaiModel || catalog.default}
+                          onChange={(e) => setEditing({ ...editing, form: { ...editing.form, openaiModel: e.target.value } })}
+                        >
+                          {hasSavedLegacy && (
+                            <option value={editing.form.openaiModel}>{editing.form.openaiModel} (legado)</option>
+                          )}
+                          {catalog.options.map((opt) => (
+                            <option key={opt.id} value={opt.id}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </Select>
+                      );
+                    }}
                   </Field>
                   <div className="flex items-end">
                     <Button
@@ -607,20 +695,62 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
                 </Field>
                 <Field label="Modelo ElevenLabs">
                   {(f) => (
-                    <Input
+                    <Select
                       id={f.id}
                       value={editing.form.elevenlabsModel}
                       onChange={(e) => setEditing({ ...editing, form: { ...editing.form, elevenlabsModel: e.target.value } })}
-                    />
+                    >
+                      {!ELEVENLABS_MODELS.some((m) => m.id === editing.form.elevenlabsModel) && editing.form.elevenlabsModel && (
+                        <option value={editing.form.elevenlabsModel}>{editing.form.elevenlabsModel}</option>
+                      )}
+                      {ELEVENLABS_MODELS.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.label}
+                        </option>
+                      ))}
+                    </Select>
                   )}
                 </Field>
                 <Field label="Voz ElevenLabs">
                   {(f) => (
-                    <Input
-                      id={f.id}
-                      value={editing.form.elevenlabsVoiceId}
-                      onChange={(e) => setEditing({ ...editing, form: { ...editing.form, elevenlabsVoiceId: e.target.value } })}
-                    />
+                    <div className="flex items-center gap-2">
+                      <Select
+                        id={f.id}
+                        value={editing.form.elevenlabsVoiceId}
+                        onChange={(e) => setEditing({ ...editing, form: { ...editing.form, elevenlabsVoiceId: e.target.value } })}
+                      >
+                        {!ELEVENLABS_VOICES.some((v) => v.id === editing.form.elevenlabsVoiceId) && editing.form.elevenlabsVoiceId && (
+                          <option value={editing.form.elevenlabsVoiceId}>{editing.form.elevenlabsVoiceId}</option>
+                        )}
+                        {ELEVENLABS_VOICES.map((v) => (
+                          <option key={v.id} value={v.id}>
+                            {v.label} · {v.style.split('·')[0].trim()}
+                          </option>
+                        ))}
+                      </Select>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        icon={<Volume2 className="size-3.5" aria-hidden />}
+                        onClick={() => {
+                          const found = ELEVENLABS_VOICES.find((v) => v.id === editing.form.elevenlabsVoiceId);
+                          previewVoiceSample(
+                            found?.label ?? editing.form.elevenlabsVoiceId,
+                            found?.style ?? 'Voz ElevenLabs',
+                            found?.pitch ?? 1,
+                            found?.rate ?? 1,
+                            {
+                              engine: 'elevenlabs',
+                              voiceId: found?.apiId ?? editing.form.elevenlabsVoiceId,
+                              model: editing.form.elevenlabsModel,
+                            },
+                          );
+                        }}
+                      >
+                        Testar
+                      </Button>
+                    </div>
                   )}
                 </Field>
               </div>
@@ -1114,17 +1244,7 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
                     )}
                   </div>
 
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <Field label="Ramal Interno (ex: 9000)">
-                      {(f) => (
-                        <Input
-                          id={f.id}
-                          value={editing.form.extension}
-                          onChange={(e) => setEditing({ ...editing, form: { ...editing.form, extension: e.target.value } })}
-                          placeholder="9000"
-                        />
-                      )}
-                    </Field>
+                  <div>
                     <Field label="DIDs associados (vírgula)">
                       {(f) => (
                         <Input

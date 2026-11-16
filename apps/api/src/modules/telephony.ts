@@ -22,6 +22,7 @@ import { audit } from '../lib/audit.js';
 import { decryptSecret, encryptSecret, maskSecret } from '../lib/crypto.js';
 import { idempotencyGuard } from '../lib/idempotency.js';
 import { loadWorkspaceTrunkSnapshot } from '../engine/trunk-capacity.js';
+import { computeSetupSteps, loadSetupSnapshot } from '../lib/telephony-setup.js';
 
 const DEFAULT_TIMEOUT_MS = 8000;
 const LONG_TIMEOUT_MS = 20000;
@@ -791,6 +792,19 @@ export async function telephonyRoutes(app: FastifyInstance) {
   const operateGuard = { preHandler: requireRoles(...CAN.supervise, ...CAN.operate) };
 
   // ---------------- Status, Cluster & Features ----------------
+  app.get<{ Querystring: { mode?: string } }>('/telephony/setup-status', async (req) => {
+    const a = actor(req);
+    const isSuper = isSuperAdminRole(a.role);
+    const mode = req.query?.mode === 'basic' ? 'basic' : 'advanced';
+    const snapshot = await loadSetupSnapshot(a.workspaceId, (path) => proxyJson(a.workspaceId, path));
+    const status = computeSetupSteps(snapshot, { mode, isSuper });
+    req.log.info(
+      { workspaceId: a.workspaceId, mode, pendingCount: status.pendingCount, partial: status.partial },
+      'telephony.setup_status',
+    );
+    return status;
+  });
+
   app.get('/telephony/status', async (req) => proxyJson(actor(req).workspaceId, '/v1/status'));
   app.get('/telephony/cluster/nodes', async (req) => proxyJson(actor(req).workspaceId, '/v1/cluster/nodes'));
   app.get('/telephony/commands', async (req) => proxyJson(actor(req).workspaceId, '/v1/commands'));
@@ -2081,4 +2095,89 @@ export async function telephonyRoutes(app: FastifyInstance) {
     const a = actor(req);
     return proxyJson(a.workspaceId, `/v1/webrtc/${enc(req.params.callId)}`, { method: 'DELETE' });
   });
+
+  const ELEVENLABS_VOICE_ID_MAP: Record<string, string> = {
+    rachel: '21m00Tcm4TlvDq8ikWAM',
+    domi: 'AZnzlk1XvdvUeBnXmlld',
+    bella: 'EXAVITQu4vr4xnSDxMaL',
+    antoni: 'ErXwobaYiN019PkySvjV',
+    elli: 'MF3mGyEYCl7XYWbV9V6O',
+    josh: 'TxGEqnHWrfWFTfGW9XjX',
+    arnold: 'VR6AewLTigWG4xSOukaG',
+    adam: 'pNInz6obpgDQGcFmaJgB',
+    sam: 'yoZ06aMxZJJ28mfd3POQ',
+  };
+
+  app.post<{ Body: { engine?: string; voice?: string; model?: string; text?: string } }>(
+    '/telephony/voice-preview',
+    async (req, reply) => {
+      const engine = String(req.body?.engine || 'openai').trim().toLowerCase();
+      const rawVoice = String(req.body?.voice || '').trim();
+      const input = String(
+        req.body?.text || `Olá! Eu sou a voz ${rawVoice || 'padrão'} da Voll Solutions para atendimento telefônico.`,
+      ).slice(0, 300);
+
+      if (engine === 'elevenlabs') {
+        const elevenKey = process.env.ELEVENLABS_API_KEY?.trim();
+        if (!elevenKey) {
+          return reply.code(503).send({ error: 'ELEVENLABS_API_KEY não configurada no servidor.' });
+        }
+        const mapped = ELEVENLABS_VOICE_ID_MAP[rawVoice.toLowerCase()];
+        const elevenVoiceId = mapped || rawVoice || ELEVENLABS_VOICE_ID_MAP.rachel;
+        const modelId = String(req.body?.model || 'eleven_turbo_v2_5').trim();
+
+        const res = await fetch(
+          `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(elevenVoiceId)}`,
+          {
+            method: 'POST',
+            headers: {
+              'xi-api-key': elevenKey,
+              'Content-Type': 'application/json',
+              Accept: 'audio/mpeg',
+            },
+            body: JSON.stringify({
+              text: input,
+              model_id: modelId,
+            }),
+          },
+        );
+
+        if (!res.ok) {
+          const errText = await res.text().catch(() => '');
+          return reply.code(res.status).send({ error: errText || `Erro ElevenLabs TTS (${res.status})` });
+        }
+
+        const buf = Buffer.from(await res.arrayBuffer());
+        return reply.header('Content-Type', 'audio/mpeg').send(buf);
+      }
+
+      const apiKey = process.env.OPENAI_API_KEY?.trim();
+      if (!apiKey) {
+        return reply.code(503).send({ error: 'OPENAI_API_KEY não configurada no servidor.' });
+      }
+      const voice = (rawVoice || 'marin').toLowerCase();
+
+      const res = await fetch('https://api.openai.com/v1/audio/speech', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini-tts',
+          voice,
+          input,
+          response_format: 'mp3',
+        }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        return reply.code(res.status).send({ error: errText || `Erro OpenAI TTS (${res.status})` });
+      }
+
+      const buf = Buffer.from(await res.arrayBuffer());
+      return reply.header('Content-Type', 'audio/mpeg').send(buf);
+    },
+  );
 }

@@ -25,6 +25,7 @@ import { useExperienceMode } from '../lib/experience-mode';
 import { fmtDateTime, fmtMoney } from '../lib/format';
 import type { Connection } from '../lib/types';
 import { ChannelFormModal } from '../components/ChannelFormModal';
+import { SetupIndicator, useTelephonySetupStatus } from '../components/TelephonySetupGuide';
 import {
   Badge,
   Button,
@@ -93,6 +94,7 @@ export function ChannelsPage() {
     queryFn: () => get<{ tenants: { id: string; name: string; voice?: string }[] }>('/telephony/tenants'),
     retry: false,
   });
+  const setupQ = useTelephonySetupStatus();
   const [edit, setEdit] = useState<Connection | null>(null);
   const [deletingConn, setDeletingConn] = useState<Connection | null>(null);
   const [agentFor, setAgentFor] = useState<Connection | null>(null);
@@ -150,6 +152,7 @@ export function ChannelsPage() {
         tooltip="Gerencie todos os canais (Voz, WebRTC, WhatsApp, SMS, E-mail e RCS) do básico ao avançado, com endereços técnicos e teste de conectividade integrados."
         actions={
           <div className="flex items-center gap-2.5">
+            <SetupIndicator />
             <ViewModeToggle value={viewMode} onChange={handleViewModeChange} />
             {canEdit && (
               <Button variant="primary" icon={<Plus className="size-4" aria-hidden />} onClick={() => setOpenNew(true)}>
@@ -178,6 +181,9 @@ export function ChannelsPage() {
           {q.data!.items.map((c) => {
             const sim = c.simulation;
             const isSimulated = c.provider === 'SIMULATED';
+            const coverageWarning = setupQ.data?.warnings.find(
+              (w) => w.code === 'channel_without_coverage' && w.resourceId === c.id,
+            );
             return (
               <Card key={c.id} padded={false} className="flex flex-col justify-between overflow-hidden border-slate-200 shadow-xs">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/70 p-4">
@@ -242,11 +248,6 @@ export function ChannelsPage() {
                     </span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {supportsVoiceAgent(c) && (
-                      <Button size="sm" variant="secondary" icon={<Bot className="size-3.5" />} onClick={() => setAgentFor(c)}>
-                        Agente de voz
-                      </Button>
-                    )}
                     {canEdit && (
                       <>
                         <Button
@@ -433,6 +434,12 @@ export function ChannelsPage() {
                       ) : (
                         <span className="inline-flex items-center gap-1 text-amber-700 font-medium">
                           Ambiente Simulado (Sandbox)
+                        </span>
+                      )}
+                      {coverageWarning && (
+                        <span className="inline-flex items-center gap-1 ml-1">
+                          <Badge tone="amber">Sem cobertura de agente/rota</Badge>
+                          <InfoTooltip content={coverageWarning.message} />
                         </span>
                       )}
                     </div>

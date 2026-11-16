@@ -4,6 +4,7 @@ import { PhoneCall, RefreshCw } from 'lucide-react';
 import { get } from '../lib/api';
 import { useExperienceMode } from '../lib/experience-mode';
 import { Badge, Button, PageHeader, Stat } from '../components/ui';
+import { SetupIndicator } from '../components/TelephonySetupGuide';
 import { TenantsTab } from './telephony/TenantsTab';
 import type { GatewayStatus, TenantConfig } from './telephony/types';
 
@@ -38,6 +39,7 @@ export function VoiceAgentsPage() {
         tooltip="Crie e configure agentes conversacionais com motor OpenAI Realtime ou ElevenLabs, voz, saudação, ramal de atendimento e filtros acústicos."
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <SetupIndicator />
             <Badge tone={s.status === 'ok' ? 'green' : statusQ.isError ? 'red' : 'amber'}>
               {s.status === 'ok'
                 ? 'Sistema de Voz Online'

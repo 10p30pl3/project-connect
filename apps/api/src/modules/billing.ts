@@ -96,7 +96,7 @@ function stableDate(raw?: string | number | null): string {
 
 export async function syncBillingLedger(force = false, anchorWorkspaceId?: string) {
   const now = Date.now();
-  if (!force && now - lastSyncAt < 10_000) return { synced: false, cached: true };
+  if (!force && now - lastSyncAt < 60_000) return { synced: false, cached: true };
   lastSyncAt = now;
 
   if (now - lastPartitionCheckAt > 3600_000) {
@@ -347,7 +347,11 @@ export async function billingRoutes(app: FastifyInstance) {
       const isSuper = isSuperAdminRole(a.role);
       const { fromIso, toIso } = parseBoundedPeriod(req.query.from, req.query.to);
 
-      await syncBillingLedger(req.query.sync === 'true' && isSuper, a.workspaceId);
+      if (req.query.sync === 'true' && isSuper) {
+        await syncBillingLedger(true, a.workspaceId);
+      } else {
+        void syncBillingLedger(false, a.workspaceId).catch(() => {});
+      }
 
       const pool = getPool();
 

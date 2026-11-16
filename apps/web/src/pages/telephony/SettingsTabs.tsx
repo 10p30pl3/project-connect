@@ -1012,6 +1012,14 @@ export function InboundRoutesPanel({ initialConnectionId }: { initialConnectionI
       >
         {editing && (
           <div className="space-y-3">
+            {(tenants.length === 0 || (editing.tenantId && !tenants.some((t) => t.id === editing.tenantId))) && (
+              <Alert tone="warn">
+                Agente de Voz selecionado não encontrado ou nenhum agente ativo.{' '}
+                <Link to="/agentes-de-voz" className="font-semibold underline">
+                  Configurar Agentes de Voz →
+                </Link>
+              </Alert>
+            )}
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Nome da Rota">
                 {(p) => <Input id={p.id} value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />}
@@ -1338,6 +1346,15 @@ export function OutboundRoutesPanel() {
       >
         {editing && (
           <div className="space-y-3">
+            {trunks.length === 0 && (
+              <Alert tone="warn">
+                Nenhum tronco SIP ativo encontrado. A rota pode ser salva, mas chamadas não serão encaminhadas até haver um tronco ativo em{' '}
+                <Link to="/telefonia?tab=trunks" className="font-semibold underline">
+                  Troncos SIP
+                </Link>
+                .
+              </Alert>
+            )}
             <Field label="Nome">
               {(p) => <Input id={p.id} value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />}
             </Field>
@@ -1976,7 +1993,7 @@ function VoiceFeaturesPanel() {
   );
 }
 
-function RoutesShortcutPanel() {
+export function RoutesShortcutPanel() {
   const routesQ = useQuery({ queryKey: ['telephony', 'routes'], queryFn: () => get<{ routes: InboundRoute[] }>('/telephony/routes'), retry: false });
   const outQ = useQuery({ queryKey: ['telephony', 'outbound-routes'], queryFn: () => get<{ routes: OutboundRoute[] }>('/telephony/outbound-routes'), retry: false });
   const inboundCount = routesQ.data?.routes?.length ?? 0;
@@ -2031,4 +2048,4 @@ export function SettingsTabs() {
     />
   );
 }
-export { Activity };
+export { Activity, TrunksAndProvidersPanel, AiProvidersAndCostsPanel, VoiceFeaturesPanel };
