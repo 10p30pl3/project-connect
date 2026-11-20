@@ -2108,11 +2108,23 @@ export async function telephonyRoutes(app: FastifyInstance) {
     sam: 'yoZ06aMxZJJ28mfd3POQ',
   };
 
-  app.post<{ Body: { engine?: string; voice?: string; model?: string; text?: string } }>(
+  app.post<{
+    Body: {
+      engine?: string;
+      voice?: string;
+      model?: string;
+      text?: string;
+      speed?: number;
+      stability?: number;
+      similarityBoost?: number;
+      optimizeLatency?: number;
+    };
+  }>(
     '/telephony/voice-preview',
     async (req, reply) => {
       const engine = String(req.body?.engine || 'openai').trim().toLowerCase();
       const rawVoice = String(req.body?.voice || '').trim();
+      const speed = Math.min(4.0, Math.max(0.25, Number(req.body?.speed ?? 1) || 1));
       const input = String(
         req.body?.text || `Olá! Eu sou a voz ${rawVoice || 'padrão'} da Voll Solutions para atendimento telefônico.`,
       ).slice(0, 300);
@@ -2125,9 +2137,12 @@ export async function telephonyRoutes(app: FastifyInstance) {
         const mapped = ELEVENLABS_VOICE_ID_MAP[rawVoice.toLowerCase()];
         const elevenVoiceId = mapped || rawVoice || ELEVENLABS_VOICE_ID_MAP.rachel;
         const modelId = String(req.body?.model || 'eleven_turbo_v2_5').trim();
+        const stability = Math.min(1, Math.max(0, Number(req.body?.stability ?? 0.5)));
+        const similarityBoost = Math.min(1, Math.max(0, Number(req.body?.similarityBoost ?? 0.75)));
+        const optimizeLatency = Math.min(4, Math.max(0, Math.round(Number(req.body?.optimizeLatency ?? 3))));
 
         const res = await fetch(
-          `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(elevenVoiceId)}`,
+          `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(elevenVoiceId)}?optimize_streaming_latency=${optimizeLatency}`,
           {
             method: 'POST',
             headers: {
@@ -2138,6 +2153,11 @@ export async function telephonyRoutes(app: FastifyInstance) {
             body: JSON.stringify({
               text: input,
               model_id: modelId,
+              voice_settings: {
+                stability,
+                similarity_boost: similarityBoost,
+                speed: Math.min(1.2, Math.max(0.7, speed)),
+              },
             }),
           },
         );
@@ -2166,6 +2186,7 @@ export async function telephonyRoutes(app: FastifyInstance) {
         body: JSON.stringify({
           model: 'gpt-4o-mini-tts',
           voice,
+          speed,
           input,
           response_format: 'mp3',
         }),

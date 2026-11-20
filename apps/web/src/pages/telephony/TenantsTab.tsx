@@ -69,10 +69,19 @@ async function previewVoiceSample(
   style: string,
   pitch = 1,
   rate = 1,
-  opts?: { engine?: StsEngine; voiceId?: string; model?: string },
+  opts?: {
+    engine?: StsEngine;
+    voiceId?: string;
+    model?: string;
+    speed?: number;
+    stability?: number;
+    similarityBoost?: number;
+    optimizeLatency?: number;
+  },
 ) {
   const engine = opts?.engine ?? 'openai';
   const voiceId = (opts?.voiceId || voiceLabel).trim();
+  const effectiveSpeed = opts?.speed ?? rate;
   const sampleText = `Olá! Eu sou a voz ${voiceLabel} da Voll Solutions. ${style.split('·')[0].trim()} para atendimento telefônico.`;
 
   try {
@@ -88,6 +97,10 @@ async function previewVoiceSample(
         engine,
         voice: engine === 'elevenlabs' ? voiceId : voiceId.toLowerCase(),
         model: opts?.model,
+        speed: effectiveSpeed,
+        stability: opts?.stability,
+        similarityBoost: opts?.similarityBoost,
+        optimizeLatency: opts?.optimizeLatency,
         text: sampleText,
       }),
     });
@@ -827,12 +840,55 @@ export function TenantsTab({ onTestTenant }: { onTestTenant: (tenantId: string) 
                 <div className="space-y-4 border-t border-slate-200 p-4">
                   {/* Parâmetros específicos da API selecionada */}
                   <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
-                    <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                      {editing.form.stsEngine === 'elevenlabs'
-                        ? 'Parâmetros da API — ElevenLabs STS'
-                        : editing.form.stsEngine === 'openai_live'
-                          ? 'Parâmetros da API — OpenAI Live'
-                          : 'Parâmetros da API — OpenAI Realtime'}
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                        {editing.form.stsEngine === 'elevenlabs'
+                          ? 'Parâmetros da API — ElevenLabs STS'
+                          : editing.form.stsEngine === 'openai_live'
+                            ? 'Parâmetros da API — OpenAI Live'
+                            : 'Parâmetros da API — OpenAI Realtime'}
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        icon={<Volume2 className="size-3.5" aria-hidden />}
+                        onClick={() => {
+                          if (editing.form.stsEngine === 'elevenlabs') {
+                            const found = ELEVENLABS_VOICES.find((v) => v.id === editing.form.elevenlabsVoiceId);
+                            previewVoiceSample(
+                              found?.label ?? editing.form.elevenlabsVoiceId,
+                              found?.style ?? 'Voz ElevenLabs',
+                              found?.pitch ?? 1,
+                              editing.form.elevenlabsSpeed,
+                              {
+                                engine: 'elevenlabs',
+                                voiceId: found?.apiId ?? editing.form.elevenlabsVoiceId,
+                                model: editing.form.elevenlabsModel,
+                                speed: editing.form.elevenlabsSpeed,
+                                stability: editing.form.elevenlabsStability,
+                                similarityBoost: editing.form.elevenlabsSimilarityBoost,
+                                optimizeLatency: editing.form.elevenlabsOptimizeLatency,
+                              },
+                            );
+                          } else {
+                            const found = OPENAI_VOICES.find((v) => v.id === editing.form.voice);
+                            previewVoiceSample(
+                              found?.label ?? editing.form.voice,
+                              found?.style ?? 'Voz OpenAI',
+                              found?.pitch ?? 1,
+                              editing.form.openaiSpeed,
+                              {
+                                engine: editing.form.stsEngine,
+                                model: editing.form.openaiModel,
+                                speed: editing.form.openaiSpeed,
+                              },
+                            );
+                          }
+                        }}
+                      >
+                        Testar com parâmetros
+                      </Button>
                     </div>
 
                     {editing.form.stsEngine !== 'elevenlabs' ? (

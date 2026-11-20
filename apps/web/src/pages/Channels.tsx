@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import {
   ArrowRight,
   Bot,
+  ExternalLink,
   Pencil,
   Plus,
   Power,
@@ -41,9 +42,14 @@ import {
   Select,
   TableWrap,
   ViewModeToggle,
+  btnClass,
   useToast,
   type ViewMode,
 } from '../components/ui';
+
+function webRtcDemoPath(c: Connection) {
+  return `/webrtc-demo?key=${encodeURIComponent(c.publicWidgetKey ?? '')}&name=${encodeURIComponent(c.name)}`;
+}
 
 export const PROVIDER_LABEL: Record<string, string> = {
   VOICE_APP: 'Voice-App IA (FreeSWITCH + Tronco Direct Call)',
@@ -366,18 +372,32 @@ export function ChannelsPage() {
                               {c.publicWidgetKey || 'chave-pendente'}
                             </code>
                           </div>
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => {
-                              const origin = typeof window !== 'undefined' ? window.location.origin : '';
-                              const tag = `<script src="${origin}/api/public/webrtc/widget.js" data-widget-key="${c.publicWidgetKey ?? ''}"></script>`;
-                              navigator.clipboard?.writeText(tag);
-                              toast('info', 'Snippet do Web Widget copiado.');
-                            }}
-                          >
-                            Copiar tag
-                          </Button>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => {
+                                const origin = typeof window !== 'undefined' ? window.location.origin : '';
+                                const tag = `<script src="${origin}/api/public/webrtc/widget.js" data-widget-key="${c.publicWidgetKey ?? ''}"></script>`;
+                                navigator.clipboard?.writeText(tag);
+                                toast('info', 'Snippet do Web Widget copiado.');
+                              }}
+                            >
+                              Copiar tag
+                            </Button>
+                            {c.publicWidgetKey && (
+                              <Link
+                                to={webRtcDemoPath(c)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={btnClass('secondary', 'sm')}
+                                title="Abrir página de demonstração pública para testar este Web Widget"
+                              >
+                                <ExternalLink className="size-3.5" aria-hidden />
+                                <span>Página demo</span>
+                              </Link>
+                            )}
+                          </div>
                         </div>
                       )}
 
@@ -583,6 +603,18 @@ export function ChannelsPage() {
                       </td>
                       <td className="text-right">
                         <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                          {isWebRtcConnection(c) && (c.webrtcMode ?? 'BOTH') !== 'WHATSAPP_CALLING' && c.publicWidgetKey && (
+                            <Link
+                              to={webRtcDemoPath(c)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={btnClass('secondary', 'sm')}
+                              title="Abrir página demo pública do Web Widget WebRTC"
+                            >
+                              <ExternalLink className="size-3.5" aria-hidden />
+                              <span>Demo</span>
+                            </Link>
+                          )}
                           {supportsVoiceAgent(c) && (
                             <Button size="sm" variant="secondary" icon={<Bot className="size-3.5" />} onClick={() => setAgentFor(c)}>
                               Agente de voz

@@ -88,7 +88,7 @@ $VOICE && PROFILES+=(--profile voice)
 $WHISPER && PROFILES+=(--profile whisper)
 
 say "Construindo imagens"
-"${COMPOSE[@]}" "${PROFILES[@]}" build
+"${COMPOSE[@]}" ${PROFILES[@]+"${PROFILES[@]}"} build
 
 say "Subindo o banco"
 "${COMPOSE[@]}" up -d db
@@ -103,7 +103,7 @@ BACKUP_DIR="$DEPLOY_DIR/backups"
 mkdir -p "$BACKUP_DIR"
 BACKUP_FILE="$BACKUP_DIR/voll_plan_$(date +%Y%m%d_%H%M%S).sql.gz"
 "${COMPOSE[@]}" exec -T db pg_dump -U voll -d voll_plan | gzip -c > "$BACKUP_FILE"
-ls -1t "$BACKUP_DIR"/voll_plan_*.sql.gz 2>/dev/null | tail -n +4 | xargs -r rm -f
+ls -1t "$BACKUP_DIR"/voll_plan_*.sql.gz 2>/dev/null | tail -n +4 | while IFS= read -r old_bak; do rm -f "$old_bak"; done
 ls -lh "$BACKUP_FILE"
 
 say "Aplicando migrações"

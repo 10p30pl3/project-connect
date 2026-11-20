@@ -25,6 +25,7 @@ function lazyNamed<K extends string, T extends Record<K, ComponentType<any>> & R
 }
 
 const LoginPage = lazyNamed(() => import('./pages/Login'), 'LoginPage');
+const WebRtcDemoPage = lazyNamed(() => import('./pages/WebRtcDemo'), 'WebRtcDemoPage');
 const OverviewPage = lazyNamed(() => import('./pages/Overview'), 'OverviewPage');
 const CampaignsPage = lazyNamed(() => import('./pages/Campaigns'), 'CampaignsPage');
 const CampaignDetailPage = lazyNamed(() => import('./pages/CampaignDetail'), 'CampaignDetailPage');
@@ -90,6 +91,7 @@ function RouteError() {
 
 export const router = createBrowserRouter([
   { path: '/login', element: <S><LoginPage /></S> },
+  { path: '/webrtc-demo', element: <S><WebRtcDemoPage /></S> },
   {
     element: <RequireAuth />,
     children: [
